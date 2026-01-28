@@ -1,0 +1,79 @@
+package cmd
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"os/signal"
+	"strings"
+
+	"github.com/runger/ai-terminal/internal/cache"
+	"github.com/runger/ai-terminal/internal/claude"
+	"github.com/runger/ai-terminal/internal/extract"
+	"github.com/spf13/cobra"
+)
+
+var askCmd = &cobra.Command{
+	Use:   "ask <question>",
+	Short: "Ask Claude a question with terminal context",
+	Long: `Ask Claude a question, automatically including terminal context
+like working directory and shell information.
+
+Examples:
+  ai-terminal ask "How do I find large files?"
+  ai-terminal ask "What's the difference between grep and ripgrep?"`,
+	Args: cobra.MinimumNArgs(1),
+	RunE: runAsk,
+}
+
+var recentCommands string
+
+func init() {
+	askCmd.Flags().StringVar(&recentCommands, "context", "", "Recent commands to include as context")
+}
+
+func runAsk(cmd *cobra.Command, args []string) error {
+	question := strings.Join(args, " ")
+
+	// Get system info
+	pwd, _ := os.Getwd()
+	shell := os.Getenv("SHELL")
+
+	// Build context
+	var contextBuilder strings.Builder
+	contextBuilder.WriteString(fmt.Sprintf("Working directory: %s\n", pwd))
+	contextBuilder.WriteString(fmt.Sprintf("Shell: %s\n", shell))
+
+	if recentCommands != "" {
+		contextBuilder.WriteString(fmt.Sprintf("Recent commands:\n%s\n", recentCommands))
+	}
+
+	contextBuilder.WriteString(fmt.Sprintf("\nQuestion: %s", question))
+
+	// Set up context with Ctrl+C handling
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	// Query Claude with interruptible context
+	response, err := claude.QueryWithContext(ctx, contextBuilder.String())
+	if err != nil {
+		if err.Error() == "interrupted" {
+			fmt.Printf("\n%sCancelled%s\n", colorDim, colorReset)
+			return nil // User cancelled, not an error
+		}
+		fmt.Printf("%sError: %s%s\n", colorRed, err.Error(), colorReset)
+		return err
+	}
+
+	fmt.Println(response)
+
+	// Extract any command suggestion from the response for Tab completion
+	if suggestion := extract.Suggestion(response); suggestion != "" {
+		if err := cache.WriteSuggestion(suggestion); err != nil {
+			// Non-fatal, just log
+			fmt.Fprintf(os.Stderr, "Warning: could not cache suggestion: %v\n", err)
+		}
+	}
+
+	return nil
+}
