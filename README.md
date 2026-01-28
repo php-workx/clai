@@ -21,6 +21,26 @@ Intelligent terminal integration using Claude Code CLI. Adds AI-powered features
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap runger/clai
+brew install clai
+```
+
+Then add to your shell config:
+
+```bash
+# For Zsh (~/.zshrc):
+eval "$(clai init zsh)"
+
+# For Bash (~/.bashrc):
+eval "$(clai init bash)"
+
+# For Fish (~/.config/fish/config.fish):
+clai init fish | source
+```
+
 ### Quick Install
 
 ```bash
@@ -98,7 +118,7 @@ npm ERR! Missing script: "biuld"
 
 ### Voice Input Correction
 
-If you use voice input (speech-to-text like [Wispr Flow](https://wisprflow.ai)), the `` ` `` prefix converts natural language to proper terminal commands:
+If you use voice input (speech-to-text), the `` ` `` prefix converts natural language to proper terminal commands:
 
 ```bash
 # Just start with ` and speak naturally

@@ -6,7 +6,7 @@ GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install clean test fmt lint help
+.PHONY: all build install install-dev clean test test-race cover fmt lint vuln dev help
 
 all: build
 
@@ -18,6 +18,27 @@ build:
 install:
 	go install $(LDFLAGS) ./cmd/clai
 
+## install-dev: Install development dependencies
+install-dev:
+	@echo "Installing Go tools..."
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install golang.org/x/vuln/cmd/govulncheck@latest
+	go install golang.org/x/tools/cmd/goimports@latest
+	@echo "Installing pre-commit..."
+	@if command -v pipx >/dev/null 2>&1; then \
+		pipx install pre-commit || pipx upgrade pre-commit; \
+	elif command -v pip3 >/dev/null 2>&1; then \
+		pip3 install --user pre-commit; \
+	elif command -v pip >/dev/null 2>&1; then \
+		pip install --user pre-commit; \
+	else \
+		echo "Error: pip/pipx not found. Install Python first."; \
+		exit 1; \
+	fi
+	@echo "Installing pre-commit hooks..."
+	pre-commit install
+	@echo "Done! Development environment ready."
+
 ## clean: Remove build artifacts
 clean:
 	rm -rf bin/
@@ -26,6 +47,16 @@ clean:
 ## test: Run tests
 test:
 	go test -v ./...
+
+## test-race: Run tests with race detector
+test-race:
+	go test -race -v ./...
+
+## cover: Run tests with coverage
+cover:
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
 
 ## fmt: Format code
 fmt:
@@ -38,6 +69,18 @@ lint:
 	else \
 		echo "golangci-lint not installed, skipping..."; \
 	fi
+
+## vuln: Scan for vulnerabilities
+vuln:
+	@if command -v govulncheck >/dev/null 2>&1; then \
+		govulncheck ./...; \
+	else \
+		echo "govulncheck not installed. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+	fi
+
+## dev: Run all checks (fmt, lint, test, vuln)
+dev: fmt lint test-race vuln
+	@echo "All checks passed!"
 
 ## deps: Download dependencies
 deps:

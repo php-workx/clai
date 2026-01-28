@@ -1,0 +1,40 @@
+# golangci-lint configuration (v2)
+# https://golangci-lint.run/usage/configuration/
+
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+formatters:
+  enable:
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/runger/clai
+
+linters:
+  # Start with default linters minus errcheck (codebase has many intentional unchecked errors)
+  # Enable errcheck later after fixing existing issues
+  default: none
+  enable:
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    # Additional useful linters
+    - bodyclose
+    - durationcheck
+    - errorlint
+    - misspell
+    - nilerr
+    - prealloc
+    - unconvert
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment

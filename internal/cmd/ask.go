@@ -7,10 +7,11 @@ import (
 	"os/signal"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/runger/clai/internal/cache"
 	"github.com/runger/clai/internal/claude"
 	"github.com/runger/clai/internal/extract"
-	"github.com/spf13/cobra"
 )
 
 var askCmd = &cobra.Command{

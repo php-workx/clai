@@ -7,9 +7,10 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/runger/clai/internal/cache"
 	"github.com/runger/clai/internal/extract"
-	"github.com/spf13/cobra"
 )
 
 var extractCmd = &cobra.Command{
