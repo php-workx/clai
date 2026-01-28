@@ -8,11 +8,11 @@ import (
 
 // Dir returns the cache directory path
 func Dir() string {
-	if dir := os.Getenv("AI_TERMINAL_CACHE"); dir != "" {
+	if dir := os.Getenv("CLAI_CACHE"); dir != "" {
 		return dir
 	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cache", "ai-terminal")
+	return filepath.Join(home, ".cache", "clai")
 }
 
 // EnsureDir creates the cache directory if it doesn't exist

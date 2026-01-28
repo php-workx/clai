@@ -7,8 +7,8 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/runger/ai-terminal/internal/cache"
-	"github.com/runger/ai-terminal/internal/claude"
+	"github.com/runger/clai/internal/cache"
+	"github.com/runger/clai/internal/claude"
 	"github.com/spf13/cobra"
 )
 
@@ -23,10 +23,10 @@ natural language like "list all files" instead of actual commands.
 The converted command is also cached for Tab completion.
 
 Examples:
-  ai-terminal voice "list all files in the current directory"
-  ai-terminal voice "show me the git status"
-  ai-terminal voice "find all Python files"
-  ai-terminal voice "install the requests package with pip"`,
+  clai voice "list all files in the current directory"
+  clai voice "show me the git status"
+  clai voice "find all Python files"
+  clai voice "install the requests package with pip"`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runVoice,
 }

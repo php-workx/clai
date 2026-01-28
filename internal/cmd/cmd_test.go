@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/runger/ai-terminal/internal/cache"
-	"github.com/runger/ai-terminal/internal/extract"
+	"github.com/runger/clai/internal/cache"
+	"github.com/runger/clai/internal/extract"
 )
 
 func TestDiagnoseCmd_RequiresArgs(t *testing.T) {
@@ -125,8 +125,8 @@ func TestExtractCmd_WithExtractPackage(t *testing.T) {
 func TestCacheIntegration(t *testing.T) {
 	// Set up temp cache dir
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	// Test suggestion workflow
 	testSuggestion := "npm install express"
@@ -166,8 +166,8 @@ func TestCacheIntegration(t *testing.T) {
 func TestDiagnoseCmd_ReadsCache(t *testing.T) {
 	// Set up temp cache dir
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	// Write mock error output
 	mockOutput := "npm ERR! code ENOENT\nnpm ERR! missing script: build"
@@ -191,8 +191,8 @@ func TestDiagnoseCmd_ReadsCache(t *testing.T) {
 func TestExtractCmd_CachesOutput(t *testing.T) {
 	// Set up temp cache dir
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	// Test the cache writing directly
 	testInput := "Run `npm install express` to install"

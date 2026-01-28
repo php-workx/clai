@@ -24,13 +24,13 @@ func TestIdleTimeout(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			original := os.Getenv("AI_TERMINAL_IDLE_TIMEOUT")
-			defer os.Setenv("AI_TERMINAL_IDLE_TIMEOUT", original)
+			original := os.Getenv("CLAI_IDLE_TIMEOUT")
+			defer os.Setenv("CLAI_IDLE_TIMEOUT", original)
 
 			if tt.envValue == "" {
-				os.Unsetenv("AI_TERMINAL_IDLE_TIMEOUT")
+				os.Unsetenv("CLAI_IDLE_TIMEOUT")
 			} else {
-				os.Setenv("AI_TERMINAL_IDLE_TIMEOUT", tt.envValue)
+				os.Setenv("CLAI_IDLE_TIMEOUT", tt.envValue)
 			}
 
 			got := idleTimeout()

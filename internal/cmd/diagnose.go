@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/runger/ai-terminal/internal/cache"
-	"github.com/runger/ai-terminal/internal/claude"
-	"github.com/runger/ai-terminal/internal/extract"
+	"github.com/runger/clai/internal/cache"
+	"github.com/runger/clai/internal/claude"
+	"github.com/runger/clai/internal/extract"
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +29,8 @@ var diagnoseCmd = &cobra.Command{
 	Long: `Diagnose a failed command by analyzing its error output with Claude.
 
 Examples:
-  ai-terminal diagnose "npm run build" 1
-  ai-terminal diagnose "python script.py" 127`,
+  clai diagnose "npm run build" 1
+  clai diagnose "python script.py" 127`,
 	Args: cobra.RangeArgs(1, 2),
 	RunE: runDiagnose,
 }

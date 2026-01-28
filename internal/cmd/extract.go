@@ -7,8 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/runger/ai-terminal/internal/cache"
-	"github.com/runger/ai-terminal/internal/extract"
+	"github.com/runger/clai/internal/cache"
+	"github.com/runger/clai/internal/extract"
 	"github.com/spf13/cobra"
 )
 
@@ -22,8 +22,8 @@ saves it to cache for error analysis, and extracts any
 suggested commands it finds.
 
 Examples:
-  npm install 2>&1 | ai-terminal extract
-  cat error.log | ai-terminal extract`,
+  npm install 2>&1 | clai extract
+  cat error.log | clai extract`,
 	RunE: runExtract,
 }
 

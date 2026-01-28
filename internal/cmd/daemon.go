@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/runger/ai-terminal/internal/claude"
+	"github.com/runger/clai/internal/claude"
 	"github.com/spf13/cobra"
 )
 

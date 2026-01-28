@@ -7,9 +7,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:embed shell/zsh/ai-terminal.zsh
-//go:embed shell/bash/ai-terminal.bash
-//go:embed shell/fish/ai-terminal.fish
+//go:embed shell/zsh/clai.zsh
+//go:embed shell/bash/clai.bash
+//go:embed shell/fish/clai.fish
 var shellScripts embed.FS
 
 var initCmd = &cobra.Command{
@@ -20,13 +20,13 @@ var initCmd = &cobra.Command{
 Add this to your shell configuration file:
 
   # For Zsh (~/.zshrc):
-  eval "$(ai-terminal init zsh)"
+  eval "$(clai init zsh)"
 
   # For Bash (~/.bashrc):
-  eval "$(ai-terminal init bash)"
+  eval "$(clai init bash)"
 
   # For Fish (~/.config/fish/config.fish):
-  ai-terminal init fish | source`,
+  clai init fish | source`,
 	Args:      cobra.ExactArgs(1),
 	ValidArgs: []string{"zsh", "bash", "fish"},
 	RunE:      runInit,
@@ -38,11 +38,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 	var filename string
 	switch shell {
 	case "zsh":
-		filename = "shell/zsh/ai-terminal.zsh"
+		filename = "shell/zsh/clai.zsh"
 	case "bash":
-		filename = "shell/bash/ai-terminal.bash"
+		filename = "shell/bash/clai.bash"
 	case "fish":
-		filename = "shell/fish/ai-terminal.fish"
+		filename = "shell/fish/clai.fish"
 	default:
 		return fmt.Errorf("unsupported shell: %s (supported: zsh, bash, fish)", shell)
 	}

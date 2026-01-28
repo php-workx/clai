@@ -4,12 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AI Terminal is an intelligent terminal assistant that integrates Claude into your shell. It provides command suggestion extraction, auto error diagnosis, and voice input correction for Zsh, Bash, and Fish shells.
+clai is an intelligent terminal assistant that integrates Claude into your shell. It provides command suggestion extraction, auto error diagnosis, and voice input correction for Zsh, Bash, and Fish shells.
 
 ## Build Commands
 
 ```bash
-make build          # Build to bin/ai-terminal
+make build          # Build to bin/clai
 make install        # Install to $GOPATH/bin
 make test           # Run all tests
 make fmt            # Format code
@@ -26,7 +26,7 @@ go test ./internal/cmd -run TestVoiceCleanCommand
 ## Architecture
 
 ### Entry Point
-`cmd/ai-terminal/main.go` → `internal/cmd.Execute()` (Cobra CLI framework)
+`cmd/clai/main.go` → `internal/cmd.Execute()` (Cobra CLI framework)
 
 ### Core Packages
 
@@ -41,19 +41,19 @@ go test ./internal/cmd -run TestVoiceCleanCommand
 **`internal/claude/`** - Claude CLI wrapper
 - `Query()` / `QueryWithContext()` - Basic Claude queries
 - `QueryFast()` - Tries daemon first, falls back to CLI
-- `daemon.go` - Background daemon with Unix socket IPC, JSON protocol, 2-minute idle timeout
+- `daemon.go` - Background daemon with Unix socket IPC, JSON protocol, configurable idle timeout (default 2 hours, via `CLAI_IDLE_TIMEOUT`)
 
 **`internal/extract/`** - Command extraction engine
 - 5 regex patterns in priority order: backticks, install commands, prefixed (`Run:`, `Try:`), dollar-prefix (`$ cmd`), to-prefix (`To install, run:`)
 - Returns last match, cleans trailing punctuation
 
-**`internal/cache/`** - File-based caching in `~/.cache/ai-terminal`
+**`internal/cache/`** - File-based caching in `~/.cache/clai`
 - `suggestion` - Current command suggestion
 - `last_output` - Last command output for diagnosis
 
 ### Shell Integration
 
-Shell scripts in `internal/cmd/shell/{zsh,bash,fish}/` are embedded via `//go:embed` and output by `ai-terminal init <shell>`. They:
+Shell scripts in `internal/cmd/shell/{zsh,bash,fish}/` are embedded via `//go:embed` and output by `clai init <shell>`. They:
 - Hook into post-command execution
 - Display suggestions in prompt
 - Handle Tab/Alt+Enter to accept suggestions
@@ -63,10 +63,11 @@ Shell scripts in `internal/cmd/shell/{zsh,bash,fish}/` are embedded via `//go:em
 ### Environment Variables
 
 ```bash
-AI_TERMINAL_AUTO_DIAGNOSE=true/false  # Auto error diagnosis
-AI_TERMINAL_AUTO_EXTRACT=true/false   # Auto command extraction
-AI_TERMINAL_AUTO_DAEMON=true/false    # Auto-start daemon (Zsh only)
-AI_TERMINAL_CACHE=~/.cache/ai-terminal
+CLAI_AUTO_DIAGNOSE=true/false  # Auto error diagnosis
+CLAI_AUTO_EXTRACT=true/false   # Auto command extraction
+CLAI_AUTO_DAEMON=true/false    # Auto-start daemon (Zsh only)
+CLAI_CACHE=~/.cache/clai
+CLAI_IDLE_TIMEOUT=2h           # Daemon idle timeout (default: 2h)
 ```
 
 ## Key Patterns

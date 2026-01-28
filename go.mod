@@ -1,4 +1,4 @@
-module github.com/runger/ai-terminal
+module github.com/runger/clai
 
 go 1.21
 

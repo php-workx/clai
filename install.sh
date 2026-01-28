@@ -1,5 +1,5 @@
 #!/bin/bash
-# install.sh - Set up AI Terminal integration
+# install.sh - Set up clai shell integration
 # Run: ./install.sh
 
 set -e
@@ -12,7 +12,7 @@ RED='\033[0;31m'
 DIM='\033[2m'
 RESET='\033[0m'
 
-echo -e "${CYAN}🤖 AI Terminal Installer${RESET}"
+echo -e "${CYAN}🤖 clai Installer${RESET}"
 echo ""
 
 # Get the directory where this script is located
@@ -38,18 +38,18 @@ fi
 echo ""
 
 # Build and install the binary
-echo -e "${YELLOW}Building ai-terminal binary...${RESET}"
+echo -e "${YELLOW}Building clai binary...${RESET}"
 cd "$SCRIPT_DIR"
 
 if command -v make &> /dev/null; then
     make install
 else
-    go install ./cmd/ai-terminal
+    go install ./cmd/clai
 fi
 
 # Verify installation
-if ! command -v ai-terminal &> /dev/null; then
-    echo -e "${RED}Warning: ai-terminal not found in PATH${RESET}"
+if ! command -v clai &> /dev/null; then
+    echo -e "${RED}Warning: clai not found in PATH${RESET}"
     echo -e "${DIM}Make sure \$GOPATH/bin or \$HOME/go/bin is in your PATH${RESET}"
 fi
 
@@ -69,7 +69,7 @@ echo -e "${YELLOW}Detected shell: ${CURRENT_SHELL}${RESET}"
 case "$CURRENT_SHELL" in
     zsh)
         RC_FILE="$HOME/.zshrc"
-        INIT_LINE='eval "$(ai-terminal init zsh)"'
+        INIT_LINE='eval "$(clai init zsh)"'
         ;;
     bash)
         if [[ -f "$HOME/.bashrc" ]]; then
@@ -77,20 +77,20 @@ case "$CURRENT_SHELL" in
         else
             RC_FILE="$HOME/.bash_profile"
         fi
-        INIT_LINE='eval "$(ai-terminal init bash)"'
+        INIT_LINE='eval "$(clai init bash)"'
         ;;
     fish)
         RC_FILE="$HOME/.config/fish/config.fish"
-        INIT_LINE='ai-terminal init fish | source'
+        INIT_LINE='clai init fish | source'
         ;;
     *)
         echo -e "${YELLOW}Unsupported shell: $CURRENT_SHELL${RESET}"
         echo "Supported shells: zsh, bash, fish"
         echo ""
         echo "Add one of these to your shell config manually:"
-        echo '  eval "$(ai-terminal init zsh)"   # for zsh'
-        echo '  eval "$(ai-terminal init bash)"  # for bash'
-        echo '  ai-terminal init fish | source   # for fish'
+        echo '  eval "$(clai init zsh)"   # for zsh'
+        echo '  eval "$(clai init bash)"  # for bash'
+        echo '  clai init fish | source   # for fish'
         exit 0
         ;;
 esac
@@ -98,7 +98,7 @@ esac
 echo ""
 
 # Check if already installed
-if grep -q "ai-terminal init" "$RC_FILE" 2>/dev/null; then
+if grep -q "clai init" "$RC_FILE" 2>/dev/null; then
     echo -e "${GREEN}Already configured in $RC_FILE${RESET}"
 else
     # Ask to add to rc file
@@ -114,7 +114,7 @@ else
 
         # Add to rc file
         echo "" >> "$RC_FILE"
-        echo "# AI Terminal Integration" >> "$RC_FILE"
+        echo "# clai Shell Integration" >> "$RC_FILE"
         echo "$INIT_LINE" >> "$RC_FILE"
         echo -e "${GREEN}  ✓ Added to $RC_FILE${RESET}"
     else
@@ -126,7 +126,7 @@ fi
 echo ""
 
 # Create cache directory
-mkdir -p "$HOME/.cache/ai-terminal"
+mkdir -p "$HOME/.cache/clai"
 echo -e "${GREEN}  ✓ Created cache directory${RESET}"
 
 echo ""

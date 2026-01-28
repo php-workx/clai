@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/runger/ai-terminal/internal/cmd"
+	"github.com/runger/clai/internal/cmd"
 )
 
 func main() {

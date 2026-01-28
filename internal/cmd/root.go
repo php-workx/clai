@@ -5,7 +5,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "ai-terminal",
+	Use:   "clai",
 	Short: "AI-powered terminal assistant",
 	Long: `AI Terminal integrates Claude into your shell to provide:
 - Automatic error diagnosis for failed commands

@@ -7,9 +7,9 @@ import (
 	"os/signal"
 	"strings"
 
-	"github.com/runger/ai-terminal/internal/cache"
-	"github.com/runger/ai-terminal/internal/claude"
-	"github.com/runger/ai-terminal/internal/extract"
+	"github.com/runger/clai/internal/cache"
+	"github.com/runger/clai/internal/claude"
+	"github.com/runger/clai/internal/extract"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +20,8 @@ var askCmd = &cobra.Command{
 like working directory and shell information.
 
 Examples:
-  ai-terminal ask "How do I find large files?"
-  ai-terminal ask "What's the difference between grep and ripgrep?"`,
+  clai ask "How do I find large files?"
+  clai ask "What's the difference between grep and ripgrep?"`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: runAsk,
 }

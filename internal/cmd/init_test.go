@@ -7,7 +7,7 @@ import (
 
 func TestRunInit_Zsh(t *testing.T) {
 	// Capture stdout by reading the embedded file directly
-	content, err := shellScripts.ReadFile("shell/zsh/ai-terminal.zsh")
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
 	if err != nil {
 		t.Fatalf("Failed to read zsh script: %v", err)
 	}
@@ -16,17 +16,17 @@ func TestRunInit_Zsh(t *testing.T) {
 
 	// Verify essential Zsh-specific content
 	requiredContent := []string{
-		"ai-terminal.zsh",
-		"AI_TERMINAL_AUTO_DIAGNOSE",
-		"AI_TERMINAL_CACHE",
+		"clai.zsh",
+		"CLAI_AUTO_DIAGNOSE",
+		"CLAI_CACHE",
 		"zle -N",
 		"bindkey",
 		"add-zsh-hook",
 		"preexec",
 		"precmd",
-		"ai-terminal diagnose",
-		"ai-terminal extract",
-		"ai-terminal ask",
+		"clai diagnose",
+		"clai extract",
+		"clai ask",
 		"RPROMPT",
 		"pipestatus",
 		"ai-fix",
@@ -46,7 +46,7 @@ func TestRunInit_Zsh(t *testing.T) {
 }
 
 func TestRunInit_Bash(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/bash/ai-terminal.bash")
+	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
 	if err != nil {
 		t.Fatalf("Failed to read bash script: %v", err)
 	}
@@ -54,15 +54,15 @@ func TestRunInit_Bash(t *testing.T) {
 	output := string(content)
 
 	requiredContent := []string{
-		"ai-terminal.bash",
-		"AI_TERMINAL_AUTO_DIAGNOSE",
-		"AI_TERMINAL_CACHE",
+		"clai.bash",
+		"CLAI_AUTO_DIAGNOSE",
+		"CLAI_CACHE",
 		"PROMPT_COMMAND",
 		"DEBUG",
 		"trap",
-		"ai-terminal diagnose",
-		"ai-terminal extract",
-		"ai-terminal ask",
+		"clai diagnose",
+		"clai extract",
+		"clai ask",
 		"PIPESTATUS",
 		"history",
 		"accept",
@@ -83,7 +83,7 @@ func TestRunInit_Bash(t *testing.T) {
 }
 
 func TestRunInit_Fish(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/fish/ai-terminal.fish")
+	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
 	if err != nil {
 		t.Fatalf("Failed to read fish script: %v", err)
 	}
@@ -91,9 +91,9 @@ func TestRunInit_Fish(t *testing.T) {
 	output := string(content)
 
 	requiredContent := []string{
-		"ai-terminal.fish",
-		"AI_TERMINAL_AUTO_DIAGNOSE",
-		"AI_TERMINAL_CACHE",
+		"clai.fish",
+		"CLAI_AUTO_DIAGNOSE",
+		"CLAI_CACHE",
 		"set -gx",
 		"function",
 		"--on-event",
@@ -101,9 +101,9 @@ func TestRunInit_Fish(t *testing.T) {
 		"fish_postexec",
 		"fish_right_prompt",
 		"commandline",
-		"ai-terminal diagnose",
-		"ai-terminal extract",
-		"ai-terminal ask",
+		"clai diagnose",
+		"clai extract",
+		"clai ask",
 		"status is-interactive",
 		"pipestatus",
 		"function ai-fix",
@@ -135,15 +135,15 @@ func TestRunInit_UnsupportedShell(t *testing.T) {
 
 func TestShellScripts_AllHaveCommonFeatures(t *testing.T) {
 	shells := map[string]string{
-		"zsh":  "shell/zsh/ai-terminal.zsh",
-		"bash": "shell/bash/ai-terminal.bash",
-		"fish": "shell/fish/ai-terminal.fish",
+		"zsh":  "shell/zsh/clai.zsh",
+		"bash": "shell/bash/clai.bash",
+		"fish": "shell/fish/clai.fish",
 	}
 
 	commonFeatures := []string{
-		"AI_TERMINAL_AUTO_DIAGNOSE",
-		"AI_TERMINAL_AUTO_EXTRACT",
-		"AI_TERMINAL_CACHE",
+		"CLAI_AUTO_DIAGNOSE",
+		"CLAI_AUTO_EXTRACT",
+		"CLAI_CACHE",
 	}
 
 	for name, path := range shells {
@@ -167,9 +167,9 @@ func TestShellScripts_AllHaveCommonFeatures(t *testing.T) {
 func TestShellScripts_Embedded(t *testing.T) {
 	// Verify all shell scripts are properly embedded
 	shells := []string{
-		"shell/zsh/ai-terminal.zsh",
-		"shell/bash/ai-terminal.bash",
-		"shell/fish/ai-terminal.fish",
+		"shell/zsh/clai.zsh",
+		"shell/bash/clai.bash",
+		"shell/fish/clai.fish",
 	}
 
 	for _, path := range shells {

@@ -1,4 +1,4 @@
-# AI Terminal
+# clai
 
 Intelligent terminal integration using Claude Code CLI. Adds AI-powered features to your shell:
 
@@ -25,8 +25,8 @@ Intelligent terminal integration using Claude Code CLI. Adds AI-powered features
 
 ```bash
 # Clone the repository
-git clone https://github.com/runger/ai-terminal.git
-cd ai-terminal
+git clone https://github.com/runger/clai.git
+cd clai
 
 # Run the installer
 ./install.sh
@@ -36,25 +36,25 @@ cd ai-terminal
 
 ```bash
 # 1. Install the binary
-go install github.com/runger/ai-terminal/cmd/ai-terminal@latest
+go install github.com/runger/clai/cmd/clai@latest
 
 # 2. Add to your shell config:
 
 # For Zsh (~/.zshrc):
-eval "$(ai-terminal init zsh)"
+eval "$(clai init zsh)"
 
 # For Bash (~/.bashrc):
-eval "$(ai-terminal init bash)"
+eval "$(clai init bash)"
 
 # For Fish (~/.config/fish/config.fish):
-ai-terminal init fish | source
+clai init fish | source
 ```
 
 ### From Source
 
 ```bash
-git clone https://github.com/runger/ai-terminal.git
-cd ai-terminal
+git clone https://github.com/runger/clai.git
+cd clai
 make install
 ```
 
@@ -142,15 +142,15 @@ voice "list all files"
 
 ### CLI Commands
 
-The `ai-terminal` binary also provides direct CLI access:
+The `clai` binary also provides direct CLI access:
 
 ```bash
-ai-terminal diagnose "npm run build" 1    # Diagnose a command
-ai-terminal extract < output.txt          # Extract suggestions from file
-ai-terminal ask "How do I find large files?"
-ai-terminal voice "list all python files" # Convert voice/natural language to command
-ai-terminal init zsh                      # Output shell integration script
-ai-terminal version                       # Show version info
+clai diagnose "npm run build" 1    # Diagnose a command
+clai extract < output.txt          # Extract suggestions from file
+clai ask "How do I find large files?"
+clai voice "list all python files" # Convert voice/natural language to command
+clai init zsh                      # Output shell integration script
+clai version                       # Show version info
 ```
 
 ### Interruptible AI Analysis
@@ -171,7 +171,7 @@ This is especially useful when auto-diagnosis kicks in but you've already spotte
 
 ### Terminal Emulator Setup (Optional)
 
-If you want a dedicated hotkey for voice mode (instead of the `?` prefix), you can configure your terminal to send a special sequence:
+If you want a dedicated hotkey for voice mode (instead of the `` ` `` prefix), you can configure your terminal to send a special sequence:
 
 **Ghostty** (`~/.config/ghostty/config`):
 ```
@@ -189,16 +189,19 @@ Set these environment variables **before** the init line in your shell config:
 
 ```bash
 # Disable auto-diagnosis (default: true)
-export AI_TERMINAL_AUTO_DIAGNOSE=false
+export CLAI_AUTO_DIAGNOSE=false
 
 # Disable command extraction (default: true)
-export AI_TERMINAL_AUTO_EXTRACT=false
+export CLAI_AUTO_EXTRACT=false
 
-# Custom cache directory (default: ~/.cache/ai-terminal)
-export AI_TERMINAL_CACHE=~/.cache/ai-terminal
+# Custom cache directory (default: ~/.cache/clai)
+export CLAI_CACHE=~/.cache/clai
+
+# Daemon idle timeout (default: 2h)
+export CLAI_IDLE_TIMEOUT=30m
 
 # Then init
-eval "$(ai-terminal init zsh)"
+eval "$(clai init zsh)"
 ```
 
 ## Architecture
@@ -213,7 +216,7 @@ eval "$(ai-terminal init zsh)"
 │         └────────────────┼────────────────┘                 │
 │                          ▼                                  │
 │  ┌───────────────────────────────────────────────────────┐  │
-│  │  ai-terminal (Go binary)                              │  │
+│  │  clai (Go binary)                                     │  │
 │  │  - diagnose: Error analysis                           │  │
 │  │  - extract: Command extraction                        │  │
 │  │  - ask: AI questions                                  │  │
@@ -229,8 +232,8 @@ eval "$(ai-terminal init zsh)"
 ## File Structure
 
 ```
-ai-terminal/
-├── cmd/ai-terminal/        # Main entry point
+clai/
+├── cmd/clai/               # Main entry point
 ├── internal/
 │   ├── cmd/                # Cobra commands
 │   │   ├── shell/          # Embedded shell scripts
@@ -244,7 +247,6 @@ ai-terminal/
 │   │   └── init.go
 │   ├── cache/              # Cache management
 │   └── claude/             # Claude CLI wrapper
-├── shell/                  # Source shell scripts (for reference)
 ├── go.mod
 ├── Makefile
 ├── install.sh
@@ -279,7 +281,7 @@ Install Claude Code CLI:
 npm install -g @anthropic-ai/claude-code
 ```
 
-### "ai-terminal: command not found"
+### "clai: command not found"
 
 Make sure `$GOPATH/bin` (or `$HOME/go/bin`) is in your PATH:
 ```bash
@@ -292,7 +294,7 @@ Toggle it off:
 ```bash
 ai-toggle
 # or
-export AI_TERMINAL_AUTO_DIAGNOSE=false
+export CLAI_AUTO_DIAGNOSE=false
 ```
 
 ### Suggestions not appearing

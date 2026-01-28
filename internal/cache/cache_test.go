@@ -8,10 +8,10 @@ import (
 )
 
 func TestDir(t *testing.T) {
-	t.Run("uses AI_TERMINAL_CACHE env var when set", func(t *testing.T) {
+	t.Run("uses CLAI_CACHE env var when set", func(t *testing.T) {
 		customDir := "/custom/cache/dir"
-		os.Setenv("AI_TERMINAL_CACHE", customDir)
-		defer os.Unsetenv("AI_TERMINAL_CACHE")
+		os.Setenv("CLAI_CACHE", customDir)
+		defer os.Unsetenv("CLAI_CACHE")
 
 		got := Dir()
 		if got != customDir {
@@ -20,11 +20,11 @@ func TestDir(t *testing.T) {
 	})
 
 	t.Run("uses default when env var not set", func(t *testing.T) {
-		os.Unsetenv("AI_TERMINAL_CACHE")
+		os.Unsetenv("CLAI_CACHE")
 
 		got := Dir()
 		home, _ := os.UserHomeDir()
-		want := filepath.Join(home, ".cache", "ai-terminal")
+		want := filepath.Join(home, ".cache", "clai")
 
 		if got != want {
 			t.Errorf("Dir() = %q, want %q", got, want)
@@ -36,8 +36,8 @@ func TestEnsureDir(t *testing.T) {
 	// Use a temp directory for testing
 	tmpDir := t.TempDir()
 	testCacheDir := filepath.Join(tmpDir, "test-cache")
-	os.Setenv("AI_TERMINAL_CACHE", testCacheDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", testCacheDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	err := EnsureDir()
 	if err != nil {
@@ -62,8 +62,8 @@ func TestEnsureDir(t *testing.T) {
 
 func TestSuggestionFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	got := SuggestionFile()
 	want := filepath.Join(tmpDir, "suggestion")
@@ -75,8 +75,8 @@ func TestSuggestionFile(t *testing.T) {
 
 func TestLastOutputFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	got := LastOutputFile()
 	want := filepath.Join(tmpDir, "last_output")
@@ -88,8 +88,8 @@ func TestLastOutputFile(t *testing.T) {
 
 func TestWriteAndReadSuggestion(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	tests := []struct {
 		name       string
@@ -123,8 +123,8 @@ func TestWriteAndReadSuggestion(t *testing.T) {
 
 func TestReadSuggestion_NonExistent(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	// Don't create the file, just try to read
 	got, err := ReadSuggestion()
@@ -138,8 +138,8 @@ func TestReadSuggestion_NonExistent(t *testing.T) {
 
 func TestClearSuggestion(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	// Write a suggestion first
 	err := WriteSuggestion("npm install")
@@ -165,8 +165,8 @@ func TestClearSuggestion(t *testing.T) {
 
 func TestWriteAndReadLastOutput(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	tests := []struct {
 		name     string
@@ -227,8 +227,8 @@ func TestWriteAndReadLastOutput(t *testing.T) {
 
 func TestReadLastOutput_NonExistent(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	got, err := ReadLastOutput(50)
 	if err != nil {
@@ -241,8 +241,8 @@ func TestReadLastOutput_NonExistent(t *testing.T) {
 
 func TestReadLastOutput_LargeFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	// Create a file with 100 lines
 	var lines []string
@@ -270,8 +270,8 @@ func TestReadLastOutput_LargeFile(t *testing.T) {
 
 func TestSuggestion_WhitespaceHandling(t *testing.T) {
 	tmpDir := t.TempDir()
-	os.Setenv("AI_TERMINAL_CACHE", tmpDir)
-	defer os.Unsetenv("AI_TERMINAL_CACHE")
+	os.Setenv("CLAI_CACHE", tmpDir)
+	defer os.Unsetenv("CLAI_CACHE")
 
 	tests := []struct {
 		name  string

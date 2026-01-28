@@ -19,7 +19,7 @@ import (
 const defaultIdleTimeout = 2 * time.Hour
 
 func idleTimeout() time.Duration {
-	if val := os.Getenv("AI_TERMINAL_IDLE_TIMEOUT"); val != "" {
+	if val := os.Getenv("CLAI_IDLE_TIMEOUT"); val != "" {
 		if d, err := time.ParseDuration(val); err == nil && d > 0 {
 			return d
 		}
@@ -29,10 +29,10 @@ func idleTimeout() time.Duration {
 
 // Daemon paths
 func daemonDir() string {
-	cacheDir := os.Getenv("AI_TERMINAL_CACHE")
+	cacheDir := os.Getenv("CLAI_CACHE")
 	if cacheDir == "" {
 		home, _ := os.UserHomeDir()
-		cacheDir = filepath.Join(home, ".cache", "ai-terminal")
+		cacheDir = filepath.Join(home, ".cache", "clai")
 	}
 	return cacheDir
 }
@@ -104,7 +104,7 @@ func StartDaemonProcess() error {
 	// Start daemon process
 	exe, err := os.Executable()
 	if err != nil {
-		exe = "ai-terminal"
+		exe = "clai"
 	}
 
 	// Create log file for daemon output
