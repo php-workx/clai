@@ -44,17 +44,21 @@ clean:
 	rm -rf bin/
 	go clean
 
-## test: Run tests
+## test: Run unit tests (fast, skips integration tests)
 test:
+	go test -short -v ./...
+
+## test-all: Run all tests including integration tests (slow, requires Claude CLI)
+test-all:
 	go test -v ./...
 
-## test-race: Run tests with race detector
+## test-race: Run unit tests with race detector
 test-race:
-	go test -race -v ./...
+	go test -short -race -v ./...
 
-## cover: Run tests with coverage
+## cover: Run unit tests with coverage
 cover:
-	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	go test -short -race -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
