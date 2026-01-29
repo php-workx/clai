@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-clai is an intelligent terminal assistant that integrates Claude into your shell. It provides command suggestion extraction, auto error diagnosis, and voice-to-command correction for Zsh, Bash, and Fish shells.
+clai is an intelligent terminal assistant that integrates Claude into your shell. It provides command suggestion extraction and voice-to-command correction for Zsh, Bash, and Fish shells.
 
 ## Critical Rules
 

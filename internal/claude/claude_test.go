@@ -17,7 +17,9 @@ func mockClaudeScript(t *testing.T, response string, exitCode int) string {
 	scriptPath := filepath.Join(dir, "claude")
 
 	script := fmt.Sprintf(`#!/bin/sh
-echo "%s"
+cat <<'EOF'
+%s
+EOF
 exit %d
 `, response, exitCode)
 
@@ -33,19 +35,14 @@ func withMockClaude(t *testing.T, response string, exitCode int, fn func()) {
 	mockDir := mockClaudeScript(t, response, exitCode)
 
 	originalPath := os.Getenv("PATH")
-	os.Setenv("PATH", mockDir+":"+originalPath)
-	defer os.Setenv("PATH", originalPath)
+	t.Setenv("PATH", mockDir+string(os.PathListSeparator)+originalPath)
 
 	fn()
 }
 
 func TestQuery_ClaudeNotInstalled(t *testing.T) {
-	// Save original PATH and restore after test
-	originalPath := os.Getenv("PATH")
-	defer os.Setenv("PATH", originalPath)
-
 	// Set PATH to empty so claude won't be found
-	os.Setenv("PATH", "")
+	t.Setenv("PATH", "")
 
 	_, err := Query("test prompt")
 	if err == nil {
@@ -103,12 +100,8 @@ func TestQuery_PromptConstruction(t *testing.T) {
 }
 
 func TestQueryWithContext_ClaudeNotInstalled(t *testing.T) {
-	// Save original PATH and restore after test
-	originalPath := os.Getenv("PATH")
-	defer os.Setenv("PATH", originalPath)
-
 	// Set PATH to empty so claude won't be found
-	os.Setenv("PATH", "")
+	t.Setenv("PATH", "")
 
 	ctx := context.Background()
 	_, err := QueryWithContext(ctx, "test prompt")
@@ -135,19 +128,27 @@ func TestQueryWithContext_CancelledContext(t *testing.T) {
 }
 
 func TestQueryWithContext_Timeout(t *testing.T) {
-	withMockClaude(t, "should not appear", 0, func() {
-		// Create a context with a very short timeout
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
-		defer cancel()
+	// Create a mock that sleeps longer than the timeout
+	dir := t.TempDir()
+	scriptPath := filepath.Join(dir, "claude")
+	script := `#!/bin/sh
+sleep 10
+echo "should not appear"
+`
+	if err := os.WriteFile(scriptPath, []byte(script), 0755); err != nil {
+		t.Fatalf("failed to create mock script: %v", err)
+	}
 
-		// This should timeout quickly
-		_, err := QueryWithContext(ctx, "test prompt")
-		// We expect an error due to timeout/cancellation
-		// The process might not even start before the context is done
-		if err == nil {
-			t.Log("QueryWithContext() completed before timeout - this can happen with fast systems")
-		}
-	})
+	originalPath := os.Getenv("PATH")
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+originalPath)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	_, err := QueryWithContext(ctx, "test prompt")
+	if err == nil {
+		t.Error("QueryWithContext() expected error when context times out")
+	}
 }
 
 func TestQueryWithContext_BackgroundContext(t *testing.T) {

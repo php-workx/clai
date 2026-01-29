@@ -116,11 +116,11 @@ The Daemon must strip patterns matching:
 | Pattern Type | Regex | Example |
 |--------------|-------|---------|
 | AWS Access Key | `AKIA[0-9A-Z]{16}` | `AKIAIOSFODNN7EXAMPLE` |
-| AWS Secret Key | `(?i)(aws_secret_access_key&#124;secret_access_key)\s*[=:]\s*\S+` | `aws_secret_access_key=wJalr...` |
+| AWS Secret Key | `(?i)(aws_secret_access_key|secret_access_key)\s*[=:]\s*\S+` | `aws_secret_access_key=wJalr...` |
 | JWT Tokens | `eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+` | `eyJhbGc...` |
 | Slack Tokens | `xox[baprs]-[0-9a-zA-Z-]+` | `xoxb-123-456-abc` |
 | PEM Blocks | `-----BEGIN [A-Z ]+-----[\s\S]+?-----END [A-Z ]+-----` | Private keys |
-| Generic Secrets | `(?i)(password&#124;token&#124;secret&#124;api_key)\s*[=:]\s*\S+` | `password=hunter2` |
+| Generic Secrets | `(?i)(password|token|secret|api_key)\s*[=:]\s*\S+` | `password=hunter2` |
 
 **Note:** History is stored locally without sanitization. Sanitization applies only to AI provider calls.
 
@@ -656,7 +656,7 @@ Export-ModuleMember -Function @()
 
 ### 7.1 Scoring Formula
 
-```
+```text
 score = (source_weight * 0.4) + (recency_score * 0.3) + (success_score * 0.2) + (affinity_score * 0.1)
 ```
 
@@ -1612,7 +1612,7 @@ func TestSanitizer_Sanitize(t *testing.T) {
         },
         {
             name:     "JWT token",
-            input:    "curl -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U'",
+            input:    "curl -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidGVzdCI6dHJ1ZX0.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'",
             expected: "curl -H 'Authorization: Bearer [REDACTED]'",
         },
         {
