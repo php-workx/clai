@@ -6,7 +6,7 @@ GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-race cover fmt lint vuln dev help
+.PHONY: all build install install-dev clean test test-race cover fmt lint vuln dev help proto
 
 all: build
 
@@ -18,12 +18,28 @@ build:
 install:
 	go install $(LDFLAGS) ./cmd/clai
 
+## proto: Generate Go code from protobuf definitions
+proto:
+	@echo "Generating protobuf code..."
+	@if ! command -v protoc >/dev/null 2>&1; then \
+		echo "Error: protoc not found. Install with: brew install protobuf"; \
+		exit 1; \
+	fi
+	@mkdir -p gen/proto/clai/v1
+	protoc --go_out=gen/proto/clai/v1 --go_opt=paths=source_relative \
+		--go-grpc_out=gen/proto/clai/v1 --go-grpc_opt=paths=source_relative \
+		-I proto/clai/v1 \
+		proto/clai/v1/clai.proto
+	@echo "Generated code in gen/proto/clai/v1/"
+
 ## install-dev: Install development dependencies
 install-dev:
 	@echo "Installing Go tools..."
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	go install golang.org/x/tools/cmd/goimports@latest
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 	@echo "Installing pre-commit..."
 	@if command -v pipx >/dev/null 2>&1; then \
 		pipx install pre-commit || pipx upgrade pre-commit; \
