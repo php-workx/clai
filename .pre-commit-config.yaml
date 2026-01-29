@@ -1,0 +1,40 @@
+# Pre-commit hooks: https://pre-commit.com
+# Install: make install-dev
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.4
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+      - id: go-imports
+        args: ['-local', 'github.com/runger/clai']
+      - id: go-mod-tidy
+
+  - repo: local
+    hooks:
+      - id: go-test
+        name: go test
+        entry: go test -race -short ./...
+        language: system
+        pass_filenames: false
+        types: [go]
+      - id: golangci-lint
+        name: golangci-lint
+        entry: golangci-lint run --new-from-rev=HEAD~1
+        language: system
+        pass_filenames: false
+        types: [go]

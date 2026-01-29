@@ -1,0 +1,74 @@
+# GoReleaser configuration
+# https://goreleaser.com
+
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: ./cmd/clai
+    binary: clai
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/runger/clai/internal/cmd.Version={{.Version}}
+      - -X github.com/runger/clai/internal/cmd.GitCommit={{.ShortCommit}}
+      - -X github.com/runger/clai/internal/cmd.BuildDate={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: runger
+    name: clai
+  draft: false
+  prerelease: auto
+
+brews:
+  - repository:
+      owner: runger
+      name: homebrew-clai
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/runger/clai"
+    description: "Intelligent terminal assistant using Claude - command suggestions, error diagnosis, voice input"
+    license: "MIT"
+    install: |
+      bin.install "clai"
+    test: |
+      system "#{bin}/clai", "version"
+    # Note: shell completion command not yet implemented
+    # extra_install: |
+    #   generate_completions_from_executable(bin/"clai", "completion")

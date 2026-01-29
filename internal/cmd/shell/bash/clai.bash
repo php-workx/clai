@@ -3,17 +3,15 @@
 #
 # Features:
 #   1. Auto-extract suggested commands from output
-#   2. Auto-diagnose errors with Claude Code
+#   2. Error diagnosis with `run` wrapper (captures output for analysis)
 #
 # Configuration (set these BEFORE sourcing):
-#   CLAI_AUTO_DIAGNOSE=true   # Auto-diagnose on errors (default: true)
 #   CLAI_AUTO_EXTRACT=true    # Auto-extract commands (default: true)
 
 # ============================================
 # Configuration
 # ============================================
 
-: ${CLAI_AUTO_DIAGNOSE:=true}
 : ${CLAI_AUTO_EXTRACT:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 
@@ -65,43 +63,14 @@ clear-suggestion() {
 }
 
 # ============================================
-# Feature 2: Auto Error Diagnosis
+# Feature 2: Prompt Hook
 # ============================================
-
-# Track last command using DEBUG trap
-_ai_debug_trap() {
-    _AI_LAST_CMD="$BASH_COMMAND"
-}
 
 # Check result after each command
 _ai_prompt_command() {
-    local exit_code=$?
-
     # Show any suggestions
     _ai_show_suggestion
-
-    # Auto-diagnose if enabled and command failed
-    if [[ "$CLAI_AUTO_DIAGNOSE" == "true" &&
-          $exit_code -ne 0 &&
-          -n "$_AI_LAST_CMD" &&
-          "$_AI_LAST_CMD" != "ai-fix"* &&
-          "$_AI_LAST_CMD" != "clai"* &&
-          "$_AI_LAST_CMD" != "_ai_"* &&
-          "$_AI_LAST_CMD" != "accept"* ]]; then
-
-        echo ""
-        echo -e "\033[38;5;214m⚡ Analyzing error...\033[0m"
-
-        # Run diagnosis
-        clai diagnose "$_AI_LAST_CMD" "$exit_code" 2>/dev/null
-    fi
-
-    # Cleanup
-    unset _AI_LAST_CMD
 }
-
-# Set up traps and hooks
-trap '_ai_debug_trap' DEBUG
 
 # Append to existing PROMPT_COMMAND
 if [[ -z "$PROMPT_COMMAND" ]]; then
@@ -136,26 +105,45 @@ _ai_check_voice_prefix() {
     return 1  # Not a voice command
 }
 
-# Hook into DEBUG trap to catch ? prefix before execution
+# Hook into DEBUG trap to catch ` prefix before execution
+# Note: extdebug must be enabled for the trap to block command execution
 _ai_debug_trap() {
     # Check for voice prefix first
     if _ai_check_voice_prefix "$BASH_COMMAND"; then
-        # Prevent the original command from running
+        # Prevent the original command from running (requires extdebug)
         return 1
     fi
-    _AI_LAST_CMD="$BASH_COMMAND"
+    return 0
 }
+
+# Save current extdebug state and enable it for voice prefix blocking
+_AI_EXTDEBUG_WAS_ON=false
+if shopt -q extdebug; then
+    _AI_EXTDEBUG_WAS_ON=true
+fi
+shopt -s extdebug
+
+trap '_ai_debug_trap' DEBUG
 
 # ============================================
 # Output Capture (via wrapper function)
 # ============================================
 
-# Wrap command execution to capture output
-# Usage: run <command> - captures output and extracts suggestions
+# Wrap command execution to capture output and auto-diagnose on failure
+# Usage: run <command> - captures output, extracts suggestions, diagnoses errors
 run() {
     # Run command, capture output, pass through clai extract
     "$@" 2>&1 | clai extract
-    return ${PIPESTATUS[0]}  # Return original command's exit code
+    local exit_code=${PIPESTATUS[0]}
+
+    # Auto-diagnose if command failed
+    if [[ $exit_code -ne 0 ]]; then
+        echo ""
+        echo -e "\033[38;5;214m⚡ Analyzing error...\033[0m"
+        clai diagnose "$*" "$exit_code" 2>/dev/null
+    fi
+
+    return $exit_code
 }
 
 # ============================================
@@ -189,21 +177,10 @@ voice() {
     clai voice "$@"
 }
 
-# Toggle auto-diagnose
-ai-toggle() {
-    if [[ "$CLAI_AUTO_DIAGNOSE" == "true" ]]; then
-        export CLAI_AUTO_DIAGNOSE=false
-        echo "Auto-diagnose: OFF"
-    else
-        export CLAI_AUTO_DIAGNOSE=true
-        echo "Auto-diagnose: ON"
-    fi
-}
-
 # ============================================
 # Startup Message
 # ============================================
 
 if [[ $- == *i* ]]; then
-    echo -e "\033[2m🤖 clai loaded. Commands: ai-fix, ai, voice, ai-toggle, run, accept | \` prefix for voice mode\033[0m"
+    echo -e "\033[2m🤖 clai loaded. Commands: ai-fix, ai, voice, run, accept | \` prefix for voice mode\033[0m"
 fi

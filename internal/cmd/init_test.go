@@ -17,20 +17,18 @@ func TestRunInit_Zsh(t *testing.T) {
 	// Verify essential Zsh-specific content
 	requiredContent := []string{
 		"clai.zsh",
-		"CLAI_AUTO_DIAGNOSE",
 		"CLAI_CACHE",
 		"zle -N",
 		"bindkey",
 		"add-zsh-hook",
-		"preexec",
 		"precmd",
 		"clai diagnose",
 		"clai extract",
 		"clai ask",
-		"RPROMPT",
+		"clai suggest",
+		"POSTDISPLAY",
 		"pipestatus",
 		"ai-fix",
-		"ai-toggle",
 		"run()",
 	}
 
@@ -55,7 +53,6 @@ func TestRunInit_Bash(t *testing.T) {
 
 	requiredContent := []string{
 		"clai.bash",
-		"CLAI_AUTO_DIAGNOSE",
 		"CLAI_CACHE",
 		"PROMPT_COMMAND",
 		"DEBUG",
@@ -67,7 +64,6 @@ func TestRunInit_Bash(t *testing.T) {
 		"history",
 		"accept",
 		"ai-fix",
-		"ai-toggle",
 		"run()",
 	}
 
@@ -92,13 +88,9 @@ func TestRunInit_Fish(t *testing.T) {
 
 	requiredContent := []string{
 		"clai.fish",
-		"CLAI_AUTO_DIAGNOSE",
 		"CLAI_CACHE",
 		"set -gx",
 		"function",
-		"--on-event",
-		"fish_preexec",
-		"fish_postexec",
 		"fish_right_prompt",
 		"commandline",
 		"clai diagnose",
@@ -107,7 +99,6 @@ func TestRunInit_Fish(t *testing.T) {
 		"status is-interactive",
 		"pipestatus",
 		"function ai-fix",
-		"function ai-toggle",
 		"function run",
 	}
 
@@ -141,7 +132,6 @@ func TestShellScripts_AllHaveCommonFeatures(t *testing.T) {
 	}
 
 	commonFeatures := []string{
-		"CLAI_AUTO_DIAGNOSE",
 		"CLAI_AUTO_EXTRACT",
 		"CLAI_CACHE",
 	}

@@ -1,40 +1,61 @@
 # Agent Instructions
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Quick Reference
+## Project Overview
+
+clai is an intelligent terminal assistant that integrates Claude into your shell. It provides command suggestion extraction and voice-to-command correction for Zsh, Bash, and Fish shells.
+
+## Critical Rules
+
+| Rule                          | Reason                                     |
+|-------------------------------|--------------------------------------------|
+| NEVER push to remote          | User pushes when ready                     |
+| NEVER commit to main          | Always use feature branches                |
+| conventional commits          | Alignment on commit message format         |
+| TARGET = `make dev`           | Automatic via pre-commit hooks             |
+| Fix failures immediately      | Don't leave broken gates for user          |
+| Always commit before stopping | Don't leave work stranded locally          |
+| NEVER change `make` rules     | gates protect quality and set expectations |
+
+
+## Build Commands
 
 ```bash
-bd ready              # Find available work
+make build          # Build to bin/clai
+make install        # Install to $GOPATH/bin
+make test           # Run all tests
+make fmt            # Format code
+make lint           # Run golangci-lint
+make build-all      # Cross-compile for all platforms
+```
+
+Run a single test:
+```bash
+go test ./internal/extract -run TestExtractCommand
+go test ./internal/cmd -run TestVoiceCleanCommand
+```
+
+## Architecture
+
+Read more in [architecture.md](docs/architecture.md)
+
+## Key Patterns
+
+- All Claude queries use `context.Context` for Ctrl+C interruptibility
+- Daemon uses Unix domain sockets for IPC with JSON request/response protocol
+- Version info injected via ldflags at build time (`Version`, `GitCommit`, `BuildDate`)
+
+## Task Tracking
+
+This project uses **bd (beads)** for ALL issue tracking.
+
+```bash
+bd ready              # Find unblocked work
 bd show <id>          # View issue details
 bd update <id> --status in_progress  # Claim work
 bd close <id>         # Complete work
-bd sync               # Sync with git
+bd sync --from-main   # Sync with main branch
 ```
 
-## Landing the Plane (Session Completion)
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd sync
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-
+For more details, see `docs/beads.md`.
