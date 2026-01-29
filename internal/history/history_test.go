@@ -38,9 +38,9 @@ func TestSuggestion(t *testing.T) {
 		{"npm i", "npm install express"},
 		{"npm r", "npm run build"},
 		{"ls", "ls -la"},
-		{"xyz", ""},           // No match
-		{"", ""},              // Empty prefix
-		{"git status", ""},    // Exact match should not suggest itself
+		{"xyz", ""},        // No match
+		{"", ""},           // Empty prefix
+		{"git status", ""}, // Exact match should not suggest itself
 	}
 
 	for _, tt := range tests {

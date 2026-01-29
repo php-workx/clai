@@ -40,11 +40,8 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 
 	if prefix == "" {
 		// No prefix - return AI suggestion if available
-		var err error
-		suggestion, err = cache.ReadSuggestion()
-		if err != nil {
-			return nil // Silent fail, no suggestion
-		}
+		// Ignore error - silent fail means no suggestion
+		suggestion, _ = cache.ReadSuggestion()
 	} else {
 		// Have prefix - search history
 		suggestion = history.Suggestion(prefix)
