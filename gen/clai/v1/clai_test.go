@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
-	claiv1 "github.com/runger/clai/gen/proto/clai/v1"
+	claiv1 "github.com/runger/clai/gen/clai/v1"
 )
 
 // testServer is a minimal implementation for testing
@@ -47,9 +47,6 @@ func startTestServer(t *testing.T) (claiv1.ClaiServiceClient, func()) {
 		_ = server.Serve(listener) // Error on Stop() is expected
 	}()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	conn, err := grpc.NewClient(listener.Addr().String(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
@@ -59,14 +56,24 @@ func startTestServer(t *testing.T) (claiv1.ClaiServiceClient, func()) {
 		t.Fatalf("failed to create client: %v", err)
 	}
 
-	// Wait for server to be ready
-	for i := 0; i < 10; i++ {
-		client := claiv1.NewClaiServiceClient(conn)
-		_, err := client.Ping(ctx, &claiv1.Ack{Ok: true})
-		if err == nil {
+	// Wait for server to be ready with proper error handling
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	client := claiv1.NewClaiServiceClient(conn)
+	var lastErr error
+	for i := 0; i < 50; i++ {
+		_, lastErr = client.Ping(ctx, &claiv1.Ack{Ok: true})
+		if lastErr == nil {
 			break
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+	if lastErr != nil {
+		conn.Close()
+		server.Stop()
+		listener.Close()
+		t.Fatalf("server failed to become ready: %v", lastErr)
 	}
 
 	cleanup := func() {
@@ -75,7 +82,7 @@ func startTestServer(t *testing.T) (claiv1.ClaiServiceClient, func()) {
 		listener.Close()
 	}
 
-	return claiv1.NewClaiServiceClient(conn), cleanup
+	return client, cleanup
 }
 
 func TestPingRPC(t *testing.T) {

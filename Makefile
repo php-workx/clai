@@ -25,12 +25,12 @@ proto:
 		echo "Error: protoc not found. Install with: brew install protobuf"; \
 		exit 1; \
 	fi
-	@mkdir -p gen/proto/clai/v1
-	protoc --go_out=gen/proto/clai/v1 --go_opt=paths=source_relative \
-		--go-grpc_out=gen/proto/clai/v1 --go-grpc_opt=paths=source_relative \
-		-I proto/clai/v1 \
+	@mkdir -p gen
+	protoc --go_out=gen --go_opt=paths=source_relative \
+		--go-grpc_out=gen --go-grpc_opt=paths=source_relative \
+		-I proto \
 		proto/clai/v1/clai.proto
-	@echo "Generated code in gen/proto/clai/v1/"
+	@echo "Generated code in gen/"
 
 ## install-dev: Install development dependencies
 install-dev:

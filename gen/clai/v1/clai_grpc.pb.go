@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.0
 // - protoc             v6.33.4
-// source: clai.proto
+// source: clai/v1/clai.proto
 
 package claiv1
 
@@ -465,5 +465,5 @@ var ClaiService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "clai.proto",
+	Metadata: "clai/v1/clai.proto",
 }

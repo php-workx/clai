@@ -1,7 +1,7 @@
 syntax = "proto3";
 package clai.v1;
 
-option go_package = "github.com/runger/clai/gen/proto/clai/v1;claiv1";
+option go_package = "github.com/runger/clai/gen/clai/v1;claiv1";
 
 // ---------------------------------------------------------
 // Common
