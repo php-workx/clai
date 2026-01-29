@@ -3,19 +3,14 @@
 #
 # Features:
 #   1. Auto-extract suggested commands from output
-#   2. Auto-diagnose errors with Claude Code
+#   2. Error diagnosis with `run` wrapper (captures output for analysis)
 #
 # Configuration (set these BEFORE sourcing):
-#   set -gx CLAI_AUTO_DIAGNOSE true
 #   set -gx CLAI_AUTO_EXTRACT true
 
 # ============================================
 # Configuration
 # ============================================
-
-if not set -q CLAI_AUTO_DIAGNOSE
-    set -gx CLAI_AUTO_DIAGNOSE true
-end
 
 if not set -q CLAI_AUTO_EXTRACT
     set -gx CLAI_AUTO_EXTRACT true
@@ -140,49 +135,28 @@ bind \cx\cv _ai_enter_voice_mode
 # Bind Enter to voice-aware execute
 bind \r _ai_voice_execute
 
-# ============================================
-# Feature 2: Auto Error Diagnosis
-# ============================================
-
-# Track command execution
-function _ai_preexec --on-event fish_preexec
-    set -g _AI_LAST_CMD $argv[1]
-end
-
-# Check result after execution
-function _ai_postexec --on-event fish_postexec
-    set -l exit_code $status
-
-    # Auto-diagnose if enabled and command failed
-    if test "$CLAI_AUTO_DIAGNOSE" = "true"
-        and test $exit_code -ne 0
-        and set -q _AI_LAST_CMD
-        and not string match -q "ai-fix*" $_AI_LAST_CMD
-        and not string match -q "clai*" $_AI_LAST_CMD
-
-        echo ""
-        set_color yellow
-        echo "⚡ Analyzing error..."
-        set_color normal
-
-        # Run diagnosis
-        clai diagnose "$_AI_LAST_CMD" "$exit_code" 2>/dev/null
-    end
-
-    # Cleanup
-    set -e _AI_LAST_CMD
-end
 
 # ============================================
 # Output Capture (via wrapper function)
 # ============================================
 
-# Wrap command execution to capture output
-# Usage: run <command> - captures output and extracts suggestions
+# Wrap command execution to capture output and auto-diagnose on failure
+# Usage: run <command> - captures output, extracts suggestions, diagnoses errors
 function run
     # Run command, capture output, pass through clai extract
     $argv 2>&1 | clai extract
-    return $pipestatus[1]  # Return original command's exit code
+    set -l exit_code $pipestatus[1]
+
+    # Auto-diagnose if command failed
+    if test $exit_code -ne 0
+        echo ""
+        set_color yellow
+        echo "⚡ Analyzing error..."
+        set_color normal
+        clai diagnose "$argv" "$exit_code" 2>/dev/null
+    end
+
+    return $exit_code
 end
 
 # ============================================
@@ -220,23 +194,12 @@ function voice
     clai voice $argv
 end
 
-# Toggle auto-diagnose
-function ai-toggle
-    if test "$CLAI_AUTO_DIAGNOSE" = "true"
-        set -gx CLAI_AUTO_DIAGNOSE false
-        echo "Auto-diagnose: OFF"
-    else
-        set -gx CLAI_AUTO_DIAGNOSE true
-        echo "Auto-diagnose: ON"
-    end
-end
-
 # ============================================
 # Startup Message
 # ============================================
 
 if status is-interactive
     set_color brblack
-    echo "🤖 clai loaded. Commands: ai-fix, ai, voice, ai-toggle, run | ` prefix for voice mode"
+    echo "🤖 clai loaded. Commands: ai-fix, ai, voice, run | ` prefix for voice mode"
     set_color normal
 end

@@ -229,9 +229,11 @@ func RunDaemon() error {
 	fmt.Println("Starting Claude process...")
 
 	// Start Claude process with an initial message to trigger initialization
+	// Use Haiku model for fast responses (voice commands, quick tasks)
 	cmd := exec.Command("claude",
 		"--print",
 		"--verbose",
+		"--model", "haiku",
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
 	)

@@ -3,11 +3,10 @@
 #
 # Features:
 #   1. Auto-extract suggested commands from output (Tab to accept)
-#   2. Auto-diagnose errors with Claude Code
-#   3. Voice mode with ` prefix (fast with daemon)
+#   2. Error diagnosis with `run` wrapper (captures output for analysis)
+#   3. Voice mode with ` prefix (fast with Haiku daemon)
 #
 # Configuration (set these BEFORE sourcing):
-#   CLAI_AUTO_DIAGNOSE=true   # Auto-diagnose on errors (default: true)
 #   CLAI_AUTO_EXTRACT=true    # Auto-extract commands (default: true)
 #   CLAI_AUTO_DAEMON=true     # Auto-start daemon for fast voice (default: true)
 
@@ -15,7 +14,6 @@
 # Configuration
 # ============================================
 
-: ${CLAI_AUTO_DIAGNOSE:=true}
 : ${CLAI_AUTO_EXTRACT:=true}
 : ${CLAI_AUTO_DAEMON:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
@@ -170,56 +168,38 @@ bindkey '^X^V' _ai_enter_voice_mode   # Ctrl+X Ctrl+V
 bindkey '^[' _ai_cancel_voice_mode    # Escape
 
 # ============================================
-# Feature 2: Auto Error Diagnosis
+# Feature 2: Prompt Update Hook
 # ============================================
 
-# Track command before execution
-_ai_preexec() {
-    _AI_LAST_CMD="$1"
-    _AI_CMD_START=$EPOCHSECONDS
-}
-
-# Check result after execution
+# Update prompt after each command
 _ai_precmd() {
-    local exit_code=$?
-
     # Update prompt with any suggestions
     _ai_update_rprompt
-
-    # Auto-diagnose if enabled and command failed
-    if [[ "$CLAI_AUTO_DIAGNOSE" == "true" &&
-          $exit_code -ne 0 &&
-          -n "$_AI_LAST_CMD" &&
-          "$_AI_LAST_CMD" != "ai-fix"* &&
-          "$_AI_LAST_CMD" != "clai"* &&
-          "$_AI_LAST_CMD" != _ai_* ]]; then
-
-        echo ""
-        echo -e "\033[38;5;214m⚡ Analyzing error...\033[0m"
-
-        # Run diagnosis
-        clai diagnose "$_AI_LAST_CMD" "$exit_code" 2>/dev/null
-    fi
-
-    # Cleanup
-    unset _AI_LAST_CMD _AI_CMD_START
 }
 
 # Register hooks
 autoload -U add-zsh-hook
-add-zsh-hook preexec _ai_preexec
 add-zsh-hook precmd _ai_precmd
 
 # ============================================
 # Output Capture (via wrapper function)
 # ============================================
 
-# Wrap command execution to capture output
-# Usage: run <command> - captures output and extracts suggestions
+# Wrap command execution to capture output and auto-diagnose on failure
+# Usage: run <command> - captures output, extracts suggestions, diagnoses errors
 run() {
     # Run command, capture output, pass through clai extract
     "$@" 2>&1 | clai extract
-    return ${pipestatus[1]}  # Return original command's exit code
+    local exit_code=${pipestatus[1]}
+
+    # Auto-diagnose if command failed
+    if [[ $exit_code -ne 0 ]]; then
+        echo ""
+        echo -e "\033[38;5;214m⚡ Analyzing error...\033[0m"
+        clai diagnose "$*" "$exit_code" 2>/dev/null
+    fi
+
+    return $exit_code
 }
 
 # ============================================
@@ -253,16 +233,6 @@ voice() {
     clai voice "$@"
 }
 
-# Toggle auto-diagnose
-ai-toggle() {
-    if [[ "$CLAI_AUTO_DIAGNOSE" == "true" ]]; then
-        export CLAI_AUTO_DIAGNOSE=false
-        echo "Auto-diagnose: OFF"
-    else
-        export CLAI_AUTO_DIAGNOSE=true
-        echo "Auto-diagnose: ON"
-    fi
-}
 
 # ============================================
 # Daemon Management
