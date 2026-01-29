@@ -69,5 +69,6 @@ brews:
       bin.install "clai"
     test: |
       system "#{bin}/clai", "version"
-    extra_install: |
-      generate_completions_from_executable(bin/"clai", "completion")
+    # Note: shell completion command not yet implemented
+    # extra_install: |
+    #   generate_completions_from_executable(bin/"clai", "completion")
