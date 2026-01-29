@@ -99,3 +99,29 @@ func TestSuggestion_MostRecent(t *testing.T) {
 		t.Errorf("Suggestion(\"git st\") = %q, want \"git stash pop\"", result)
 	}
 }
+
+func TestSuggestion_TrailingMultiline(t *testing.T) {
+	// Verify trailing unfinished multiline command is preserved
+	tmpDir := t.TempDir()
+	histFile := filepath.Join(tmpDir, ".zsh_history")
+
+	// History file ending with incomplete multiline command (no final newline)
+	histContent := `: 1706000001:0;echo "hello"
+: 1706000002:0;docker run \
+  --name test \
+  alpine`
+	if err := os.WriteFile(histFile, []byte(histContent), 0644); err != nil {
+		t.Fatalf("Failed to write test history: %v", err)
+	}
+
+	oldHistFile := os.Getenv("HISTFILE")
+	os.Setenv("HISTFILE", histFile)
+	defer os.Setenv("HISTFILE", oldHistFile)
+
+	// Should find the multiline docker command
+	result := Suggestion("docker")
+	expected := "docker run \n  --name test \n  alpine"
+	if result != expected {
+		t.Errorf("Suggestion(\"docker\") = %q, want %q", result, expected)
+	}
+}

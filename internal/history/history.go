@@ -114,5 +114,10 @@ func readZshHistory(path string) ([]string, error) {
 		}
 	}
 
+	// Handle trailing unfinished multiline command
+	if multilineCmd.Len() > 0 {
+		entries = append(entries, strings.TrimSuffix(multilineCmd.String(), "\n"))
+	}
+
 	return entries, scanner.Err()
 }

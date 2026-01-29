@@ -106,8 +106,7 @@ _ai_clear_suggestion() {
 }
 zle -N _ai_clear_suggestion
 
-# Bind Escape to clear
-bindkey '^[' _ai_clear_suggestion
+# Note: Escape is bound later to _ai_cancel_voice_mode which calls _ai_clear_suggestion
 
 # ============================================
 # Feature 3: Voice Mode

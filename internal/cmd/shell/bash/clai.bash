@@ -106,13 +106,22 @@ _ai_check_voice_prefix() {
 }
 
 # Hook into DEBUG trap to catch ` prefix before execution
+# Note: extdebug must be enabled for the trap to block command execution
 _ai_debug_trap() {
     # Check for voice prefix first
     if _ai_check_voice_prefix "$BASH_COMMAND"; then
-        # Prevent the original command from running
+        # Prevent the original command from running (requires extdebug)
         return 1
     fi
+    return 0
 }
+
+# Save current extdebug state and enable it for voice prefix blocking
+_AI_EXTDEBUG_WAS_ON=false
+if shopt -q extdebug; then
+    _AI_EXTDEBUG_WAS_ON=true
+fi
+shopt -s extdebug
 
 trap '_ai_debug_trap' DEBUG
 
