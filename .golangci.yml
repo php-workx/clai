@@ -32,9 +32,9 @@ linters:
     - nilerr
     - prealloc
     - unconvert
-
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
+  settings:
+    govet:
+      enable-all: true
+      disable:
+        - fieldalignment
+        - shadow
