@@ -173,15 +173,65 @@ function run
 end
 
 # ============================================
+# Session Tracking
+# ============================================
+# Generate unique session ID for this shell instance
+
+if not set -q CLAI_SESSION_ID
+    if command -v uuidgen >/dev/null 2>&1
+        set -gx CLAI_SESSION_ID (uuidgen | tr '[:upper:]' '[:lower:]')
+    else
+        set -gx CLAI_SESSION_ID (date +%s)"-"$fish_pid
+    end
+end
+
+# ============================================
 # Manual Commands
 # ============================================
+
+# Intercept history command to show session-specific history
+# Falls back to shell history if no session history available
+# Use `history --global` or `history -g` for shell-native history
+function history --wraps=history
+    if test (count $argv) -gt 0
+        switch $argv[1]
+            case '--global' '-g'
+                # Pass through to builtin history (remove the --global flag)
+                builtin history $argv[2..-1]
+                return
+            case '--help' '-h'
+                echo "Usage: history [options] [query]"
+                echo ""
+                echo "Shows command history (session-specific if available, else shell history)."
+                echo ""
+                echo "Options:"
+                echo "  -g, --global    Always use shell's native history"
+                echo "  -n, --limit N   Maximum number of commands to show (default: 20)"
+                echo "  --cwd PATH      Filter by working directory"
+                echo ""
+                echo "Examples:"
+                echo "  history              # Show session or shell history"
+                echo "  history git          # Filter to git commands"
+                echo "  history --global     # Force shell's native history"
+                return
+        end
+    end
+    # Try clai session history first, fall back to shell history
+    set -l output (clai history --session="$CLAI_SESSION_ID" $argv 2>/dev/null)
+    if test -n "$output" -a "$output" != "*No command*"
+        echo "$output"
+    else
+        # Fall back to shell's native history
+        builtin history $argv
+    end
+end
 
 # Manually diagnose last command
 function ai-fix
     if test (count $argv) -gt 0
         set cmd $argv[1]
     else
-        set cmd (history --max=1)
+        set cmd (builtin history --max=1)
     end
     clai diagnose "$cmd" "1"
 end
@@ -193,7 +243,7 @@ function ai
         return 1
     end
 
-    set -l recent_cmds (history --max=5 | string join ';')
+    set -l recent_cmds (builtin history --max=5 | string join ';')
     clai ask --context "$recent_cmds" $argv
 end
 

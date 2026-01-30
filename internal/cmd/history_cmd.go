@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	historyLimit int
-	historyCWD   string
+	historyLimit   int
+	historyCWD     string
+	historySession string
 )
 
 var historyCmd = &cobra.Command{
@@ -26,19 +27,22 @@ Without arguments, shows the most recent commands.
 With a query argument, filters commands matching the prefix.
 
 The history is stored in the local SQLite database and includes
-commands from all shell sessions.
+commands from all shell sessions by default. Use --session to
+filter to a specific session.
 
 Examples:
-  clai history              # Show last 20 commands
-  clai history --limit=50   # Show last 50 commands
-  clai history git          # Show commands starting with "git"
-  clai history --cwd=/tmp   # Show commands from /tmp directory`,
+  clai history                    # Show last 20 commands
+  clai history --limit=50         # Show last 50 commands
+  clai history git                # Show commands starting with "git"
+  clai history --cwd=/tmp         # Show commands from /tmp directory
+  clai history --session=$CLAI_SESSION_ID  # Show current session only`,
 	RunE: runHistory,
 }
 
 func init() {
 	historyCmd.Flags().IntVarP(&historyLimit, "limit", "n", 20, "Maximum number of commands to show")
 	historyCmd.Flags().StringVar(&historyCWD, "cwd", "", "Filter by working directory")
+	historyCmd.Flags().StringVar(&historySession, "session", "", "Filter by session ID (use $CLAI_SESSION_ID for current session)")
 	rootCmd.AddCommand(historyCmd)
 }
 
@@ -68,6 +72,11 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		query.CWD = &historyCWD
 	}
 
+	// Add session filter if provided
+	if historySession != "" {
+		query.SessionID = &historySession
+	}
+
 	// Execute query
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -78,7 +87,15 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(commands) == 0 {
-		if len(args) > 0 {
+		if historySession != "" {
+			// Session-specific query returned no results
+			if len(args) > 0 {
+				fmt.Printf("No commands matching '%s' in this session.\n", args[0])
+			} else {
+				fmt.Println("No commands logged in this session yet.")
+			}
+			fmt.Println("Tip: Use 'history --global' for shell's native history.")
+		} else if len(args) > 0 {
 			fmt.Printf("No commands found matching '%s'\n", args[0])
 		} else {
 			fmt.Println("No command history available.")

@@ -4,7 +4,7 @@
 # Features:
 #   1. Session tracking (commands logged for context-aware suggestions)
 #   2. Inline command suggestions (history + AI) with right-arrow to accept
-#   3. Menu selection with Ctrl+Space (up/down to navigate, Enter to select)
+#   3. Menu selection with ↓ arrow (up/down to navigate, Enter to select)
 #   4. Error diagnosis with `run` wrapper (captures output for analysis)
 #   5. Voice mode with ` prefix (fast with Haiku daemon)
 #
@@ -65,10 +65,10 @@ _ai_update_suggestion() {
     local suggestion=""
 
     if [[ -z "$BUFFER" ]]; then
-        # Empty buffer - check for AI suggestion
+        # Empty buffer - check for cached AI suggestion
         suggestion=$(clai suggest 2>/dev/null)
     else
-        # Has content - search history
+        # Has content - clai handles daemon vs history fallback
         suggestion=$(clai suggest "$BUFFER" 2>/dev/null)
     fi
 
@@ -247,9 +247,10 @@ _ai_preexec() {
     # Skip if no command
     [[ -z "$1" ]] && return
 
-    # Generate unique command ID
-    _CLAI_COMMAND_ID="${CLAI_SESSION_ID}-$(date +%s%N 2>/dev/null || echo $RANDOM)"
-    _CLAI_COMMAND_START_TIME=$(date +%s%3N 2>/dev/null || date +%s)000
+    # Generate unique command ID (use seconds + random for uniqueness)
+    _CLAI_COMMAND_ID="${CLAI_SESSION_ID}-$(date +%s)-${RANDOM}"
+    # Store start time in milliseconds (macOS date doesn't support %N)
+    _CLAI_COMMAND_START_TIME=$(($(date +%s) * 1000))
     _CLAI_LAST_COMMAND="$1"
 
     # Fire and forget - log command start to daemon
@@ -266,7 +267,7 @@ _ai_precmd() {
 
     # Log command completion if we have a pending command
     if [[ -n "$_CLAI_COMMAND_ID" ]]; then
-        local end_time=$(date +%s%3N 2>/dev/null || date +%s)000
+        local end_time=$(($(date +%s) * 1000))
         local duration=$((end_time - _CLAI_COMMAND_START_TIME))
 
         # Fire and forget - log command end to daemon
@@ -315,6 +316,43 @@ run() {
 # Manual Commands
 # ============================================
 
+# Intercept history command to show session-specific history
+# Falls back to shell history if no session history available
+# Use `history --global` or `history -g` for shell-native history
+# Note: In zsh, `history` is an alias to `fc -l`, so we unalias it first
+unalias history 2>/dev/null
+history() {
+    if [[ "$1" == "--global" || "$1" == "-g" ]]; then
+        # Pass through to zsh's native history (fc -l)
+        shift
+        fc -l "$@"
+    elif [[ "$1" == "--help" || "$1" == "-h" ]]; then
+        echo "Usage: history [options] [query]"
+        echo ""
+        echo "Shows command history (session-specific if available, else shell history)."
+        echo ""
+        echo "Options:"
+        echo "  -g, --global    Always use shell's native history"
+        echo "  -n, --limit N   Maximum number of commands to show (default: 20)"
+        echo "  --cwd PATH      Filter by working directory"
+        echo ""
+        echo "Examples:"
+        echo "  history              # Show session or shell history"
+        echo "  history git          # Filter to git commands"
+        echo "  history --global     # Force shell's native history"
+    else
+        # Try clai session history first, fall back to shell history
+        local output
+        output=$(clai history --session="$CLAI_SESSION_ID" "$@" 2>/dev/null)
+        if [[ -n "$output" && "$output" != *"No command"* ]]; then
+            echo "$output"
+        else
+            # Fall back to shell's native history
+            fc -l "$@"
+        fi
+    fi
+}
+
 # Manually diagnose last command
 ai-fix() {
     local cmd="${1:-$(fc -ln -1)}"
@@ -344,11 +382,12 @@ voice() {
 
 
 # ============================================
-# Feature 4: Menu Selection (Ctrl+Space)
+# Feature 4: Menu Selection (↓ or Ctrl+Space)
 # ============================================
 # Shows multiple suggestions in a selectable menu
-# - Ctrl+Space: Show suggestion menu
-# - Up/Down arrows: Navigate
+# - Down arrow (when typing): Show suggestion menu
+# - Ctrl+Space: Alternative way to show menu
+# - Up/Down arrows: Navigate menu once open
 # - Enter: Accept selection
 # - Escape: Cancel
 
@@ -361,7 +400,7 @@ _AI_MENU_ACTIVE=false
 _ai_show_menu() {
     local prefix="$BUFFER"
 
-    # Get multiple suggestions from clai
+    # Get multiple suggestions (clai handles daemon vs history fallback)
     local -a suggestions
     if [[ -n "$prefix" ]]; then
         suggestions=(${(f)"$(clai suggest --limit "$CLAI_MENU_LIMIT" "$prefix" 2>/dev/null)"})
@@ -415,9 +454,10 @@ _ai_menu_up() {
     fi
 }
 
-# Navigate menu down
+# Navigate menu down (or open menu if typing)
 _ai_menu_down() {
     if [[ "$_AI_MENU_ACTIVE" == "true" ]]; then
+        # Menu active - navigate down
         if [[ $_AI_MENU_INDEX -lt $((${#_AI_MENU_SUGGESTIONS[@]} - 1)) ]]; then
             ((_AI_MENU_INDEX++))
         else
@@ -425,7 +465,11 @@ _ai_menu_down() {
             _AI_MENU_INDEX=0
         fi
         _ai_render_menu
+    elif [[ -n "$BUFFER" ]]; then
+        # Has input - show menu (arrow down is safe to override here)
+        _ai_show_menu
     else
+        # Empty buffer - normal history navigation
         zle .down-line-or-history
     fi
 }
@@ -533,7 +577,7 @@ if [[ -o interactive ]]; then
     # Register cleanup on shell exit
     trap '_clai_cleanup' EXIT HUP
 
-    echo -e "\033[2m🤖 clai loaded. Ctrl+Space for suggestions | \` for voice | ai-fix, ai, voice, ai-daemon\033[0m"
+    echo -e "\033[2m🤖 clai loaded. ↓ for menu | → to accept | \` for voice | ai-fix, ai, voice\033[0m"
 fi
 
 # Cleanup function for shell exit

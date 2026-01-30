@@ -104,6 +104,7 @@ func TestShellHooks_ZshRequiredFunctions(t *testing.T) {
 		"_ai_forward_char",
 		"_ai_precmd",
 		"run()",
+		"history()",
 	}
 
 	for _, fn := range requiredFunctions {
@@ -130,12 +131,61 @@ func TestShellHooks_BashRequiredFunctions(t *testing.T) {
 		"_ai_prompt_command",
 		"run()",
 		"ai-fix()",
+		"history()",
 	}
 
 	for _, fn := range requiredFunctions {
 		if !strings.Contains(string(content), fn) {
 			t.Errorf("required function %q not found in bash hooks", fn)
 		}
+	}
+}
+
+// TestShellHooks_HistoryInterception verifies history command interception is set up.
+func TestShellHooks_HistoryInterception(t *testing.T) {
+	tests := []struct {
+		shell string
+		file  string
+	}{
+		{"zsh", "clai.zsh"},
+		{"bash", "clai.bash"},
+		{"fish", "clai.fish"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			hookPath := findHookFile(tt.file)
+			if hookPath == "" {
+				t.Skipf("%s hook file not found", tt.shell)
+			}
+
+			content, err := os.ReadFile(hookPath)
+			if err != nil {
+				t.Fatalf("failed to read hook file: %v", err)
+			}
+
+			contentStr := string(content)
+
+			// Check for history function definition
+			if !strings.Contains(contentStr, "history") {
+				t.Errorf("%s: history function not found", tt.shell)
+			}
+
+			// Check for --global flag support
+			if !strings.Contains(contentStr, "--global") {
+				t.Errorf("%s: --global flag support not found in history function", tt.shell)
+			}
+
+			// Check for session-specific history call
+			if !strings.Contains(contentStr, "clai history") {
+				t.Errorf("%s: clai history call not found", tt.shell)
+			}
+
+			// Check for CLAI_SESSION_ID usage
+			if !strings.Contains(contentStr, "CLAI_SESSION_ID") {
+				t.Errorf("%s: CLAI_SESSION_ID not found in history function", tt.shell)
+			}
+		})
 	}
 }
 

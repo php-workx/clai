@@ -181,12 +181,59 @@ run() {
 }
 
 # ============================================
+# Session Tracking
+# ============================================
+# Generate unique session ID for this shell instance
+
+# Generate session ID (use uuidgen if available, fallback to date+pid)
+if command -v uuidgen >/dev/null 2>&1; then
+    export CLAI_SESSION_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+else
+    export CLAI_SESSION_ID="$(date +%s)-$$"
+fi
+
+# ============================================
 # Manual Commands
 # ============================================
 
+# Intercept history command to show session-specific history
+# Falls back to shell history if no session history available
+# Use `history --global` or `history -g` for shell-native history
+history() {
+    if [[ "$1" == "--global" || "$1" == "-g" ]]; then
+        # Pass through to builtin history (remove the --global flag)
+        shift
+        builtin history "$@"
+    elif [[ "$1" == "--help" || "$1" == "-h" ]]; then
+        echo "Usage: history [options] [query]"
+        echo ""
+        echo "Shows command history (session-specific if available, else shell history)."
+        echo ""
+        echo "Options:"
+        echo "  -g, --global    Always use shell's native history"
+        echo "  -n, --limit N   Maximum number of commands to show (default: 20)"
+        echo "  --cwd PATH      Filter by working directory"
+        echo ""
+        echo "Examples:"
+        echo "  history              # Show session or shell history"
+        echo "  history git          # Filter to git commands"
+        echo "  history --global     # Force shell's native history"
+    else
+        # Try clai session history first, fall back to shell history
+        local output
+        output=$(clai history --session="$CLAI_SESSION_ID" "$@" 2>/dev/null)
+        if [[ -n "$output" && "$output" != *"No command"* ]]; then
+            echo "$output"
+        else
+            # Fall back to shell's native history
+            builtin history "$@"
+        fi
+    fi
+}
+
 # Manually diagnose last command
 ai-fix() {
-    local cmd="${1:-$(history 1 | sed 's/^[ ]*[0-9]*[ ]*//')}"
+    local cmd="${1:-$(builtin history 1 | sed 's/^[ ]*[0-9]*[ ]*//')}"
     clai diagnose "$cmd" "1"
 }
 
@@ -197,7 +244,7 @@ ai() {
         return 1
     fi
 
-    local recent_cmds=$(history 5 | sed 's/^[ ]*[0-9]*[ ]*//' | tr '\n' ';')
+    local recent_cmds=$(builtin history 5 | sed 's/^[ ]*[0-9]*[ ]*//' | tr '\n' ';')
     clai ask --context "$recent_cmds" "$@"
 }
 
