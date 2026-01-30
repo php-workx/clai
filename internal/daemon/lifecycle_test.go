@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -158,5 +159,26 @@ func TestWaitForSocketWithPaths_Timeout(t *testing.T) {
 	err := WaitForSocketWithPaths(paths, 100*time.Millisecond)
 	if err == nil {
 		t.Error("expected timeout error")
+	}
+}
+
+func TestWaitForSocketWithContext_Cancelled(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	paths := &config.Paths{
+		RuntimeDir: tmpDir,
+	}
+
+	// Create a context that we'll cancel
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Cancel immediately
+	cancel()
+
+	// Should return context.Canceled error
+	err := WaitForSocketWithContext(ctx, paths, 5*time.Second)
+	if err != context.Canceled {
+		t.Errorf("expected context.Canceled, got %v", err)
 	}
 }

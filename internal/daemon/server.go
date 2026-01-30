@@ -175,12 +175,26 @@ func (s *Server) Start(ctx context.Context) error {
 	s.wg.Add(1)
 	go s.pruneCacheLoop(ctx)
 
-	// Serve gRPC requests (blocking)
-	if err := s.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-		return fmt.Errorf("gRPC server error: %w", err)
-	}
+	// Serve gRPC requests in a goroutine
+	errChan := make(chan error, 1)
+	go func() {
+		if err := s.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
+			errChan <- fmt.Errorf("gRPC server error: %w", err)
+		} else {
+			errChan <- nil
+		}
+	}()
 
-	return nil
+	// Wait for context cancellation or server error
+	select {
+	case <-ctx.Done():
+		s.Shutdown()
+		// Wait for server to finish
+		<-errChan
+		return nil
+	case err := <-errChan:
+		return err
+	}
 }
 
 // Shutdown gracefully shuts down the server.

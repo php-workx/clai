@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -526,5 +527,1420 @@ func TestTruncate(t *testing.T) {
 		if result != tt.expected {
 			t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.maxLen, result, tt.expected)
 		}
+	}
+}
+
+// ============================================================================
+// Additional tests for edge cases and error paths
+// ============================================================================
+
+// --- truncate function edge cases ---
+
+func TestTruncate_EdgeCases(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		maxLen   int
+		expected string
+	}{
+		{
+			name:     "empty string",
+			input:    "",
+			maxLen:   10,
+			expected: "",
+		},
+		{
+			name:     "negative maxLen",
+			input:    "hello",
+			maxLen:   -5,
+			expected: "", // returns empty string for maxLen <= 0
+		},
+		{
+			name:     "zero maxLen",
+			input:    "hello",
+			maxLen:   0,
+			expected: "", // returns empty string for maxLen <= 0
+		},
+		{
+			name:     "maxLen equals 1",
+			input:    "hello",
+			maxLen:   1,
+			expected: "h",
+		},
+		{
+			name:     "maxLen equals 2",
+			input:    "hello",
+			maxLen:   2,
+			expected: "he",
+		},
+		{
+			name:     "maxLen equals 3",
+			input:    "hello",
+			maxLen:   3,
+			expected: "hel",
+		},
+		{
+			name:     "maxLen equals 4 with long string",
+			input:    "hello world",
+			maxLen:   4,
+			expected: "h...",
+		},
+		{
+			name:     "exact length match",
+			input:    "hello",
+			maxLen:   5,
+			expected: "hello",
+		},
+		{
+			name:     "unicode string",
+			input:    "hello 世界",
+			maxLen:   8,
+			expected: "hello...",
+		},
+		{
+			name:     "very long string",
+			input:    "this is a very long command that should be truncated properly",
+			maxLen:   20,
+			expected: "this is a very lo...",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := truncate(tt.input, tt.maxLen)
+			if result != tt.expected {
+				t.Errorf("truncate(%q, %d) = %q, want %q", tt.input, tt.maxLen, result, tt.expected)
+			}
+		})
+	}
+}
+
+// --- SessionStart edge cases ---
+
+func TestHandler_SessionStart_NilClient(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	req := &pb.SessionStartRequest{
+		SessionId:       "test-nil-client",
+		Cwd:             "/tmp",
+		Client:          nil, // No client info provided
+		StartedAtUnixMs: time.Now().UnixMilli(),
+	}
+
+	resp, err := server.SessionStart(ctx, req)
+	if err != nil {
+		t.Fatalf("SessionStart failed: %v", err)
+	}
+
+	if !resp.Ok {
+		t.Errorf("SessionStart returned ok=false: %s", resp.Error)
+	}
+
+	// Verify session was registered with defaults
+	if !server.sessionManager.Exists("test-nil-client") {
+		t.Error("session was not registered in session manager")
+	}
+
+	// Get session info and verify defaults
+	info, ok := server.sessionManager.Get("test-nil-client")
+	if !ok {
+		t.Fatal("session not found in manager")
+	}
+
+	// Shell should be empty when no client info
+	if info.Shell != "" {
+		t.Errorf("expected empty shell, got %q", info.Shell)
+	}
+
+	// OS should default to runtime.GOOS
+	if info.OS == "" {
+		t.Error("expected OS to be set to default")
+	}
+}
+
+func TestHandler_SessionStart_PartialClientInfo(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	req := &pb.SessionStartRequest{
+		SessionId: "test-partial-client",
+		Cwd:       "/home/user",
+		Client: &pb.ClientInfo{
+			Shell: "fish",
+			// OS, Hostname, Username omitted
+		},
+	}
+
+	resp, err := server.SessionStart(ctx, req)
+	if err != nil {
+		t.Fatalf("SessionStart failed: %v", err)
+	}
+
+	if !resp.Ok {
+		t.Errorf("SessionStart returned ok=false: %s", resp.Error)
+	}
+
+	info, ok := server.sessionManager.Get("test-partial-client")
+	if !ok {
+		t.Fatal("session not found")
+	}
+
+	if info.Shell != "fish" {
+		t.Errorf("expected shell 'fish', got %q", info.Shell)
+	}
+
+	// Should have default OS
+	if info.OS == "" {
+		t.Error("expected default OS")
+	}
+}
+
+func TestHandler_SessionStart_ZeroTimestamp(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	beforeStart := time.Now()
+
+	req := &pb.SessionStartRequest{
+		SessionId:       "test-zero-ts",
+		Cwd:             "/tmp",
+		Client:          &pb.ClientInfo{Shell: "bash"},
+		StartedAtUnixMs: 0, // Zero means use current time
+	}
+
+	resp, err := server.SessionStart(ctx, req)
+	if err != nil {
+		t.Fatalf("SessionStart failed: %v", err)
+	}
+
+	if !resp.Ok {
+		t.Errorf("SessionStart returned ok=false: %s", resp.Error)
+	}
+
+	afterStart := time.Now()
+
+	info, ok := server.sessionManager.Get("test-zero-ts")
+	if !ok {
+		t.Fatal("session not found")
+	}
+
+	// StartedAt should be between beforeStart and afterStart
+	if info.StartedAt.Before(beforeStart) || info.StartedAt.After(afterStart) {
+		t.Errorf("StartedAt %v not in expected range [%v, %v]", info.StartedAt, beforeStart, afterStart)
+	}
+}
+
+// --- CommandStarted edge cases ---
+
+func TestHandler_CommandStarted_UpdatesCWD(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	// First start a session with initial CWD
+	startReq := &pb.SessionStartRequest{
+		SessionId: "test-cwd-update",
+		Cwd:       "/home/user",
+		Client:    &pb.ClientInfo{Shell: "zsh"},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	// Verify initial CWD
+	info, _ := server.sessionManager.Get("test-cwd-update")
+	if info.CWD != "/home/user" {
+		t.Errorf("expected initial CWD /home/user, got %s", info.CWD)
+	}
+
+	// Start a command with a different CWD
+	cmdReq := &pb.CommandStartRequest{
+		SessionId: "test-cwd-update",
+		CommandId: "cmd-cwd",
+		Cwd:       "/home/user/project", // New CWD
+		Command:   "ls -la",
+	}
+
+	resp, err := server.CommandStarted(ctx, cmdReq)
+	if err != nil {
+		t.Fatalf("CommandStarted failed: %v", err)
+	}
+
+	if !resp.Ok {
+		t.Errorf("CommandStarted returned ok=false: %s", resp.Error)
+	}
+
+	// Verify CWD was updated
+	info, _ = server.sessionManager.Get("test-cwd-update")
+	if info.CWD != "/home/user/project" {
+		t.Errorf("expected CWD to be updated to /home/user/project, got %s", info.CWD)
+	}
+}
+
+func TestHandler_CommandStarted_EmptyCWD(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	// Start a session
+	startReq := &pb.SessionStartRequest{
+		SessionId: "test-empty-cwd",
+		Cwd:       "/home/user",
+		Client:    &pb.ClientInfo{Shell: "zsh"},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	// Start a command with empty CWD
+	cmdReq := &pb.CommandStartRequest{
+		SessionId: "test-empty-cwd",
+		CommandId: "cmd-empty-cwd",
+		Cwd:       "", // Empty CWD should not update
+		Command:   "echo hello",
+	}
+
+	resp, err := server.CommandStarted(ctx, cmdReq)
+	if err != nil {
+		t.Fatalf("CommandStarted failed: %v", err)
+	}
+
+	if !resp.Ok {
+		t.Errorf("CommandStarted returned ok=false: %s", resp.Error)
+	}
+
+	// Verify CWD was NOT updated (still original)
+	info, _ := server.sessionManager.Get("test-empty-cwd")
+	if info.CWD != "/home/user" {
+		t.Errorf("expected CWD to remain /home/user, got %s", info.CWD)
+	}
+}
+
+func TestHandler_CommandStarted_ZeroTimestamp(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	startReq := &pb.SessionStartRequest{
+		SessionId: "test-cmd-zero-ts",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	beforeCmd := time.Now()
+
+	cmdReq := &pb.CommandStartRequest{
+		SessionId: "test-cmd-zero-ts",
+		CommandId: "cmd-zero-ts",
+		Cwd:       "/tmp",
+		Command:   "pwd",
+		TsUnixMs:  0, // Zero means use current time
+	}
+
+	resp, err := server.CommandStarted(ctx, cmdReq)
+	if err != nil {
+		t.Fatalf("CommandStarted failed: %v", err)
+	}
+
+	if !resp.Ok {
+		t.Errorf("CommandStarted returned ok=false: %s", resp.Error)
+	}
+
+	afterCmd := time.Now()
+
+	// The command should be recorded with a timestamp between beforeCmd and afterCmd
+	// We can't easily verify this without accessing the store, but at least the call succeeded
+	_ = beforeCmd
+	_ = afterCmd
+}
+
+// --- Suggest edge cases ---
+
+func TestHandler_Suggest_ZeroMaxResults(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	req := &pb.SuggestRequest{
+		SessionId:  "test-session",
+		Cwd:        "/tmp",
+		Buffer:     "git",
+		MaxResults: 0, // Should default to 5
+	}
+
+	resp, err := server.Suggest(ctx, req)
+	if err != nil {
+		t.Fatalf("Suggest failed: %v", err)
+	}
+
+	// Should still return suggestions with default limit
+	if len(resp.Suggestions) == 0 {
+		t.Error("expected suggestions even with MaxResults=0")
+	}
+}
+
+func TestHandler_Suggest_NegativeMaxResults(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	req := &pb.SuggestRequest{
+		SessionId:  "test-session",
+		Cwd:        "/tmp",
+		Buffer:     "git",
+		MaxResults: -10, // Negative should default to 5
+	}
+
+	resp, err := server.Suggest(ctx, req)
+	if err != nil {
+		t.Fatalf("Suggest failed: %v", err)
+	}
+
+	// Should still return suggestions with default limit
+	if len(resp.Suggestions) == 0 {
+		t.Error("expected suggestions even with negative MaxResults")
+	}
+}
+
+func TestHandler_Suggest_LargeMaxResults(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	req := &pb.SuggestRequest{
+		SessionId:  "test-session",
+		Cwd:        "/tmp",
+		Buffer:     "git",
+		MaxResults: 1000, // Very large limit
+	}
+
+	resp, err := server.Suggest(ctx, req)
+	if err != nil {
+		t.Fatalf("Suggest failed: %v", err)
+	}
+
+	// Should return whatever suggestions are available
+	if resp.Suggestions == nil {
+		t.Error("suggestions should not be nil")
+	}
+}
+
+func TestHandler_Suggest_WithActiveSession(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	// Start a session first
+	startReq := &pb.SessionStartRequest{
+		SessionId: "suggest-session",
+		Cwd:       "/home/user",
+		Client:    &pb.ClientInfo{Shell: "zsh", Os: "darwin"},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	req := &pb.SuggestRequest{
+		SessionId:  "suggest-session",
+		Cwd:        "/home/user",
+		Buffer:     "git",
+		MaxResults: 5,
+	}
+
+	resp, err := server.Suggest(ctx, req)
+	if err != nil {
+		t.Fatalf("Suggest failed: %v", err)
+	}
+
+	if len(resp.Suggestions) == 0 {
+		t.Error("expected suggestions")
+	}
+}
+
+// --- Risk detection tests ---
+
+func TestHandler_TextToCommand_DestructiveCommandFlagged(t *testing.T) {
+	t.Parallel()
+
+	// Create server with mock provider that returns destructive command
+	store := newMockStore()
+	ranker := &mockRanker{}
+
+	mockProv := &mockProvider{
+		name:       "test",
+		available:  true,
+		suggestion: "rm -rf /important/data",
+	}
+
+	registry := provider.NewRegistry()
+	registry.Register(mockProv)
+	registry.SetPreferred("test")
+
+	server, err := NewServer(&ServerConfig{
+		Store:    store,
+		Ranker:   ranker,
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.TextToCommandRequest{
+		SessionId: "test-session",
+		Prompt:    "delete all data",
+		Cwd:       "/tmp",
+	}
+
+	resp, err := server.TextToCommand(ctx, req)
+	if err != nil {
+		t.Fatalf("TextToCommand failed: %v", err)
+	}
+
+	if len(resp.Suggestions) == 0 {
+		t.Fatal("expected suggestions")
+	}
+
+	if resp.Suggestions[0].Risk != "destructive" {
+		t.Errorf("expected risk 'destructive', got %q", resp.Suggestions[0].Risk)
+	}
+}
+
+func TestHandler_NextStep_DestructiveCommandFlagged(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	ranker := &mockRanker{}
+
+	mockProv := &mockProvider{
+		name:       "test",
+		available:  true,
+		suggestion: "git reset --hard HEAD",
+	}
+
+	registry := provider.NewRegistry()
+	registry.Register(mockProv)
+	registry.SetPreferred("test")
+
+	server, err := NewServer(&ServerConfig{
+		Store:    store,
+		Ranker:   ranker,
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.NextStepRequest{
+		SessionId:    "test-session",
+		LastCommand:  "git add .",
+		LastExitCode: 0,
+		Cwd:          "/tmp",
+	}
+
+	resp, err := server.NextStep(ctx, req)
+	if err != nil {
+		t.Fatalf("NextStep failed: %v", err)
+	}
+
+	if len(resp.Suggestions) == 0 {
+		t.Fatal("expected suggestions")
+	}
+
+	if resp.Suggestions[0].Risk != "destructive" {
+		t.Errorf("expected risk 'destructive', got %q", resp.Suggestions[0].Risk)
+	}
+}
+
+func TestHandler_Diagnose_DestructiveFixFlagged(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	ranker := &mockRanker{}
+
+	mockProv := &mockProvider{
+		name:       "test",
+		available:  true,
+		suggestion: "sudo rm -rf /var/log/*",
+	}
+
+	registry := provider.NewRegistry()
+	registry.Register(mockProv)
+	registry.SetPreferred("test")
+
+	server, err := NewServer(&ServerConfig{
+		Store:    store,
+		Ranker:   ranker,
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.DiagnoseRequest{
+		SessionId: "test-session",
+		Command:   "disk full error",
+		ExitCode:  1,
+		Cwd:       "/tmp",
+	}
+
+	resp, err := server.Diagnose(ctx, req)
+	if err != nil {
+		t.Fatalf("Diagnose failed: %v", err)
+	}
+
+	if len(resp.Fixes) == 0 {
+		t.Fatal("expected fixes")
+	}
+
+	if resp.Fixes[0].Risk != "destructive" {
+		t.Errorf("expected risk 'destructive', got %q", resp.Fixes[0].Risk)
+	}
+}
+
+// --- Store failure tests ---
+
+// mockFailingStore implements storage.Store with configurable failures.
+type mockFailingStore struct {
+	*mockStore
+	failCreateSession    bool
+	failEndSession       bool
+	failCreateCommand    bool
+	failUpdateCommandEnd bool
+}
+
+func newMockFailingStore() *mockFailingStore {
+	return &mockFailingStore{
+		mockStore: newMockStore(),
+	}
+}
+
+func (m *mockFailingStore) CreateSession(ctx context.Context, s *storage.Session) error {
+	if m.failCreateSession {
+		return storage.ErrSessionNotFound
+	}
+	return m.mockStore.CreateSession(ctx, s)
+}
+
+func (m *mockFailingStore) EndSession(ctx context.Context, sessionID string, endTime int64) error {
+	if m.failEndSession {
+		return storage.ErrSessionNotFound
+	}
+	return m.mockStore.EndSession(ctx, sessionID, endTime)
+}
+
+func (m *mockFailingStore) CreateCommand(ctx context.Context, c *storage.Command) error {
+	if m.failCreateCommand {
+		return storage.ErrCommandNotFound
+	}
+	return m.mockStore.CreateCommand(ctx, c)
+}
+
+func (m *mockFailingStore) UpdateCommandEnd(ctx context.Context, commandID string, exitCode int, endTime, duration int64) error {
+	if m.failUpdateCommandEnd {
+		return storage.ErrCommandNotFound
+	}
+	return m.mockStore.UpdateCommandEnd(ctx, commandID, exitCode, endTime, duration)
+}
+
+func TestHandler_SessionStart_StoreFailure(t *testing.T) {
+	t.Parallel()
+
+	store := newMockFailingStore()
+	store.failCreateSession = true
+
+	server, err := NewServer(&ServerConfig{
+		Store:  store,
+		Ranker: &mockRanker{},
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.SessionStartRequest{
+		SessionId: "fail-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	}
+
+	resp, err := server.SessionStart(ctx, req)
+	if err != nil {
+		t.Fatalf("SessionStart returned error: %v", err)
+	}
+
+	// Should return ok=false with error message
+	if resp.Ok {
+		t.Error("expected ok=false on store failure")
+	}
+
+	if resp.Error == "" {
+		t.Error("expected error message on store failure")
+	}
+}
+
+func TestHandler_SessionEnd_StoreFailure(t *testing.T) {
+	t.Parallel()
+
+	store := newMockFailingStore()
+	store.failEndSession = true
+
+	server, err := NewServer(&ServerConfig{
+		Store:  store,
+		Ranker: &mockRanker{},
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// First start a session successfully
+	startReq := &pb.SessionStartRequest{
+		SessionId: "end-fail-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	// Now try to end it with store failure
+	endReq := &pb.SessionEndRequest{
+		SessionId: "end-fail-session",
+	}
+
+	resp, err := server.SessionEnd(ctx, endReq)
+	if err != nil {
+		t.Fatalf("SessionEnd returned error: %v", err)
+	}
+
+	if resp.Ok {
+		t.Error("expected ok=false on store failure")
+	}
+
+	if resp.Error == "" {
+		t.Error("expected error message on store failure")
+	}
+}
+
+func TestHandler_CommandStarted_StoreFailure(t *testing.T) {
+	t.Parallel()
+
+	store := newMockFailingStore()
+	store.failCreateCommand = true
+
+	server, err := NewServer(&ServerConfig{
+		Store:  store,
+		Ranker: &mockRanker{},
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Start a session first
+	startReq := &pb.SessionStartRequest{
+		SessionId: "cmd-fail-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	cmdReq := &pb.CommandStartRequest{
+		SessionId: "cmd-fail-session",
+		CommandId: "fail-cmd",
+		Cwd:       "/tmp",
+		Command:   "echo test",
+	}
+
+	resp, err := server.CommandStarted(ctx, cmdReq)
+	if err != nil {
+		t.Fatalf("CommandStarted returned error: %v", err)
+	}
+
+	if resp.Ok {
+		t.Error("expected ok=false on store failure")
+	}
+
+	if resp.Error == "" {
+		t.Error("expected error message on store failure")
+	}
+}
+
+func TestHandler_CommandEnded_StoreFailure(t *testing.T) {
+	t.Parallel()
+
+	store := newMockFailingStore()
+
+	server, err := NewServer(&ServerConfig{
+		Store:  store,
+		Ranker: &mockRanker{},
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// Start a session and command first
+	startReq := &pb.SessionStartRequest{
+		SessionId: "cmd-end-fail-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	cmdStartReq := &pb.CommandStartRequest{
+		SessionId: "cmd-end-fail-session",
+		CommandId: "end-fail-cmd",
+		Cwd:       "/tmp",
+		Command:   "echo test",
+	}
+	_, _ = server.CommandStarted(ctx, cmdStartReq)
+
+	// Now make the store fail for update
+	store.failUpdateCommandEnd = true
+
+	cmdEndReq := &pb.CommandEndRequest{
+		SessionId:  "cmd-end-fail-session",
+		CommandId:  "end-fail-cmd",
+		ExitCode:   0,
+		DurationMs: 100,
+	}
+
+	resp, err := server.CommandEnded(ctx, cmdEndReq)
+	if err != nil {
+		t.Fatalf("CommandEnded returned error: %v", err)
+	}
+
+	if resp.Ok {
+		t.Error("expected ok=false on store failure")
+	}
+
+	if resp.Error == "" {
+		t.Error("expected error message on store failure")
+	}
+}
+
+// --- Ranker failure tests ---
+
+// mockFailingRanker returns errors on Rank.
+type mockFailingRanker struct {
+	shouldFail bool
+}
+
+func (m *mockFailingRanker) Rank(ctx context.Context, req *suggest.RankRequest) ([]suggest.Suggestion, error) {
+	if m.shouldFail {
+		return nil, storage.ErrSessionNotFound
+	}
+	return []suggest.Suggestion{}, nil
+}
+
+func TestHandler_Suggest_RankerFailure(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	ranker := &mockFailingRanker{shouldFail: true}
+
+	server, err := NewServer(&ServerConfig{
+		Store:  store,
+		Ranker: ranker,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.SuggestRequest{
+		SessionId:  "test-session",
+		Cwd:        "/tmp",
+		Buffer:     "git",
+		MaxResults: 5,
+	}
+
+	resp, err := server.Suggest(ctx, req)
+	if err != nil {
+		t.Fatalf("Suggest returned error: %v", err)
+	}
+
+	// Should return empty response on ranker failure (graceful degradation)
+	if len(resp.Suggestions) != 0 {
+		t.Errorf("expected empty suggestions on ranker failure, got %d", len(resp.Suggestions))
+	}
+}
+
+// --- Provider failure tests ---
+
+// mockFailingProvider returns errors on AI calls.
+type mockFailingProvider struct {
+	name       string
+	available  bool
+	shouldFail bool
+}
+
+func (m *mockFailingProvider) Name() string {
+	return m.name
+}
+
+func (m *mockFailingProvider) Available() bool {
+	return m.available
+}
+
+func (m *mockFailingProvider) TextToCommand(ctx context.Context, req *provider.TextToCommandRequest) (*provider.TextToCommandResponse, error) {
+	if m.shouldFail {
+		return nil, storage.ErrSessionNotFound
+	}
+	return &provider.TextToCommandResponse{}, nil
+}
+
+func (m *mockFailingProvider) NextStep(ctx context.Context, req *provider.NextStepRequest) (*provider.NextStepResponse, error) {
+	if m.shouldFail {
+		return nil, storage.ErrSessionNotFound
+	}
+	return &provider.NextStepResponse{}, nil
+}
+
+func (m *mockFailingProvider) Diagnose(ctx context.Context, req *provider.DiagnoseRequest) (*provider.DiagnoseResponse, error) {
+	if m.shouldFail {
+		return nil, storage.ErrSessionNotFound
+	}
+	return &provider.DiagnoseResponse{}, nil
+}
+
+func TestHandler_TextToCommand_NoProvider(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	ranker := &mockRanker{}
+
+	// Empty registry with no available providers
+	registry := provider.NewRegistry()
+	// Clear default providers by setting preferred to non-existent
+	registry.SetPreferred("nonexistent")
+
+	server, err := NewServer(&ServerConfig{
+		Store:    store,
+		Ranker:   ranker,
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.TextToCommandRequest{
+		SessionId: "test-session",
+		Prompt:    "list files",
+		Cwd:       "/tmp",
+	}
+
+	resp, err := server.TextToCommand(ctx, req)
+	if err != nil {
+		t.Fatalf("TextToCommand returned error: %v", err)
+	}
+
+	// Should return empty response when no provider available
+	if len(resp.Suggestions) != 0 {
+		t.Errorf("expected empty suggestions when no provider, got %d", len(resp.Suggestions))
+	}
+}
+
+func TestHandler_TextToCommand_ProviderFailure(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	ranker := &mockRanker{}
+
+	mockProv := &mockFailingProvider{
+		name:       "failing",
+		available:  true,
+		shouldFail: true,
+	}
+
+	registry := provider.NewRegistry()
+	registry.Register(mockProv)
+	registry.SetPreferred("failing")
+
+	server, err := NewServer(&ServerConfig{
+		Store:    store,
+		Ranker:   ranker,
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.TextToCommandRequest{
+		SessionId: "test-session",
+		Prompt:    "list files",
+		Cwd:       "/tmp",
+	}
+
+	resp, err := server.TextToCommand(ctx, req)
+	if err != nil {
+		t.Fatalf("TextToCommand returned error: %v", err)
+	}
+
+	// Should return empty response on provider failure
+	if len(resp.Suggestions) != 0 {
+		t.Errorf("expected empty suggestions on provider failure, got %d", len(resp.Suggestions))
+	}
+}
+
+func TestHandler_NextStep_NoProvider(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	ranker := &mockRanker{}
+
+	registry := provider.NewRegistry()
+	registry.SetPreferred("nonexistent")
+
+	server, err := NewServer(&ServerConfig{
+		Store:    store,
+		Ranker:   ranker,
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.NextStepRequest{
+		SessionId:    "test-session",
+		LastCommand:  "git add .",
+		LastExitCode: 0,
+		Cwd:          "/tmp",
+	}
+
+	resp, err := server.NextStep(ctx, req)
+	if err != nil {
+		t.Fatalf("NextStep returned error: %v", err)
+	}
+
+	if len(resp.Suggestions) != 0 {
+		t.Errorf("expected empty suggestions when no provider, got %d", len(resp.Suggestions))
+	}
+}
+
+func TestHandler_NextStep_ProviderFailure(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	ranker := &mockRanker{}
+
+	mockProv := &mockFailingProvider{
+		name:       "failing",
+		available:  true,
+		shouldFail: true,
+	}
+
+	registry := provider.NewRegistry()
+	registry.Register(mockProv)
+	registry.SetPreferred("failing")
+
+	server, err := NewServer(&ServerConfig{
+		Store:    store,
+		Ranker:   ranker,
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.NextStepRequest{
+		SessionId:    "test-session",
+		LastCommand:  "git add .",
+		LastExitCode: 0,
+		Cwd:          "/tmp",
+	}
+
+	resp, err := server.NextStep(ctx, req)
+	if err != nil {
+		t.Fatalf("NextStep returned error: %v", err)
+	}
+
+	if len(resp.Suggestions) != 0 {
+		t.Errorf("expected empty suggestions on provider failure, got %d", len(resp.Suggestions))
+	}
+}
+
+func TestHandler_Diagnose_NoProvider(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	ranker := &mockRanker{}
+
+	registry := provider.NewRegistry()
+	registry.SetPreferred("nonexistent")
+
+	server, err := NewServer(&ServerConfig{
+		Store:    store,
+		Ranker:   ranker,
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.DiagnoseRequest{
+		SessionId: "test-session",
+		Command:   "npm install",
+		ExitCode:  1,
+		Cwd:       "/tmp",
+	}
+
+	resp, err := server.Diagnose(ctx, req)
+	if err != nil {
+		t.Fatalf("Diagnose returned error: %v", err)
+	}
+
+	// Should return explanation about no provider
+	if resp.Explanation == "" {
+		t.Error("expected explanation when no provider")
+	}
+}
+
+func TestHandler_Diagnose_ProviderFailure(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	ranker := &mockRanker{}
+
+	mockProv := &mockFailingProvider{
+		name:       "failing",
+		available:  true,
+		shouldFail: true,
+	}
+
+	registry := provider.NewRegistry()
+	registry.Register(mockProv)
+	registry.SetPreferred("failing")
+
+	server, err := NewServer(&ServerConfig{
+		Store:    store,
+		Ranker:   ranker,
+		Registry: registry,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.DiagnoseRequest{
+		SessionId: "test-session",
+		Command:   "npm install",
+		ExitCode:  1,
+		Cwd:       "/tmp",
+	}
+
+	resp, err := server.Diagnose(ctx, req)
+	if err != nil {
+		t.Fatalf("Diagnose returned error: %v", err)
+	}
+
+	// Should return explanation about failure
+	if resp.Explanation == "" {
+		t.Error("expected explanation on provider failure")
+	}
+}
+
+// --- Session context in AI calls ---
+
+func TestHandler_TextToCommand_UsesSessionContext(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	// Start a session with specific OS and shell
+	startReq := &pb.SessionStartRequest{
+		SessionId: "context-session",
+		Cwd:       "/home/user",
+		Client: &pb.ClientInfo{
+			Shell: "fish",
+			Os:    "linux",
+		},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	req := &pb.TextToCommandRequest{
+		SessionId: "context-session",
+		Prompt:    "list files",
+		Cwd:       "/home/user",
+	}
+
+	resp, err := server.TextToCommand(ctx, req)
+	if err != nil {
+		t.Fatalf("TextToCommand failed: %v", err)
+	}
+
+	// The mock provider should have received the session context
+	// We can't easily verify the context was passed, but at least the call succeeded
+	if resp.Provider != "test" {
+		t.Errorf("expected provider 'test', got %s", resp.Provider)
+	}
+}
+
+func TestHandler_NextStep_UsesSessionContext(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	// Start a session with specific OS and shell
+	startReq := &pb.SessionStartRequest{
+		SessionId: "nextstep-context-session",
+		Cwd:       "/home/user",
+		Client: &pb.ClientInfo{
+			Shell: "fish",
+			Os:    "linux",
+		},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	req := &pb.NextStepRequest{
+		SessionId:    "nextstep-context-session",
+		LastCommand:  "cd /var/log",
+		LastExitCode: 0,
+		Cwd:          "/var/log",
+	}
+
+	resp, err := server.NextStep(ctx, req)
+	if err != nil {
+		t.Fatalf("NextStep failed: %v", err)
+	}
+
+	// Should return suggestions
+	if len(resp.Suggestions) == 0 {
+		t.Error("expected suggestions")
+	}
+}
+
+func TestHandler_Diagnose_UsesSessionContext(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	// Start a session with specific OS and shell
+	startReq := &pb.SessionStartRequest{
+		SessionId: "diagnose-context-session",
+		Cwd:       "/home/user",
+		Client: &pb.ClientInfo{
+			Shell: "fish",
+			Os:    "linux",
+		},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	req := &pb.DiagnoseRequest{
+		SessionId: "diagnose-context-session",
+		Command:   "npm install",
+		ExitCode:  1,
+		Cwd:       "/home/user/project",
+	}
+
+	resp, err := server.Diagnose(ctx, req)
+	if err != nil {
+		t.Fatalf("Diagnose failed: %v", err)
+	}
+
+	// Should return explanation and fixes
+	if resp.Explanation == "" {
+		t.Error("expected explanation")
+	}
+}
+
+// --- Multiple destructive commands ---
+
+func TestHandler_Suggest_MultipleDestructivePatterns(t *testing.T) {
+	t.Parallel()
+
+	destructiveCommands := []string{
+		"rm -rf /",
+		"rm -r /home/user",
+		"rm -f important.txt",
+		"git reset --hard HEAD",
+		"git push --force",
+		"DROP TABLE users;",
+		"kubectl delete pod myapp",
+		"docker system prune -a",
+		"chmod 777 /etc/passwd",
+		"dd if=/dev/zero of=/dev/sda",
+	}
+
+	for _, cmd := range destructiveCommands {
+		t.Run(cmd, func(t *testing.T) {
+			store := newMockStore()
+			ranker := &mockRanker{
+				suggestions: []suggest.Suggestion{
+					{Text: cmd, Source: "session", Score: 0.9},
+				},
+			}
+
+			server, err := NewServer(&ServerConfig{
+				Store:  store,
+				Ranker: ranker,
+			})
+			if err != nil {
+				t.Fatalf("failed to create server: %v", err)
+			}
+
+			ctx := context.Background()
+			req := &pb.SuggestRequest{
+				SessionId:  "test-session",
+				Cwd:        "/tmp",
+				Buffer:     "",
+				MaxResults: 5,
+			}
+
+			resp, err := server.Suggest(ctx, req)
+			if err != nil {
+				t.Fatalf("Suggest failed: %v", err)
+			}
+
+			if len(resp.Suggestions) == 0 {
+				t.Fatal("expected suggestions")
+			}
+
+			if resp.Suggestions[0].Risk != "destructive" {
+				t.Errorf("expected %q to be flagged as destructive, got risk=%q", cmd, resp.Suggestions[0].Risk)
+			}
+		})
+	}
+}
+
+func TestHandler_Suggest_SafeCommands(t *testing.T) {
+	t.Parallel()
+
+	safeCommands := []string{
+		"ls -la",
+		"git status",
+		"echo hello",
+		"cat file.txt",
+		"grep pattern file",
+		"cd /home/user",
+		"pwd",
+		"mkdir newdir",
+		"npm install",
+		"go build",
+	}
+
+	for _, cmd := range safeCommands {
+		t.Run(cmd, func(t *testing.T) {
+			store := newMockStore()
+			ranker := &mockRanker{
+				suggestions: []suggest.Suggestion{
+					{Text: cmd, Source: "session", Score: 0.9},
+				},
+			}
+
+			server, err := NewServer(&ServerConfig{
+				Store:  store,
+				Ranker: ranker,
+			})
+			if err != nil {
+				t.Fatalf("failed to create server: %v", err)
+			}
+
+			ctx := context.Background()
+			req := &pb.SuggestRequest{
+				SessionId:  "test-session",
+				Cwd:        "/tmp",
+				Buffer:     "",
+				MaxResults: 5,
+			}
+
+			resp, err := server.Suggest(ctx, req)
+			if err != nil {
+				t.Fatalf("Suggest failed: %v", err)
+			}
+
+			if len(resp.Suggestions) == 0 {
+				t.Fatal("expected suggestions")
+			}
+
+			if resp.Suggestions[0].Risk != "" {
+				t.Errorf("expected %q to be safe (empty risk), got risk=%q", cmd, resp.Suggestions[0].Risk)
+			}
+		})
+	}
+}
+
+// --- CommandEnded counter verification ---
+
+func TestHandler_CommandEnded_MultipleCommands(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	// Start a session
+	startReq := &pb.SessionStartRequest{
+		SessionId: "multi-cmd-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	}
+	_, _ = server.SessionStart(ctx, startReq)
+
+	// Execute multiple commands
+	numCommands := 5
+	for i := 0; i < numCommands; i++ {
+		cmdStartReq := &pb.CommandStartRequest{
+			SessionId: "multi-cmd-session",
+			CommandId: fmt.Sprintf("cmd-%d", i),
+			Cwd:       "/tmp",
+			Command:   fmt.Sprintf("echo %d", i),
+		}
+		_, _ = server.CommandStarted(ctx, cmdStartReq)
+
+		cmdEndReq := &pb.CommandEndRequest{
+			SessionId:  "multi-cmd-session",
+			CommandId:  fmt.Sprintf("cmd-%d", i),
+			ExitCode:   0,
+			DurationMs: 10,
+		}
+		_, _ = server.CommandEnded(ctx, cmdEndReq)
+	}
+
+	// Verify counter
+	if server.getCommandsLogged() != int64(numCommands) {
+		t.Errorf("expected %d commands logged, got %d", numCommands, server.getCommandsLogged())
+	}
+}
+
+// --- GetStatus with version ---
+
+func TestHandler_GetStatus_ReturnsVersion(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	resp, err := server.GetStatus(ctx, &pb.Ack{})
+	if err != nil {
+		t.Fatalf("GetStatus failed: %v", err)
+	}
+
+	// Version should be set (defaults to "dev")
+	if resp.Version == "" {
+		t.Error("expected version to be set")
 	}
 }

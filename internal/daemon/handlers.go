@@ -184,9 +184,13 @@ func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.Sugge
 
 	// Get the last command from the session for affinity scoring
 	lastCommand := ""
-	if info, ok := s.sessionManager.Get(req.SessionId); ok {
-		// Could query the last command from DB, but for now use empty
-		_ = info
+	sessionID := req.SessionId
+	cmds, err := s.store.QueryCommands(ctx, storage.CommandQuery{
+		SessionID: &sessionID,
+		Limit:     1,
+	})
+	if err == nil && len(cmds) > 0 {
+		lastCommand = cmds[0].Command
 	}
 
 	// Rank suggestions from history
@@ -242,16 +246,7 @@ func (s *Server) TextToCommand(ctx context.Context, req *pb.TextToCommandRequest
 	}
 
 	// Get session info for context
-	osName := runtime.GOOS
-	shell := "bash"
-	if info, ok := s.sessionManager.Get(req.SessionId); ok {
-		if info.OS != "" {
-			osName = info.OS
-		}
-		if info.Shell != "" {
-			shell = info.Shell
-		}
-	}
+	osName, shell := s.getSessionContext(req.SessionId)
 
 	// Build AI request
 	aiReq := &provider.TextToCommandRequest{
@@ -310,16 +305,7 @@ func (s *Server) NextStep(ctx context.Context, req *pb.NextStepRequest) (*pb.Nex
 	}
 
 	// Get session info for context
-	osName := runtime.GOOS
-	shell := "bash"
-	if info, ok := s.sessionManager.Get(req.SessionId); ok {
-		if info.OS != "" {
-			osName = info.OS
-		}
-		if info.Shell != "" {
-			shell = info.Shell
-		}
-	}
+	osName, shell := s.getSessionContext(req.SessionId)
 
 	// Build AI request
 	aiReq := &provider.NextStepRequest{
@@ -377,16 +363,7 @@ func (s *Server) Diagnose(ctx context.Context, req *pb.DiagnoseRequest) (*pb.Dia
 	}
 
 	// Get session info for context
-	osName := runtime.GOOS
-	shell := "bash"
-	if info, ok := s.sessionManager.Get(req.SessionId); ok {
-		if info.OS != "" {
-			osName = info.OS
-		}
-		if info.Shell != "" {
-			shell = info.Shell
-		}
-	}
+	osName, shell := s.getSessionContext(req.SessionId)
 
 	// Build AI request
 	aiReq := &provider.DiagnoseRequest{
@@ -456,6 +433,9 @@ func (s *Server) GetStatus(ctx context.Context, req *pb.Ack) (*pb.StatusResponse
 
 // truncate truncates a string to the given length with "..." suffix.
 func truncate(s string, maxLen int) string {
+	if maxLen <= 0 {
+		return ""
+	}
 	if len(s) <= maxLen {
 		return s
 	}
@@ -463,4 +443,20 @@ func truncate(s string, maxLen int) string {
 		return s[:maxLen]
 	}
 	return s[:maxLen-3] + "..."
+}
+
+// getSessionContext retrieves OS and shell information from a session.
+// Returns runtime.GOOS and "bash" as defaults if session not found.
+func (s *Server) getSessionContext(sessionID string) (osName, shell string) {
+	osName = runtime.GOOS
+	shell = "bash"
+	if info, ok := s.sessionManager.Get(sessionID); ok {
+		if info.OS != "" {
+			osName = info.OS
+		}
+		if info.Shell != "" {
+			shell = info.Shell
+		}
+	}
+	return osName, shell
 }

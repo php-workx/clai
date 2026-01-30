@@ -28,6 +28,7 @@ func Run(ctx context.Context, cfg *ServerConfig) error {
 	// Handle signals
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	defer signal.Stop(sigChan)
 
 	go func() {
 		select {
@@ -162,15 +163,40 @@ func WaitForSocket(timeout time.Duration) error {
 
 // WaitForSocketWithPaths waits for the socket using the given paths.
 func WaitForSocketWithPaths(paths *config.Paths, timeout time.Duration) error {
+	return WaitForSocketWithContext(context.Background(), paths, timeout)
+}
+
+// WaitForSocketWithContext waits for the socket using context for cancellation.
+func WaitForSocketWithContext(ctx context.Context, paths *config.Paths, timeout time.Duration) error {
 	socketPath := paths.SocketFile()
-	deadline := time.Now().Add(timeout)
 
-	for time.Now().Before(deadline) {
-		if _, err := os.Stat(socketPath); err == nil {
-			return nil
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.DeadlineExceeded {
+				return fmt.Errorf("socket not available after %v", timeout)
+			}
+			return ctx.Err()
+		default:
+			if _, err := os.Stat(socketPath); err == nil {
+				return nil
+			}
 		}
-		time.Sleep(50 * time.Millisecond)
-	}
 
-	return fmt.Errorf("socket not available after %v", timeout)
+		select {
+		case <-ctx.Done():
+			if ctx.Err() == context.DeadlineExceeded {
+				return fmt.Errorf("socket not available after %v", timeout)
+			}
+			return ctx.Err()
+		case <-ticker.C:
+			// Continue to next iteration
+		}
+	}
 }
