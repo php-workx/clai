@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -178,7 +179,7 @@ func TestWaitForSocketWithContext_Cancelled(t *testing.T) {
 
 	// Should return context.Canceled error
 	err := WaitForSocketWithContext(ctx, paths, 5*time.Second)
-	if err != context.Canceled {
+	if !errors.Is(err, context.Canceled) {
 		t.Errorf("expected context.Canceled, got %v", err)
 	}
 }
