@@ -64,3 +64,5 @@ func shouldDisableColors() bool {
 
 	return false
 }
+
+// test comment
