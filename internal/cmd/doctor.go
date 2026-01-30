@@ -235,12 +235,12 @@ func checkDaemon() checkResult {
 func checkAIProviders() []checkResult {
 	var results []checkResult
 
-	// Check Claude CLI
+	// Check Claude CLI (only supported AI provider)
 	claudePath, err := exec.LookPath("claude")
 	if err != nil {
 		results = append(results, checkResult{
 			name:    "Claude CLI",
-			status:  "warn",
+			status:  "error",
 			message: "Not found. Install from https://claude.ai/cli",
 		})
 	} else {
@@ -248,49 +248,6 @@ func checkAIProviders() []checkResult {
 			name:    "Claude CLI",
 			status:  "ok",
 			message: claudePath,
-		})
-	}
-
-	// Check API keys
-	if os.Getenv("ANTHROPIC_API_KEY") != "" {
-		results = append(results, checkResult{
-			name:    "Anthropic API key",
-			status:  "ok",
-			message: "Set in environment",
-		})
-	} else {
-		results = append(results, checkResult{
-			name:    "Anthropic API key",
-			status:  "warn",
-			message: "Not set (ANTHROPIC_API_KEY)",
-		})
-	}
-
-	if os.Getenv("OPENAI_API_KEY") != "" {
-		results = append(results, checkResult{
-			name:    "OpenAI API key",
-			status:  "ok",
-			message: "Set in environment",
-		})
-	} else {
-		results = append(results, checkResult{
-			name:    "OpenAI API key",
-			status:  "warn",
-			message: "Not set (OPENAI_API_KEY) - OpenAI provider unavailable",
-		})
-	}
-
-	if os.Getenv("GOOGLE_API_KEY") != "" {
-		results = append(results, checkResult{
-			name:    "Google API key",
-			status:  "ok",
-			message: "Set in environment",
-		})
-	} else {
-		results = append(results, checkResult{
-			name:    "Google API key",
-			status:  "warn",
-			message: "Not set (GOOGLE_API_KEY) - Google provider unavailable",
 		})
 	}
 

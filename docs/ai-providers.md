@@ -1,105 +1,23 @@
-# AI Providers
+# AI Integration
 
-clai supports multiple AI providers for intelligent features like voice-to-command, error diagnosis, and smart suggestions.
+clai uses the Claude CLI for intelligent features like voice-to-command, error diagnosis, and smart suggestions.
 
-## Supported Providers
+## Requirements
 
-| Provider | Environment Variable | Models |
-| -------- | -------------------- | ------ |
-| Anthropic | `ANTHROPIC_API_KEY` | claude-3-haiku, claude-3-sonnet, claude-3-opus |
-| OpenAI | `OPENAI_API_KEY` | gpt-4o-mini, gpt-4o, gpt-4-turbo |
-| Google | `GOOGLE_API_KEY` | gemini-1.5-flash, gemini-1.5-pro |
-| Claude CLI | (uses Claude CLI auth) | Configured in Claude CLI |
-
-## Quick Setup
-
-### 1. Get an API Key
-
-**Anthropic (Recommended):**
-1. Go to [console.anthropic.com](https://console.anthropic.com)
-2. Create an account and add credits
-3. Generate an API key
-
-**OpenAI:**
-1. Go to [platform.openai.com](https://platform.openai.com)
-2. Create an account and add credits
-3. Generate an API key
-
-**Google:**
-1. Go to [makersuite.google.com](https://makersuite.google.com)
-2. Create a project
-3. Generate an API key
-
-### 2. Set Environment Variable
-
-Add to your shell RC file (`~/.zshrc` or `~/.bashrc`):
+To use AI features, you need the [Claude CLI](https://claude.ai/cli) installed and authenticated:
 
 ```bash
-# Anthropic
-export ANTHROPIC_API_KEY="sk-ant-api03-..."
-
-# Or OpenAI
-export OPENAI_API_KEY="sk-..."
-
-# Or Google
-export GOOGLE_API_KEY="AIza..."
-```
-
-### 3. Enable AI Features
-
-```bash
-# Enable AI
-clai config set ai.enabled true
-
-# Optionally set provider explicitly
-clai config set ai.provider anthropic
-
-# Verify
-clai doctor
-```
-
-## Provider Configuration
-
-### Auto-Detection (Default)
-
-When `ai.provider` is set to `"auto"` (default), clai checks for API keys in order:
-
-1. `ANTHROPIC_API_KEY` → Uses Anthropic
-2. `OPENAI_API_KEY` → Uses OpenAI
-3. `GOOGLE_API_KEY` → Uses Google
-4. Claude CLI installed → Uses Claude CLI
-
-### Explicit Provider
-
-```bash
-# Set specific provider
-clai config set ai.provider anthropic
-clai config set ai.provider openai
-clai config set ai.provider google
-```
-
-### Custom Model
-
-```bash
-# Use a specific model
-clai config set ai.model claude-3-sonnet-20240229
-clai config set ai.model gpt-4o
-clai config set ai.model gemini-1.5-pro
-```
-
-## Using Claude CLI
-
-If you have the [Claude CLI](https://claude.ai/cli) installed, clai can use it without an API key:
-
-```bash
-# Install Claude CLI (if not installed)
-# See: https://claude.ai/cli
-
-# Authenticate
+# Install Claude CLI (see https://claude.ai/cli)
+# Then authenticate:
 claude login
 
-# clai will auto-detect and use Claude CLI
+# Verify installation
+which claude
+
+# Enable AI features in clai
 clai config set ai.enabled true
+
+# Verify
 clai doctor  # Should show [OK] Claude CLI
 ```
 
@@ -147,7 +65,7 @@ clai config set suggestions.max_ai 3
 
 ## Response Caching
 
-AI responses are cached to reduce API calls and latency:
+AI responses are cached to reduce latency:
 
 ```bash
 # Set cache duration (hours)
@@ -158,13 +76,13 @@ ls ~/.cache/clai/
 ```
 
 Caching behavior:
-- Same natural language query → returns cached response
-- Same error diagnosis → returns cached response
+- Same natural language query returns cached response
+- Same error diagnosis returns cached response
 - Cache is pruned automatically (hourly and on daemon start)
 
 ## Privacy & Sanitization
 
-By default, clai sanitizes sensitive data before sending to AI:
+By default, clai sanitizes sensitive data before sending to Claude:
 
 ```bash
 # Check sanitization status
@@ -181,52 +99,26 @@ Sanitization removes:
 - Private keys
 - Email addresses (optional)
 
-## Cost Considerations
-
-AI providers charge per token. clai is designed to minimize costs:
-
-| Feature | Typical Tokens | Frequency |
-| ------- | -------------- | --------- |
-| Voice-to-command | ~500 | Per query |
-| Error diagnosis | ~1000 | Per failure |
-| Smart suggestions | ~300 | Per request |
-
-Tips to reduce costs:
-- Use `claude-3-haiku` or `gpt-4o-mini` (cheapest models)
-- Increase cache TTL
-- Disable auto-diagnosis if not needed
-- Use history-based suggestions (free) over AI suggestions
-
-```bash
-# Use cheaper model
-clai config set ai.model claude-3-haiku-20240307
-
-# Increase cache duration
-clai config set ai.cache_ttl_hours 48
-
-# Reduce AI suggestions
-clai config set suggestions.max_ai 1
-```
-
 ## Troubleshooting
 
-### API Key Not Detected
+### Claude CLI Not Found
 
 ```bash
-# Check environment variable is set
-echo $ANTHROPIC_API_KEY
+# Check Claude CLI is installed
+which claude
 
-# Verify in clai
-clai doctor
-# Should show: [OK] Anthropic API key - Set in environment
+# If not installed, see https://claude.ai/cli
 ```
 
-### Rate Limiting
+### Not Authenticated
 
-If you hit rate limits:
-- Increase cache TTL
-- Use a cheaper model (often higher limits)
-- Check your API usage dashboard
+```bash
+# Run Claude login
+claude login
+
+# Verify
+claude --version
+```
 
 ### Network Issues
 

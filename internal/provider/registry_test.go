@@ -56,22 +56,16 @@ func TestNewRegistry(t *testing.T) {
 		t.Errorf("NewRegistry() preferred = %q, want %q", r.preferred, "auto")
 	}
 
-	// Should have default providers registered
+	// Should have default provider registered (only anthropic/Claude CLI)
 	if _, ok := r.providers["anthropic"]; !ok {
 		t.Error("NewRegistry() missing anthropic provider")
-	}
-	if _, ok := r.providers["openai"]; !ok {
-		t.Error("NewRegistry() missing openai provider")
-	}
-	if _, ok := r.providers["google"]; !ok {
-		t.Error("NewRegistry() missing google provider")
 	}
 }
 
 func TestNewRegistryWithPreference(t *testing.T) {
-	r := NewRegistryWithPreference("openai")
-	if r.preferred != "openai" {
-		t.Errorf("NewRegistryWithPreference() preferred = %q, want %q", r.preferred, "openai")
+	r := NewRegistryWithPreference("anthropic")
+	if r.preferred != "anthropic" {
+		t.Errorf("NewRegistryWithPreference() preferred = %q, want %q", r.preferred, "anthropic")
 	}
 }
 
@@ -91,17 +85,17 @@ func TestRegistry_Register(t *testing.T) {
 
 func TestRegistry_SetPreferred(t *testing.T) {
 	r := NewRegistry()
-	r.SetPreferred("openai")
-	if r.preferred != "openai" {
-		t.Errorf("SetPreferred() preferred = %q, want %q", r.preferred, "openai")
+	r.SetPreferred("anthropic")
+	if r.preferred != "anthropic" {
+		t.Errorf("SetPreferred() preferred = %q, want %q", r.preferred, "anthropic")
 	}
 }
 
 func TestRegistry_GetPreferred(t *testing.T) {
 	r := NewRegistry()
-	r.preferred = "google"
-	if r.GetPreferred() != "google" {
-		t.Errorf("GetPreferred() = %q, want %q", r.GetPreferred(), "google")
+	r.preferred = "anthropic"
+	if r.GetPreferred() != "anthropic" {
+		t.Errorf("GetPreferred() = %q, want %q", r.GetPreferred(), "anthropic")
 	}
 }
 
@@ -179,38 +173,34 @@ func TestRegistry_GetBest_Auto(t *testing.T) {
 		preferred: "auto",
 	}
 
-	// Register providers with different availability
-	r.providers["anthropic"] = &MockProvider{name: "anthropic", available: false}
-	r.providers["openai"] = &MockProvider{name: "openai", available: true}
-	r.providers["google"] = &MockProvider{name: "google", available: true}
+	// Register anthropic provider (the only supported provider)
+	r.providers["anthropic"] = &MockProvider{name: "anthropic", available: true}
 
 	p, err := r.GetBest()
 	if err != nil {
 		t.Fatalf("GetBest() error = %v", err)
 	}
 
-	// Should return first available in priority order (openai, since anthropic is unavailable)
-	if p.Name() != "openai" {
-		t.Errorf("GetBest() returned provider %q, want %q", p.Name(), "openai")
+	// Should return anthropic
+	if p.Name() != "anthropic" {
+		t.Errorf("GetBest() returned provider %q, want %q", p.Name(), "anthropic")
 	}
 }
 
-func TestRegistry_GetBest_Auto_AllAvailable(t *testing.T) {
+func TestRegistry_GetBest_Auto_Available(t *testing.T) {
 	r := &Registry{
 		providers: make(map[string]Provider),
 		preferred: "auto",
 	}
 
 	r.providers["anthropic"] = &MockProvider{name: "anthropic", available: true}
-	r.providers["openai"] = &MockProvider{name: "openai", available: true}
-	r.providers["google"] = &MockProvider{name: "google", available: true}
 
 	p, err := r.GetBest()
 	if err != nil {
 		t.Fatalf("GetBest() error = %v", err)
 	}
 
-	// Should return anthropic (first in priority)
+	// Should return anthropic (only supported provider)
 	if p.Name() != "anthropic" {
 		t.Errorf("GetBest() returned provider %q, want %q", p.Name(), "anthropic")
 	}
@@ -223,8 +213,6 @@ func TestRegistry_GetBest_Auto_NoneAvailable(t *testing.T) {
 	}
 
 	r.providers["anthropic"] = &MockProvider{name: "anthropic", available: false}
-	r.providers["openai"] = &MockProvider{name: "openai", available: false}
-	r.providers["google"] = &MockProvider{name: "google", available: false}
 
 	_, err := r.GetBest()
 	if err == nil {
@@ -306,7 +294,7 @@ func TestRegistry_ListAll(t *testing.T) {
 }
 
 func TestProviderPriority(t *testing.T) {
-	expected := []string{"anthropic", "openai", "google"}
+	expected := []string{"anthropic"}
 
 	if len(ProviderPriority) != len(expected) {
 		t.Fatalf("ProviderPriority has %d items, want %d", len(ProviderPriority), len(expected))
@@ -353,10 +341,10 @@ func TestSetDefaultPreference(t *testing.T) {
 	defer func() { DefaultRegistry = original }()
 
 	DefaultRegistry = NewRegistry()
-	SetDefaultPreference("openai")
+	SetDefaultPreference("anthropic")
 
-	if DefaultRegistry.preferred != "openai" {
-		t.Errorf("SetDefaultPreference() preferred = %q, want %q", DefaultRegistry.preferred, "openai")
+	if DefaultRegistry.preferred != "anthropic" {
+		t.Errorf("SetDefaultPreference() preferred = %q, want %q", DefaultRegistry.preferred, "anthropic")
 	}
 }
 

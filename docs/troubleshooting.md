@@ -116,24 +116,25 @@ clai logs --follow
    # Should show: true
    ```
 
-2. Check API key is set:
+2. Check Claude CLI is installed:
    ```bash
    clai doctor
-   # Look for: [OK] Anthropic API key
+   # Look for: [OK] Claude CLI
    ```
 
-3. Test API key directly:
+3. Verify Claude CLI is authenticated:
    ```bash
-   curl -H "x-api-key: $ANTHROPIC_API_KEY" \
-        -H "anthropic-version: 2023-06-01" \
-        https://api.anthropic.com/v1/messages \
-        -d '{"model":"claude-3-haiku-20240307","max_tokens":10,"messages":[{"role":"user","content":"Hi"}]}'
+   claude --version
+   # Should show version without errors
+
+   # If not authenticated:
+   claude login
    ```
 
 4. Check provider setting:
    ```bash
    clai config get ai.provider
-   # Should match your API key (anthropic, openai, google, or auto)
+   # Should show: anthropic or auto
    ```
 
 ### Database Issues
@@ -281,7 +282,7 @@ No. Shell hooks are designed to be non-blocking:
 
 Yes, but:
 - Install clai on the server
-- AI features require API keys on the server
+- AI features require Claude CLI on the server
 - Each server has its own history database
 
 ### Q: How do I completely remove clai?

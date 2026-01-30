@@ -14,7 +14,8 @@ type Registry struct {
 }
 
 // ProviderPriority defines the order of provider selection when in "auto" mode
-var ProviderPriority = []string{"anthropic", "openai", "google"}
+// Currently only Claude CLI (via Anthropic provider) is supported
+var ProviderPriority = []string{"anthropic"}
 
 // NewRegistry creates a new provider registry with default providers
 func NewRegistry() *Registry {
@@ -23,10 +24,8 @@ func NewRegistry() *Registry {
 		preferred: "auto",
 	}
 
-	// Register default providers
+	// Register default provider (Claude CLI via Anthropic)
 	r.Register(NewAnthropicProvider())
-	r.Register(NewOpenAIProvider())
-	r.Register(NewGoogleProvider())
 
 	return r
 }

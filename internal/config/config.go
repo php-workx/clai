@@ -39,7 +39,7 @@ type ClientConfig struct {
 // AIConfig holds AI-related settings.
 type AIConfig struct {
 	Enabled       bool   `yaml:"enabled"`         // Must opt-in to AI features
-	Provider      string `yaml:"provider"`        // anthropic, openai, google, or auto
+	Provider      string `yaml:"provider"`        // anthropic or auto (Claude CLI only)
 	Model         string `yaml:"model"`           // Provider-specific model
 	AutoDiagnose  bool   `yaml:"auto_diagnose"`   // Auto-trigger diagnosis on non-zero exit
 	CacheTTLHours int    `yaml:"cache_ttl_hours"` // AI response cache lifetime
@@ -305,7 +305,7 @@ func (c *Config) setAIField(field, value string) error {
 		c.AI.Enabled = v
 	case "provider":
 		if !isValidProvider(value) {
-			return fmt.Errorf("invalid provider: %s (must be anthropic, openai, google, or auto)", value)
+			return fmt.Errorf("invalid provider: %s (must be anthropic or auto)", value)
 		}
 		c.AI.Provider = value
 	case "model":
@@ -409,7 +409,7 @@ func (c *Config) Validate() error {
 	}
 
 	if !isValidProvider(c.AI.Provider) {
-		return fmt.Errorf("ai.provider must be anthropic, openai, google, or auto (got: %s)", c.AI.Provider)
+		return fmt.Errorf("ai.provider must be anthropic or auto (got: %s)", c.AI.Provider)
 	}
 
 	if c.AI.CacheTTLHours < 0 {
@@ -438,7 +438,7 @@ func isValidLogLevel(level string) bool {
 
 func isValidProvider(provider string) bool {
 	switch provider {
-	case "anthropic", "openai", "google", "auto":
+	case "anthropic", "auto":
 		return true
 	default:
 		return false

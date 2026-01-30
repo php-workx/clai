@@ -63,7 +63,7 @@ Configure AI-powered features.
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `ai.enabled` | bool | `false` | Enable AI features (opt-in required) |
-| `ai.provider` | string | `"auto"` | Provider: anthropic, openai, google, auto |
+| `ai.provider` | string | `"auto"` | Provider: anthropic or auto (Claude CLI) |
 | `ai.model` | string | `""` | Model name (empty = provider default) |
 | `ai.auto_diagnose` | bool | `false` | Auto-diagnose on non-zero exit |
 | `ai.cache_ttl_hours` | int | `24` | AI response cache lifetime |
@@ -71,8 +71,7 @@ Configure AI-powered features.
 ```yaml
 ai:
   enabled: true
-  provider: anthropic
-  model: claude-3-haiku-20240307
+  provider: auto  # Uses Claude CLI
   auto_diagnose: false
   cache_ttl_hours: 24
 ```
@@ -122,7 +121,7 @@ client:
 
 ai:
   enabled: true
-  provider: anthropic
+  provider: auto  # Uses Claude CLI
   auto_diagnose: false
   cache_ttl_hours: 48
 
@@ -141,9 +140,6 @@ Some settings can be overridden via environment variables:
 
 | Variable | Description |
 |----------|-------------|
-| `ANTHROPIC_API_KEY` | Anthropic API key |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `GOOGLE_API_KEY` | Google AI API key |
 | `CLAI_AUTO_DAEMON` | Override auto-start daemon |
 | `CLAI_AUTO_DIAGNOSE` | Override auto-diagnose |
 | `CLAI_LOG_LEVEL` | Override log level |

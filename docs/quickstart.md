@@ -69,17 +69,18 @@ clai status
 
 ## 4. Enable AI Features (Optional)
 
-AI features require an API key from Anthropic, OpenAI, or Google.
+AI features require the [Claude CLI](https://claude.ai/cli) to be installed and authenticated.
 
 ```bash
-# Set your API key
-export ANTHROPIC_API_KEY="your-key-here"
+# Install Claude CLI from: https://claude.ai/cli
+# Then authenticate:
+claude login
 
 # Enable AI in config
 clai config set ai.enabled true
 
-# Or use the Claude CLI
-# Install from: https://claude.ai/cli
+# Verify Claude CLI is detected
+clai doctor  # Should show [OK] Claude CLI
 ```
 
 ### Voice-to-Command
@@ -122,7 +123,7 @@ Common settings:
 | Key | Description | Default |
 | --- | ----------- | ------- |
 | `ai.enabled` | Enable AI features | `false` |
-| `ai.provider` | AI provider (anthropic, openai, google, auto) | `auto` |
+| `ai.provider` | AI provider (anthropic, auto) | `auto` |
 | `suggestions.max_history` | Max history-based suggestions | `5` |
 | `suggestions.show_risk_warning` | Warn about destructive commands | `true` |
 

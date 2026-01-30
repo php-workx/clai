@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -40,16 +39,13 @@ func (p *AnthropicProvider) Name() string {
 	return "anthropic"
 }
 
-// Available checks if Claude CLI is available or API key is set
+// Available checks if Claude CLI is available
 func (p *AnthropicProvider) Available() bool {
-	// First check for Claude CLI
 	if path, err := exec.LookPath("claude"); err == nil {
 		p.cliPath = path
 		return true
 	}
-
-	// Fallback: check for API key (for future direct API support)
-	return os.Getenv("ANTHROPIC_API_KEY") != ""
+	return false
 }
 
 // TextToCommand converts natural language to shell commands

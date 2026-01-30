@@ -311,7 +311,7 @@ func TestValidLogLevels(t *testing.T) {
 }
 
 func TestValidProviders(t *testing.T) {
-	validProviders := []string{"anthropic", "openai", "google", "auto"}
+	validProviders := []string{"anthropic", "auto"}
 
 	for _, provider := range validProviders {
 		if !isValidProvider(provider) {
@@ -504,8 +504,6 @@ func TestSetAllAIFields(t *testing.T) {
 		{"ai.enabled", "true", "true"},
 		{"ai.enabled", "false", "false"},
 		{"ai.provider", "anthropic", "anthropic"},
-		{"ai.provider", "openai", "openai"},
-		{"ai.provider", "google", "google"},
 		{"ai.provider", "auto", "auto"},
 		{"ai.model", "gpt-4", "gpt-4"},
 		{"ai.model", "", ""},
@@ -972,14 +970,14 @@ func TestValidateAllErrors(t *testing.T) {
 			modify: func(c *Config) {
 				c.AI.Provider = ""
 			},
-			wantErr: "ai.provider must be anthropic, openai, google, or auto",
+			wantErr: "ai.provider must be anthropic or auto",
 		},
 		{
 			name: "invalid_provider_unknown",
 			modify: func(c *Config) {
 				c.AI.Provider = "unknown"
 			},
-			wantErr: "ai.provider must be anthropic, openai, google, or auto",
+			wantErr: "ai.provider must be anthropic or auto",
 		},
 		{
 			name: "negative_cache_ttl",
