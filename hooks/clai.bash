@@ -68,13 +68,13 @@ __CLAI_IN_PRECMD=false
 # Before command execution (DEBUG trap)
 __clai_preexec() {
     # Skip if inside PROMPT_COMMAND
-    [[ "$__CLAI_IN_PRECMD" == "true" ]] && return
+    [[ "$__CLAI_IN_PRECMD" == "true" ]] && return 0
     # Skip clai commands
-    [[ "$BASH_COMMAND" == clai-shim* ]] && return
-    [[ "$BASH_COMMAND" == "command clai"* ]] && return
+    [[ "$BASH_COMMAND" == clai-shim* ]] && return 0
+    [[ "$BASH_COMMAND" == "command clai"* ]] && return 0
     # Skip prompt command itself
-    [[ "$BASH_COMMAND" == "$PROMPT_COMMAND" ]] && return
-    [[ "$BASH_COMMAND" == __clai_precmd* ]] && return
+    [[ "$BASH_COMMAND" == "$PROMPT_COMMAND" ]] && return 0
+    [[ "$BASH_COMMAND" == __clai_precmd* ]] && return 0
 
     __CLAI_CMD_ID=$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || echo "$$-$RANDOM")
     __CLAI_CMD_ID="${__CLAI_CMD_ID,,}"
@@ -96,8 +96,10 @@ __clai_precmd() {
 
     # Skip if no command was tracked
     if [[ -n "$__CLAI_CMD_ID" ]]; then
-        local now=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
-        local duration=$((now - __CLAI_CMD_START))
+        local now
+        now=$(date +%s%3N 2>/dev/null || echo $(($(date +%s) * 1000)))
+        local duration
+        duration=$((now - __CLAI_CMD_START))
 
         command clai-shim log-end \
             --session-id="$CLAI_SESSION_ID" \
@@ -130,17 +132,20 @@ __clai_precmd() {
 
 _clai_show_suggestion() {
     if [[ -s "$_CLAI_SUGGEST_FILE" ]]; then
-        local suggestion=$(cat "$_CLAI_SUGGEST_FILE")
+        local suggestion
+        suggestion=$(cat "$_CLAI_SUGGEST_FILE")
         if [[ -n "$suggestion" ]]; then
             echo -e "\033[38;5;242m→ $suggestion (use 'accept' to run)\033[0m"
         fi
     fi
+    return 0
 }
 
 # Accept suggestion command
 accept() {
     if [[ -s "$_CLAI_SUGGEST_FILE" ]]; then
-        local suggestion=$(cat "$_CLAI_SUGGEST_FILE")
+        local suggestion
+        suggestion=$(cat "$_CLAI_SUGGEST_FILE")
         if [[ -n "$suggestion" ]]; then
             # Clear suggestion
             > "$_CLAI_SUGGEST_FILE"
@@ -158,6 +163,7 @@ accept() {
 clear-suggestion() {
     > "$_CLAI_SUGGEST_FILE"
     echo "Suggestion cleared"
+    return 0
 }
 
 # ============================================
@@ -172,7 +178,8 @@ _clai_check_voice_prefix() {
         voice_input="${voice_input## }"
 
         echo "🎤 Converting: $voice_input"
-        local result=$(command clai voice "$voice_input" 2>/dev/null)
+        local result
+        result=$(command clai voice "$voice_input" 2>/dev/null)
         if [[ -n "$result" ]]; then
             echo "→ $result"
             echo "$result" > "$_CLAI_SUGGEST_FILE"
@@ -222,7 +229,8 @@ run() {
 
 # Diagnose last command
 ai-fix() {
-    local cmd="${1:-$(history 1 | sed 's/^[ ]*[0-9]*[ ]*//')}"
+    local cmd
+    cmd="${1:-$(history 1 | sed 's/^[ ]*[0-9]*[ ]*//')}"
     command clai diagnose "$cmd" "1"
 }
 
@@ -232,7 +240,8 @@ ai() {
         echo "Usage: ai \"your question\""
         return 1
     fi
-    local recent_cmds=$(history 5 | sed 's/^[ ]*[0-9]*[ ]*//' | tr '\n' ';')
+    local recent_cmds
+    recent_cmds=$(history 5 | sed 's/^[ ]*[0-9]*[ ]*//' | tr '\n' ';')
     command clai ask --context "$recent_cmds" "$@"
 }
 
@@ -254,6 +263,7 @@ ai-daemon() {
         restart) command clai daemon stop && command clai daemon start ;;
         *)
             echo "Usage: ai-daemon {start|stop|status|restart}"
+            return 1
             ;;
     esac
 }

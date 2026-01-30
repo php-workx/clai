@@ -53,6 +53,15 @@ const (
 	weightAffinity = 0.1
 )
 
+// candidate represents an aggregated command candidate for ranking.
+type candidate struct {
+	cmd          storage.Command
+	source       Source
+	successCount int
+	failureCount int
+	latestTime   int64
+}
+
 // Rank retrieves and ranks command suggestions based on the scoring formula:
 // score = (source_weight * 0.4) + (recency_score * 0.3) + (success_score * 0.2) + (affinity_score * 0.1)
 func (r *DefaultRanker) Rank(ctx context.Context, req *RankRequest) ([]Suggestion, error) {
@@ -60,81 +69,90 @@ func (r *DefaultRanker) Rank(ctx context.Context, req *RankRequest) ([]Suggestio
 		return nil, nil
 	}
 
-	// Default max results
-	maxResults := req.MaxResults
-	if maxResults <= 0 {
-		maxResults = 10
-	}
-
-	// Query limit per scope - get more than needed to allow for deduplication
+	maxResults := normalizeMaxResults(req.MaxResults)
 	limitPerScope := maxResults * 3
 
-	// Query all scopes
 	results, err := r.source.QueryAllScopes(ctx, req.SessionID, req.CWD, req.Prefix, limitPerScope)
 	if err != nil {
 		return nil, err
 	}
 
-	// Build scored candidates
-	now := time.Now()
-	lastToolPrefix := GetToolPrefix(req.LastCommand)
+	candidates := aggregateCandidates(results)
+	suggestions := scoreCandidates(candidates, time.Now(), GetToolPrefix(req.LastCommand))
+	return limitResults(suggestions, maxResults), nil
+}
 
-	// Map to aggregate commands by normalized form
-	type candidate struct {
-		cmd          storage.Command
-		source       Source
-		successCount int
-		failureCount int
-		latestTime   int64
+// normalizeMaxResults returns a valid max results value, defaulting to 10.
+func normalizeMaxResults(maxResults int) int {
+	if maxResults <= 0 {
+		return 10
 	}
+	return maxResults
+}
+
+// aggregateCandidates builds a map of deduplicated candidates from query results.
+func aggregateCandidates(results []*QueryResult) map[string]*candidate {
 	candidates := make(map[string]*candidate)
 
 	for _, result := range results {
 		for _, cmd := range result.Commands {
 			key := DeduplicateKey(cmd.CommandNorm)
-
 			existing, ok := candidates[key]
 			if !ok {
-				// New candidate
-				successCount := 0
-				failureCount := 0
-				if cmd.IsSuccess == nil || *cmd.IsSuccess {
-					successCount = 1
-				} else {
-					failureCount = 1
-				}
-				candidates[key] = &candidate{
-					cmd:          cmd,
-					source:       result.Source,
-					successCount: successCount,
-					failureCount: failureCount,
-					latestTime:   cmd.TsStartUnixMs,
-				}
+				candidates[key] = newCandidate(cmd, result.Source)
 			} else {
-				// Update existing candidate
-				if cmd.IsSuccess == nil || *cmd.IsSuccess {
-					existing.successCount++
-				} else {
-					existing.failureCount++
-				}
-				// Keep the most recent timestamp
-				if cmd.TsStartUnixMs > existing.latestTime {
-					existing.latestTime = cmd.TsStartUnixMs
-					existing.cmd = cmd
-				}
-				// Keep the highest priority source
-				if SourceWeight(result.Source) > SourceWeight(existing.source) {
-					existing.source = result.Source
-				}
+				updateCandidate(existing, cmd, result.Source)
 			}
 		}
 	}
 
-	// Score and rank candidates
+	return candidates
+}
+
+// newCandidate creates a new candidate from a command.
+func newCandidate(cmd storage.Command, source Source) *candidate {
+	successCount, failureCount := countSuccessFailure(cmd)
+	return &candidate{
+		cmd:          cmd,
+		source:       source,
+		successCount: successCount,
+		failureCount: failureCount,
+		latestTime:   cmd.TsStartUnixMs,
+	}
+}
+
+// countSuccessFailure returns (successCount, failureCount) for a command.
+func countSuccessFailure(cmd storage.Command) (int, int) {
+	if cmd.IsSuccess == nil || *cmd.IsSuccess {
+		return 1, 0
+	}
+	return 0, 1
+}
+
+// updateCandidate updates an existing candidate with a new command occurrence.
+func updateCandidate(existing *candidate, cmd storage.Command, source Source) {
+	if cmd.IsSuccess == nil || *cmd.IsSuccess {
+		existing.successCount++
+	} else {
+		existing.failureCount++
+	}
+
+	if cmd.TsStartUnixMs > existing.latestTime {
+		existing.latestTime = cmd.TsStartUnixMs
+		existing.cmd = cmd
+	}
+
+	if SourceWeight(source) > SourceWeight(existing.source) {
+		existing.source = source
+	}
+}
+
+// scoreCandidates scores all candidates and returns sorted suggestions.
+func scoreCandidates(candidates map[string]*candidate, now time.Time, lastToolPrefix string) []Suggestion {
 	suggestions := make([]Suggestion, 0, len(candidates))
+
 	for _, c := range candidates {
 		score := calculateScore(c.source, c.latestTime, now, c.successCount, c.failureCount, c.cmd.Command, lastToolPrefix)
-
 		suggestions = append(suggestions, Suggestion{
 			Text:   c.cmd.Command,
 			Source: string(c.source),
@@ -143,17 +161,19 @@ func (r *DefaultRanker) Rank(ctx context.Context, req *RankRequest) ([]Suggestio
 		})
 	}
 
-	// Sort by score (descending)
 	sort.Slice(suggestions, func(i, j int) bool {
 		return suggestions[i].Score > suggestions[j].Score
 	})
 
-	// Limit results
-	if len(suggestions) > maxResults {
-		suggestions = suggestions[:maxResults]
-	}
+	return suggestions
+}
 
-	return suggestions, nil
+// limitResults truncates the suggestions slice to maxResults.
+func limitResults(suggestions []Suggestion, maxResults int) []Suggestion {
+	if len(suggestions) > maxResults {
+		return suggestions[:maxResults]
+	}
+	return suggestions
 }
 
 // calculateScore computes the final score for a command using the formula:

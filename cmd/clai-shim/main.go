@@ -28,6 +28,20 @@ var (
 	BuildDate = "unknown"
 )
 
+// Flag name constants to avoid duplication
+const (
+	flagSessionID = "session-id"
+	flagCommandID = "command-id"
+	flagCwd       = "cwd"
+	flagShell     = "shell"
+	flagCommand   = "command"
+	flagBuffer    = "buffer"
+	flagCursor    = "cursor"
+	flagPrompt    = "prompt"
+	flagExitCode  = "exit-code"
+	flagDuration  = "duration"
+)
+
 func main() {
 	// Silent exit on any panic
 	defer func() {
@@ -127,9 +141,9 @@ func parseFlags(args []string) map[string]string {
 func runSessionStart() {
 	flags := parseFlags(os.Args[2:])
 
-	sessionID := flags["session-id"]
-	cwd := flags["cwd"]
-	shell := flags["shell"]
+	sessionID := flags[flagSessionID]
+	cwd := flags[flagCwd]
+	shell := flags[flagShell]
 
 	if sessionID == "" {
 		return // Silent failure
@@ -157,7 +171,7 @@ func runSessionStart() {
 func runSessionEnd() {
 	flags := parseFlags(os.Args[2:])
 
-	sessionID := flags["session-id"]
+	sessionID := flags[flagSessionID]
 	if sessionID == "" {
 		return // Silent failure
 	}
@@ -176,10 +190,10 @@ func runSessionEnd() {
 func runLogStart() {
 	flags := parseFlags(os.Args[2:])
 
-	sessionID := flags["session-id"]
-	commandID := flags["command-id"]
-	cwd := flags["cwd"]
-	command := flags["command"]
+	sessionID := flags[flagSessionID]
+	commandID := flags[flagCommandID]
+	cwd := flags[flagCwd]
+	command := flags[flagCommand]
 
 	if sessionID == "" || commandID == "" {
 		return // Silent failure
@@ -202,10 +216,10 @@ func runLogStart() {
 func runLogEnd() {
 	flags := parseFlags(os.Args[2:])
 
-	sessionID := flags["session-id"]
-	commandID := flags["command-id"]
-	exitCodeStr := flags["exit-code"]
-	durationStr := flags["duration"]
+	sessionID := flags[flagSessionID]
+	commandID := flags[flagCommandID]
+	exitCodeStr := flags[flagExitCode]
+	durationStr := flags[flagDuration]
 
 	if sessionID == "" || commandID == "" {
 		return // Silent failure
@@ -229,10 +243,10 @@ func runLogEnd() {
 func runSuggest() {
 	flags := parseFlags(os.Args[2:])
 
-	sessionID := flags["session-id"]
-	cwd := flags["cwd"]
-	buffer := flags["buffer"]
-	cursorStr := flags["cursor"]
+	sessionID := flags[flagSessionID]
+	cwd := flags[flagCwd]
+	buffer := flags[flagBuffer]
+	cursorStr := flags[flagCursor]
 
 	if sessionID == "" {
 		// Try without flags for backwards compatibility
@@ -276,9 +290,9 @@ func runSuggest() {
 func runTextToCommand() {
 	flags := parseFlags(os.Args[2:])
 
-	sessionID := flags["session-id"]
-	cwd := flags["cwd"]
-	prompt := flags["prompt"]
+	sessionID := flags[flagSessionID]
+	cwd := flags[flagCwd]
+	prompt := flags[flagPrompt]
 
 	if sessionID == "" {
 		// Try without flags for backwards compatibility

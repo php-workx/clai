@@ -12,6 +12,13 @@ import (
 	"github.com/runger/clai/internal/suggest"
 )
 
+// Common string constants to avoid duplication
+const (
+	errNoAIProvider = "no AI provider available"
+	sourceAI        = "ai"
+	riskDestructive = "destructive"
+)
+
 // SessionStart handles the SessionStart RPC.
 // It creates a new session in the database and registers it with the session manager.
 func (s *Server) SessionStart(ctx context.Context, req *pb.SessionStartRequest) (*pb.Ack, error) {
@@ -216,7 +223,7 @@ func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.Sugge
 	for i, sug := range suggestions {
 		risk := ""
 		if sanitize.IsDestructive(sug.Text) {
-			risk = "destructive"
+			risk = riskDestructive
 		}
 		pbSuggestions[i] = &pb.Suggestion{
 			Text:        sug.Text,
@@ -241,7 +248,7 @@ func (s *Server) TextToCommand(ctx context.Context, req *pb.TextToCommandRequest
 	// Get the best available provider
 	prov, err := s.registry.GetBest()
 	if err != nil {
-		s.logger.Warn("no AI provider available", "error", err)
+		s.logger.Warn(errNoAIProvider, "error", err)
 		return &pb.TextToCommandResponse{}, nil
 	}
 
@@ -274,12 +281,12 @@ func (s *Server) TextToCommand(ctx context.Context, req *pb.TextToCommandRequest
 	for i, sug := range resp.Suggestions {
 		risk := ""
 		if sanitize.IsDestructive(sug.Text) {
-			risk = "destructive"
+			risk = riskDestructive
 		}
 		pbSuggestions[i] = &pb.Suggestion{
 			Text:        sug.Text,
 			Description: sug.Description,
-			Source:      "ai",
+			Source:      sourceAI,
 			Score:       sug.Score,
 			Risk:        risk,
 		}
@@ -300,7 +307,7 @@ func (s *Server) NextStep(ctx context.Context, req *pb.NextStepRequest) (*pb.Nex
 	// Get the best available provider
 	prov, err := s.registry.GetBest()
 	if err != nil {
-		s.logger.Warn("no AI provider available", "error", err)
+		s.logger.Warn(errNoAIProvider, "error", err)
 		return &pb.NextStepResponse{}, nil
 	}
 
@@ -332,12 +339,12 @@ func (s *Server) NextStep(ctx context.Context, req *pb.NextStepRequest) (*pb.Nex
 	for i, sug := range resp.Suggestions {
 		risk := ""
 		if sanitize.IsDestructive(sug.Text) {
-			risk = "destructive"
+			risk = riskDestructive
 		}
 		pbSuggestions[i] = &pb.Suggestion{
 			Text:        sug.Text,
 			Description: sug.Description,
-			Source:      "ai",
+			Source:      sourceAI,
 			Score:       sug.Score,
 			Risk:        risk,
 		}
@@ -356,7 +363,7 @@ func (s *Server) Diagnose(ctx context.Context, req *pb.DiagnoseRequest) (*pb.Dia
 	// Get the best available provider
 	prov, err := s.registry.GetBest()
 	if err != nil {
-		s.logger.Warn("no AI provider available", "error", err)
+		s.logger.Warn(errNoAIProvider, "error", err)
 		return &pb.DiagnoseResponse{
 			Explanation: "No AI provider available for diagnosis",
 		}, nil
@@ -392,12 +399,12 @@ func (s *Server) Diagnose(ctx context.Context, req *pb.DiagnoseRequest) (*pb.Dia
 	for i, sug := range resp.Fixes {
 		risk := ""
 		if sanitize.IsDestructive(sug.Text) {
-			risk = "destructive"
+			risk = riskDestructive
 		}
 		pbFixes[i] = &pb.Suggestion{
 			Text:        sug.Text,
 			Description: sug.Description,
-			Source:      "ai",
+			Source:      sourceAI,
 			Score:       sug.Score,
 			Risk:        risk,
 		}
