@@ -15,15 +15,6 @@ import (
 	"github.com/runger/clai/internal/extract"
 )
 
-// ANSI colors
-const (
-	colorRed    = "\033[0;31m"
-	colorCyan   = "\033[0;36m"
-	colorYellow = "\033[38;5;214m"
-	colorDim    = "\033[2m"
-	colorReset  = "\033[0m"
-)
-
 var diagnoseCmd = &cobra.Command{
 	Use:   "diagnose <command> [exit_code]",
 	Short: "Diagnose a failed command using Claude",

@@ -33,8 +33,8 @@
 
 #### Provider Adapters
 
-- **Role:** Interface to AI providers for text-to-command and diagnosis
-- **Strategy:** CLI-first (wrap `claude`, `openai`, `gemini` CLIs), fallback to direct API
+- **Role:** Interface to Claude CLI for text-to-command and diagnosis
+- **Strategy:** Wrap `claude` CLI for AI operations
 - **Features:** Streaming responses, cancellation support
 
 #### Local Store
@@ -370,7 +370,7 @@ CREATE INDEX IF NOT EXISTS idx_commands_hash ON commands(command_hash);
 CREATE TABLE IF NOT EXISTS ai_cache (
   cache_key TEXT PRIMARY KEY,     -- SHA256(provider + prompt + context)
   response_json TEXT NOT NULL,    -- Cached response
-  provider TEXT NOT NULL,         -- anthropic, openai, google
+  provider TEXT NOT NULL,         -- anthropic (Claude CLI)
   created_at_unix_ms INTEGER NOT NULL,
   expires_at_unix_ms INTEGER NOT NULL,  -- created_at + 24 hours
   hit_count INTEGER DEFAULT 0     -- For cache analytics
@@ -744,9 +744,8 @@ Respond with 1-3 shell commands, one per line. No explanations.
 ### 8.3 Provider Priority
 
 1. Check config `ai.provider` setting
-2. If set, use that provider exclusively
-3. If "auto", try in order: anthropic → openai → google
-4. Skip unavailable providers (CLI not found, API key missing)
+2. If set to "anthropic" or "auto", use Claude CLI
+3. Requires Claude CLI to be installed and authenticated
 
 ---
 
@@ -773,7 +772,7 @@ fire_and_forget = true          # Don't wait for logging acks
 
 [ai]
 enabled = false                 # Must opt-in to AI features
-provider = "auto"               # anthropic, openai, google, or auto
+provider = "auto"               # anthropic or auto (Claude CLI)
 model = ""                      # Provider-specific model (empty = default)
 auto_diagnose = false           # Auto-trigger diagnosis on non-zero exit
 cache_ttl_hours = 24            # AI response cache lifetime
@@ -951,10 +950,9 @@ clai/
 │   ├── provider/                   # AI provider adapters
 │   │   ├── provider.go             # Interface definition
 │   │   ├── registry.go             # Provider selection logic
-│   │   ├── anthropic.go            # Claude CLI/API wrapper
-│   │   ├── openai.go               # OpenAI CLI/API wrapper
-│   │   ├── google.go               # Gemini CLI/API wrapper
-│   │   └── context.go              # AI context builder
+│   │   ├── anthropic.go            # Claude CLI wrapper
+│   │   ├── context.go              # AI context builder
+│   │   └── parse.go                # Response parsing
 │   │
 │   ├── sanitize/                   # Security
 │   │   ├── sanitizer.go            # Regex sanitization
@@ -1489,15 +1487,13 @@ func init() {
 - `internal/provider/provider.go`
 - `internal/provider/registry.go`
 - `internal/provider/anthropic.go`
-- `internal/provider/openai.go`
-- `internal/provider/google.go`
 - `internal/provider/context.go`
+- `internal/provider/parse.go`
 - `internal/sanitize/*.go`
 
 **Acceptance Criteria:**
 - [ ] Implements `Provider` interface (Section 15.3)
-- [ ] CLI detection (`claude --version`, etc.)
-- [ ] Falls back to API if CLI unavailable
+- [ ] CLI detection (`claude --version`)
 - [ ] Constructs AI context (Section 8.2)
 - [ ] Sanitizes input before sending (Section 3.2)
 - [ ] Caches responses
@@ -1505,14 +1501,10 @@ func init() {
 
 **Key Implementation Notes:**
 ```go
-// CLI-first pattern
+// Claude CLI detection
 func (p *AnthropicProvider) Available() bool {
     _, err := exec.LookPath("claude")
-    if err == nil {
-        return true
-    }
-    // Check for API key as fallback
-    return os.Getenv("ANTHROPIC_API_KEY") != ""
+    return err == nil
 }
 ```
 

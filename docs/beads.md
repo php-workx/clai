@@ -36,4 +36,3 @@ bd sync               # Sync with git
 - NEVER stop before committing - that leaves work stranded locally
 - NEVER say "ready to commit when you are" - YOU must commit
 - If commit fails, resolve and retry until it succeeds
-

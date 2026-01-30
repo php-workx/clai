@@ -6,8 +6,11 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        exclude: ^\.beads/
       - id: end-of-file-fixer
+        exclude: ^\.beads/
       - id: check-yaml
+        exclude: ^\.beads/
       - id: check-added-large-files
         args: ['--maxkb=500']
 

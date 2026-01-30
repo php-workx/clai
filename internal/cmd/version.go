@@ -22,3 +22,5 @@ var versionCmd = &cobra.Command{
 		fmt.Printf("  built:  %s\n", BuildDate)
 	},
 }
+
+// test

@@ -1,335 +1,66 @@
 # clai
 
-Intelligent terminal integration using Claude Code CLI. Adds AI-powered features to your shell:
+Your shell, with smart completions — supercharged with AI.
 
-1. **Command Suggestion**: Extracts suggested commands from output (install commands, etc.) and lets you accept them
-2. **Auto Error Diagnosis**: Automatically diagnoses failed commands using Claude
-3. **Voice Input Correction**: Converts natural language (from speech-to-text) into proper terminal commands
-4. **Interruptible AI**: Press Ctrl+C to cancel any AI analysis in progress
+<!-- TODO: Add demo GIF here
+     Record with: asciinema rec demo.cast && agg demo.cast demo.gif
+     Show: typing "git c" and getting history-based suggestions
+-->
 
-## Supported Shells
+Start typing and get intelligent suggestions from your command history.
+No more ↑↑↑ scrolling or trying to remember that complex kubectl command.
 
-- **Zsh** (default on macOS)
-- **Bash**
-- **Fish**
+## ✨ Features
+
+📜 **History-Aware Completions** — Suggestions from your actual command history as you type
+
+🎯 **Inline Suggestions** — See what you'll run before you hit Enter (like fish, but everywhere)
+
+🐚 **Works Everywhere** — Zsh, Bash, and Fish support
+
+### Coming Soon
+
+🎤 Voice-to-Command • 🔧 AI Error Diagnosis • 💡 Smart Output Extraction
+
+## 🚀 Quick Start
+
+```bash
+# Install
+brew tap runger/clai && brew install clai
+
+# Add to your shell config (pick one)
+echo 'eval "$(clai init zsh)"' >> ~/.zshrc
+echo 'eval "$(clai init bash)"' >> ~/.bashrc
+
+# Restart your shell — done!
+```
+
+## 💡 Example
+
+```bash
+git c█
+  git commit -m "fix: address review feedback"  # from your history
+  git checkout main
+  git cherry-pick abc123
+```
+
+Type a few characters, get smart suggestions ranked by recency and context.
+Press **Tab** to complete.
+
+## 📚 Documentation
+
+- [Getting Started](docs/getting-started.md)
+- [Features & Usage](docs/features.md)
+- [Configuration](docs/configuration.md)
+- [CLI Reference](docs/cli-reference.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ## Requirements
 
-- **Go 1.21+** - For building the binary
-- **Claude Code CLI** - Install from: https://docs.anthropic.com/en/docs/claude-code
-- A Claude Pro/Max subscription for Claude Code
-
-## Installation
-
-### Homebrew (macOS/Linux)
-
-```bash
-brew tap runger/clai
-brew install clai
-```
-
-Then add to your shell config:
-
-```bash
-# For Zsh (~/.zshrc):
-eval "$(clai init zsh)"
-
-# For Bash (~/.bashrc):
-eval "$(clai init bash)"
-
-# For Fish (~/.config/fish/config.fish):
-clai init fish | source
-```
-
-### Quick Install
-
-```bash
-# Clone the repository
-git clone https://github.com/runger/clai.git
-cd clai
-
-# Run the installer
-./install.sh
-```
-
-### Manual Install
-
-```bash
-# 1. Install the binary
-go install github.com/runger/clai/cmd/clai@latest
-
-# 2. Add to your shell config:
-
-# For Zsh (~/.zshrc):
-eval "$(clai init zsh)"
-
-# For Bash (~/.bashrc):
-eval "$(clai init bash)"
-
-# For Fish (~/.config/fish/config.fish):
-clai init fish | source
-```
-
-### From Source
-
-```bash
-git clone https://github.com/runger/clai.git
-cd clai
-make install
-```
-
-## Usage
-
-### Command Suggestion
-
-When a command outputs text with suggested commands (like `pip install X`), they're extracted automatically.
-
-```bash
-# Use 'run' to capture output and extract suggestions
-run pro add-tab
-
-# If a command is suggested, you'll see it in the prompt
-#
-# Zsh: appears in right prompt, press Tab to accept
-# Fish: appears in right prompt, press Alt+Enter to accept
-# Bash: shown after command, type 'accept' to run
-```
-
-**Supported patterns:**
-- Commands in backticks: `` `npm install express` ``
-- Install commands: `pip install requests`, `brew install wget`
-- "Run:" prefixes: `Run: npm start`
-- Documentation examples: `$ python app.py`
-
-### Auto Error Diagnosis
-
-When a command fails (non-zero exit code), Claude automatically analyzes it:
-
-```bash
-$ npm run biuld
-npm ERR! Missing script: "biuld"
-
-⚡ Analyzing error...
-━━━ AI Diagnosis ━━━
-**Problem**: Typo in script name - "biuld" should be "build"
-**Fix**: `npm run build`
-━━━━━━━━━━━━━━━━━━━━
-```
-
-### Voice Input Correction
-
-If you use voice input (speech-to-text), the `` ` `` prefix converts natural language to proper terminal commands:
-
-```bash
-# Just start with ` and speak naturally
-`list all files in this directory
-# 🎤 Converting: list all files in this directory
-# → ls -la
-
-`show me the git status
-# → git status
-
-`find all Python files
-# → find . -name "*.py"
-
-`install the requests package with pip
-# → pip install requests
-```
-
-**Workflow with speech-to-text tools:**
-1. Press your speech-to-text hotkey (e.g., Cmd+Ctrl for Wispr Flow)
-2. Say "backtick" then your command naturally
-3. Press Enter - it converts and puts the command in your buffer to review
-
-The converted command is cached for Tab completion (Zsh) or `accept` (Bash).
-
-You can also use the `voice` command directly:
-```bash
-voice "list all files"
-```
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `ai-fix` | Manually diagnose the last failed command |
-| `ai-fix "cmd"` | Diagnose a specific command |
-| `ai "question"` | Ask Claude anything with terminal context |
-| `voice "text"` | Convert natural language to terminal command |
-| `ai-toggle` | Turn auto-diagnosis on/off |
-| `run <cmd>` | Run command with output capture |
-| `accept` | (Bash only) Accept and run the suggested command |
-
-### CLI Commands
-
-The `clai` binary also provides direct CLI access:
-
-```bash
-clai diagnose "npm run build" 1    # Diagnose a command
-clai extract < output.txt          # Extract suggestions from file
-clai ask "How do I find large files?"
-clai voice "list all python files" # Convert voice/natural language to command
-clai init zsh                      # Output shell integration script
-clai version                       # Show version info
-```
-
-### Interruptible AI Analysis
-
-All AI operations support Ctrl+C to cancel:
-
-```bash
-# If AI analysis is taking too long, just press Ctrl+C
-$ ai-fix
-⚡ Analyzing error...
-^C
-Analysis cancelled
-```
-
-This is especially useful when auto-diagnosis kicks in but you've already spotted the issue yourself.
-
-## Configuration
-
-### Terminal Emulator Setup (Optional)
-
-If you want a dedicated hotkey for voice mode (instead of the `` ` `` prefix), you can configure your terminal to send a special sequence:
-
-**Ghostty** (`~/.config/ghostty/config`):
-```
-keybind = super+ctrl+v=text:\x18\x16
-```
-This maps Cmd+Ctrl+V to send Ctrl+X Ctrl+V, which enters voice mode.
-
-**iTerm2** (Preferences → Keys → Key Bindings):
-- Add new binding: `⌘⌃V` → Send Escape Sequence → `[24~`
-- Then add to your shell config: `bindkey '\e[24~' _ai_enter_voice_mode`
-
-### Environment Variables
-
-Set these environment variables **before** the init line in your shell config:
-
-```bash
-# Disable auto-diagnosis (default: true)
-export CLAI_AUTO_DIAGNOSE=false
-
-# Disable command extraction (default: true)
-export CLAI_AUTO_EXTRACT=false
-
-# Custom cache directory (default: ~/.cache/clai)
-export CLAI_CACHE=~/.cache/clai
-
-# Daemon idle timeout (default: 2h)
-export CLAI_IDLE_TIMEOUT=30m
-
-# Then init
-eval "$(clai init zsh)"
-```
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Shell Integration Layer                                     │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │ Zsh hooks   │  │ Bash hooks  │  │ Fish hooks  │          │
-│  │ + ZLE       │  │ + DEBUG     │  │ + events    │          │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘          │
-│         └────────────────┼────────────────┘                 │
-│                          ▼                                  │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  clai (Go binary)                                     │  │
-│  │  - diagnose: Error analysis                           │  │
-│  │  - extract: Command extraction                        │  │
-│  │  - ask: AI questions                                  │  │
-│  │  - init: Shell script generation                      │  │
-│  └─────────────────────────┬─────────────────────────────┘  │
-│                            ▼                                │
-│  ┌───────────────────────────────────────────────────────┐  │
-│  │  claude --print (Claude Code CLI)                     │  │
-│  └───────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## File Structure
-
-```
-clai/
-├── cmd/clai/               # Main entry point
-├── internal/
-│   ├── cmd/                # Cobra commands
-│   │   ├── shell/          # Embedded shell scripts
-│   │   │   ├── zsh/
-│   │   │   ├── bash/
-│   │   │   └── fish/
-│   │   ├── root.go
-│   │   ├── diagnose.go
-│   │   ├── extract.go
-│   │   ├── ask.go
-│   │   └── init.go
-│   ├── cache/              # Cache management
-│   └── claude/             # Claude CLI wrapper
-├── go.mod
-├── Makefile
-├── install.sh
-└── README.md
-```
-
-## Building
-
-```bash
-# Build binary
-make build
-
-# Install to $GOPATH/bin
-make install
-
-# Run tests
-make test
-
-# Build for all platforms
-make build-all
-
-# Show all targets
-make help
-```
-
-## Troubleshooting
-
-### "claude: command not found"
-
-Install Claude Code CLI:
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
-### "clai: command not found"
-
-Make sure `$GOPATH/bin` (or `$HOME/go/bin`) is in your PATH:
-```bash
-export PATH="$PATH:$HOME/go/bin"
-```
-
-### Auto-diagnosis is annoying
-
-Toggle it off:
-```bash
-ai-toggle
-# or
-export CLAI_AUTO_DIAGNOSE=false
-```
-
-### Suggestions not appearing
-
-Make sure to use `run` prefix:
-```bash
-run pip install nonexistent-package
-```
-
-Or alias your common commands in your shell config:
-```bash
-alias pip='run pip'
-alias npm='run npm'
-```
+- macOS or Linux
+- Zsh, Bash, or Fish
 
 ## License
 
-MIT - Do whatever you want with it!
+MIT
+# test

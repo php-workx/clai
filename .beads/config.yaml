@@ -60,3 +60,9 @@
 # - linear.api-key
 # - github.org
 # - github.repo
+
+# Hook chaining configuration
+# Runs .beads/hooks/pre-commit before beads' own pre-commit logic
+hooks:
+  chain_strategy: before
+  chain_timeout_ms: 120000  # 2 minutes for tests to run
