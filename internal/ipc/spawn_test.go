@@ -1,0 +1,103 @@
+package ipc
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestPidPath(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	expected := filepath.Join(home, ".clai", "run", "clai.pid")
+
+	path := PidPath()
+	if path != expected {
+		t.Errorf("PidPath() = %q, want %q", path, expected)
+	}
+}
+
+func TestLogPath(t *testing.T) {
+	home, _ := os.UserHomeDir()
+	expected := filepath.Join(home, ".clai", "run", "clai.log")
+
+	path := LogPath()
+	if path != expected {
+		t.Errorf("LogPath() = %q, want %q", path, expected)
+	}
+}
+
+func TestFindDaemonBinaryFromEnv(t *testing.T) {
+	// Create a temp file to act as the daemon binary
+	tmpFile, err := os.CreateTemp("", "claid-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp file: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	// Set environment variable
+	os.Setenv("CLAI_DAEMON_PATH", tmpFile.Name())
+	defer os.Unsetenv("CLAI_DAEMON_PATH")
+
+	path, err := findDaemonBinary()
+	if err != nil {
+		t.Errorf("findDaemonBinary() error = %v", err)
+	}
+	if path != tmpFile.Name() {
+		t.Errorf("findDaemonBinary() = %q, want %q", path, tmpFile.Name())
+	}
+}
+
+func TestFindDaemonBinaryNotFound(t *testing.T) {
+	// Ensure no env override
+	os.Unsetenv("CLAI_DAEMON_PATH")
+
+	// Use a non-existent path prefix to ensure binary isn't found
+	oldPath := os.Getenv("PATH")
+	os.Setenv("PATH", "/nonexistent")
+	defer os.Setenv("PATH", oldPath)
+
+	_, err := findDaemonBinary()
+	if err == nil {
+		t.Error("findDaemonBinary() should fail when binary not found")
+	}
+}
+
+func TestIsDaemonRunningNoSocket(t *testing.T) {
+	os.Setenv("CLAI_SOCKET", "/tmp/nonexistent-clai-daemon-test.sock")
+	defer os.Unsetenv("CLAI_SOCKET")
+
+	if IsDaemonRunning() {
+		t.Error("IsDaemonRunning() = true for non-existent socket")
+	}
+}
+
+func TestDaemonBinaryName(t *testing.T) {
+	if DaemonBinaryName == "" {
+		t.Error("DaemonBinaryName should not be empty")
+	}
+	if DaemonBinaryName != "claid" {
+		t.Errorf("DaemonBinaryName = %q, want %q", DaemonBinaryName, "claid")
+	}
+}
+
+func TestSpawnDaemonMissingBinary(t *testing.T) {
+	// Ensure daemon binary isn't found
+	os.Unsetenv("CLAI_DAEMON_PATH")
+	oldPath := os.Getenv("PATH")
+	os.Setenv("PATH", "/nonexistent")
+	defer os.Setenv("PATH", oldPath)
+
+	// Use a temp directory for run dir
+	tmpDir, err := os.MkdirTemp("", "clai-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// This should fail because daemon binary doesn't exist
+	err = SpawnDaemon()
+	if err == nil {
+		t.Error("SpawnDaemon() should fail when daemon binary not found")
+	}
+}
