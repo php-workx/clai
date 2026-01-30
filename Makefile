@@ -22,7 +22,7 @@ install:
 proto:
 	@echo "Generating protobuf code..."
 	@if ! command -v protoc >/dev/null 2>&1; then \
-		echo "Error: protoc not found. Install with: brew install protobuf"; \
+		echo "Error: protoc not found. Please install the protobuf compiler. See: https://grpc.io/docs/protoc-installation/"; \
 		exit 1; \
 	fi
 	@mkdir -p gen
