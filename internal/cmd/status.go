@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/runger/clai/internal/claude"
 	"github.com/runger/clai/internal/config"
+	"github.com/runger/clai/internal/daemon"
 )
 
 var statusCmd = &cobra.Command{
@@ -39,7 +39,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Daemon status
 	fmt.Printf("\n%sDaemon:%s\n", colorBold, colorReset)
-	if claude.IsDaemonRunning() {
+	if daemon.IsRunning() {
 		fmt.Printf("  Status:  %srunning%s\n", colorGreen, colorReset)
 		// Try to get PID
 		pidFile := paths.PIDFile()
@@ -78,7 +78,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 
 	// Shell integration
 	fmt.Printf("\n%sShell Integration:%s\n", colorBold, colorReset)
-	shells := checkShellIntegration()
+	shells := checkShellIntegrationWithPaths(paths)
 	if len(shells) == 0 {
 		fmt.Printf("  Status:  %snot installed%s\n", colorDim, colorReset)
 		fmt.Printf("  Run 'clai install' to set up shell integration.\n")
@@ -97,13 +97,12 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func checkShellIntegration() []string {
+func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil
 	}
 
-	paths := config.DefaultPaths()
 	var installed []string
 
 	// Check zsh
@@ -124,6 +123,10 @@ func checkShellIntegration() []string {
 	}
 
 	return installed
+}
+
+func checkShellIntegration() []string {
+	return checkShellIntegrationWithPaths(config.DefaultPaths())
 }
 
 func printQuickStats(paths *config.Paths) {

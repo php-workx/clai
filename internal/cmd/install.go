@@ -107,10 +107,16 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	defer f.Close()
 
 	// Add newline before if file doesn't end with one
-	info, _ := f.Stat()
+	info, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat %s: %w", rcFile, err)
+	}
 	if info.Size() > 0 {
 		// Read last byte to check for newline
-		content, _ := os.ReadFile(rcFile)
+		content, err := os.ReadFile(rcFile)
+		if err != nil {
+			return fmt.Errorf("failed to read %s: %w", rcFile, err)
+		}
 		if len(content) > 0 && content[len(content)-1] != '\n' {
 			if _, err := f.WriteString("\n"); err != nil {
 				return fmt.Errorf("failed to write to %s: %w", rcFile, err)

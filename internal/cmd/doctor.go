@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/runger/clai/internal/claude"
 	"github.com/runger/clai/internal/config"
+	"github.com/runger/clai/internal/daemon"
 )
 
 var doctorCmd = &cobra.Command{
@@ -126,7 +126,7 @@ func checkDirectories() []checkResult {
 	var results []checkResult
 	paths := config.DefaultPaths()
 
-	// Check and create directories
+	// Check directories (no side effects - just report status)
 	dirs := []struct {
 		name string
 		path string
@@ -139,20 +139,11 @@ func checkDirectories() []checkResult {
 
 	for _, d := range dirs {
 		if _, err := os.Stat(d.path); os.IsNotExist(err) {
-			// Try to create it
-			if err := os.MkdirAll(d.path, 0755); err != nil {
-				results = append(results, checkResult{
-					name:    d.name,
-					status:  "error",
-					message: fmt.Sprintf("Cannot create: %s", d.path),
-				})
-			} else {
-				results = append(results, checkResult{
-					name:    d.name,
-					status:  "ok",
-					message: fmt.Sprintf("Created: %s", d.path),
-				})
-			}
+			results = append(results, checkResult{
+				name:    d.name,
+				status:  "warn",
+				message: fmt.Sprintf("Missing: %s (will be created when needed)", d.path),
+			})
 		} else if err != nil {
 			results = append(results, checkResult{
 				name:    d.name,
@@ -226,7 +217,7 @@ func checkShellIntegrationDoctor() checkResult {
 }
 
 func checkDaemon() checkResult {
-	if claude.IsDaemonRunning() {
+	if daemon.IsRunning() {
 		return checkResult{
 			name:    "Daemon",
 			status:  "ok",
@@ -281,6 +272,12 @@ func checkAIProviders() []checkResult {
 			status:  "ok",
 			message: "Set in environment",
 		})
+	} else {
+		results = append(results, checkResult{
+			name:    "OpenAI API key",
+			status:  "warn",
+			message: "Not set (OPENAI_API_KEY) - OpenAI provider unavailable",
+		})
 	}
 
 	if os.Getenv("GOOGLE_API_KEY") != "" {
@@ -288,6 +285,12 @@ func checkAIProviders() []checkResult {
 			name:    "Google API key",
 			status:  "ok",
 			message: "Set in environment",
+		})
+	} else {
+		results = append(results, checkResult{
+			name:    "Google API key",
+			status:  "warn",
+			message: "Not set (GOOGLE_API_KEY) - Google provider unavailable",
 		})
 	}
 

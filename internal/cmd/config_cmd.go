@@ -46,7 +46,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	switch len(args) {
 	case 0:
 		// List all keys
-		return listConfig(cfg)
+		return listConfig(cfg, paths)
 	case 1:
 		// Get value
 		return getConfig(cfg, args[0])
@@ -58,15 +58,17 @@ func runConfig(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func listConfig(cfg *config.Config) error {
+func listConfig(cfg *config.Config, paths *config.Paths) error {
 	fmt.Printf("%sConfiguration Keys%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
 	fmt.Println()
 
 	keys := config.ListKeys()
+	var failedKeys []string
 	for _, key := range keys {
 		value, err := cfg.Get(key)
 		if err != nil {
+			failedKeys = append(failedKeys, key)
 			continue
 		}
 
@@ -79,8 +81,12 @@ func listConfig(cfg *config.Config) error {
 		fmt.Printf("  %s%s%s = %s\n", colorCyan, key, colorReset, displayValue)
 	}
 
+	if len(failedKeys) > 0 {
+		fmt.Printf("\n%sWarning:%s Failed to retrieve keys: %s\n", colorYellow, colorReset, strings.Join(failedKeys, ", "))
+	}
+
 	fmt.Println()
-	fmt.Printf("Config file: %s\n", config.DefaultPaths().ConfigFile())
+	fmt.Printf("Config file: %s\n", paths.ConfigFile())
 
 	return nil
 }

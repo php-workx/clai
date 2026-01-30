@@ -57,6 +57,11 @@ func runLogs(cmd *cobra.Command, args []string) error {
 }
 
 func tailLogs(filename string, n int) error {
+	// Validate n to prevent panic on negative capacity
+	if n <= 0 {
+		return nil
+	}
+
 	f, err := os.Open(filename)
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
@@ -79,6 +84,7 @@ func tailLogs(filename string, n int) error {
 	lines := make([]string, 0, n)
 	bufSize := int64(4096)
 	offset := size
+	remainder := "" // Carry partial line fragment between chunks
 
 	for len(lines) < n && offset > 0 {
 		// Calculate read position
@@ -96,8 +102,17 @@ func tailLogs(filename string, n int) error {
 		}
 
 		// Parse lines from chunk (in reverse order)
-		chunk := string(buf)
+		// Prepend remainder from previous chunk to handle lines spanning chunks
+		chunk := string(buf) + remainder
 		chunkLines := splitLines(chunk)
+
+		// The first element may be a partial line if we're not at file start
+		if offset > 0 && len(chunkLines) > 0 {
+			remainder = chunkLines[0]
+			chunkLines = chunkLines[1:]
+		} else {
+			remainder = ""
+		}
 
 		// Prepend lines
 		for i := len(chunkLines) - 1; i >= 0 && len(lines) < n; i-- {
@@ -105,6 +120,11 @@ func tailLogs(filename string, n int) error {
 				lines = append([]string{chunkLines[i]}, lines...)
 			}
 		}
+	}
+
+	// Include remainder if we have room and it's not empty
+	if remainder != "" && len(lines) < n {
+		lines = append([]string{remainder}, lines...)
 	}
 
 	// Print lines

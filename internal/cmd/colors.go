@@ -41,6 +41,13 @@ func shouldDisableColors() bool {
 		return true
 	}
 
+	// Check if stdout is a TTY (not a pipe or file)
+	if info, err := os.Stdout.Stat(); err == nil {
+		if (info.Mode() & os.ModeCharDevice) == 0 {
+			return true
+		}
+	}
+
 	// On Windows, check if ANSI is supported
 	if runtime.GOOS == "windows" {
 		// Windows Terminal and newer terminals support ANSI
