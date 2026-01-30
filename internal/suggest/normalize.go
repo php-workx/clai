@@ -2,10 +2,9 @@
 package suggest
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"strings"
-	"unicode"
+
+	"github.com/runger/clai/internal/cmdutil"
 )
 
 // GetToolPrefix extracts the base command (tool) from a command string.
@@ -47,7 +46,7 @@ func GetToolPrefix(cmd string) string {
 }
 
 // NormalizeForDisplay normalizes a command for display purposes.
-// Unlike storage.NormalizeCommand (which is for deduplication),
+// Unlike NormalizeCommand (which is for deduplication),
 // this preserves original arguments but normalizes whitespace.
 func NormalizeForDisplay(cmd string) string {
 	cmd = strings.TrimSpace(cmd)
@@ -62,83 +61,35 @@ func NormalizeForDisplay(cmd string) string {
 
 // DeduplicateKey generates a key for deduplication purposes.
 // Commands that should be considered duplicates will have the same key.
-// This uses the command hash from the storage layer.
+// Currently returns the input verbatim; callers should pre-normalize via NormalizeCommand.
+// For hash-based deduplication, use Hash instead.
 func DeduplicateKey(normalizedCmd string) string {
 	return normalizedCmd
 }
 
-// Normalize normalizes a command for comparison and deduplication.
+// NormalizeCommand normalizes a command for comparison and deduplication.
 // It lowercases the command, trims whitespace, and normalizes variable arguments.
+// This is a re-export of cmdutil.NormalizeCommand.
+var NormalizeCommand = cmdutil.NormalizeCommand
+
+// Normalize is an alias for NormalizeCommand for backward compatibility.
+// Deprecated: Use NormalizeCommand instead.
 func Normalize(cmd string) string {
-	// Trim whitespace
-	cmd = strings.TrimSpace(cmd)
-
-	// Lowercase
-	cmd = strings.ToLower(cmd)
-
-	// Split into parts
-	parts := strings.Fields(cmd)
-	if len(parts) == 0 {
-		return ""
-	}
-
-	// Keep the base command and common flags, but normalize variable arguments
-	normalized := make([]string, 0, len(parts))
-	for i, part := range parts {
-		// Keep the first part (the command itself) always
-		if i == 0 {
-			normalized = append(normalized, part)
-			continue
-		}
-
-		// Keep flags (start with -)
-		if strings.HasPrefix(part, "-") {
-			normalized = append(normalized, part)
-			continue
-		}
-
-		// Skip paths that look like absolute paths or home-relative paths
-		if strings.HasPrefix(part, "/") || strings.HasPrefix(part, "~") {
-			// Replace with a placeholder for normalization
-			normalized = append(normalized, "<path>")
-			continue
-		}
-
-		// Skip things that look like URLs
-		if strings.Contains(part, "://") {
-			normalized = append(normalized, "<url>")
-			continue
-		}
-
-		// Skip things that look like numbers (e.g., PIDs, port numbers)
-		if isNumeric(part) {
-			normalized = append(normalized, "<num>")
-			continue
-		}
-
-		// Keep other arguments
-		normalized = append(normalized, part)
-	}
-
-	return strings.Join(normalized, " ")
+	return cmdutil.NormalizeCommand(cmd)
 }
 
-// Hash generates a SHA256 hash of a command string.
+// HashCommand generates a SHA256 hash of a normalized command string.
+// The command should already be normalized before calling this function.
+// This is a re-export of cmdutil.HashCommand.
+var HashCommand = cmdutil.HashCommand
+
+// Hash normalizes a command and then generates a SHA256 hash.
+// This is a convenience function that combines NormalizeCommand and HashCommand.
 func Hash(cmd string) string {
-	normalized := Normalize(cmd)
-	hash := sha256.Sum256([]byte(normalized))
-	return hex.EncodeToString(hash[:])
+	normalized := cmdutil.NormalizeCommand(cmd)
+	return cmdutil.HashCommand(normalized)
 }
 
-// isNumeric checks if a string contains only digits.
-func isNumeric(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	return true
-}
+// IsNumeric checks if a string contains only digits.
+// This is a re-export of cmdutil.IsNumeric.
+var IsNumeric = cmdutil.IsNumeric

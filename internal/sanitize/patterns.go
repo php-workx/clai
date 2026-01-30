@@ -60,8 +60,13 @@ var secretPatterns = []Pattern{
 		Replacement: "$1=[PRIVATE_KEY_REDACTED]",
 	},
 	{
-		Name:        "Bearer Token",
+		Name:        "Bearer Token (JWT)",
 		Regex:       regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`),
+		Replacement: "Bearer [TOKEN_REDACTED]",
+	},
+	{
+		Name:        "Bearer Token (Generic)",
+		Regex:       regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9_-]{20,}`),
 		Replacement: "Bearer [TOKEN_REDACTED]",
 	},
 	{
@@ -71,7 +76,10 @@ var secretPatterns = []Pattern{
 	},
 }
 
-// GetSecretPatterns returns the list of secret detection patterns
+// GetSecretPatterns returns a copy of the secret detection patterns list.
+// A copy is returned to prevent callers from mutating the internal patterns.
 func GetSecretPatterns() []Pattern {
-	return secretPatterns
+	result := make([]Pattern, len(secretPatterns))
+	copy(result, secretPatterns)
+	return result
 }

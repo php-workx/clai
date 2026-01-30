@@ -169,7 +169,7 @@ func TestClientWithMockServer(t *testing.T) {
 	}
 
 	// Test Suggest
-	suggestions := client.Suggest("test-session", "/home/user", "ls", 2, false, 5)
+	suggestions := client.Suggest(context.Background(), "test-session", "/home/user", "ls", 2, false, 5)
 	if len(suggestions) != 2 {
 		t.Errorf("Suggest() returned %d suggestions, want 2", len(suggestions))
 	}
@@ -178,7 +178,7 @@ func TestClientWithMockServer(t *testing.T) {
 	}
 
 	// Test TextToCommand
-	resp, err := client.TextToCommand("test-session", "find go files", "/home/user", 3)
+	resp, err := client.TextToCommand(context.Background(), "test-session", "find go files", "/home/user", 3)
 	if err != nil {
 		t.Errorf("TextToCommand() error = %v", err)
 	}
@@ -308,7 +308,7 @@ func TestSuggestDefaultMaxResults(t *testing.T) {
 	defer client.Close()
 
 	// Test with maxResults = 0 (should default to 5)
-	suggestions := client.Suggest("test", "/", "ls", 2, false, 0)
+	suggestions := client.Suggest(context.Background(), "test", "/", "ls", 2, false, 0)
 	if suggestions == nil {
 		t.Error("Suggest with maxResults=0 returned nil")
 	}
@@ -346,7 +346,7 @@ func TestTextToCommandDefaultMaxSuggestions(t *testing.T) {
 	defer client.Close()
 
 	// Test with maxSuggestions = 0 (should default to 3)
-	resp, err := client.TextToCommand("test", "find files", "/", 0)
+	resp, err := client.TextToCommand(context.Background(), "test", "find files", "/", 0)
 	if err != nil {
 		t.Errorf("TextToCommand with maxSuggestions=0 failed: %v", err)
 	}

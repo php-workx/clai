@@ -11,6 +11,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -260,7 +261,7 @@ func runSuggest() {
 	}
 	defer client.Close()
 
-	suggestions := client.Suggest(sessionID, cwd, buffer, cursorPos, false, 5)
+	suggestions := client.Suggest(context.Background(), sessionID, cwd, buffer, cursorPos, false, 5)
 	if len(suggestions) == 0 {
 		return
 	}
@@ -301,7 +302,7 @@ func runTextToCommand() {
 	}
 	defer client.Close()
 
-	resp, err := client.TextToCommand(sessionID, prompt, cwd, 3)
+	resp, err := client.TextToCommand(context.Background(), sessionID, prompt, cwd, 3)
 	if err != nil || resp == nil || len(resp.Suggestions) == 0 {
 		return
 	}

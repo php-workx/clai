@@ -202,8 +202,9 @@ func TestCP3_CommandLogging(t *testing.T) {
 		} else if *cmd.ExitCode != tc.exitCode {
 			t.Errorf("command %q exit code mismatch: got %d, want %d", tc.command, *cmd.ExitCode, tc.exitCode)
 		}
-		if cmd.IsSuccess != (tc.exitCode == 0) {
-			t.Errorf("command %q IsSuccess mismatch: got %v, want %v", tc.command, cmd.IsSuccess, tc.exitCode == 0)
+		expectedSuccess := tc.exitCode == 0
+		if cmd.IsSuccess == nil || *cmd.IsSuccess != expectedSuccess {
+			t.Errorf("command %q IsSuccess mismatch: got %v, want %v", tc.command, cmd.IsSuccess, expectedSuccess)
 		}
 	}
 }

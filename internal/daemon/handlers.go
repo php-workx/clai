@@ -118,7 +118,7 @@ func (s *Server) CommandStarted(ctx context.Context, req *pb.CommandStartRequest
 		Command:       req.Command,
 		CommandNorm:   suggest.Normalize(req.Command),
 		CommandHash:   suggest.Hash(req.Command),
-		IsSuccess:     true, // Assume success until CommandEnded
+		IsSuccess:     boolPtr(true), // Assume success until CommandEnded
 	}
 
 	if err := s.store.CreateCommand(ctx, cmd); err != nil {
@@ -459,4 +459,9 @@ func (s *Server) getSessionContext(sessionID string) (osName, shell string) {
 		}
 	}
 	return osName, shell
+}
+
+// boolPtr returns a pointer to a bool value.
+func boolPtr(b bool) *bool {
+	return &b
 }

@@ -7,8 +7,11 @@ import (
 )
 
 func TestSocketPath(t *testing.T) {
-	// Test default path
-	home, _ := os.UserHomeDir()
+	// Test default path - handle fallback to /tmp when home dir unavailable
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "/tmp"
+	}
 	expected := filepath.Join(home, ".clai", "run", "clai.sock")
 
 	path := SocketPath()
@@ -30,7 +33,11 @@ func TestSocketPathEnvOverride(t *testing.T) {
 }
 
 func TestRunDir(t *testing.T) {
-	home, _ := os.UserHomeDir()
+	// Handle fallback to /tmp when home dir unavailable
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "/tmp"
+	}
 	expected := filepath.Join(home, ".clai", "run")
 
 	dir := RunDir()

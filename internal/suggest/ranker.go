@@ -98,7 +98,7 @@ func (r *DefaultRanker) Rank(ctx context.Context, req *RankRequest) ([]Suggestio
 				// New candidate
 				successCount := 0
 				failureCount := 0
-				if cmd.IsSuccess {
+				if cmd.IsSuccess == nil || *cmd.IsSuccess {
 					successCount = 1
 				} else {
 					failureCount = 1
@@ -112,7 +112,7 @@ func (r *DefaultRanker) Rank(ctx context.Context, req *RankRequest) ([]Suggestio
 				}
 			} else {
 				// Update existing candidate
-				if cmd.IsSuccess {
+				if cmd.IsSuccess == nil || *cmd.IsSuccess {
 					existing.successCount++
 				} else {
 					existing.failureCount++

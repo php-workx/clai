@@ -50,7 +50,7 @@ func createTestCommand(t *testing.T, store *storage.SQLiteStore, sessionID, comm
 		TsStartUnixMs: ts,
 		CWD:           cwd,
 		Command:       command,
-		IsSuccess:     isSuccess,
+		IsSuccess:     &isSuccess,
 	}
 	if err := store.CreateCommand(ctx, cmd); err != nil {
 		t.Fatalf("CreateCommand() error = %v", err)

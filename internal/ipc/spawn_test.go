@@ -7,7 +7,10 @@ import (
 )
 
 func TestPidPath(t *testing.T) {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir() error = %v", err)
+	}
 	expected := filepath.Join(home, ".clai", "run", "clai.pid")
 
 	path := PidPath()
@@ -17,7 +20,10 @@ func TestPidPath(t *testing.T) {
 }
 
 func TestLogPath(t *testing.T) {
-	home, _ := os.UserHomeDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir() error = %v", err)
+	}
 	expected := filepath.Join(home, ".clai", "run", "clai.log")
 
 	path := LogPath()
@@ -34,6 +40,11 @@ func TestFindDaemonBinaryFromEnv(t *testing.T) {
 	}
 	defer os.Remove(tmpFile.Name())
 	tmpFile.Close()
+
+	// Make temp file executable
+	if err := os.Chmod(tmpFile.Name(), 0o755); err != nil {
+		t.Fatalf("Failed to chmod temp file: %v", err)
+	}
 
 	// Set environment variable
 	os.Setenv("CLAI_DAEMON_PATH", tmpFile.Name())
@@ -88,12 +99,17 @@ func TestSpawnDaemonMissingBinary(t *testing.T) {
 	os.Setenv("PATH", "/nonexistent")
 	defer os.Setenv("PATH", oldPath)
 
-	// Use a temp directory for run dir
+	// Use a temp directory for run dir to avoid creating dirs under real user home
 	tmpDir, err := os.MkdirTemp("", "clai-test-*")
 	if err != nil {
 		t.Fatalf("Failed to create temp dir: %v", err)
 	}
 	defer os.RemoveAll(tmpDir)
+
+	// Set XDG_RUNTIME_DIR to temp directory to isolate test
+	oldXDG := os.Getenv("XDG_RUNTIME_DIR")
+	os.Setenv("XDG_RUNTIME_DIR", tmpDir)
+	defer os.Setenv("XDG_RUNTIME_DIR", oldXDG)
 
 	// This should fail because daemon binary doesn't exist
 	err = SpawnDaemon()

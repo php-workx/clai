@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 )
 
@@ -69,10 +68,8 @@ func SpawnDaemon() error {
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
 
-	// Detach from parent process group
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true,
-	}
+	// Detach from parent process group (platform-specific)
+	setProcAttr(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start daemon: %w", err)

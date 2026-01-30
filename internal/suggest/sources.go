@@ -113,35 +113,30 @@ func (s *CommandSource) QueryGlobal(ctx context.Context, prefix string, limit in
 
 // QueryAllScopes queries all three scopes and returns the combined results.
 // Results from higher-priority sources are returned first.
+// Partial failures are tolerated: if one scope fails, results from other scopes are still returned.
 func (s *CommandSource) QueryAllScopes(ctx context.Context, sessionID, cwd, prefix string, limitPerScope int) ([]*QueryResult, error) {
 	results := make([]*QueryResult, 0, 3)
 
 	// Session scope (highest priority)
 	sessionResult, err := s.QuerySession(ctx, sessionID, prefix, limitPerScope)
-	if err != nil {
-		return nil, err
-	}
-	if len(sessionResult.Commands) > 0 {
+	if err == nil && len(sessionResult.Commands) > 0 {
 		results = append(results, sessionResult)
 	}
+	// Continue on error - partial results are acceptable
 
 	// CWD scope
 	cwdResult, err := s.QueryCWD(ctx, cwd, prefix, limitPerScope)
-	if err != nil {
-		return nil, err
-	}
-	if len(cwdResult.Commands) > 0 {
+	if err == nil && len(cwdResult.Commands) > 0 {
 		results = append(results, cwdResult)
 	}
+	// Continue on error - partial results are acceptable
 
 	// Global scope (lowest priority)
 	globalResult, err := s.QueryGlobal(ctx, prefix, limitPerScope)
-	if err != nil {
-		return nil, err
-	}
-	if len(globalResult.Commands) > 0 {
+	if err == nil && len(globalResult.Commands) > 0 {
 		results = append(results, globalResult)
 	}
+	// Continue on error - partial results are acceptable
 
 	return results, nil
 }

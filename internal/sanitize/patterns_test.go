@@ -4,6 +4,19 @@ import (
 	"testing"
 )
 
+// mustGetPattern retrieves a pattern by name from GetSecretPatterns.
+// It calls t.Fatalf if the pattern is not found.
+func mustGetPattern(t *testing.T, name string) Pattern {
+	t.Helper()
+	for _, p := range GetSecretPatterns() {
+		if p.Name == name {
+			return p
+		}
+	}
+	t.Fatalf("Pattern %q not found in GetSecretPatterns()", name)
+	return Pattern{} // unreachable
+}
+
 func TestGetSecretPatterns(t *testing.T) {
 	patterns := GetSecretPatterns()
 	if len(patterns) == 0 {
@@ -57,13 +70,7 @@ func TestPatterns_AWSAccessKey(t *testing.T) {
 		},
 	}
 
-	var pattern Pattern
-	for _, p := range GetSecretPatterns() {
-		if p.Name == "AWS Access Key" {
-			pattern = p
-			break
-		}
-	}
+	pattern := mustGetPattern(t, "AWS Access Key")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -103,13 +110,7 @@ func TestPatterns_AWSSecretKey(t *testing.T) {
 		},
 	}
 
-	var pattern Pattern
-	for _, p := range GetSecretPatterns() {
-		if p.Name == "AWS Secret Key" {
-			pattern = p
-			break
-		}
-	}
+	pattern := mustGetPattern(t, "AWS Secret Key")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -149,13 +150,7 @@ func TestPatterns_JWT(t *testing.T) {
 		},
 	}
 
-	var pattern Pattern
-	for _, p := range GetSecretPatterns() {
-		if p.Name == "JWT Token" {
-			pattern = p
-			break
-		}
-	}
+	pattern := mustGetPattern(t, "JWT Token")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -195,13 +190,7 @@ func TestPatterns_SlackToken(t *testing.T) {
 		},
 	}
 
-	var pattern Pattern
-	for _, p := range GetSecretPatterns() {
-		if p.Name == "Slack Token" {
-			pattern = p
-			break
-		}
-	}
+	pattern := mustGetPattern(t, "Slack Token")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -240,13 +229,7 @@ MIIDXTCCAkWgAwIB...
 		},
 	}
 
-	var pattern Pattern
-	for _, p := range GetSecretPatterns() {
-		if p.Name == "PEM Block" {
-			pattern = p
-			break
-		}
-	}
+	pattern := mustGetPattern(t, "PEM Block")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -296,13 +279,7 @@ func TestPatterns_GenericSecret(t *testing.T) {
 		},
 	}
 
-	var pattern Pattern
-	for _, p := range GetSecretPatterns() {
-		if p.Name == "Generic Secret" {
-			pattern = p
-			break
-		}
-	}
+	pattern := mustGetPattern(t, "Generic Secret")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -342,13 +319,7 @@ func TestPatterns_GitHubToken(t *testing.T) {
 		},
 	}
 
-	var pattern Pattern
-	for _, p := range GetSecretPatterns() {
-		if p.Name == "GitHub Token" {
-			pattern = p
-			break
-		}
-	}
+	pattern := mustGetPattern(t, "GitHub Token")
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

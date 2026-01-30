@@ -54,10 +54,11 @@ func (m *mockStore) CreateCommand(ctx context.Context, c *storage.Command) error
 func (m *mockStore) UpdateCommandEnd(ctx context.Context, commandID string, exitCode int, endTime, duration int64) error {
 	if c, ok := m.commands[commandID]; ok {
 		ec := exitCode
+		isSuccess := exitCode == 0
 		c.ExitCode = &ec
 		c.TsEndUnixMs = &endTime
 		c.DurationMs = &duration
-		c.IsSuccess = exitCode == 0
+		c.IsSuccess = &isSuccess
 	}
 	return nil
 }

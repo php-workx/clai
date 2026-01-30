@@ -127,8 +127,9 @@ func (c *Client) LogEnd(sessionID, commandID string, exitCode int, durationMs in
 
 // Suggest requests command suggestions from the daemon.
 // Returns suggestions or nil on timeout/error.
-func (c *Client) Suggest(sessionID, cwd, buffer string, cursorPos int, includeAI bool, maxResults int) []*pb.Suggestion {
-	ctx, cancel := context.WithTimeout(context.Background(), SuggestTimeout)
+// The provided context is used for cancellation; a timeout is applied internally.
+func (c *Client) Suggest(ctx context.Context, sessionID, cwd, buffer string, cursorPos int, includeAI bool, maxResults int) []*pb.Suggestion {
+	ctx, cancel := context.WithTimeout(ctx, SuggestTimeout)
 	defer cancel()
 
 	if maxResults <= 0 {
@@ -154,8 +155,9 @@ func (c *Client) Suggest(sessionID, cwd, buffer string, cursorPos int, includeAI
 
 // TextToCommand converts natural language to shell commands.
 // Uses a longer timeout suitable for AI operations.
-func (c *Client) TextToCommand(sessionID, prompt, cwd string, maxSuggestions int) (*pb.TextToCommandResponse, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), InteractiveTimeout)
+// The provided context is used for cancellation; a timeout is applied internally.
+func (c *Client) TextToCommand(ctx context.Context, sessionID, prompt, cwd string, maxSuggestions int) (*pb.TextToCommandResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, InteractiveTimeout)
 	defer cancel()
 
 	if maxSuggestions <= 0 {
