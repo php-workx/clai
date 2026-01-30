@@ -77,7 +77,7 @@ AI features require the [Claude CLI](https://claude.ai/cli) to be installed and 
 claude login
 
 # Enable AI in config
-clai config set ai.enabled true
+clai config ai.enabled true
 
 # Verify Claude CLI is detected
 clai doctor  # Should show [OK] Claude CLI
@@ -112,10 +112,10 @@ View and modify settings:
 clai config list
 
 # Get a specific value
-clai config get ai.enabled
+clai config ai.enabled
 
 # Set a value
-clai config set suggestions.max_history 10
+clai config suggestions.max_history 10
 ```
 
 Common settings:

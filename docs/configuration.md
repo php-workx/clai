@@ -9,10 +9,10 @@ clai uses a YAML configuration file at `~/.config/clai/config.yaml`.
 clai config list
 
 # Get a specific value
-clai config get ai.enabled
+clai config ai.enabled
 
 # Set a value
-clai config set ai.enabled true
+clai config ai.enabled true
 
 # View config file location
 clai status

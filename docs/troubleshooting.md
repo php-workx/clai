@@ -91,12 +91,12 @@ clai logs --follow
 
 2. Reduce suggestion timeout:
    ```bash
-   clai config set client.suggest_timeout_ms 30
+   clai config client.suggest_timeout_ms 30
    ```
 
 3. Disable AI suggestions (use history only):
    ```bash
-   clai config set suggestions.max_ai 0
+   clai config suggestions.max_ai 0
    ```
 
 4. Check daemon logs for slow queries:
@@ -112,7 +112,7 @@ clai logs --follow
 
 1. Verify AI is enabled:
    ```bash
-   clai config get ai.enabled
+   clai config ai.enabled
    # Should show: true
    ```
 
@@ -133,7 +133,7 @@ clai logs --follow
 
 4. Check provider setting:
    ```bash
-   clai config get ai.provider
+   clai config ai.provider
    # Should show: anthropic or auto
    ```
 
@@ -170,7 +170,7 @@ clai logs --follow
 
 1. Check daemon idle timeout:
    ```bash
-   clai config get daemon.idle_timeout_mins
+   clai config daemon.idle_timeout_mins
    # Default 20 - daemon stops after idle
    ```
 
@@ -215,7 +215,7 @@ Increase logging for debugging:
 
 ```bash
 # Set debug logging
-clai config set daemon.log_level debug
+clai config daemon.log_level debug
 
 # Restart daemon
 clai daemon stop

@@ -15,7 +15,7 @@ claude login
 which claude
 
 # Enable AI features in clai
-clai config set ai.enabled true
+clai config ai.enabled true
 
 # Verify
 clai doctor  # Should show [OK] Claude CLI
@@ -44,7 +44,7 @@ Get explanations for command failures:
 
 ```bash
 # Enable auto-diagnosis
-clai config set ai.auto_diagnose true
+clai config ai.auto_diagnose true
 
 # Or use the run wrapper
 run npm install
@@ -57,8 +57,8 @@ AI-powered command suggestions based on context:
 
 ```bash
 # Enable AI suggestions
-clai config set ai.enabled true
-clai config set suggestions.max_ai 3
+clai config ai.enabled true
+clai config suggestions.max_ai 3
 
 # Now suggestions include AI-generated options
 ```
@@ -69,7 +69,7 @@ AI responses are cached to reduce latency:
 
 ```bash
 # Set cache duration (hours)
-clai config set ai.cache_ttl_hours 24
+clai config ai.cache_ttl_hours 24
 
 # Cache location
 ls ~/.cache/clai/
@@ -86,10 +86,10 @@ By default, clai sanitizes sensitive data before sending to Claude:
 
 ```bash
 # Check sanitization status
-clai config get privacy.sanitize_ai_calls
+clai config privacy.sanitize_ai_calls
 
 # Disable (not recommended)
-clai config set privacy.sanitize_ai_calls false
+clai config privacy.sanitize_ai_calls false
 ```
 
 Sanitization removes:
