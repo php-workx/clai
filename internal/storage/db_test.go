@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -135,7 +136,9 @@ func TestSQLiteStore_ConcurrentWrites_Safe(t *testing.T) {
 	// Run concurrent writes
 	const numWriters = 10
 	const writesPerWriter = 10
-	errCh := make(chan error, numWriters*writesPerWriter)
+
+	// Channel capacity matches exactly the number of goroutines (one result per goroutine)
+	errCh := make(chan error, numWriters)
 
 	for i := 0; i < numWriters; i++ {
 		go func(writerID int) {
@@ -146,7 +149,7 @@ func TestSQLiteStore_ConcurrentWrites_Safe(t *testing.T) {
 					TsStartUnixMs: int64(1000 + writerID*100 + j),
 					CWD:           "/tmp",
 					Command:       "echo test",
-					IsSuccess:     true,
+					IsSuccess:     boolPtr(true),
 				}
 				if err := store.CreateCommand(ctx, cmd); err != nil {
 					errCh <- err
@@ -157,24 +160,30 @@ func TestSQLiteStore_ConcurrentWrites_Safe(t *testing.T) {
 		}(i)
 	}
 
-	// Wait for all writers
+	// Wait for all writers (exactly numWriters results expected)
+	var errs []error
 	for i := 0; i < numWriters; i++ {
 		if err := <-errCh; err != nil {
-			t.Errorf("Concurrent write error: %v", err)
+			errs = append(errs, err)
 		}
 	}
-
-	// Verify all commands were written
-	cmds, err := store.QueryCommands(ctx, CommandQuery{
-		SessionID: strPtr("test-concurrent-session"),
-		Limit:     numWriters * writesPerWriter,
-	})
-	if err != nil {
-		t.Fatalf("QueryCommands() error = %v", err)
+	for _, err := range errs {
+		t.Errorf("Concurrent write error: %v", err)
 	}
 
-	if len(cmds) != numWriters*writesPerWriter {
-		t.Errorf("Got %d commands, want %d", len(cmds), numWriters*writesPerWriter)
+	// Verify all commands were written (only if no errors)
+	if len(errs) == 0 {
+		cmds, err := store.QueryCommands(ctx, CommandQuery{
+			SessionID: strPtr("test-concurrent-session"),
+			Limit:     numWriters * writesPerWriter,
+		})
+		if err != nil {
+			t.Fatalf("QueryCommands() error = %v", err)
+		}
+
+		if len(cmds) != numWriters*writesPerWriter {
+			t.Errorf("Got %d commands, want %d", len(cmds), numWriters*writesPerWriter)
+		}
 	}
 }
 
@@ -214,7 +223,7 @@ func newTestStore(t *testing.T) *SQLiteStore {
 }
 
 func generateTestID(writerID, writeNum int) string {
-	return filepath.Join("cmd", string(rune('a'+writerID)), string(rune('0'+writeNum)))
+	return fmt.Sprintf("cmd-%c-%c", 'a'+writerID, '0'+writeNum)
 }
 
 func strPtr(s string) *string {

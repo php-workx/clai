@@ -45,12 +45,10 @@ func (s *SQLiteStore) GetCached(ctx context.Context, key string) (*CacheEntry, e
 		return nil, fmt.Errorf("failed to get cache entry: %w", err)
 	}
 
-	// Increment hit count asynchronously (fire-and-forget)
-	go func() {
-		_, _ = s.db.ExecContext(context.Background(), `
-			UPDATE ai_cache SET hit_count = hit_count + 1 WHERE cache_key = ?
-		`, key)
-	}()
+	// Increment hit count synchronously (best-effort, ignore errors)
+	_, _ = s.db.ExecContext(ctx, `
+		UPDATE ai_cache SET hit_count = hit_count + 1 WHERE cache_key = ?
+	`, key)
 
 	return &entry, nil
 }
@@ -76,7 +74,7 @@ func (s *SQLiteStore) SetCached(ctx context.Context, entry *CacheEntry) error {
 	}
 	if entry.ExpiresAtUnixMs == 0 {
 		// Default TTL: 24 hours
-		entry.ExpiresAtUnixMs = entry.CreatedAtUnixMs + (24 * 60 * 60 * 1000)
+		entry.ExpiresAtUnixMs = entry.CreatedAtUnixMs + (24 * time.Hour).Milliseconds()
 	}
 
 	_, err := s.db.ExecContext(ctx, `

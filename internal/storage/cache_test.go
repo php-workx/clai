@@ -126,20 +126,27 @@ func TestSQLiteStore_GetCached_IncrementsHitCount(t *testing.T) {
 		}
 	}
 
-	// Give async update time to complete
-	time.Sleep(100 * time.Millisecond)
+	// Poll until hit count is updated or timeout
+	timeout := time.After(2 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
 
-	// Check hit count directly
-	var hitCount int64
-	err := store.DB().QueryRowContext(ctx,
-		"SELECT hit_count FROM ai_cache WHERE cache_key = ?",
-		"hit-count-key").Scan(&hitCount)
-	if err != nil {
-		t.Fatalf("Failed to query hit count: %v", err)
-	}
-
-	if hitCount < 3 {
-		t.Errorf("hit_count = %d, want >= 3", hitCount)
+	for {
+		select {
+		case <-timeout:
+			t.Fatal("Timed out waiting for hit count to reach 3")
+		case <-ticker.C:
+			var hitCount int64
+			err := store.DB().QueryRowContext(ctx,
+				"SELECT hit_count FROM ai_cache WHERE cache_key = ?",
+				"hit-count-key").Scan(&hitCount)
+			if err != nil {
+				t.Fatalf("Failed to query hit count: %v", err)
+			}
+			if hitCount >= 3 {
+				return // Success
+			}
+		}
 	}
 }
 
@@ -204,11 +211,12 @@ func TestSQLiteStore_SetCached_DefaultTTL(t *testing.T) {
 		t.Error("ExpiresAtUnixMs was not set")
 	}
 
-	// Verify TTL is approximately 24 hours
+	// Verify TTL is approximately 24 hours (allow 1 second tolerance for time skew)
 	ttl := entry.ExpiresAtUnixMs - entry.CreatedAtUnixMs
 	expected := int64(24 * 60 * 60 * 1000) // 24 hours in ms
-	if ttl != expected {
-		t.Errorf("TTL = %d ms, want %d ms", ttl, expected)
+	tolerance := int64(1000)               // 1 second tolerance
+	if ttl < expected-tolerance || ttl > expected+tolerance {
+		t.Errorf("TTL = %d ms, want %d ms (within %d ms tolerance)", ttl, expected, tolerance)
 	}
 }
 

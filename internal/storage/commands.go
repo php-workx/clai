@@ -2,13 +2,11 @@ package storage
 
 import (
 	"context"
-	"crypto/sha256"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
-	"strings"
-	"unicode"
+
+	"github.com/runger/clai/internal/cmdutil"
 )
 
 // ErrCommandNotFound is returned when a command is not found.
@@ -35,18 +33,22 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 
 	// Normalize command if not already set
 	if cmd.CommandNorm == "" {
-		cmd.CommandNorm = NormalizeCommand(cmd.Command)
+		cmd.CommandNorm = cmdutil.NormalizeCommand(cmd.Command)
 	}
 
 	// Generate hash if not already set
 	if cmd.CommandHash == "" {
-		cmd.CommandHash = HashCommand(cmd.CommandNorm)
+		cmd.CommandHash = cmdutil.HashCommand(cmd.CommandNorm)
 	}
 
-	// Default is_success to true
-	isSuccess := 1
-	if !cmd.IsSuccess {
-		isSuccess = 0
+	// Determine is_success value: nil = unknown (treated as success), false = failure, true = success
+	var isSuccess *int
+	if cmd.IsSuccess != nil {
+		v := 0
+		if *cmd.IsSuccess {
+			v = 1
+		}
+		isSuccess = &v
 	}
 
 	result, err := s.db.ExecContext(ctx, `
@@ -196,7 +198,10 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 			ec := int(exitCode.Int32)
 			cmd.ExitCode = &ec
 		}
-		cmd.IsSuccess = !isSuccess.Valid || isSuccess.Int32 == 1
+		if isSuccess.Valid {
+			v := isSuccess.Int32 == 1
+			cmd.IsSuccess = &v
+		}
 
 		commands = append(commands, cmd)
 	}
@@ -210,78 +215,12 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 
 // NormalizeCommand normalizes a command for comparison and deduplication.
 // It lowercases the command, trims whitespace, and removes variable arguments.
-func NormalizeCommand(cmd string) string {
-	// Trim whitespace
-	cmd = strings.TrimSpace(cmd)
-
-	// Lowercase
-	cmd = strings.ToLower(cmd)
-
-	// Split into parts
-	parts := strings.Fields(cmd)
-	if len(parts) == 0 {
-		return ""
-	}
-
-	// Keep the base command and common flags, but normalize variable arguments
-	normalized := make([]string, 0, len(parts))
-	for i, part := range parts {
-		// Keep the first part (the command itself) always
-		if i == 0 {
-			normalized = append(normalized, part)
-			continue
-		}
-
-		// Keep flags (start with -)
-		if strings.HasPrefix(part, "-") {
-			normalized = append(normalized, part)
-			continue
-		}
-
-		// Skip paths that look like absolute paths or home-relative paths
-		if strings.HasPrefix(part, "/") || strings.HasPrefix(part, "~") {
-			// Replace with a placeholder for normalization
-			normalized = append(normalized, "<path>")
-			continue
-		}
-
-		// Skip things that look like URLs
-		if strings.Contains(part, "://") {
-			normalized = append(normalized, "<url>")
-			continue
-		}
-
-		// Skip things that look like numbers (e.g., PIDs, port numbers)
-		if isNumeric(part) {
-			normalized = append(normalized, "<num>")
-			continue
-		}
-
-		// Keep other arguments
-		normalized = append(normalized, part)
-	}
-
-	return strings.Join(normalized, " ")
-}
+// This is a re-export of cmdutil.NormalizeCommand for backward compatibility.
+var NormalizeCommand = cmdutil.NormalizeCommand
 
 // HashCommand generates a SHA256 hash of a normalized command.
-func HashCommand(normalizedCmd string) string {
-	hash := sha256.Sum256([]byte(normalizedCmd))
-	return hex.EncodeToString(hash[:])
-}
-
-// isNumeric checks if a string contains only digits.
-func isNumeric(s string) bool {
-	if s == "" {
-		return false
-	}
-	for _, r := range s {
-		if !unicode.IsDigit(r) {
-			return false
-		}
-	}
-	return true
-}
+// This is a re-export of cmdutil.HashCommand for backward compatibility.
+var HashCommand = cmdutil.HashCommand
 
 // isForeignKeyError checks if the error is a foreign key constraint violation.
 func isForeignKeyError(err error) bool {

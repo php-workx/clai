@@ -168,7 +168,9 @@ func TestSQLiteStore_CreateSession_Validation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // rebind loop variable for parallel safety
 		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 			err := store.CreateSession(context.Background(), tt.session)
 			if err == nil {
 				t.Error("Expected error, got nil")

@@ -51,7 +51,7 @@ type Command struct {
 	CommandNorm   string
 	CommandHash   string
 	ExitCode      *int
-	IsSuccess     bool
+	IsSuccess     *bool // nil = unknown (treated as success), false = failure, true = success
 }
 
 // CommandQuery defines parameters for querying commands.

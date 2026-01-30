@@ -93,11 +93,16 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT version FROM schema_meta ORDER BY version DESC LIMIT 1
 	`)
-	if err := row.Scan(&currentVersion); err != nil && err != sql.ErrNoRows {
-		// Table might not exist yet, which is fine
-		if !isTableNotFoundError(err) {
-			// Try to read anyway - if schema_meta doesn't exist, we start from 0
+	if err := row.Scan(&currentVersion); err != nil {
+		if err == sql.ErrNoRows {
+			// No version recorded yet, start from 0
 			currentVersion = 0
+		} else if isTableNotFoundError(err) {
+			// Table doesn't exist yet, start from 0
+			currentVersion = 0
+		} else {
+			// Propagate unexpected errors
+			return fmt.Errorf("failed to read schema version: %w", err)
 		}
 	}
 

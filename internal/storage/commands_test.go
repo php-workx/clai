@@ -32,7 +32,7 @@ func TestSQLiteStore_CreateCommand_Success(t *testing.T) {
 		TsStartUnixMs: 1700000001000,
 		CWD:           "/home/user",
 		Command:       "git status",
-		IsSuccess:     true,
+		IsSuccess:     boolPtr(true),
 	}
 
 	err := store.CreateCommand(ctx, cmd)
@@ -80,7 +80,7 @@ func TestSQLiteStore_CreateCommand_AutoNormalization(t *testing.T) {
 		TsStartUnixMs: 1700000001000,
 		CWD:           "/home/user",
 		Command:       "  Git Status  ",
-		IsSuccess:     true,
+		IsSuccess:     boolPtr(true),
 	}
 
 	err := store.CreateCommand(ctx, cmd)
@@ -105,7 +105,7 @@ func TestSQLiteStore_CreateCommand_InvalidSessionID(t *testing.T) {
 		TsStartUnixMs: 1700000001000,
 		CWD:           "/tmp",
 		Command:       "ls",
-		IsSuccess:     true,
+		IsSuccess:     boolPtr(true),
 	}
 
 	err := store.CreateCommand(context.Background(), cmd)
@@ -213,7 +213,7 @@ func TestSQLiteStore_UpdateCommandEnd_Success(t *testing.T) {
 		TsStartUnixMs: 1700000001000,
 		CWD:           "/tmp",
 		Command:       "make build",
-		IsSuccess:     true,
+		IsSuccess:     boolPtr(true),
 	}
 	if err := store.CreateCommand(ctx, cmd); err != nil {
 		t.Fatalf("CreateCommand() error = %v", err)
@@ -245,8 +245,8 @@ func TestSQLiteStore_UpdateCommandEnd_Success(t *testing.T) {
 	if cmds[0].ExitCode == nil || *cmds[0].ExitCode != 0 {
 		t.Errorf("ExitCode = %v, want 0", cmds[0].ExitCode)
 	}
-	if !cmds[0].IsSuccess {
-		t.Error("IsSuccess = false, want true")
+	if cmds[0].IsSuccess == nil || !*cmds[0].IsSuccess {
+		t.Error("IsSuccess = false or nil, want true")
 	}
 }
 
@@ -277,7 +277,7 @@ func TestSQLiteStore_UpdateCommandEnd_FailedCommand(t *testing.T) {
 		TsStartUnixMs: 1700000001000,
 		CWD:           "/tmp",
 		Command:       "false",
-		IsSuccess:     true, // Initial state
+		IsSuccess:     boolPtr(true), // Initial state
 	}
 	if err := store.CreateCommand(ctx, cmd); err != nil {
 		t.Fatalf("CreateCommand() error = %v", err)
@@ -303,8 +303,8 @@ func TestSQLiteStore_UpdateCommandEnd_FailedCommand(t *testing.T) {
 	if cmds[0].ExitCode == nil || *cmds[0].ExitCode != 1 {
 		t.Errorf("ExitCode = %v, want 1", cmds[0].ExitCode)
 	}
-	if cmds[0].IsSuccess {
-		t.Error("IsSuccess = true, want false")
+	if cmds[0].IsSuccess == nil || *cmds[0].IsSuccess {
+		t.Error("IsSuccess = true or nil, want false")
 	}
 }
 
@@ -360,7 +360,7 @@ func TestSQLiteStore_QueryCommands_BySession(t *testing.T) {
 			TsStartUnixMs: 1700000001000,
 			CWD:           "/tmp",
 			Command:       c.cmd,
-			IsSuccess:     true,
+			IsSuccess:     boolPtr(true),
 		}
 		if err := store.CreateCommand(ctx, cmd); err != nil {
 			t.Fatalf("CreateCommand() error = %v", err)
@@ -417,7 +417,7 @@ func TestSQLiteStore_QueryCommands_ByCWD(t *testing.T) {
 			TsStartUnixMs: 1700000001000,
 			CWD:           c.cwd,
 			Command:       "ls",
-			IsSuccess:     true,
+			IsSuccess:     boolPtr(true),
 		}
 		if err := store.CreateCommand(ctx, cmd); err != nil {
 			t.Fatalf("CreateCommand() error = %v", err)
@@ -472,7 +472,7 @@ func TestSQLiteStore_QueryCommands_ByPrefix(t *testing.T) {
 			TsStartUnixMs: int64(1700000001000 + i),
 			CWD:           "/tmp",
 			Command:       c,
-			IsSuccess:     true,
+			IsSuccess:     boolPtr(true),
 		}
 		if err := store.CreateCommand(ctx, cmd); err != nil {
 			t.Fatalf("CreateCommand() error = %v", err)
@@ -538,7 +538,7 @@ func TestSQLiteStore_QueryCommands_Limit(t *testing.T) {
 			TsStartUnixMs: int64(1700000001000 + i),
 			CWD:           "/tmp",
 			Command:       "ls",
-			IsSuccess:     true,
+			IsSuccess:     boolPtr(true),
 		}
 		if err := store.CreateCommand(ctx, cmd); err != nil {
 			t.Fatalf("CreateCommand() error = %v", err)
@@ -588,7 +588,7 @@ func TestSQLiteStore_QueryCommands_OrderByRecent(t *testing.T) {
 			TsStartUnixMs: ts,
 			CWD:           "/tmp",
 			Command:       "cmd",
-			IsSuccess:     true,
+			IsSuccess:     boolPtr(true),
 		}
 		if err := store.CreateCommand(ctx, cmd); err != nil {
 			t.Fatalf("CreateCommand() error = %v", err)
@@ -684,6 +684,7 @@ func TestNormalizeCommand(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt // rebind loop variable for parallel safety
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got := NormalizeCommand(tt.input)
@@ -718,4 +719,8 @@ func TestHashCommand(t *testing.T) {
 
 func generateTestCommandID(n int) string {
 	return "test-cmd-" + string(rune('A'+n))
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }
