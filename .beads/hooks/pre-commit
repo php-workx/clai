@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# Chained pre-commit hook - runs pre-commit framework before beads
+# This file is called by bd hook pre-commit when chain_strategy is set
+
+# Run pre-commit if available
+if command -v pre-commit >/dev/null 2>&1; then
+    pre-commit run --config .pre-commit-config.yaml || exit 1
+fi
