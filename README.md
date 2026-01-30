@@ -49,8 +49,11 @@ Press **Tab** to complete.
 
 ## 📚 Documentation
 
-- [Design & Features](docs/func_design.md) — Architecture, phases, configuration
-- [Technical Spec](docs/tech_design.md) — Implementation details for contributors
+- [Getting Started](docs/getting-started.md)
+- [Features & Usage](docs/features.md)
+- [Configuration](docs/configuration.md)
+- [CLI Reference](docs/cli-reference.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ## Requirements
 
