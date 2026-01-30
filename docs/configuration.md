@@ -1,6 +1,6 @@
 # Configuration
 
-clai uses a YAML configuration file at `~/.config/clai/config.yaml`.
+clai uses a YAML configuration file at `~/.clai/config.yaml`.
 
 ## Managing Configuration
 
@@ -108,7 +108,7 @@ privacy:
 
 ## Example Configuration File
 
-Full example at `~/.config/clai/config.yaml`:
+Full example at `~/.clai/config.yaml`:
 
 ```yaml
 daemon:
@@ -146,23 +146,20 @@ Some settings can be overridden via environment variables:
 
 ## Default Paths
 
-clai follows XDG Base Directory conventions:
+All clai data is stored in a single directory:
 
 | Path | Purpose |
 |------|---------|
-| `~/.config/clai/config.yaml` | Configuration file |
-| `~/.local/share/clai/clai.db` | SQLite database |
-| `~/.local/share/clai/hooks/` | Shell hook scripts |
-| `~/.cache/clai/` | AI response cache |
-| `~/.local/state/clai/clai.sock` | Unix socket |
-| `~/.local/state/clai/clai.pid` | Daemon PID file |
-| `~/.local/state/clai/clai.log` | Daemon log file |
+| `~/.clai/config.yaml` | Configuration file |
+| `~/.clai/state.db` | SQLite database |
+| `~/.clai/hooks/` | Shell hook scripts |
+| `~/.clai/cache/` | AI response cache |
+| `~/.clai/logs/` | Daemon log files |
+| `~/.clai/clai.sock` | Unix socket |
+| `~/.clai/clai.pid` | Daemon PID file |
 
-Override with XDG environment variables:
-- `XDG_CONFIG_HOME` (default: `~/.config`)
-- `XDG_DATA_HOME` (default: `~/.local/share`)
-- `XDG_CACHE_HOME` (default: `~/.cache`)
-- `XDG_STATE_HOME` (default: `~/.local/state`)
+Override with environment variable:
+- `CLAI_HOME` - set to use a custom directory (default: `~/.clai`)
 
 ## Validation
 
@@ -173,7 +170,7 @@ clai validates configuration on load:
 clai doctor
 
 # Shows:
-#   [OK] Configuration - ~/.config/clai/config.yaml
+#   [OK] Configuration - ~/.clai/config.yaml
 # Or:
 #   [ERROR] Configuration - Invalid: ai.provider must be...
 ```

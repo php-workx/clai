@@ -11,59 +11,62 @@ import (
 func TestDefaultPaths(t *testing.T) {
 	paths := DefaultPaths()
 
-	if paths.ConfigDir == "" {
-		t.Error("ConfigDir is empty")
-	}
-	if paths.DataDir == "" {
-		t.Error("DataDir is empty")
-	}
-	if paths.CacheDir == "" {
-		t.Error("CacheDir is empty")
-	}
-	if paths.RuntimeDir == "" {
-		t.Error("RuntimeDir is empty")
+	if paths.BaseDir == "" {
+		t.Error("BaseDir is empty")
 	}
 
-	// All paths should be absolute
-	if !filepath.IsAbs(paths.ConfigDir) {
-		t.Errorf("ConfigDir should be absolute: %s", paths.ConfigDir)
+	// BaseDir should be absolute
+	if !filepath.IsAbs(paths.BaseDir) {
+		t.Errorf("BaseDir should be absolute: %s", paths.BaseDir)
 	}
-	if !filepath.IsAbs(paths.DataDir) {
-		t.Errorf("DataDir should be absolute: %s", paths.DataDir)
+
+	// BaseDir should contain "clai"
+	if !strings.Contains(paths.BaseDir, "clai") {
+		t.Errorf("BaseDir should contain 'clai': %s", paths.BaseDir)
 	}
 }
 
-func TestDefaultPaths_XDG(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("XDG test not applicable on Windows")
-	}
-
-	// Save original env vars
-	origConfigHome := os.Getenv("XDG_CONFIG_HOME")
-	origDataHome := os.Getenv("XDG_DATA_HOME")
-	origCacheHome := os.Getenv("XDG_CACHE_HOME")
+func TestDefaultPaths_CLAIHome(t *testing.T) {
+	// Save original env var
+	origClaiHome := os.Getenv("CLAI_HOME")
 
 	defer func() {
-		os.Setenv("XDG_CONFIG_HOME", origConfigHome)
-		os.Setenv("XDG_DATA_HOME", origDataHome)
-		os.Setenv("XDG_CACHE_HOME", origCacheHome)
+		if origClaiHome != "" {
+			os.Setenv("CLAI_HOME", origClaiHome)
+		} else {
+			os.Unsetenv("CLAI_HOME")
+		}
 	}()
 
-	// Set custom XDG paths
-	os.Setenv("XDG_CONFIG_HOME", "/custom/config")
-	os.Setenv("XDG_DATA_HOME", "/custom/data")
-	os.Setenv("XDG_CACHE_HOME", "/custom/cache")
+	// Set custom CLAI_HOME
+	os.Setenv("CLAI_HOME", "/custom/clai/home")
 
 	paths := DefaultPaths()
 
-	if !strings.HasPrefix(paths.ConfigDir, "/custom/config") {
-		t.Errorf("ConfigDir should respect XDG_CONFIG_HOME: %s", paths.ConfigDir)
+	if paths.BaseDir != "/custom/clai/home" {
+		t.Errorf("BaseDir should respect CLAI_HOME: %s", paths.BaseDir)
 	}
-	if !strings.HasPrefix(paths.DataDir, "/custom/data") {
-		t.Errorf("DataDir should respect XDG_DATA_HOME: %s", paths.DataDir)
+}
+
+func TestPaths_DerivedDirs(t *testing.T) {
+	paths := &Paths{BaseDir: "/test/clai"}
+
+	tests := []struct {
+		name     string
+		got      string
+		wantBase string
+	}{
+		{"CacheDir", paths.CacheDir(), "/test/clai/cache"},
+		{"LogDir", paths.LogDir(), "/test/clai/logs"},
+		{"HooksDir", paths.HooksDir(), "/test/clai/hooks"},
 	}
-	if !strings.HasPrefix(paths.CacheDir, "/custom/cache") {
-		t.Errorf("CacheDir should respect XDG_CACHE_HOME: %s", paths.CacheDir)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.got != tt.wantBase {
+				t.Errorf("%s = %s, want %s", tt.name, tt.got, tt.wantBase)
+			}
+		})
 	}
 }
 
@@ -152,10 +155,7 @@ func TestPaths_EnsureDirectories(t *testing.T) {
 
 	// Create custom paths pointing to temp directory
 	paths := &Paths{
-		ConfigDir:  filepath.Join(tmpDir, "config", "clai"),
-		DataDir:    filepath.Join(tmpDir, "data", "clai"),
-		CacheDir:   filepath.Join(tmpDir, "cache", "clai"),
-		RuntimeDir: filepath.Join(tmpDir, "run", "clai"),
+		BaseDir: filepath.Join(tmpDir, "clai"),
 	}
 
 	// Ensure directories
@@ -166,12 +166,10 @@ func TestPaths_EnsureDirectories(t *testing.T) {
 
 	// Check directories exist
 	dirs := []string{
-		paths.ConfigDir,
-		paths.DataDir,
-		paths.CacheDir,
-		paths.RuntimeDir,
+		paths.BaseDir,
 		paths.LogDir(),
 		paths.HooksDir(),
+		paths.CacheDir(),
 	}
 
 	for _, dir := range dirs {
@@ -195,18 +193,15 @@ func TestHomeDir(t *testing.T) {
 	}
 }
 
-func TestLegacyConfigDir(t *testing.T) {
-	legacyDir := LegacyConfigDir()
-
-	if !strings.HasSuffix(legacyDir, ".clai") {
-		t.Errorf("LegacyConfigDir should end with .clai: %s", legacyDir)
+func TestDefaultPaths_Windows(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-specific test")
 	}
-}
 
-func TestLegacyCacheDir(t *testing.T) {
-	legacyDir := LegacyCacheDir()
+	paths := DefaultPaths()
 
-	if !strings.Contains(legacyDir, ".cache") || !strings.Contains(legacyDir, "clai") {
-		t.Errorf("LegacyCacheDir should contain .cache and clai: %s", legacyDir)
+	// On Windows, should use APPDATA
+	if !strings.Contains(paths.BaseDir, "AppData") && !strings.Contains(paths.BaseDir, "Roaming") {
+		t.Errorf("On Windows, BaseDir should be in AppData: %s", paths.BaseDir)
 	}
 }

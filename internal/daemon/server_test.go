@@ -5,7 +5,6 @@ import (
 	"context"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strconv"
 	"sync"
 	"testing"
@@ -238,13 +237,13 @@ func TestNewServer_TableDriven(t *testing.T) {
 			config: &ServerConfig{
 				Store: validStore,
 				Paths: &config.Paths{
-					RuntimeDir: "/tmp/clai-test-runtime",
+					BaseDir: "/tmp/clai-test",
 				},
 			},
 			wantErr: false,
 			validate: func(t *testing.T, s *Server) {
-				if s.paths.RuntimeDir != "/tmp/clai-test-runtime" {
-					t.Errorf("expected custom runtime dir, got %s", s.paths.RuntimeDir)
+				if s.paths.BaseDir != "/tmp/clai-test" {
+					t.Errorf("expected custom base dir, got %s", s.paths.BaseDir)
 				}
 			},
 		},
@@ -426,7 +425,7 @@ func TestServer_WritePIDFile(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
-		RuntimeDir: tmpDir,
+		BaseDir: tmpDir,
 	}
 
 	store := newMockStore()
@@ -476,7 +475,7 @@ func TestServer_Cleanup(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
-		RuntimeDir: tmpDir,
+		BaseDir: tmpDir,
 	}
 
 	store := newMockStore()
@@ -529,7 +528,7 @@ func TestServer_Cleanup_NonexistentFiles(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
-		RuntimeDir: tmpDir,
+		BaseDir: tmpDir,
 	}
 
 	store := newMockStore()
@@ -905,10 +904,7 @@ func TestServer_Start_CreatesSocket(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	paths := &config.Paths{
-		ConfigDir:  filepath.Join(tmpDir, "cfg"),
-		DataDir:    filepath.Join(tmpDir, "data"),
-		CacheDir:   filepath.Join(tmpDir, "cache"),
-		RuntimeDir: filepath.Join(tmpDir, "run"),
+		BaseDir: tmpDir,
 	}
 
 	// Pre-create all directories that EnsureDirectories would create
@@ -1026,10 +1022,7 @@ func TestServer_Shutdown_ClosesListener(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	paths := &config.Paths{
-		ConfigDir:  filepath.Join(tmpDir, "cfg"),
-		DataDir:    filepath.Join(tmpDir, "data"),
-		CacheDir:   filepath.Join(tmpDir, "cache"),
-		RuntimeDir: filepath.Join(tmpDir, "run"),
+		BaseDir: tmpDir,
 	}
 
 	// Pre-create directories

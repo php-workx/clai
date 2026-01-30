@@ -34,7 +34,7 @@ clai logs --follow
 
 2. Check hook file exists:
    ```bash
-   ls ~/.local/share/clai/hooks/
+   ls ~/.clai/hooks/
    # Should show: clai.zsh or clai.bash
    ```
 
@@ -145,19 +145,19 @@ clai logs --follow
 
 1. Check database file:
    ```bash
-   ls -la ~/.local/share/clai/clai.db
+   ls -la ~/.clai/state.db
    # Should exist and have content
    ```
 
 2. Check for corruption:
    ```bash
-   sqlite3 ~/.local/share/clai/clai.db "PRAGMA integrity_check;"
+   sqlite3 ~/.clai/state.db "PRAGMA integrity_check;"
    # Should show: ok
    ```
 
 3. Reset database (loses history):
    ```bash
-   rm ~/.local/share/clai/clai.db
+   rm ~/.clai/state.db
    clai daemon stop
    # Database recreated on next command
    ```
@@ -194,13 +194,13 @@ clai logs --follow
 
 1. Check directory permissions:
    ```bash
-   ls -la ~/.config/clai ~/.local/share/clai ~/.local/state/clai
+   ls -la ~/.clai/
    # All should be owned by you
    ```
 
 2. Fix permissions:
    ```bash
-   chmod -R u+rwX ~/.config/clai ~/.local/share/clai ~/.local/state/clai
+   chmod -R u+rwX ~/.clai/
    ```
 
 3. Check socket permissions:
@@ -298,5 +298,5 @@ clai daemon stop
 sudo rm /usr/local/bin/clai /usr/local/bin/clai-shim
 
 # Remove all data
-rm -rf ~/.config/clai ~/.local/share/clai ~/.cache/clai ~/.local/state/clai
+rm -rf ~/.clai
 ```

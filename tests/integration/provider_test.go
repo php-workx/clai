@@ -297,10 +297,7 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 	}
 
 	paths := &config.Paths{
-		ConfigDir:  filepath.Join(tempDir, "config"),
-		DataDir:    filepath.Join(tempDir, "data"),
-		CacheDir:   filepath.Join(tempDir, "cache"),
-		RuntimeDir: filepath.Join(tempDir, "run"),
+		BaseDir: tempDir,
 	}
 	if err := paths.EnsureDirectories(); err != nil {
 		os.RemoveAll(tempDir)

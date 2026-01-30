@@ -8,22 +8,15 @@ import (
 )
 
 // Paths holds all the path configurations for clai.
+// All paths are relative to the base directory (~/.clai on Unix, %APPDATA%\clai on Windows).
 type Paths struct {
-	// ConfigDir is the directory for configuration files (~/.config/clai)
-	ConfigDir string
-
-	// DataDir is the directory for data files (~/.local/share/clai)
-	DataDir string
-
-	// CacheDir is the directory for cache files (~/.cache/clai)
-	CacheDir string
-
-	// RuntimeDir is the directory for runtime files like sockets and PID files
-	RuntimeDir string
+	// BaseDir is the root directory for all clai files (~/.clai)
+	BaseDir string
 }
 
-// DefaultPaths returns the default paths based on XDG Base Directory spec.
-// On Windows, it uses %APPDATA% instead.
+// DefaultPaths returns the default paths.
+// Unix: ~/.clai
+// Windows: %APPDATA%\clai
 func DefaultPaths() *Paths {
 	home := homeDir()
 
@@ -32,74 +25,46 @@ func DefaultPaths() *Paths {
 		if appData == "" {
 			appData = filepath.Join(home, "AppData", "Roaming")
 		}
-		localAppData := os.Getenv("LOCALAPPDATA")
-		if localAppData == "" {
-			localAppData = filepath.Join(home, "AppData", "Local")
-		}
-
 		return &Paths{
-			ConfigDir:  filepath.Join(appData, "clai"),
-			DataDir:    filepath.Join(localAppData, "clai"),
-			CacheDir:   filepath.Join(localAppData, "clai", "cache"),
-			RuntimeDir: filepath.Join(localAppData, "clai", "run"),
+			BaseDir: filepath.Join(appData, "clai"),
 		}
 	}
 
-	// Unix-like systems follow XDG Base Directory spec
-	configHome := os.Getenv("XDG_CONFIG_HOME")
-	if configHome == "" {
-		configHome = filepath.Join(home, ".config")
-	}
-
-	dataHome := os.Getenv("XDG_DATA_HOME")
-	if dataHome == "" {
-		dataHome = filepath.Join(home, ".local", "share")
-	}
-
-	cacheHome := os.Getenv("XDG_CACHE_HOME")
-	if cacheHome == "" {
-		cacheHome = filepath.Join(home, ".cache")
-	}
-
-	runtimeDir := os.Getenv("XDG_RUNTIME_DIR")
-	if runtimeDir == "" {
-		// Fallback to ~/.clai/run for runtime files
-		runtimeDir = filepath.Join(home, ".clai", "run")
-	} else {
-		runtimeDir = filepath.Join(runtimeDir, "clai")
+	// Check for CLAI_HOME override
+	if claiHome := os.Getenv("CLAI_HOME"); claiHome != "" {
+		return &Paths{
+			BaseDir: claiHome,
+		}
 	}
 
 	return &Paths{
-		ConfigDir:  filepath.Join(configHome, "clai"),
-		DataDir:    filepath.Join(dataHome, "clai"),
-		CacheDir:   filepath.Join(cacheHome, "clai"),
-		RuntimeDir: runtimeDir,
+		BaseDir: filepath.Join(home, ".clai"),
 	}
 }
 
 // ConfigFile returns the path to the main configuration file.
 func (p *Paths) ConfigFile() string {
-	return filepath.Join(p.ConfigDir, "config.yaml")
+	return filepath.Join(p.BaseDir, "config.yaml")
 }
 
 // DatabaseFile returns the path to the SQLite database.
 func (p *Paths) DatabaseFile() string {
-	return filepath.Join(p.DataDir, "state.db")
+	return filepath.Join(p.BaseDir, "state.db")
 }
 
 // SocketFile returns the path to the Unix domain socket.
 func (p *Paths) SocketFile() string {
-	return filepath.Join(p.RuntimeDir, "clai.sock")
+	return filepath.Join(p.BaseDir, "clai.sock")
 }
 
 // PIDFile returns the path to the daemon PID file.
 func (p *Paths) PIDFile() string {
-	return filepath.Join(p.RuntimeDir, "clai.pid")
+	return filepath.Join(p.BaseDir, "clai.pid")
 }
 
 // LogDir returns the path to the log directory.
 func (p *Paths) LogDir() string {
-	return filepath.Join(p.DataDir, "logs")
+	return filepath.Join(p.BaseDir, "logs")
 }
 
 // LogFile returns the path to the daemon log file.
@@ -109,28 +74,31 @@ func (p *Paths) LogFile() string {
 
 // HooksDir returns the path to the hooks directory.
 func (p *Paths) HooksDir() string {
-	return filepath.Join(p.DataDir, "hooks")
+	return filepath.Join(p.BaseDir, "hooks")
+}
+
+// CacheDir returns the path to the cache directory.
+func (p *Paths) CacheDir() string {
+	return filepath.Join(p.BaseDir, "cache")
 }
 
 // SuggestionFile returns the path to the suggestion cache file.
 func (p *Paths) SuggestionFile() string {
-	return filepath.Join(p.CacheDir, "suggestion")
+	return filepath.Join(p.CacheDir(), "suggestion")
 }
 
 // LastOutputFile returns the path to the last output cache file.
 func (p *Paths) LastOutputFile() string {
-	return filepath.Join(p.CacheDir, "last_output")
+	return filepath.Join(p.CacheDir(), "last_output")
 }
 
 // EnsureDirectories creates all necessary directories.
 func (p *Paths) EnsureDirectories() error {
 	dirs := []string{
-		p.ConfigDir,
-		p.DataDir,
-		p.CacheDir,
-		p.RuntimeDir,
+		p.BaseDir,
 		p.LogDir(),
 		p.HooksDir(),
+		p.CacheDir(),
 	}
 
 	for _, dir := range dirs {
@@ -155,13 +123,19 @@ func homeDir() string {
 	return home
 }
 
-// LegacyConfigDir returns the legacy config directory (~/.clai).
-// Used for migration from older versions.
-func LegacyConfigDir() string {
-	return filepath.Join(homeDir(), ".clai")
+// Deprecated compatibility methods - these now all return paths under BaseDir
+
+// ConfigDir returns the base directory (for backward compatibility).
+func (p *Paths) ConfigDir() string {
+	return p.BaseDir
 }
 
-// LegacyCacheDir returns the legacy cache directory (~/.cache/clai).
-func LegacyCacheDir() string {
-	return filepath.Join(homeDir(), ".cache", "clai")
+// DataDir returns the base directory (for backward compatibility).
+func (p *Paths) DataDir() string {
+	return p.BaseDir
+}
+
+// RuntimeDir returns the base directory (for backward compatibility).
+func (p *Paths) RuntimeDir() string {
+	return p.BaseDir
 }

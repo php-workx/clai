@@ -157,7 +157,7 @@ clai uninstall
 
 3. Verify hook file exists:
    ```bash
-   ls ~/.local/share/clai/hooks/
+   ls ~/.clai/hooks/
    ```
 
 ### Slow Shell Startup

@@ -49,10 +49,7 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 
 	// Create paths
 	paths := &config.Paths{
-		ConfigDir:  filepath.Join(tempDir, "config"),
-		DataDir:    filepath.Join(tempDir, "data"),
-		CacheDir:   filepath.Join(tempDir, "cache"),
-		RuntimeDir: filepath.Join(tempDir, "run"),
+		BaseDir: tempDir,
 	}
 	if err := paths.EnsureDirectories(); err != nil {
 		os.RemoveAll(tempDir)

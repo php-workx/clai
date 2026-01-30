@@ -64,7 +64,7 @@ func TestIsRunningWithPaths_NotRunning(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
-		RuntimeDir: tmpDir,
+		BaseDir: tmpDir,
 	}
 
 	// No PID file exists
@@ -78,7 +78,7 @@ func TestIsRunningWithPaths_StalePID(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
-		RuntimeDir: tmpDir,
+		BaseDir: tmpDir,
 	}
 
 	// Write a stale PID (unlikely to be a running process)
@@ -98,7 +98,7 @@ func TestCleanupStaleWithPaths(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
-		RuntimeDir: tmpDir,
+		BaseDir: tmpDir,
 	}
 
 	// Create socket and PID files
@@ -132,7 +132,7 @@ func TestWaitForSocketWithPaths_Exists(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
-		RuntimeDir: tmpDir,
+		BaseDir: tmpDir,
 	}
 
 	// Create the socket file
@@ -153,7 +153,7 @@ func TestWaitForSocketWithPaths_Timeout(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
-		RuntimeDir: tmpDir,
+		BaseDir: tmpDir,
 	}
 
 	// Don't create the socket file
@@ -168,7 +168,7 @@ func TestWaitForSocketWithContext_Cancelled(t *testing.T) {
 
 	tmpDir := t.TempDir()
 	paths := &config.Paths{
-		RuntimeDir: tmpDir,
+		BaseDir: tmpDir,
 	}
 
 	// Create a context that we'll cancel

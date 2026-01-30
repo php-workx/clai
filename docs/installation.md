@@ -87,14 +87,17 @@ clai status
 
 ## Directory Structure
 
-clai follows XDG Base Directory conventions:
+All clai data is stored in `~/.clai/`:
 
 | Location | Purpose |
 | -------- | ------- |
-| `~/.config/clai/` | Configuration files |
-| `~/.local/share/clai/` | Database, hooks |
-| `~/.cache/clai/` | Suggestion cache, AI cache |
-| `~/.local/state/clai/` | Runtime files (socket, PID, logs) |
+| `~/.clai/config.yaml` | Configuration file |
+| `~/.clai/state.db` | SQLite database |
+| `~/.clai/hooks/` | Shell hook scripts |
+| `~/.clai/cache/` | AI response cache |
+| `~/.clai/logs/` | Daemon log files |
+
+Set `CLAI_HOME` environment variable to use a custom directory.
 
 ## Uninstalling
 
@@ -106,7 +109,7 @@ clai uninstall
 sudo rm /usr/local/bin/clai /usr/local/bin/clai-shim
 
 # Remove data (optional)
-rm -rf ~/.config/clai ~/.local/share/clai ~/.cache/clai ~/.local/state/clai
+rm -rf ~/.clai
 ```
 
 ## Next Steps

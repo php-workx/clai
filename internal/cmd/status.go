@@ -71,7 +71,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	// Cache
-	cacheDir := paths.CacheDir
+	cacheDir := paths.CacheDir()
 	if info, err := os.Stat(cacheDir); err == nil && info.IsDir() {
 		fmt.Printf("  Cache:    %s\n", cacheDir)
 	}

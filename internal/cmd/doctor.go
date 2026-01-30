@@ -126,37 +126,25 @@ func checkDirectories() []checkResult {
 	var results []checkResult
 	paths := config.DefaultPaths()
 
-	// Check directories (no side effects - just report status)
-	dirs := []struct {
-		name string
-		path string
-	}{
-		{"Config directory", paths.ConfigDir},
-		{"Data directory", paths.DataDir},
-		{"Cache directory", paths.CacheDir},
-		{"Runtime directory", paths.RuntimeDir},
-	}
-
-	for _, d := range dirs {
-		if _, err := os.Stat(d.path); os.IsNotExist(err) {
-			results = append(results, checkResult{
-				name:    d.name,
-				status:  "warn",
-				message: fmt.Sprintf("Missing: %s (will be created when needed)", d.path),
-			})
-		} else if err != nil {
-			results = append(results, checkResult{
-				name:    d.name,
-				status:  "error",
-				message: fmt.Sprintf("Error accessing: %s", d.path),
-			})
-		} else {
-			results = append(results, checkResult{
-				name:    d.name,
-				status:  "ok",
-				message: d.path,
-			})
-		}
+	// Check base directory
+	if _, err := os.Stat(paths.BaseDir); os.IsNotExist(err) {
+		results = append(results, checkResult{
+			name:    "Data directory",
+			status:  "warn",
+			message: fmt.Sprintf("Missing: %s (will be created when needed)", paths.BaseDir),
+		})
+	} else if err != nil {
+		results = append(results, checkResult{
+			name:    "Data directory",
+			status:  "error",
+			message: fmt.Sprintf("Error accessing: %s", paths.BaseDir),
+		})
+	} else {
+		results = append(results, checkResult{
+			name:    "Data directory",
+			status:  "ok",
+			message: paths.BaseDir,
+		})
 	}
 
 	return results

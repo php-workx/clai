@@ -72,7 +72,7 @@ AI responses are cached to reduce latency:
 clai config ai.cache_ttl_hours 24
 
 # Cache location
-ls ~/.cache/clai/
+ls ~/.clai/cache/
 ```
 
 Caching behavior:
