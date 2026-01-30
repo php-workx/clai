@@ -251,7 +251,7 @@ When reporting issues, include:
 4. Relevant log output: `clai logs | tail -50`
 5. Steps to reproduce the issue
 
-Report issues at: https://github.com/runger/clai/issues
+Report issues at: [GitHub Issues](https://github.com/runger/clai/issues)
 
 ## FAQ
 

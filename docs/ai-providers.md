@@ -5,7 +5,7 @@ clai supports multiple AI providers for intelligent features like voice-to-comma
 ## Supported Providers
 
 | Provider | Environment Variable | Models |
-|----------|---------------------|--------|
+| -------- | -------------------- | ------ |
 | Anthropic | `ANTHROPIC_API_KEY` | claude-3-haiku, claude-3-sonnet, claude-3-opus |
 | OpenAI | `OPENAI_API_KEY` | gpt-4o-mini, gpt-4o, gpt-4-turbo |
 | Google | `GOOGLE_API_KEY` | gemini-1.5-flash, gemini-1.5-pro |
@@ -109,14 +109,14 @@ clai doctor  # Should show [OK] Claude CLI
 
 Convert natural language to shell commands:
 
-```
-$ `show disk usage by folder
+```text
+`show disk usage by folder
 # Suggests: du -sh */ | sort -h
 
-$ `find python files modified today
+`find python files modified today
 # Suggests: find . -name "*.py" -mtime 0
 
-$ `compress all logs older than 7 days
+`compress all logs older than 7 days
 # Suggests: find /var/log -name "*.log" -mtime +7 -exec gzip {} \;
 ```
 
@@ -186,7 +186,7 @@ Sanitization removes:
 AI providers charge per token. clai is designed to minimize costs:
 
 | Feature | Typical Tokens | Frequency |
-|---------|---------------|-----------|
+| ------- | -------------- | --------- |
 | Voice-to-command | ~500 | Per query |
 | Error diagnosis | ~1000 | Per failure |
 | Smart suggestions | ~300 | Per request |

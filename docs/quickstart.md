@@ -34,9 +34,9 @@ clai doctor
 
 As you type, clai suggests commands from your history:
 
-```
-$ git c[TAB]           # Shows: git commit, git checkout, git clone
-$ docker r[TAB]        # Shows: docker run, docker rm, docker restart
+```text
+git c[TAB]           # Shows: git commit, git checkout, git clone
+docker r[TAB]        # Shows: docker run, docker rm, docker restart
 ```
 
 Press **Tab** to cycle through suggestions, **Right Arrow** to accept.
@@ -86,8 +86,8 @@ clai config set ai.enabled true
 
 With AI enabled, use the backtick prefix for natural language:
 
-```
-$ `find all large log files
+```text
+`find all large log files
 # Suggests: find /var/log -type f -size +100M
 ```
 
@@ -120,7 +120,7 @@ clai config set suggestions.max_history 10
 Common settings:
 
 | Key | Description | Default |
-|-----|-------------|---------|
+| --- | ----------- | ------- |
 | `ai.enabled` | Enable AI features | `false` |
 | `ai.provider` | AI provider (anthropic, openai, google, auto) | `auto` |
 | `suggestions.max_history` | Max history-based suggestions | `5` |

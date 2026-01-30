@@ -10,8 +10,7 @@
 ### Homebrew (Recommended)
 
 ```bash
-brew tap runger/clai
-brew install clai
+brew install runger/tap/clai
 ```
 
 ### From Source

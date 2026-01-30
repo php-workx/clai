@@ -5,9 +5,10 @@ clai integrates with your shell to provide command suggestions, history tracking
 ## Supported Shells
 
 | Shell | Version | Status |
-|-------|---------|--------|
+| ----- | ------- | ------ |
 | zsh | 5.8+ | Full support |
 | bash | 4.4+ (3.2 on macOS) | Full support |
+| fish | 3.0+ | Full support |
 | PowerShell | 7.x | Planned |
 
 ## How It Works

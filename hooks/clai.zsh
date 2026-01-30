@@ -128,8 +128,12 @@ _clai_update_suggestion() {
     if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" ]]; then
         if [[ -z "$BUFFER" ]]; then
             POSTDISPLAY="${suggestion}"
-        else
+        elif [[ "$suggestion" == "$BUFFER"* ]]; then
+            # Only show suffix if suggestion starts with current buffer
             POSTDISPLAY="${suggestion#$BUFFER}"
+        else
+            # Suggestion doesn't start with buffer, don't show suffix
+            POSTDISPLAY=""
         fi
     else
         POSTDISPLAY=""

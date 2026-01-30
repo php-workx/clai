@@ -37,9 +37,9 @@ echo 'eval "$(clai init bash)"' >> ~/.bashrc
 
 ## 💡 Example
 
-```
-$ git c█
-  git commit -m "fix: address review feedback"  ← from your history
+```bash
+git c█
+  git commit -m "fix: address review feedback"  # from your history
   git checkout main
   git cherry-pick abc123
 ```

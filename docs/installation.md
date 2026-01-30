@@ -90,7 +90,7 @@ clai status
 clai follows XDG Base Directory conventions:
 
 | Location | Purpose |
-|----------|---------|
+| -------- | ------- |
 | `~/.config/clai/` | Configuration files |
 | `~/.local/share/clai/` | Database, hooks |
 | `~/.cache/clai/` | Suggestion cache, AI cache |

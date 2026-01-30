@@ -16,7 +16,7 @@ Intelligent terminal integration using Claude Code CLI. Adds AI-powered features
 ## Requirements
 
 - **Go 1.21+** - For building the binary
-- **Claude Code CLI** - Install from: https://docs.anthropic.com/en/docs/claude-code
+- **Claude Code CLI** - Install from: [Claude Code Documentation](https://docs.anthropic.com/en/docs/claude-code)
 - A Claude Pro/Max subscription for Claude Code
 
 ## Installation
@@ -151,7 +151,7 @@ voice "list all files"
 ### Commands
 
 | Command | Description |
-|---------|-------------|
+| ------- | ----------- |
 | `ai-fix` | Manually diagnose the last failed command |
 | `ai-fix "cmd"` | Diagnose a specific command |
 | `ai "question"` | Ask Claude anything with terminal context |
@@ -226,7 +226,7 @@ eval "$(clai init zsh)"
 
 ## Architecture
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │  Shell Integration Layer                                     │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
@@ -251,7 +251,7 @@ eval "$(clai init zsh)"
 
 ## File Structure
 
-```
+```text
 clai/
 ├── cmd/clai/               # Main entry point
 ├── internal/

@@ -10,8 +10,8 @@ clai learns from your command history and suggests commands as you type. Suggest
 
 ### How It Works
 
-```
-$ git c█
+```text
+git c█
   git commit -m "fix: address review feedback"  ← most recent
   git checkout main
   git cherry-pick abc123

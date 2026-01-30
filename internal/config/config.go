@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -123,9 +124,9 @@ func (c *Config) Save() error {
 
 // SaveToFile saves the configuration to the specified file.
 func (c *Config) SaveToFile(path string) error {
-	// Ensure directory exists
-	paths := DefaultPaths()
-	if err := paths.EnsureDirectories(); err != nil {
+	// Derive directory from path and ensure it exists
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
