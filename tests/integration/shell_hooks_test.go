@@ -100,10 +100,10 @@ func TestShellHooks_ZshRequiredFunctions(t *testing.T) {
 	}
 
 	requiredFunctions := []string{
-		"__clai_session_start",
-		"__clai_session_end",
-		"__clai_preexec",
-		"__clai_precmd",
+		"_ai_update_suggestion",
+		"_ai_forward_char",
+		"_ai_precmd",
+		"run()",
 	}
 
 	for _, fn := range requiredFunctions {
@@ -126,10 +126,10 @@ func TestShellHooks_BashRequiredFunctions(t *testing.T) {
 	}
 
 	requiredFunctions := []string{
-		"__clai_session_start",
-		"__clai_session_end",
-		"__clai_preexec",
-		"__clai_precmd",
+		"_clai_completion",
+		"_ai_prompt_command",
+		"run()",
+		"ai-fix()",
 	}
 
 	for _, fn := range requiredFunctions {
@@ -157,8 +157,8 @@ func TestShellHooks_ZshSessionIDGeneration(t *testing.T) {
 	}
 }
 
-// TestShellHooks_ClaiShimCalls verifies hooks call clai-shim correctly.
-func TestShellHooks_ClaiShimCalls(t *testing.T) {
+// TestShellHooks_ClaiCalls verifies hooks call clai commands correctly.
+func TestShellHooks_ClaiCalls(t *testing.T) {
 	hookPath := findHookFile("clai.zsh")
 	if hookPath == "" {
 		t.Skip("zsh hook file not found")
@@ -170,15 +170,14 @@ func TestShellHooks_ClaiShimCalls(t *testing.T) {
 	}
 
 	expectedCalls := []string{
-		"clai-shim session-start",
-		"clai-shim session-end",
-		"clai-shim log-start",
-		"clai-shim log-end",
+		"clai suggest",
+		"clai voice",
+		"clai diagnose",
 	}
 
 	for _, call := range expectedCalls {
 		if !strings.Contains(string(content), call) {
-			t.Errorf("expected clai-shim call %q not found in hooks", call)
+			t.Errorf("expected clai call %q not found in hooks", call)
 		}
 	}
 }
@@ -233,7 +232,8 @@ func TestShellHooks_ConfigVariables(t *testing.T) {
 
 	expectedVars := []string{
 		"CLAI_AUTO_DAEMON",
-		"CLAI_AUTO_DIAGNOSE",
+		"CLAI_AUTO_EXTRACT",
+		"CLAI_CACHE",
 	}
 
 	for _, v := range expectedVars {
@@ -276,16 +276,16 @@ func TestShellHooks_ZshIntegration(t *testing.T) {
 	// Create a test script that sources the hooks and checks functions exist
 	script := `
 source "` + hookPath + `"
-if typeset -f __clai_session_start > /dev/null; then
-    echo "PASS: __clai_session_start defined"
+if typeset -f _ai_update_suggestion > /dev/null; then
+    echo "PASS: _ai_update_suggestion defined"
 else
-    echo "FAIL: __clai_session_start not defined"
+    echo "FAIL: _ai_update_suggestion not defined"
     exit 1
 fi
-if typeset -f __clai_preexec > /dev/null; then
-    echo "PASS: __clai_preexec defined"
+if typeset -f _ai_precmd > /dev/null; then
+    echo "PASS: _ai_precmd defined"
 else
-    echo "FAIL: __clai_preexec not defined"
+    echo "FAIL: _ai_precmd not defined"
     exit 1
 fi
 echo "All functions defined"
@@ -316,18 +316,19 @@ func TestShellHooks_BashIntegration(t *testing.T) {
 	}
 
 	// Create a test script that sources the hooks and checks functions exist
+	// Note: Some bash versions don't support complete -D, so we check core functions
 	script := `
-source "` + hookPath + `"
-if type __clai_session_start &>/dev/null; then
-    echo "PASS: __clai_session_start defined"
+source "` + hookPath + `" 2>/dev/null || true
+if type _ai_prompt_command &>/dev/null; then
+    echo "PASS: _ai_prompt_command defined"
 else
-    echo "FAIL: __clai_session_start not defined"
+    echo "FAIL: _ai_prompt_command not defined"
     exit 1
 fi
-if type __clai_preexec &>/dev/null; then
-    echo "PASS: __clai_preexec defined"
+if type run &>/dev/null; then
+    echo "PASS: run defined"
 else
-    echo "FAIL: __clai_preexec not defined"
+    echo "FAIL: run not defined"
     exit 1
 fi
 echo "All functions defined"
@@ -355,14 +356,20 @@ func findHookFile(name string) string {
 		return hookPath
 	}
 
-	// Try project hooks directory
-	hookPath = filepath.Join("hooks", name)
+	// Get shell name from filename (e.g., "clai.zsh" -> "zsh")
+	ext := filepath.Ext(name)
+	shellName := strings.TrimPrefix(ext, ".")
+
+	// Try relative to working directory
+	cwd, _ := os.Getwd()
+
+	// Try project internal shell directory (new location)
+	hookPath = filepath.Join(cwd, "internal", "cmd", "shell", shellName, name)
 	if _, err := os.Stat(hookPath); err == nil {
 		return hookPath
 	}
 
-	// Try relative to working directory
-	cwd, _ := os.Getwd()
+	// Try project hooks directory (legacy location)
 	hookPath = filepath.Join(cwd, "hooks", name)
 	if _, err := os.Stat(hookPath); err == nil {
 		return hookPath
@@ -371,6 +378,14 @@ func findHookFile(name string) string {
 	// Try parent directories (for running from tests/integration)
 	for i := 0; i < 3; i++ {
 		cwd = filepath.Dir(cwd)
+
+		// Try internal shell directory
+		hookPath = filepath.Join(cwd, "internal", "cmd", "shell", shellName, name)
+		if _, err := os.Stat(hookPath); err == nil {
+			return hookPath
+		}
+
+		// Try hooks directory
 		hookPath = filepath.Join(cwd, "hooks", name)
 		if _, err := os.Stat(hookPath); err == nil {
 			return hookPath

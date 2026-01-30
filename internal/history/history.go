@@ -11,29 +11,47 @@ import (
 // Suggestion finds the most recent history entry starting with prefix
 // Returns empty string if no match found
 func Suggestion(prefix string) string {
-	if prefix == "" {
-		return ""
+	suggestions := Suggestions(prefix, 1)
+	if len(suggestions) > 0 {
+		return suggestions[0]
+	}
+	return ""
+}
+
+// Suggestions finds up to `limit` unique history entries starting with prefix
+// Returns entries in order from most recent to oldest
+func Suggestions(prefix string, limit int) []string {
+	if prefix == "" || limit <= 0 {
+		return nil
 	}
 
 	histFile := zshHistoryPath()
 	if histFile == "" {
-		return ""
+		return nil
 	}
 
 	entries, err := readZshHistory(histFile)
 	if err != nil {
-		return ""
+		return nil
 	}
 
+	// Use a map to track seen commands (deduplication)
+	seen := make(map[string]bool)
+	var results []string
+
 	// Search from most recent (end of file)
-	for i := len(entries) - 1; i >= 0; i-- {
+	for i := len(entries) - 1; i >= 0 && len(results) < limit; i-- {
 		entry := entries[i]
 		if strings.HasPrefix(entry, prefix) && entry != prefix {
-			return entry
+			// Skip duplicates
+			if !seen[entry] {
+				seen[entry] = true
+				results = append(results, entry)
+			}
 		}
 	}
 
-	return ""
+	return results
 }
 
 // zshHistoryPath returns the path to zsh history file

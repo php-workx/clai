@@ -125,3 +125,118 @@ func TestSuggestion_TrailingMultiline(t *testing.T) {
 		t.Errorf("Suggestion(\"docker\") = %q, want %q", result, expected)
 	}
 }
+
+func TestSuggestions_Multiple(t *testing.T) {
+	// Test returning multiple suggestions
+	tmpDir := t.TempDir()
+	histFile := filepath.Join(tmpDir, ".zsh_history")
+
+	histContent := `: 1706000001:0;git status
+: 1706000002:0;git stash
+: 1706000003:0;git stash pop
+: 1706000004:0;git stash list
+: 1706000005:0;git switch main
+: 1706000006:0;git status --short
+`
+	if err := os.WriteFile(histFile, []byte(histContent), 0644); err != nil {
+		t.Fatalf("Failed to write test history: %v", err)
+	}
+
+	oldHistFile := os.Getenv("HISTFILE")
+	os.Setenv("HISTFILE", histFile)
+	defer os.Setenv("HISTFILE", oldHistFile)
+
+	tests := []struct {
+		name     string
+		prefix   string
+		limit    int
+		expected []string
+	}{
+		{
+			name:     "multiple git commands",
+			prefix:   "git st",
+			limit:    5,
+			expected: []string{"git status --short", "git stash list", "git stash pop", "git stash", "git status"},
+		},
+		{
+			name:     "limit to 2",
+			prefix:   "git st",
+			limit:    2,
+			expected: []string{"git status --short", "git stash list"},
+		},
+		{
+			name:     "limit to 1 (same as Suggestion)",
+			prefix:   "git st",
+			limit:    1,
+			expected: []string{"git status --short"},
+		},
+		{
+			name:     "no matches",
+			prefix:   "xyz",
+			limit:    5,
+			expected: nil,
+		},
+		{
+			name:     "empty prefix",
+			prefix:   "",
+			limit:    5,
+			expected: nil,
+		},
+		{
+			name:     "zero limit",
+			prefix:   "git",
+			limit:    0,
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Suggestions(tt.prefix, tt.limit)
+			if len(result) != len(tt.expected) {
+				t.Errorf("Suggestions(%q, %d) returned %d results, want %d", tt.prefix, tt.limit, len(result), len(tt.expected))
+				return
+			}
+			for i, exp := range tt.expected {
+				if result[i] != exp {
+					t.Errorf("Suggestions(%q, %d)[%d] = %q, want %q", tt.prefix, tt.limit, i, result[i], exp)
+				}
+			}
+		})
+	}
+}
+
+func TestSuggestions_Deduplication(t *testing.T) {
+	// Test that duplicate commands are deduplicated
+	tmpDir := t.TempDir()
+	histFile := filepath.Join(tmpDir, ".zsh_history")
+
+	// Same command repeated multiple times
+	histContent := `: 1706000001:0;git status
+: 1706000002:0;git status
+: 1706000003:0;git status
+: 1706000004:0;git stash
+: 1706000005:0;git status
+`
+	if err := os.WriteFile(histFile, []byte(histContent), 0644); err != nil {
+		t.Fatalf("Failed to write test history: %v", err)
+	}
+
+	oldHistFile := os.Getenv("HISTFILE")
+	os.Setenv("HISTFILE", histFile)
+	defer os.Setenv("HISTFILE", oldHistFile)
+
+	// Should return only unique commands
+	result := Suggestions("git", 5)
+	expected := []string{"git status", "git stash"}
+
+	if len(result) != len(expected) {
+		t.Errorf("Suggestions with duplicates returned %d results, want %d: %v", len(result), len(expected), result)
+		return
+	}
+	for i, exp := range expected {
+		if result[i] != exp {
+			t.Errorf("result[%d] = %q, want %q", i, result[i], exp)
+		}
+	}
+}

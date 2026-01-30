@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/runger/clai/internal/claude"
 	"github.com/runger/clai/internal/config"
-	"github.com/runger/clai/internal/daemon"
 )
 
 var statusCmd = &cobra.Command{
@@ -37,17 +37,13 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%sclai Status%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
 
-	// Daemon status
+	// Daemon status (Claude daemon for fast voice responses)
 	fmt.Printf("\n%sDaemon:%s\n", colorBold, colorReset)
-	if daemon.IsRunning() {
+	if claude.IsDaemonRunning() {
 		fmt.Printf("  Status:  %srunning%s\n", colorGreen, colorReset)
-		// Try to get PID
-		pidFile := paths.PIDFile()
-		if data, err := os.ReadFile(pidFile); err == nil {
-			fmt.Printf("  PID:     %s\n", strings.TrimSpace(string(data)))
-		}
 	} else {
 		fmt.Printf("  Status:  %snot running%s\n", colorDim, colorReset)
+		fmt.Printf("  Run 'clai daemon start' to enable fast voice responses.\n")
 	}
 
 	// Configuration
