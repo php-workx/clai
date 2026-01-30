@@ -53,16 +53,20 @@ _ai_update_suggestion() {
 
     _AI_CURRENT_SUGGESTION="$suggestion"
 
-    # Show suggestion as ghost text after cursor
+    # Clear ghost text (we use right prompt now)
+    POSTDISPLAY=""
+
+    # Show suggestion in right prompt
     if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" ]]; then
-        # Show only the part after what user typed
         if [[ -z "$BUFFER" ]]; then
-            POSTDISPLAY="${suggestion}"
+            # No input yet - show full suggestion
+            RPS1="%F{242}($suggestion)%f"
         else
-            POSTDISPLAY="${suggestion#$BUFFER}"
+            # Show (partial → full) format
+            RPS1="%F{242}($BUFFER → $suggestion)%f"
         fi
     else
-        POSTDISPLAY=""
+        RPS1=""
     fi
 }
 

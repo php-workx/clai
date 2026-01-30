@@ -113,17 +113,30 @@ function _ai_voice_execute
     commandline -f execute
 end
 
-# Show voice mode indicator in right prompt
+# Show voice mode indicator or suggestion in right prompt
 function fish_right_prompt
     if test "$_AI_VOICE_MODE" = "true"
         set_color magenta
         echo -n "🎤 Voice mode"
         set_color normal
+        return
+    end
+
+    set -l current (commandline)
+    if test -n "$current"
+        # Have input - get suggestion for prefix
+        set -l suggestion (clai suggest "$current" 2>/dev/null)
+        if test -n "$suggestion" -a "$suggestion" != "$current"
+            set_color brblack
+            echo -n "($current → $suggestion)"
+            set_color normal
+        end
     else if test -s $_AI_SUGGEST_FILE
+        # No input - show cached AI suggestion
         set -l suggestion (cat $_AI_SUGGEST_FILE)
         if test -n "$suggestion"
             set_color brblack
-            echo -n "→ $suggestion"
+            echo -n "($suggestion)"
             set_color normal
         end
     end

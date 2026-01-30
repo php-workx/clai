@@ -26,20 +26,54 @@ _AI_SUGGEST_FILE="$CLAI_CACHE/suggestion"
 _AI_LAST_OUTPUT="$CLAI_CACHE/last_output"
 
 # ============================================
-# Feature 1: Command Suggestion
+# Feature 1: Enhanced Tab Completion
 # ============================================
+# Adds clai history suggestions to Tab completion menu
+# Our suggestions appear first, followed by defaults
 
-# Show suggestion in prompt when available
+_clai_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+
+    # Only enhance first word (command) completion
+    if [[ $COMP_CWORD -eq 0 && -n "$cur" ]]; then
+        # Get clai suggestion from history
+        local suggestion=$(clai suggest "$cur" 2>/dev/null)
+
+        # Get default command completions
+        local defaults=$(compgen -c -- "$cur" 2>/dev/null | head -20)
+
+        # Combine: clai suggestion first (if different from cur)
+        if [[ -n "$suggestion" && "$suggestion" != "$cur" ]]; then
+            COMPREPLY=("$suggestion" $defaults)
+        else
+            COMPREPLY=($defaults)
+        fi
+
+        # Deduplicate while preserving order
+        COMPREPLY=($(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++'))
+    else
+        # For arguments, use default file completion
+        COMPREPLY=($(compgen -f -- "$cur"))
+    fi
+}
+
+# Register as default completion for commands
+complete -D -F _clai_completion
+
+# Also register for specific common commands to ensure it's used
+complete -F _clai_completion git npm yarn docker kubectl
+
+# Show AI suggestion in prompt when available (for AI-generated suggestions)
 _ai_show_suggestion() {
     if [[ -s "$_AI_SUGGEST_FILE" ]]; then
         local suggestion=$(cat "$_AI_SUGGEST_FILE")
         if [[ -n "$suggestion" ]]; then
-            echo -e "\033[38;5;242m→ $suggestion (use 'accept' to run)\033[0m"
+            echo -e "\033[38;5;242m($suggestion) - use 'accept' to run\033[0m"
         fi
     fi
 }
 
-# Accept suggestion command
+# Accept AI suggestion command
 accept() {
     if [[ -s "$_AI_SUGGEST_FILE" ]]; then
         local suggestion=$(cat "$_AI_SUGGEST_FILE")
