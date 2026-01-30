@@ -19,7 +19,7 @@ func NewContextBuilder(os, shell, cwd string, recentCmds []CommandContext) *Cont
 		os:         os,
 		shell:      shell,
 		cwd:        cwd,
-		recentCmds: recentCmds,
+		recentCmds: TrimRecentCommands(recentCmds),
 	}
 }
 

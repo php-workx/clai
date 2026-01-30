@@ -2,6 +2,7 @@ package provider
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 )
 
@@ -107,6 +108,7 @@ func (r *Registry) ListAvailable() []string {
 			available = append(available, name)
 		}
 	}
+	sort.Strings(available)
 	return available
 }
 

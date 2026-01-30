@@ -10,6 +10,12 @@ import (
 // DefaultTimeout is the default timeout for AI provider calls
 const DefaultTimeout = 10 * time.Second
 
+// Source constants for suggestion origins
+const (
+	SourceHistory = "history" // Historical command
+	SourceAI      = "ai"      // AI-generated suggestion
+)
+
 // Provider defines the interface for AI providers
 type Provider interface {
 	// Name returns the provider name (e.g., "anthropic", "openai", "google")
@@ -92,7 +98,7 @@ type DiagnoseResponse struct {
 type Suggestion struct {
 	Text        string  // The suggested command
 	Description string  // Optional description
-	Source      string  // "history", "ai"
+	Source      string  // SourceHistory or SourceAI
 	Score       float64 // Ranking score (0.0 to 1.0)
 	Risk        string  // "safe", "destructive"
 }

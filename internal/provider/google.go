@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/runger/clai/internal/sanitize"
@@ -16,7 +18,9 @@ import (
 type GoogleProvider struct {
 	sanitizer *sanitize.Sanitizer
 	cliPath   string
+	cliType   string // "gemini" or "gcloud"
 	model     string
+	initOnce  sync.Once
 }
 
 // NewGoogleProvider creates a new Google/Gemini provider
@@ -42,23 +46,30 @@ func (p *GoogleProvider) Name() string {
 
 // Available checks if Gemini CLI is available or API key is set
 func (p *GoogleProvider) Available() bool {
-	// Check for Gemini CLI
-	if path, err := exec.LookPath("gemini"); err == nil {
-		p.cliPath = path
+	p.initOnce.Do(func() {
+		// Check for Gemini CLI
+		if path, err := exec.LookPath("gemini"); err == nil {
+			p.cliPath = path
+			p.cliType = "gemini"
+			return
+		}
+
+		// Also check for gcloud with generative AI capabilities
+		if path, err := exec.LookPath("gcloud"); err == nil {
+			// Verify gcloud is configured with a project
+			cmd := exec.Command(path, "config", "get-value", "project")
+			if output, err := cmd.Output(); err == nil && len(output) > 0 {
+				p.cliPath = path
+				p.cliType = "gcloud"
+				return
+			}
+		}
+	})
+
+	// Check discovered CLI or API key
+	if p.cliPath != "" {
 		return true
 	}
-
-	// Also check for gcloud with generative AI capabilities
-	if path, err := exec.LookPath("gcloud"); err == nil {
-		// Verify gcloud is configured with a project
-		cmd := exec.Command(path, "config", "get-value", "project")
-		if output, err := cmd.Output(); err == nil && len(output) > 0 {
-			p.cliPath = path
-			return true
-		}
-	}
-
-	// Fallback: check for API key
 	return os.Getenv("GOOGLE_API_KEY") != "" || os.Getenv("GEMINI_API_KEY") != ""
 }
 
@@ -168,8 +179,13 @@ func (p *GoogleProvider) query(ctx context.Context, prompt string) (string, erro
 func (p *GoogleProvider) queryViaCLI(ctx context.Context, prompt string) (string, error) {
 	var cmd *exec.Cmd
 
-	// Check which CLI we're using
-	if strings.HasSuffix(p.cliPath, "gemini") || strings.Contains(p.cliPath, "gemini") {
+	// Check which CLI we're using based on stored type or fallback to filepath.Base
+	cliType := p.cliType
+	if cliType == "" {
+		cliType = filepath.Base(p.cliPath)
+	}
+
+	if cliType == "gemini" {
 		// Gemini CLI format (hypothetical, adjust to actual CLI)
 		cmd = exec.CommandContext(ctx, p.cliPath, "prompt", prompt)
 	} else {
@@ -203,7 +219,7 @@ func (p *GoogleProvider) queryViaCLI(ctx context.Context, prompt string) (string
 
 // parseCommandResponse parses a response into suggestions
 func (p *GoogleProvider) parseCommandResponse(response string) []Suggestion {
-	var suggestions []Suggestion
+	suggestions := make([]Suggestion, 0, 3)
 
 	lines := strings.Split(response, "\n")
 	for _, line := range lines {
@@ -237,8 +253,8 @@ func (p *GoogleProvider) parseCommandResponse(response string) []Suggestion {
 
 		suggestions = append(suggestions, Suggestion{
 			Text:   cleaned,
-			Source: "ai",
-			Score:  1.0 - float64(len(suggestions))*0.1,
+			Source: SourceAI,
+			Score:  max(0.1, 1.0-float64(len(suggestions))*0.1),
 			Risk:   risk,
 		})
 
@@ -274,24 +290,25 @@ func (p *GoogleProvider) parseDiagnoseResponse(response string) (string, []Sugge
 			}
 			fixes = append(fixes, Suggestion{
 				Text:   cmd,
-				Source: "ai",
+				Source: SourceAI,
 				Score:  1.0 - float64(len(fixes))*0.1,
 				Risk:   risk,
 			})
 			continue
 		}
 
-		// Check for numbered fix commands
+		// Check for numbered/bulleted fix commands - these also start the fixes section
 		cleaned := cleanCommandPrefix(line)
-		if inFixes && cleaned != "" && !strings.HasPrefix(line, "#") {
+		if startsFixSection(line) && cleaned != "" && !strings.HasPrefix(line, "#") {
+			inFixes = true
 			risk := "safe"
 			if sanitize.IsDestructive(cleaned) {
 				risk = "destructive"
 			}
 			fixes = append(fixes, Suggestion{
 				Text:   cleaned,
-				Source: "ai",
-				Score:  1.0 - float64(len(fixes))*0.1,
+				Source: SourceAI,
+				Score:  max(0.1, 1.0-float64(len(fixes))*0.1),
 				Risk:   risk,
 			})
 			continue

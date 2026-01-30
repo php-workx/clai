@@ -14,9 +14,10 @@ import (
 
 // OpenAIProvider implements the Provider interface for OpenAI
 type OpenAIProvider struct {
-	sanitizer *sanitize.Sanitizer
-	cliPath   string
-	model     string
+	sanitizer  *sanitize.Sanitizer
+	cliPath    string
+	model      string
+	cliChecked bool
 }
 
 // NewOpenAIProvider creates a new OpenAI provider
@@ -141,6 +142,14 @@ func (p *OpenAIProvider) query(ctx context.Context, prompt string) (string, erro
 	ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
 	defer cancel()
 
+	// Lazily resolve CLI path if not already checked
+	if !p.cliChecked {
+		if path, err := exec.LookPath("openai"); err == nil {
+			p.cliPath = path
+		}
+		p.cliChecked = true
+	}
+
 	// Check if CLI is available
 	if p.cliPath != "" {
 		return p.queryViaCLI(ctx, prompt)
@@ -187,7 +196,7 @@ func (p *OpenAIProvider) queryViaCLI(ctx context.Context, prompt string) (string
 
 // parseCommandResponse parses a response into suggestions
 func (p *OpenAIProvider) parseCommandResponse(response string) []Suggestion {
-	var suggestions []Suggestion
+	suggestions := make([]Suggestion, 0, 3)
 
 	lines := strings.Split(response, "\n")
 	for _, line := range lines {
@@ -221,7 +230,7 @@ func (p *OpenAIProvider) parseCommandResponse(response string) []Suggestion {
 
 		suggestions = append(suggestions, Suggestion{
 			Text:   cleaned,
-			Source: "ai",
+			Source: SourceAI,
 			Score:  1.0 - float64(len(suggestions))*0.1,
 			Risk:   risk,
 		})
@@ -258,24 +267,25 @@ func (p *OpenAIProvider) parseDiagnoseResponse(response string) (string, []Sugge
 			}
 			fixes = append(fixes, Suggestion{
 				Text:   cmd,
-				Source: "ai",
+				Source: SourceAI,
 				Score:  1.0 - float64(len(fixes))*0.1,
 				Risk:   risk,
 			})
 			continue
 		}
 
-		// Check for numbered fix commands
+		// Check for numbered/bulleted fix commands - these also start the fixes section
 		cleaned := cleanCommandPrefix(line)
-		if inFixes && cleaned != "" && !strings.HasPrefix(line, "#") {
+		if startsFixSection(line) && cleaned != "" && !strings.HasPrefix(line, "#") {
+			inFixes = true
 			risk := "safe"
 			if sanitize.IsDestructive(cleaned) {
 				risk = "destructive"
 			}
 			fixes = append(fixes, Suggestion{
 				Text:   cleaned,
-				Source: "ai",
-				Score:  1.0 - float64(len(fixes))*0.1,
+				Source: SourceAI,
+				Score:  max(0.1, 1.0-float64(len(fixes))*0.1),
 				Risk:   risk,
 			})
 			continue

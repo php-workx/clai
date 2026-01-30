@@ -172,7 +172,7 @@ func (p *AnthropicProvider) query(ctx context.Context, prompt string) (string, e
 
 // parseCommandResponse parses a response into suggestions
 func (p *AnthropicProvider) parseCommandResponse(response string) []Suggestion {
-	var suggestions []Suggestion
+	suggestions := make([]Suggestion, 0, 3)
 
 	lines := strings.Split(response, "\n")
 	for _, line := range lines {
@@ -206,7 +206,7 @@ func (p *AnthropicProvider) parseCommandResponse(response string) []Suggestion {
 
 		suggestions = append(suggestions, Suggestion{
 			Text:   cleaned,
-			Source: "ai",
+			Source: SourceAI,
 			Score:  1.0 - float64(len(suggestions))*0.1, // Decreasing score by order
 			Risk:   risk,
 		})
@@ -244,24 +244,25 @@ func (p *AnthropicProvider) parseDiagnoseResponse(response string) (string, []Su
 			}
 			fixes = append(fixes, Suggestion{
 				Text:   cmd,
-				Source: "ai",
+				Source: SourceAI,
 				Score:  1.0 - float64(len(fixes))*0.1,
 				Risk:   risk,
 			})
 			continue
 		}
 
-		// Check for numbered fix commands
+		// Check for numbered/bulleted fix commands - these also start the fixes section
 		cleaned := cleanCommandPrefix(line)
-		if inFixes && cleaned != "" && !strings.HasPrefix(line, "#") {
+		if startsFixSection(line) && cleaned != "" && !strings.HasPrefix(line, "#") {
+			inFixes = true
 			risk := "safe"
 			if sanitize.IsDestructive(cleaned) {
 				risk = "destructive"
 			}
 			fixes = append(fixes, Suggestion{
 				Text:   cleaned,
-				Source: "ai",
-				Score:  1.0 - float64(len(fixes))*0.1,
+				Source: SourceAI,
+				Score:  max(0.1, 1.0-float64(len(fixes))*0.1),
 				Risk:   risk,
 			})
 			continue
@@ -277,6 +278,27 @@ func (p *AnthropicProvider) parseDiagnoseResponse(response string) (string, []Su
 	}
 
 	return strings.TrimSpace(explanation.String()), fixes
+}
+
+// startsFixSection returns true if the line looks like the start of a numbered or bulleted list
+func startsFixSection(line string) bool {
+	if len(line) < 2 {
+		return false
+	}
+	// Check for numbered patterns: "1.", "1)", "2.", "2)", etc.
+	if line[0] >= '1' && line[0] <= '9' {
+		if line[1] == '.' || line[1] == ')' {
+			return true
+		}
+		if len(line) >= 3 && (line[2] == '.' || line[2] == ')') {
+			return true
+		}
+	}
+	// Check for bullet patterns: "- ", "* "
+	if strings.HasPrefix(line, "- ") || strings.HasPrefix(line, "* ") {
+		return true
+	}
+	return false
 }
 
 // cleanCommandPrefix removes common prefixes from command lines
