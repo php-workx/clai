@@ -259,27 +259,27 @@ func waitForSocket(path string, timeout time.Duration) error {
 
 // dialSocket creates a gRPC connection to the Unix socket.
 func dialSocket(path string) (*grpc.ClientConn, pb.ClaiServiceClient, error) {
-	dialer := func(ctx context.Context, _ string) (net.Conn, error) {
-		var d net.Dialer
-		return d.DialContext(ctx, "unix", path)
+	// Use the new grpc.NewClient API with unix socket resolver
+	conn, err := grpc.NewClient(
+		"unix://"+path,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
+	// Verify connection by making a quick ping
+	client := pb.NewClaiServiceClient(conn)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	//nolint:staticcheck // Using deprecated DialContext for blocking connection behavior
-	conn, err := grpc.DialContext(
-		ctx,
-		"passthrough:///"+path,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithContextDialer(dialer),
-		grpc.WithBlock(),
-	)
+	// Try to connect by making a health check call
+	_, err = client.Ping(ctx, &pb.Ack{Ok: true})
 	if err != nil {
-		return nil, nil, err
+		conn.Close()
+		return nil, nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	client := pb.NewClaiServiceClient(conn)
 	return conn, client, nil
 }
 

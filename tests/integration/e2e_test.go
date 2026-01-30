@@ -416,21 +416,33 @@ func TestE2E_DestructiveCommandRiskFlag(t *testing.T) {
 
 	// Log a destructive command
 	commandID := generateCommandID()
-	_, _ = env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
+	startResp, err := env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
 		SessionId: sessionID,
 		CommandId: commandID,
 		Cwd:       "/",
 		Command:   "rm -rf /",
 		TsUnixMs:  time.Now().UnixMilli(),
 	})
+	if err != nil {
+		t.Fatalf("CommandStarted failed: %v", err)
+	}
+	if !startResp.Ok {
+		t.Fatalf("CommandStarted returned ok=false: %s", startResp.Error)
+	}
 
-	_, _ = env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
+	endResp, err := env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
 		SessionId:  sessionID,
 		CommandId:  commandID,
 		ExitCode:   0,
 		DurationMs: 100,
 		TsUnixMs:   time.Now().UnixMilli(),
 	})
+	if err != nil {
+		t.Fatalf("CommandEnded failed: %v", err)
+	}
+	if !endResp.Ok {
+		t.Fatalf("CommandEnded returned ok=false: %s", endResp.Error)
+	}
 
 	// The destructive risk flag is applied by the suggestion handler,
 	// which calls sanitize.IsDestructive(). We verify the command was stored

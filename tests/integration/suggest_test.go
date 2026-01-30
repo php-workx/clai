@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -209,7 +210,7 @@ func TestSuggest_MaxResults(t *testing.T) {
 	testCases := []int{1, 3, 5, 10}
 
 	for _, maxResults := range testCases {
-		t.Run("MaxResults"+string(rune('0'+maxResults)), func(t *testing.T) {
+		t.Run(fmt.Sprintf("MaxResults%d", maxResults), func(t *testing.T) {
 			resp, err := env.Client.Suggest(ctx, &pb.SuggestRequest{
 				SessionId:  "hist-session",
 				Cwd:        "/home/test",
@@ -443,7 +444,7 @@ func TestSuggest_SuccessFailureWeighting(t *testing.T) {
 
 		if buildIdx >= 0 && testIdx >= 0 {
 			if buildIdx > testIdx {
-				t.Log("successful command 'make build' should rank higher than failing 'make test'")
+				t.Errorf("successful command 'make build' (idx=%d) should rank higher than failing 'make test' (idx=%d)", buildIdx, testIdx)
 			}
 		}
 	}
@@ -533,7 +534,7 @@ func TestSuggest_RecencyWeighting(t *testing.T) {
 
 		if oldIdx >= 0 && recentIdx >= 0 {
 			if recentIdx > oldIdx {
-				t.Log("recent command should rank higher than old command")
+				t.Errorf("recent command 'old recent' (idx=%d) should rank higher than old command 'old command' (idx=%d)", recentIdx, oldIdx)
 			}
 		}
 	}
