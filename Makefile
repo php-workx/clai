@@ -6,7 +6,7 @@ GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-race cover fmt lint vuln dev help proto
+.PHONY: all build install install-dev clean test test-race test-interactive test-docker cover fmt lint vuln dev help proto
 
 all: build
 
@@ -77,6 +77,23 @@ cover:
 	go test -short -race -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
+
+## test-interactive: Run interactive shell tests (requires zsh, bash, fish)
+test-interactive:
+	go test -v ./tests/expect/...
+
+## test-docker: Run interactive tests in Docker containers (Alpine, Ubuntu, Debian)
+test-docker:
+	@if command -v docker-compose >/dev/null 2>&1; then \
+		docker-compose -f tests/docker/docker-compose.yml build && \
+		docker-compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
+	elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
+		docker compose -f tests/docker/docker-compose.yml build && \
+		docker compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
+	else \
+		echo "Error: docker-compose or docker compose not found"; \
+		exit 1; \
+	fi
 
 ## fmt: Format code
 fmt:

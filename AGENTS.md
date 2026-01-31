@@ -58,4 +58,4 @@ bd close <id>         # Complete work
 bd sync --from-main   # Sync with main branch
 ```
 
-For more details, see `docs/beads.md`.
+For more details, see `specs/beads.md`.
