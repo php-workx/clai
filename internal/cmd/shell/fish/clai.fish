@@ -73,15 +73,15 @@ end
 function _ai_voice_execute
     set -l current_cmd (commandline)
 
-    # Check for ` prefix (voice input marker)
-    if string match -q '`*' -- $current_cmd
+    # Check for ? prefix (natural language input marker)
+    if string match -q '\\?*' -- $current_cmd
         and test (string length -- $current_cmd) -gt 1
-        # Remove the ` prefix and any leading space
-        set -l voice_input (string replace -r '^`\\s*' '' -- $current_cmd)
+        # Remove the ? prefix and any leading space
+        set -l nl_input (string replace -r '^\\?\\s*' '' -- $current_cmd)
         commandline -r ""
 
-        echo "🎤 Converting: $voice_input"
-        set -l cmd (clai voice "$voice_input" 2>/dev/null)
+        echo "? $nl_input"
+        set -l cmd (clai voice "$nl_input" 2>/dev/null)
         if test -n "$cmd"
             echo "→ $cmd"
             # Put command in buffer for user to review
@@ -97,7 +97,7 @@ function _ai_voice_execute
         set -g _AI_VOICE_MODE false
         commandline -r ""
 
-        echo "🎤 Converting: $current_cmd"
+        echo "? $current_cmd"
         set -l cmd (clai voice "$current_cmd" 2>/dev/null)
         if test -n "$cmd"
             echo "→ $cmd"
@@ -262,7 +262,8 @@ end
 # ============================================
 
 if status is-interactive
+    set -l short_id (string sub -l 8 -- $CLAI_SESSION_ID)
     set_color brblack
-    echo "🤖 clai loaded. Commands: ai-fix, ai, voice, run | ` prefix for voice mode"
+    echo "🤖 clai [$short_id] Tab suggest | Alt+Enter accept | ?\"describe task\""
     set_color normal
 end

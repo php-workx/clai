@@ -6,7 +6,7 @@
 #   2. Inline command suggestions (history + AI) with right-arrow to accept
 #   3. Menu selection with ↓ arrow (up/down to navigate, Enter to select)
 #   4. Error diagnosis with `run` wrapper (captures output for analysis)
-#   5. Voice mode with ` prefix (fast with Haiku daemon)
+#   5. Natural language → command with ? prefix (e.g., "?list all files")
 #
 # Configuration (set these BEFORE sourcing):
 #   CLAI_AUTO_DAEMON=true     # Auto-start daemon for fast voice (default: true)
@@ -38,10 +38,13 @@ _AI_LAST_OUTPUT="$CLAI_CACHE/last_output"
 # This enables context-aware suggestions across commands
 
 # Generate session ID (use uuidgen if available, fallback to date+pid)
-if command -v uuidgen >/dev/null 2>&1; then
-    export CLAI_SESSION_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
-else
-    export CLAI_SESSION_ID="$(date +%s)-$$"
+# Only generate if not already set (preserves ID when re-sourcing)
+if [[ -z "$CLAI_SESSION_ID" ]]; then
+    if command -v uuidgen >/dev/null 2>&1; then
+        export CLAI_SESSION_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+    else
+        export CLAI_SESSION_ID="$(date +%s)-$$"
+    fi
 fi
 
 # Command tracking state
@@ -157,8 +160,8 @@ zle -N _ai_clear_suggestion
 # When activated, the next Enter press will run the input through voice conversion
 # This works with speech-to-text tools like Wispr Flow that use the same hotkey
 #
-# Use ` prefix for voice input (e.g., "`list all files")
-# The ` prefix is intercepted by ZLE before shell evaluation
+# Use ? prefix for natural language input (e.g., "?list all files")
+# The ? prefix is intercepted by ZLE before shell evaluation
 
 _AI_VOICE_MODE=false
 
@@ -170,19 +173,19 @@ _ai_enter_voice_mode() {
 }
 zle -N _ai_enter_voice_mode
 
-# ZLE widget: Execute with voice conversion if in voice mode or ` prefix
+# ZLE widget: Execute with voice conversion if in voice mode or ? prefix
 _ai_voice_accept_line() {
-    # Check for ` prefix (voice input marker)
-    # Intercepted by ZLE before shell evaluation, so backtick is safe
-    if [[ "$BUFFER" == '`'* && ${#BUFFER} -gt 1 ]]; then
-        local voice_input="${BUFFER#\`}"  # Remove the ` prefix
+    # Check for ? prefix (natural language marker)
+    # Intercepted by ZLE before shell evaluation
+    if [[ "$BUFFER" == '?'* && ${#BUFFER} -gt 1 ]]; then
+        local voice_input="${BUFFER#\?}"  # Remove the ? prefix
         voice_input="${voice_input## }"   # Remove leading space if any
         BUFFER=""
         zle redisplay
 
         # Run voice conversion and show result
         echo ""
-        echo "🎤 Converting: $voice_input"
+        echo "? $voice_input"
         local cmd=$(clai voice "$voice_input" 2>/dev/null)
         if [[ -n "$cmd" ]]; then
             echo "→ $cmd"
@@ -203,7 +206,7 @@ _ai_voice_accept_line() {
 
         # Run voice conversion and show result
         echo ""
-        echo "🎤 Converting: $voice_input"
+        echo "? $voice_input"
         local cmd=$(clai voice "$voice_input" 2>/dev/null)
         if [[ -n "$cmd" ]]; then
             echo "→ $cmd"
@@ -449,7 +452,11 @@ _ai_menu_up() {
             _AI_MENU_INDEX=$((${#_AI_MENU_SUGGESTIONS[@]} - 1))
         fi
         _ai_render_menu
+    elif [[ -n "$BUFFER" ]]; then
+        # Has input - show menu (symmetric with down arrow)
+        _ai_show_menu
     else
+        # Empty buffer - normal history navigation
         zle .up-line-or-history
     fi
 }
@@ -577,7 +584,8 @@ if [[ -o interactive ]]; then
     # Register cleanup on shell exit
     trap '_clai_cleanup' EXIT HUP
 
-    echo -e "\033[2m🤖 clai loaded. ↓ for menu | → to accept | \` for voice | ai-fix, ai, voice\033[0m"
+    local short_id="${CLAI_SESSION_ID:0:8}"
+    echo -e "\033[2m🤖 clai [$short_id] ↑↓ history | → accept | ?\"describe task\"\033[0m"
 fi
 
 # Cleanup function for shell exit

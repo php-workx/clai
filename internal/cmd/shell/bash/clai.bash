@@ -114,20 +114,20 @@ else
 fi
 
 # ============================================
-# Feature 3: Voice Mode (` prefix)
+# Feature 3: Natural Language to Command (? prefix)
 # ============================================
-# Lines starting with ` are treated as voice/natural language input
-# Example: `list all files → ls -la
+# Lines starting with ? are treated as natural language input
+# Example: ?list all files → ls -la
 
-# Check for ` prefix and convert voice input
-_ai_check_voice_prefix() {
+# Check for ? prefix and convert to command
+_ai_check_nl_prefix() {
     local cmd="$1"
-    if [[ "$cmd" == '`'* && ${#cmd} -gt 1 ]]; then
-        local voice_input="${cmd#\`}"      # Remove the ` prefix
-        voice_input="${voice_input## }"    # Remove leading space if any
+    if [[ "$cmd" == '?'* && ${#cmd} -gt 1 ]]; then
+        local nl_input="${cmd#\?}"         # Remove the ? prefix
+        nl_input="${nl_input## }"          # Remove leading space if any
 
-        echo "🎤 Converting: $voice_input"
-        local result=$(clai voice "$voice_input" 2>/dev/null)
+        echo "? $nl_input"
+        local result=$(clai voice "$nl_input" 2>/dev/null)
         if [[ -n "$result" ]]; then
             echo "→ $result"
             # Cache for 'accept' command
@@ -136,21 +136,21 @@ _ai_check_voice_prefix() {
         fi
         return 0  # Handled
     fi
-    return 1  # Not a voice command
+    return 1  # Not a natural language command
 }
 
-# Hook into DEBUG trap to catch ` prefix before execution
+# Hook into DEBUG trap to catch ? prefix before execution
 # Note: extdebug must be enabled for the trap to block command execution
 _ai_debug_trap() {
-    # Check for voice prefix first
-    if _ai_check_voice_prefix "$BASH_COMMAND"; then
+    # Check for natural language prefix first
+    if _ai_check_nl_prefix "$BASH_COMMAND"; then
         # Prevent the original command from running (requires extdebug)
         return 1
     fi
     return 0
 }
 
-# Save current extdebug state and enable it for voice prefix blocking
+# Save current extdebug state and enable it for ? prefix blocking
 _AI_EXTDEBUG_WAS_ON=false
 if shopt -q extdebug; then
     _AI_EXTDEBUG_WAS_ON=true
@@ -186,10 +186,13 @@ run() {
 # Generate unique session ID for this shell instance
 
 # Generate session ID (use uuidgen if available, fallback to date+pid)
-if command -v uuidgen >/dev/null 2>&1; then
-    export CLAI_SESSION_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
-else
-    export CLAI_SESSION_ID="$(date +%s)-$$"
+# Only generate if not already set (preserves ID when re-sourcing)
+if [[ -z "$CLAI_SESSION_ID" ]]; then
+    if command -v uuidgen >/dev/null 2>&1; then
+        export CLAI_SESSION_ID=$(uuidgen | tr '[:upper:]' '[:lower:]')
+    else
+        export CLAI_SESSION_ID="$(date +%s)-$$"
+    fi
 fi
 
 # ============================================
@@ -263,5 +266,6 @@ voice() {
 # ============================================
 
 if [[ $- == *i* ]]; then
-    echo -e "\033[2m🤖 clai loaded. Commands: ai-fix, ai, voice, run, accept | \` prefix for voice mode\033[0m"
+    local short_id="${CLAI_SESSION_ID:0:8}"
+    echo -e "\033[2m🤖 clai [$short_id] Tab complete | accept | ?\"describe task\"\033[0m"
 fi

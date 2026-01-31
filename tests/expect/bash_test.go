@@ -137,8 +137,8 @@ func TestBash_ClearSuggestionWorks(t *testing.T) {
 	assert.Contains(t, output, "cleared", "should confirm suggestion cleared")
 }
 
-// TestBash_VoiceModeBacktickPrefix verifies backtick prefix handling.
-func TestBash_VoiceModeBacktickPrefix(t *testing.T) {
+// TestBash_NaturalLanguagePrefix verifies ? prefix handling.
+func TestBash_NaturalLanguagePrefix(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -158,7 +158,7 @@ func TestBash_VoiceModeBacktickPrefix(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(500 * time.Millisecond)
 
-	// Note: The backtick prefix in bash uses extdebug trap
+	// Note: The ? prefix in bash uses extdebug trap
 	// This is complex to test interactively because the DEBUG trap
 	// intercepts commands before they run
 	// Verify extdebug is enabled

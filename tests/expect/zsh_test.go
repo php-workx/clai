@@ -216,8 +216,8 @@ func TestZsh_WorksWithExistingRPS1(t *testing.T) {
 	assert.NotContains(t, output, "error", "should not have errors")
 }
 
-// TestZsh_VoiceModeBacktickPrefix verifies backtick prefix triggers voice mode.
-func TestZsh_VoiceModeBacktickPrefix(t *testing.T) {
+// TestZsh_NaturalLanguagePrefix verifies ? prefix triggers natural language to command conversion.
+func TestZsh_NaturalLanguagePrefix(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -236,20 +236,20 @@ func TestZsh_VoiceModeBacktickPrefix(t *testing.T) {
 	defer session.Close()
 
 	// Wait for loaded message
-	_, err = session.ExpectTimeout("clai loaded", 5*time.Second)
+	_, err = session.ExpectTimeout("clai", 5*time.Second)
 	require.NoError(t, err)
 
-	// Type backtick prefix with a voice command
+	// Type ? prefix with a natural language query
 	// Note: This will try to call clai voice which may not be available in test env
-	err = session.Send("`list files")
+	err = session.Send("?list files")
 	require.NoError(t, err)
 
-	// Press Enter to trigger voice mode
+	// Press Enter to trigger conversion
 	err = session.SendKey(KeyEnter)
 	require.NoError(t, err)
 
-	// Should see the converting message
-	_, _ = session.ExpectTimeout("Converting:", 2*time.Second)
+	// Should see the query echoed back (new format: "? <query>")
+	_, _ = session.ExpectTimeout("list files", 2*time.Second)
 	// Note: May fail if clai binary not available, that's ok for this test
 }
 
