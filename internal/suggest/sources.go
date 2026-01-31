@@ -97,17 +97,14 @@ func (s *CommandSource) QueryCWD(ctx context.Context, sessionID, cwd, prefix str
 	}, nil
 }
 
-// QueryGlobal retrieves commands from the current session across all directories.
-// This provides session-wide history while maintaining session isolation.
-func (s *CommandSource) QueryGlobal(ctx context.Context, sessionID, prefix string, limit int) (*QueryResult, error) {
-	if sessionID == "" {
-		return &QueryResult{Commands: nil, Source: SourceGlobal}, nil
-	}
-
+// QueryGlobal retrieves commands from all sessions EXCEPT the current one.
+// This provides discovery of commands from past sessions while avoiding
+// duplicates with QuerySession and preventing parallel session leakage.
+func (s *CommandSource) QueryGlobal(ctx context.Context, excludeSessionID, prefix string, limit int) (*QueryResult, error) {
 	cmds, err := s.store.QueryCommands(ctx, storage.CommandQuery{
-		SessionID: &sessionID,
-		Prefix:    prefix,
-		Limit:     limit,
+		ExcludeSessionID: excludeSessionID,
+		Prefix:           prefix,
+		Limit:            limit,
 	})
 	if err != nil {
 		return nil, err

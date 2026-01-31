@@ -56,10 +56,11 @@ type Command struct {
 
 // CommandQuery defines parameters for querying commands.
 type CommandQuery struct {
-	SessionID *string
-	CWD       *string
-	Prefix    string
-	Limit     int
+	SessionID        *string // Include only this session
+	ExcludeSessionID string  // Exclude this session (for global queries)
+	CWD              *string
+	Prefix           string
+	Limit            int
 }
 
 // CacheEntry represents a cached AI response.

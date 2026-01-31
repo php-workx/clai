@@ -196,16 +196,17 @@ func TestCommandSource_QueryGlobal(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Create commands in multiple sessions and directories
+	// Create commands in multiple sessions
 	createTestSession(t, store, "session-1")
 	createTestSession(t, store, "session-2")
+	createTestSession(t, store, "session-3")
 	createTestCommand(t, store, "session-1", "cmd-1", "/tmp", "docker run nginx", 1700000001000, true)
-	createTestCommand(t, store, "session-1", "cmd-2", "/var", "docker build .", 1700000002000, true)
-	createTestCommand(t, store, "session-2", "cmd-3", "/home", "docker ps", 1700000003000, true)
+	createTestCommand(t, store, "session-2", "cmd-2", "/var", "docker build .", 1700000002000, true)
+	createTestCommand(t, store, "session-3", "cmd-3", "/home", "docker ps", 1700000003000, true)
 
 	source := NewCommandSource(store)
 
-	// Query global for session-1 - should only see session-1's commands (session isolation)
+	// Query global excluding session-1 - should see session-2 and session-3's commands
 	result, err := source.QueryGlobal(ctx, "session-1", "docker", 10)
 	if err != nil {
 		t.Fatalf("QueryGlobal() error = %v", err)
@@ -214,34 +215,42 @@ func TestCommandSource_QueryGlobal(t *testing.T) {
 	if result.Source != SourceGlobal {
 		t.Errorf("Source = %v, want %v", result.Source, SourceGlobal)
 	}
-	// Should only see session-1's 2 docker commands, not session-2's
+	// Should see 2 commands from session-2 and session-3, not session-1
 	if len(result.Commands) != 2 {
-		t.Errorf("Got %d commands, want 2 (session isolation)", len(result.Commands))
+		t.Errorf("Got %d commands, want 2 (excluding session-1)", len(result.Commands))
 	}
 
-	// Verify no commands from session-2
+	// Verify no commands from session-1 (the excluded session)
 	for _, cmd := range result.Commands {
-		if cmd.SessionID == "session-2" {
-			t.Errorf("QueryGlobal returned command from wrong session: %s", cmd.SessionID)
+		if cmd.SessionID == "session-1" {
+			t.Errorf("QueryGlobal returned command from excluded session: %s", cmd.SessionID)
 		}
 	}
 }
 
-func TestCommandSource_QueryGlobal_EmptySessionID(t *testing.T) {
+func TestCommandSource_QueryGlobal_NoExclusion(t *testing.T) {
 	t.Parallel()
 
 	store := newTestStore(t)
 	defer store.Close()
 
+	ctx := context.Background()
+
+	createTestSession(t, store, "session-1")
+	createTestSession(t, store, "session-2")
+	createTestCommand(t, store, "session-1", "cmd-1", "/tmp", "docker run nginx", 1700000001000, true)
+	createTestCommand(t, store, "session-2", "cmd-2", "/var", "docker build .", 1700000002000, true)
+
 	source := NewCommandSource(store)
 
-	result, err := source.QueryGlobal(context.Background(), "", "docker", 10)
+	// Query global with empty exclusion - should see all commands
+	result, err := source.QueryGlobal(ctx, "", "docker", 10)
 	if err != nil {
 		t.Fatalf("QueryGlobal() error = %v", err)
 	}
 
-	if len(result.Commands) != 0 {
-		t.Errorf("Expected 0 commands for empty sessionID, got %d", len(result.Commands))
+	if len(result.Commands) != 2 {
+		t.Errorf("Expected 2 commands with no exclusion, got %d", len(result.Commands))
 	}
 }
 

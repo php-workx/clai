@@ -137,6 +137,11 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 		args = append(args, *q.SessionID)
 	}
 
+	if q.ExcludeSessionID != "" {
+		query += " AND session_id != ?"
+		args = append(args, q.ExcludeSessionID)
+	}
+
 	if q.CWD != nil {
 		query += " AND cwd = ?"
 		args = append(args, *q.CWD)
