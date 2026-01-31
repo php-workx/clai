@@ -1,0 +1,28 @@
+# Dockerfile for Alpine Linux interactive shell tests
+# Uses official Go image with Alpine as base
+FROM golang:1.24-alpine
+
+# Install shells and build tools
+RUN apk add --no-cache \
+    zsh \
+    bash \
+    fish \
+    git \
+    gcc \
+    musl-dev
+
+# Create app directory
+WORKDIR /app
+
+# Copy go.mod and go.sum first for better caching
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the rest of the source
+COPY . .
+
+# Build the clai binary
+RUN go build -o /usr/local/bin/clai ./cmd/clai
+
+# Default command: run interactive shell tests
+CMD ["go", "test", "-v", "./tests/expect/..."]
