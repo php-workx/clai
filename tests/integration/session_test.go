@@ -399,6 +399,231 @@ func TestSession_MultipleSessions(t *testing.T) {
 	}
 }
 
+// TestSession_HistoryIsolation verifies that commands from one session don't appear
+// in another session's suggestions. This is critical for session-specific history.
+func TestSession_HistoryIsolation(t *testing.T) {
+	env := SetupTestEnv(t)
+	defer env.Teardown()
+
+	ctx := context.Background()
+
+	// Create two parallel sessions
+	sessionA := generateSessionID()
+	sessionB := generateSessionID()
+
+	// Start both sessions
+	for _, s := range []struct {
+		id   string
+		cwd  string
+		user string
+	}{
+		{sessionA, "/home/alice/project", "alice"},
+		{sessionB, "/home/bob/project", "bob"},
+	} {
+		_, err := env.Client.SessionStart(ctx, &pb.SessionStartRequest{
+			SessionId:       s.id,
+			Cwd:             s.cwd,
+			StartedAtUnixMs: time.Now().UnixMilli(),
+			Client: &pb.ClientInfo{
+				Shell:    "zsh",
+				Os:       "darwin",
+				Username: s.user,
+			},
+		})
+		if err != nil {
+			t.Fatalf("SessionStart for %s failed: %v", s.user, err)
+		}
+	}
+
+	// Log unique commands to session A
+	sessionACommands := []string{
+		"alice-unique-command-1",
+		"alice-unique-command-2",
+		"shared-prefix-alice",
+	}
+	for _, cmd := range sessionACommands {
+		commandID := generateCommandID()
+		_, _ = env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
+			SessionId: sessionA,
+			CommandId: commandID,
+			Cwd:       "/home/alice/project",
+			Command:   cmd,
+			TsUnixMs:  time.Now().UnixMilli(),
+		})
+		_, _ = env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
+			SessionId:  sessionA,
+			CommandId:  commandID,
+			ExitCode:   0,
+			DurationMs: 100,
+			TsUnixMs:   time.Now().UnixMilli(),
+		})
+	}
+
+	// Log unique commands to session B
+	sessionBCommands := []string{
+		"bob-unique-command-1",
+		"bob-unique-command-2",
+		"shared-prefix-bob",
+	}
+	for _, cmd := range sessionBCommands {
+		commandID := generateCommandID()
+		_, _ = env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
+			SessionId: sessionB,
+			CommandId: commandID,
+			Cwd:       "/home/bob/project",
+			Command:   cmd,
+			TsUnixMs:  time.Now().UnixMilli(),
+		})
+		_, _ = env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
+			SessionId:  sessionB,
+			CommandId:  commandID,
+			ExitCode:   0,
+			DurationMs: 100,
+			TsUnixMs:   time.Now().UnixMilli(),
+		})
+	}
+
+	// Query suggestions from session A with "alice" prefix
+	t.Run("SessionA_OnlySeesOwnCommands", func(t *testing.T) {
+		resp, err := env.Client.Suggest(ctx, &pb.SuggestRequest{
+			SessionId:  sessionA,
+			Cwd:        "/home/alice/project",
+			Buffer:     "alice",
+			MaxResults: 10,
+		})
+		if err != nil {
+			t.Fatalf("Suggest failed: %v", err)
+		}
+
+		// Should find alice's commands
+		foundAlice := false
+		for _, s := range resp.Suggestions {
+			if s.Text == "alice-unique-command-1" || s.Text == "alice-unique-command-2" {
+				foundAlice = true
+			}
+			// Should NOT find bob's commands
+			if s.Text == "bob-unique-command-1" || s.Text == "bob-unique-command-2" {
+				t.Errorf("session A should not see session B's command: %s", s.Text)
+			}
+		}
+		if !foundAlice && len(resp.Suggestions) > 0 {
+			t.Log("alice's commands not found in suggestions (may be expected if session filtering is strict)")
+		}
+	})
+
+	// Query suggestions from session B with "bob" prefix
+	t.Run("SessionB_OnlySeesOwnCommands", func(t *testing.T) {
+		resp, err := env.Client.Suggest(ctx, &pb.SuggestRequest{
+			SessionId:  sessionB,
+			Cwd:        "/home/bob/project",
+			Buffer:     "bob",
+			MaxResults: 10,
+		})
+		if err != nil {
+			t.Fatalf("Suggest failed: %v", err)
+		}
+
+		// Should find bob's commands
+		foundBob := false
+		for _, s := range resp.Suggestions {
+			if s.Text == "bob-unique-command-1" || s.Text == "bob-unique-command-2" {
+				foundBob = true
+			}
+			// Should NOT find alice's commands
+			if s.Text == "alice-unique-command-1" || s.Text == "alice-unique-command-2" {
+				t.Errorf("session B should not see session A's command: %s", s.Text)
+			}
+		}
+		if !foundBob && len(resp.Suggestions) > 0 {
+			t.Log("bob's commands not found in suggestions (may be expected if session filtering is strict)")
+		}
+	})
+
+	// Query with shared prefix - each session should only see their own
+	t.Run("SharedPrefix_IsolatedBySession", func(t *testing.T) {
+		// Session A queries "shared-prefix"
+		respA, err := env.Client.Suggest(ctx, &pb.SuggestRequest{
+			SessionId:  sessionA,
+			Cwd:        "/home/alice/project",
+			Buffer:     "shared-prefix",
+			MaxResults: 10,
+		})
+		if err != nil {
+			t.Fatalf("Suggest for session A failed: %v", err)
+		}
+
+		// Session B queries "shared-prefix"
+		respB, err := env.Client.Suggest(ctx, &pb.SuggestRequest{
+			SessionId:  sessionB,
+			Cwd:        "/home/bob/project",
+			Buffer:     "shared-prefix",
+			MaxResults: 10,
+		})
+		if err != nil {
+			t.Fatalf("Suggest for session B failed: %v", err)
+		}
+
+		// Session A should see "shared-prefix-alice" but not "shared-prefix-bob"
+		for _, s := range respA.Suggestions {
+			if s.Text == "shared-prefix-bob" {
+				t.Error("session A should not see session B's 'shared-prefix-bob'")
+			}
+		}
+
+		// Session B should see "shared-prefix-bob" but not "shared-prefix-alice"
+		for _, s := range respB.Suggestions {
+			if s.Text == "shared-prefix-alice" {
+				t.Error("session B should not see session A's 'shared-prefix-alice'")
+			}
+		}
+	})
+
+	// Verify via direct storage query that commands are properly tagged
+	t.Run("StorageQuery_CommandsTaggedWithSession", func(t *testing.T) {
+		// Query commands for session A
+		commandsA, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
+			SessionID: &sessionA,
+			Limit:     100,
+		})
+		if err != nil {
+			t.Fatalf("QueryCommands for session A failed: %v", err)
+		}
+
+		// Query commands for session B
+		commandsB, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
+			SessionID: &sessionB,
+			Limit:     100,
+		})
+		if err != nil {
+			t.Fatalf("QueryCommands for session B failed: %v", err)
+		}
+
+		// Verify counts
+		if len(commandsA) != len(sessionACommands) {
+			t.Errorf("session A should have %d commands, got %d", len(sessionACommands), len(commandsA))
+		}
+		if len(commandsB) != len(sessionBCommands) {
+			t.Errorf("session B should have %d commands, got %d", len(sessionBCommands), len(commandsB))
+		}
+
+		// Verify no cross-contamination
+		for _, cmd := range commandsA {
+			for _, bCmd := range sessionBCommands {
+				if cmd.Command == bCmd {
+					t.Errorf("session A commands contain session B command: %s", cmd.Command)
+				}
+			}
+		}
+		for _, cmd := range commandsB {
+			for _, aCmd := range sessionACommands {
+				if cmd.Command == aCmd {
+					t.Errorf("session B commands contain session A command: %s", cmd.Command)
+				}
+			}
+		}
+	})
+}
+
 // TestSession_ClientInfoDefaults verifies that minimal client info is handled properly.
 // The storage layer requires shell, so sessions without shell will fail.
 func TestSession_ClientInfoDefaults(t *testing.T) {

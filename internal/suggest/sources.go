@@ -74,16 +74,18 @@ func (s *CommandSource) QuerySession(ctx context.Context, sessionID, prefix stri
 	}, nil
 }
 
-// QueryCWD retrieves commands from the current working directory.
-func (s *CommandSource) QueryCWD(ctx context.Context, cwd, prefix string, limit int) (*QueryResult, error) {
-	if cwd == "" {
+// QueryCWD retrieves commands from the current working directory within the current session.
+// This ensures session isolation while providing CWD-specific suggestions.
+func (s *CommandSource) QueryCWD(ctx context.Context, sessionID, cwd, prefix string, limit int) (*QueryResult, error) {
+	if cwd == "" || sessionID == "" {
 		return &QueryResult{Commands: nil, Source: SourceCWD}, nil
 	}
 
 	cmds, err := s.store.QueryCommands(ctx, storage.CommandQuery{
-		CWD:    &cwd,
-		Prefix: prefix,
-		Limit:  limit,
+		SessionID: &sessionID,
+		CWD:       &cwd,
+		Prefix:    prefix,
+		Limit:     limit,
 	})
 	if err != nil {
 		return nil, err
@@ -95,11 +97,17 @@ func (s *CommandSource) QueryCWD(ctx context.Context, cwd, prefix string, limit 
 	}, nil
 }
 
-// QueryGlobal retrieves commands from global history.
-func (s *CommandSource) QueryGlobal(ctx context.Context, prefix string, limit int) (*QueryResult, error) {
+// QueryGlobal retrieves commands from the current session across all directories.
+// This provides session-wide history while maintaining session isolation.
+func (s *CommandSource) QueryGlobal(ctx context.Context, sessionID, prefix string, limit int) (*QueryResult, error) {
+	if sessionID == "" {
+		return &QueryResult{Commands: nil, Source: SourceGlobal}, nil
+	}
+
 	cmds, err := s.store.QueryCommands(ctx, storage.CommandQuery{
-		Prefix: prefix,
-		Limit:  limit,
+		SessionID: &sessionID,
+		Prefix:    prefix,
+		Limit:     limit,
 	})
 	if err != nil {
 		return nil, err
@@ -113,26 +121,28 @@ func (s *CommandSource) QueryGlobal(ctx context.Context, prefix string, limit in
 
 // QueryAllScopes queries all three scopes and returns the combined results.
 // Results from higher-priority sources are returned first.
+// All scopes are filtered by session ID to ensure session isolation.
 // Partial failures are tolerated: if one scope fails, results from other scopes are still returned.
 func (s *CommandSource) QueryAllScopes(ctx context.Context, sessionID, cwd, prefix string, limitPerScope int) ([]*QueryResult, error) {
 	results := make([]*QueryResult, 0, 3)
 
-	// Session scope (highest priority)
+	// Session scope (highest priority) - current session, any directory
 	sessionResult, err := s.QuerySession(ctx, sessionID, prefix, limitPerScope)
 	if err == nil && len(sessionResult.Commands) > 0 {
 		results = append(results, sessionResult)
 	}
 	// Continue on error - partial results are acceptable
 
-	// CWD scope
-	cwdResult, err := s.QueryCWD(ctx, cwd, prefix, limitPerScope)
+	// CWD scope - current session, current directory only
+	cwdResult, err := s.QueryCWD(ctx, sessionID, cwd, prefix, limitPerScope)
 	if err == nil && len(cwdResult.Commands) > 0 {
 		results = append(results, cwdResult)
 	}
 	// Continue on error - partial results are acceptable
 
-	// Global scope (lowest priority)
-	globalResult, err := s.QueryGlobal(ctx, prefix, limitPerScope)
+	// Global scope (lowest priority) - current session, any directory
+	// Note: With session filtering, this overlaps with Session scope but may have different ranking
+	globalResult, err := s.QueryGlobal(ctx, sessionID, prefix, limitPerScope)
 	if err == nil && len(globalResult.Commands) > 0 {
 		results = append(results, globalResult)
 	}

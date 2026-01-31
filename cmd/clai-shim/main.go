@@ -100,7 +100,7 @@ Commands:
   session-end --session-id=ID                              Notify session ending
   log-start --session-id=ID --command-id=ID --cwd=PATH --command="CMD"  Log command start
   log-end --session-id=ID --command-id=ID --exit-code=N --duration=MS   Log command end
-  suggest --session-id=ID --cwd=PATH --buffer="TEXT" [--cursor=N]       Get suggestions
+  suggest --session-id=ID --cwd=PATH --buffer="TEXT" [--cursor=N] [--limit=N]  Get suggestions
   text-to-command --session-id=ID --cwd=PATH --prompt="TEXT"            Text to command
   ping                                        Check daemon connectivity
   status                                      Get daemon status
@@ -238,8 +238,8 @@ func runLogEnd() {
 }
 
 // runSuggest handles the suggest command
-// Flags: --session-id, --cwd, --buffer, --cursor
-// Output: JSON array of suggestions or single line for shell
+// Flags: --session-id, --cwd, --buffer, --cursor, --limit
+// Output: suggestions (one per line)
 func runSuggest() {
 	flags := parseFlags(os.Args[2:])
 
@@ -247,6 +247,7 @@ func runSuggest() {
 	cwd := flags[flagCwd]
 	buffer := flags[flagBuffer]
 	cursorStr := flags[flagCursor]
+	limitStr := flags["limit"]
 
 	if sessionID == "" {
 		// Try without flags for backwards compatibility
@@ -269,19 +270,28 @@ func runSuggest() {
 		cursorPos, _ = strconv.Atoi(cursorStr)
 	}
 
+	limit := 1
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
 	client, err := ipc.NewClient()
 	if err != nil {
 		return // Silent failure
 	}
 	defer client.Close()
 
-	suggestions := client.Suggest(context.Background(), sessionID, cwd, buffer, cursorPos, false, 5)
+	suggestions := client.Suggest(context.Background(), sessionID, cwd, buffer, cursorPos, false, limit)
 	if len(suggestions) == 0 {
 		return
 	}
 
-	// Output first suggestion for shell integration
-	fmt.Println(suggestions[0].Text)
+	// Output suggestions (one per line)
+	for _, s := range suggestions {
+		fmt.Println(s.Text)
+	}
 }
 
 // runTextToCommand handles the text-to-command command
