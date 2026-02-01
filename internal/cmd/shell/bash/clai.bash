@@ -260,5 +260,5 @@ voice() {
 
 if [[ $- == *i* ]]; then
     # Use printf for better portability across bash versions
-    printf '\033[2m🤖 clai [%s] Tab ↑↓ | → accept | ?"describe task"\033[0m\n' "${CLAI_SESSION_ID:0:8}"
+    printf '\033[2m🤖 clai [%s] Tab complete | accept cmd | ?"describe task"\033[0m\n' "${CLAI_SESSION_ID:0:8}"
 fi

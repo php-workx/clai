@@ -569,7 +569,7 @@ if [[ -o interactive ]]; then
     trap '_clai_cleanup' EXIT HUP
 
     local short_id="${CLAI_SESSION_ID:0:8}"
-    echo -e "\033[2m🤖 clai [$short_id] Tab ↑↓ | → accept | ?\"describe task\"\033[0m"
+    echo -e "\033[2m🤖 clai [$short_id] ↑↓ history | → accept | ?\"describe task\"\033[0m"
 fi
 
 # Cleanup function for shell exit

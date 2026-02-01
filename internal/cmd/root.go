@@ -6,11 +6,10 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:   "clai",
-	Short: "AI-powered terminal assistant",
-	Long: `AI Terminal integrates Claude into your shell to provide:
-- Automatic error diagnosis for failed commands
-- Command suggestion extraction from output
-- Natural language questions with terminal context`,
+	Short: "fish-like intelligence for any shell",
+	Long: `clai - fish-like intelligence for any shell
+  - ?describe task → get the right command
+  - ↑↓ smart suggestions matching context`,
 }
 
 // Execute runs the root command

@@ -260,6 +260,6 @@ end
 if status is-interactive
     set -l short_id (string sub -l 8 -- $CLAI_SESSION_ID)
     set_color brblack
-    echo "🤖 clai [$short_id] Tab ↑↓ | → accept | ?\"describe task\""
+    echo "🤖 clai [$short_id] → suggest | Alt+↵ accept | ?\"describe task\""
     set_color normal
 end
