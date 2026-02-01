@@ -6,7 +6,7 @@ GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-race test-interactive test-docker cover fmt lint vuln dev help proto
+.PHONY: all build install install-dev clean test test-all test-interactive test-docker cover fmt lint vuln dev help proto
 
 all: build
 
@@ -64,21 +64,16 @@ clean:
 	rm -rf bin/
 	go clean
 
-## test: Run unit tests (fast, skips integration tests)
+## test: Run all tests with race detector
 test:
-	go test -short -v ./...
+	go test -race -v ./...
 
-## test-all: Run all tests including integration tests (slow, requires Claude CLI)
-test-all:
-	go test -v ./...
+## test-all: Run all tests including Docker containers
+test-all: test test-docker
 
-## test-race: Run unit tests with race detector
-test-race:
-	go test -short -race -v ./...
-
-## cover: Run unit tests with coverage
+## cover: Run all tests with coverage
 cover:
-	go test -short -race -coverprofile=coverage.out -covermode=atomic ./...
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
@@ -120,7 +115,7 @@ vuln:
 	fi
 
 ## dev: Run all checks (fmt, lint, test, vuln)
-dev: fmt lint test-race vuln
+dev: fmt lint test vuln
 	@echo "All checks passed!"
 
 ## deps: Download dependencies
