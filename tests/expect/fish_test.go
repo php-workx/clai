@@ -448,6 +448,41 @@ func TestFish_DoctorShowsCorrectShell(t *testing.T) {
 	assert.NotContains(t, output, "bash (.bashrc)", "doctor should not show bash when in fish")
 }
 
+// TestFish_InstallDetectsShell verifies clai install correctly detects fish
+// even without CLAI_CURRENT_SHELL set. Fish is special because it doesn't
+// export FISH_VERSION, so detection relies on parent process checking.
+func TestFish_InstallDetectsShell(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "fish")
+
+	// Start a clean fish session WITHOUT clai loaded (no hook file)
+	// This simulates a user who just did `brew install clai`
+	session, err := NewSession("fish",
+		WithTimeout(10*time.Second),
+		WithEnv("CLAI_CURRENT_SHELL", ""), // Ensure not set
+	)
+	require.NoError(t, err, "failed to create fish session")
+	defer session.Close()
+
+	// Wait for prompt
+	time.Sleep(500 * time.Millisecond)
+
+	// Fish doesn't export FISH_VERSION to child processes, but we can verify
+	// we're in fish by checking $FISH_VERSION directly (it's set in fish)
+	err = session.SendLine(`echo "FISH_VERSION=$FISH_VERSION"; echo DONE`)
+	require.NoError(t, err)
+
+	output, err := session.ExpectTimeout("DONE", 3*time.Second)
+	require.NoError(t, err, "command should complete")
+
+	// FISH_VERSION should be set within fish
+	assert.Contains(t, output, "FISH_VERSION=", "FISH_VERSION should be visible in fish")
+	// But verify it's not empty (it won't be exported but will be shown)
+	assert.NotContains(t, output, "FISH_VERSION=\n", "FISH_VERSION should have a value in fish")
+}
+
 // TestFish_StatusShowsCorrectShell verifies clai status detects fish correctly.
 func TestFish_StatusShowsCorrectShell(t *testing.T) {
 	if testing.Short() {

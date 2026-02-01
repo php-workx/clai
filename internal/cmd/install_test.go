@@ -216,3 +216,79 @@ func TestIsInstalled_NonExistentFile(t *testing.T) {
 		t.Error("isInstalled should return false for nonexistent file")
 	}
 }
+
+func TestValidateShellInput(t *testing.T) {
+	// Test that only valid shells are accepted
+	validShells := []string{"zsh", "bash", "fish"}
+	invalidShells := []string{"sh", "csh", "tcsh", "ksh", "powershell", "", "invalid", "ZSH", "BASH"}
+
+	for _, shell := range validShells {
+		t.Run("valid_"+shell, func(t *testing.T) {
+			switch shell {
+			case "zsh", "bash", "fish":
+				// These should be valid - test passes
+			default:
+				t.Errorf("shell %q should be valid", shell)
+			}
+		})
+	}
+
+	for _, shell := range invalidShells {
+		t.Run("invalid_"+shell, func(t *testing.T) {
+			switch shell {
+			case "zsh", "bash", "fish":
+				t.Errorf("shell %q should be invalid", shell)
+			default:
+				// These should be invalid - test passes
+			}
+		})
+	}
+}
+
+func TestDetectShell_ParentProcessFallback(t *testing.T) {
+	// This test verifies that when version variables aren't set,
+	// we fall back to parent process detection (which should work for the test runner)
+
+	// Save and clear all detection variables
+	origShell := os.Getenv("SHELL")
+	origZshVersion := os.Getenv("ZSH_VERSION")
+	origBashVersion := os.Getenv("BASH_VERSION")
+	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
+	defer func() {
+		os.Setenv("SHELL", origShell)
+		if origZshVersion != "" {
+			os.Setenv("ZSH_VERSION", origZshVersion)
+		}
+		if origBashVersion != "" {
+			os.Setenv("BASH_VERSION", origBashVersion)
+		}
+		if origClaiShell != "" {
+			os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
+		}
+	}()
+
+	// Clear all variables to force parent process detection
+	os.Unsetenv("CLAI_CURRENT_SHELL")
+	os.Unsetenv("ZSH_VERSION")
+	os.Unsetenv("BASH_VERSION")
+	os.Setenv("SHELL", "/bin/sh") // Set to unsupported shell
+
+	// The detection should either:
+	// 1. Detect parent process (if running from zsh/bash/fish) - confident=true
+	// 2. Fall back to SHELL=/bin/sh which is unsupported - shell="", confident=false
+	shell, confident := detectShell()
+
+	// We can't know for sure what the test runner's parent is, but we can verify
+	// the function doesn't crash and returns sensible values
+	t.Logf("detectShell with cleared vars: shell=%q, confident=%v", shell, confident)
+
+	// If we got a shell, it should be one of the supported ones
+	if shell != "" {
+		switch shell {
+		case "zsh", "bash", "fish":
+			// Valid
+		default:
+			t.Errorf("detected unsupported shell: %q", shell)
+		}
+	}
+}

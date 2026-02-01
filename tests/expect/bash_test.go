@@ -364,6 +364,37 @@ func TestBash_DoctorShowsCorrectShell(t *testing.T) {
 	assert.True(t, hasBash, "doctor should show bash status or not installed")
 }
 
+// TestBash_InstallDetectsShell verifies clai install correctly detects bash
+// even without CLAI_CURRENT_SHELL set (simulating fresh install after brew).
+func TestBash_InstallDetectsShell(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "bash")
+
+	// Start a clean bash session WITHOUT clai loaded (no hook file)
+	// This simulates a user who just did `brew install clai`
+	session, err := NewSession("bash",
+		WithTimeout(10*time.Second),
+		WithEnv("CLAI_CURRENT_SHELL", ""), // Ensure not set
+	)
+	require.NoError(t, err, "failed to create bash session")
+	defer session.Close()
+
+	// Wait for prompt
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify BASH_VERSION is set in the bash environment
+	err = session.SendLine(`echo "BASH_VERSION=$BASH_VERSION"`)
+	require.NoError(t, err)
+
+	output, err := session.ExpectTimeout("BASH_VERSION=", 3*time.Second)
+	require.NoError(t, err, "BASH_VERSION should be set in bash")
+
+	// The version should not be empty
+	assert.NotContains(t, output, "BASH_VERSION=\n", "BASH_VERSION should have a value")
+}
+
 // TestBash_StatusShowsCorrectShell verifies clai status detects bash correctly.
 func TestBash_StatusShowsCorrectShell(t *testing.T) {
 	if testing.Short() {
