@@ -246,8 +246,8 @@ func TestCheckShellIntegrationWithPaths_NoCurrentShell(t *testing.T) {
 }
 
 func TestCheckShellIntegrationWithPaths_ActiveSession(t *testing.T) {
-	// When CLAI_CURRENT_SHELL and CLAI_SESSION_ID are set, should detect as active session
-	// without checking RC files (used when running via eval "$(clai init zsh)")
+	// When running in zsh (ZSH_VERSION set) with CLAI_CURRENT_SHELL=zsh and
+	// CLAI_SESSION_ID set, should detect as active session
 	tmpDir := t.TempDir()
 	home := tmpDir
 
@@ -259,17 +259,17 @@ func TestCheckShellIntegrationWithPaths_ActiveSession(t *testing.T) {
 	// Save and set env
 	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
 	origSessionID := os.Getenv("CLAI_SESSION_ID")
+	origZshVersion := os.Getenv("ZSH_VERSION")
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
-		if origSessionID != "" {
-			os.Setenv("CLAI_SESSION_ID", origSessionID)
-		} else {
-			os.Unsetenv("CLAI_SESSION_ID")
-		}
+		restoreEnv("CLAI_CURRENT_SHELL", origClaiShell)
+		restoreEnv("CLAI_SESSION_ID", origSessionID)
+		restoreEnv("ZSH_VERSION", origZshVersion)
 		os.Setenv("HOME", origHome)
 	}()
 
+	// Simulate being in zsh with active clai session
+	os.Setenv("ZSH_VERSION", "5.9")
 	os.Setenv("CLAI_CURRENT_SHELL", "zsh")
 	os.Setenv("CLAI_SESSION_ID", "test-session-123")
 	os.Setenv("HOME", home)
@@ -282,6 +282,54 @@ func TestCheckShellIntegrationWithPaths_ActiveSession(t *testing.T) {
 	}
 	if len(result) > 0 && result[0] != "zsh (active session)" {
 		t.Errorf("expected 'zsh (active session)', got %q", result[0])
+	}
+}
+
+func TestCheckShellIntegrationWithPaths_InheritedSessionNotActive(t *testing.T) {
+	// When in bash (BASH_VERSION set) but CLAI_CURRENT_SHELL=zsh (inherited from parent),
+	// should NOT report active session - the clai session is not active in bash
+	tmpDir := t.TempDir()
+	home := tmpDir
+
+	paths := &config.Paths{
+		BaseDir: tmpDir,
+	}
+
+	// Save and set env
+	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
+	origSessionID := os.Getenv("CLAI_SESSION_ID")
+	origBashVersion := os.Getenv("BASH_VERSION")
+	origZshVersion := os.Getenv("ZSH_VERSION")
+	origHome := os.Getenv("HOME")
+	defer func() {
+		restoreEnv("CLAI_CURRENT_SHELL", origClaiShell)
+		restoreEnv("CLAI_SESSION_ID", origSessionID)
+		restoreEnv("BASH_VERSION", origBashVersion)
+		restoreEnv("ZSH_VERSION", origZshVersion)
+		os.Setenv("HOME", origHome)
+	}()
+
+	// Simulate being in bash with inherited zsh clai session
+	os.Setenv("BASH_VERSION", "5.2.0")
+	os.Unsetenv("ZSH_VERSION")             // Not in zsh
+	os.Setenv("CLAI_CURRENT_SHELL", "zsh") // Inherited from parent
+	os.Setenv("CLAI_SESSION_ID", "test-session-123")
+	os.Setenv("HOME", home)
+
+	result := checkShellIntegrationWithPaths(paths)
+
+	// Should return empty - clai is not active in bash, and no RC files exist
+	if len(result) != 0 {
+		t.Errorf("expected empty result when inherited session doesn't match shell, got %v", result)
+	}
+}
+
+// restoreEnv restores an environment variable to its original value
+func restoreEnv(key, value string) {
+	if value != "" {
+		os.Setenv(key, value)
+	} else {
+		os.Unsetenv(key)
 	}
 }
 

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -93,16 +94,82 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// detectActualShell detects the actual running shell.
+// First tries parent process detection (most reliable for child processes),
+// then falls back to shell version env vars (which may not be exported).
+func detectActualShell() string {
+	// Check parent process - when user runs `clai doctor` from bash,
+	// the parent process IS bash
+	if shell := detectParentShell(); shell != "" {
+		return shell
+	}
+	// Fall back to shell-specific version variables
+	// Note: These are usually not exported, so this rarely works for child processes
+	if os.Getenv("BASH_VERSION") != "" {
+		return "bash"
+	}
+	if os.Getenv("ZSH_VERSION") != "" {
+		return "zsh"
+	}
+	if os.Getenv("FISH_VERSION") != "" {
+		return "fish"
+	}
+	return ""
+}
+
+// detectParentShell detects the shell by checking the parent process name.
+func detectParentShell() string {
+	ppid := os.Getppid()
+	if ppid <= 0 {
+		return ""
+	}
+
+	// Try reading from /proc (Linux)
+	commPath := fmt.Sprintf("/proc/%d/comm", ppid)
+	if data, err := os.ReadFile(commPath); err == nil {
+		name := strings.TrimSpace(string(data))
+		return extractShellName(name)
+	}
+
+	// Fall back to ps command (macOS, BSD)
+	cmd := exec.Command("ps", "-p", fmt.Sprintf("%d", ppid), "-o", "comm=")
+	if output, err := cmd.Output(); err == nil {
+		name := strings.TrimSpace(string(output))
+		return extractShellName(name)
+	}
+
+	return ""
+}
+
+// extractShellName extracts the shell name from a process path or name.
+func extractShellName(name string) string {
+	// Handle paths like /bin/zsh or /usr/local/bin/bash
+	base := filepath.Base(name)
+	// Handle names like "bash-3.2" or "zsh-5.9"
+	if idx := strings.Index(base, "-"); idx > 0 {
+		base = base[:idx]
+	}
+	// Only return if it's a known shell
+	switch base {
+	case "zsh", "bash", "fish":
+		return base
+	}
+	return ""
+}
+
 // detectCurrentShell returns the current shell name (zsh, bash, fish, etc.)
-// First checks CLAI_CURRENT_SHELL (set by shell integration scripts),
-// then falls back to SHELL environment variable.
+// Uses shell-specific env vars first, then CLAI_CURRENT_SHELL, then $SHELL.
 func detectCurrentShell() string {
-	// CLAI_CURRENT_SHELL is set by shell integration scripts and reflects
-	// the actual running shell, not the login shell
+	// First try to detect actual shell via version variables
+	if shell := detectActualShell(); shell != "" {
+		return shell
+	}
+	// CLAI_CURRENT_SHELL is set by shell integration scripts
+	// Note: This may be inherited from parent shell, so less reliable
 	if shell := os.Getenv("CLAI_CURRENT_SHELL"); shell != "" {
 		return shell
 	}
-	// Fall back to SHELL (login shell) - less accurate but better than nothing
+	// Fall back to SHELL (login shell) - least accurate
 	shell := os.Getenv("SHELL")
 	if shell == "" {
 		return ""
@@ -117,26 +184,31 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 		return nil
 	}
 
-	currentShell := detectCurrentShell()
+	// Detect the ACTUAL shell we're running in (using version env vars)
+	actualShell := detectActualShell()
 	var installed []string
 
-	// If CLAI_CURRENT_SHELL and CLAI_SESSION_ID are set, shell integration is active
-	// even if not installed in RC files (e.g., running via eval "$(clai init zsh)")
-	// Note: We use CLAI_CURRENT_SHELL directly (not detectCurrentShell) because
-	// an "active session" requires the shell integration to have run and set this var.
-	// Only recognize supported shells to avoid false positives.
+	// Check if clai integration is active in THIS shell
+	// CLAI_CURRENT_SHELL/CLAI_SESSION_ID might be inherited from parent shell,
+	// so we only report "active session" if it matches the actual shell
 	claiCurrentShell := os.Getenv("CLAI_CURRENT_SHELL")
-	if claiCurrentShell != "" && os.Getenv("CLAI_SESSION_ID") != "" {
-		// Only report active session for supported shells
-		switch claiCurrentShell {
-		case "zsh", "bash", "fish":
-			installed = append(installed, fmt.Sprintf("%s (active session)", claiCurrentShell))
-			return installed
-		}
+	sessionID := os.Getenv("CLAI_SESSION_ID")
+
+	if actualShell != "" && claiCurrentShell == actualShell && sessionID != "" {
+		// Active session in the current shell
+		installed = append(installed, fmt.Sprintf("%s (active session)", actualShell))
+		return installed
+	}
+
+	// Not an active session - check RC files for the current shell only
+	// We focus on the current shell, not all shells
+	shellToCheck := actualShell
+	if shellToCheck == "" {
+		shellToCheck = detectCurrentShell() // Fall back to other detection methods
 	}
 
 	// Check zsh
-	if currentShell == "" || currentShell == "zsh" {
+	if shellToCheck == "" || shellToCheck == "zsh" {
 		zshrc := filepath.Join(home, ".zshrc")
 		if ok, _, _ := isInstalled(zshrc, filepath.Join(paths.HooksDir(), "clai.zsh"), "zsh"); ok {
 			installed = append(installed, "zsh (.zshrc)")
@@ -144,7 +216,7 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 	}
 
 	// Check bash
-	if currentShell == "" || currentShell == "bash" {
+	if shellToCheck == "" || shellToCheck == "bash" {
 		bashrc := filepath.Join(home, ".bashrc")
 		if ok, _, _ := isInstalled(bashrc, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
 			installed = append(installed, "bash (.bashrc)")
@@ -157,7 +229,7 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 	}
 
 	// Check fish
-	if currentShell == "" || currentShell == "fish" {
+	if shellToCheck == "" || shellToCheck == "fish" {
 		fishConfig := filepath.Join(home, ".config", "fish", "config.fish")
 		if ok, _, _ := isInstalled(fishConfig, filepath.Join(paths.HooksDir(), "clai.fish"), "fish"); ok {
 			installed = append(installed, "fish (config.fish)")
