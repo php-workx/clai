@@ -42,6 +42,7 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 		filepath.Join(home, ".zshrc"),
 		filepath.Join(home, ".bashrc"),
 		filepath.Join(home, ".bash_profile"),
+		filepath.Join(home, ".config", "fish", "config.fish"),
 	}
 
 	removed := false
@@ -61,6 +62,7 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 	hookFiles := []string{
 		filepath.Join(paths.HooksDir(), "clai.zsh"),
 		filepath.Join(paths.HooksDir(), "clai.bash"),
+		filepath.Join(paths.HooksDir(), "clai.fish"),
 	}
 
 	for _, hookFile := range hookFiles {
@@ -102,6 +104,7 @@ func removeFromRCFile(rcFile, hooksDir string) (bool, error) {
 		"eval \"$(clai init",
 		"clai init zsh",
 		"clai init bash",
+		"clai init fish",
 		"# clai shell integration",
 	}
 

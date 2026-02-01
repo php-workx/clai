@@ -36,7 +36,7 @@ Examples:
 }
 
 func init() {
-	installCmd.Flags().StringVar(&installShell, "shell", "", "Shell to install for (zsh, bash)")
+	installCmd.Flags().StringVar(&installShell, "shell", "", "Shell to install for (zsh, bash, fish)")
 	rootCmd.AddCommand(installCmd)
 }
 
@@ -53,10 +53,10 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Validate shell
 	switch shell {
-	case "zsh", "bash":
+	case "zsh", "bash", "fish":
 		// OK
 	default:
-		return fmt.Errorf("unsupported shell: %s (supported: zsh, bash)", shell)
+		return fmt.Errorf("unsupported shell: %s (supported: zsh, bash, fish)", shell)
 	}
 
 	paths := config.DefaultPaths()
@@ -86,7 +86,12 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	// Check if already installed
 	sourceLine := fmt.Sprintf(`source "%s"`, hookFile)
-	evalLine := fmt.Sprintf(`eval "$(clai init %s)"`, shell)
+	var evalLine string
+	if shell == "fish" {
+		evalLine = "clai init fish | source"
+	} else {
+		evalLine = fmt.Sprintf(`eval "$(clai init %s)"`, shell)
+	}
 
 	installed, installedLine, err := isInstalled(rcFile, hookFile, shell)
 	if err != nil {
@@ -140,12 +145,20 @@ func runInstall(cmd *cobra.Command, args []string) error {
 }
 
 func detectShell() string {
-	// Check SHELL environment variable
+	// First check CLAI_CURRENT_SHELL (set by shell integration)
+	if current := os.Getenv("CLAI_CURRENT_SHELL"); current != "" {
+		switch current {
+		case "zsh", "bash", "fish":
+			return current
+		}
+	}
+
+	// Check SHELL environment variable (login shell)
 	shell := os.Getenv("SHELL")
 	if shell != "" {
 		base := filepath.Base(shell)
 		switch base {
-		case "zsh", "bash":
+		case "zsh", "bash", "fish":
 			return base
 		}
 	}
@@ -188,6 +201,13 @@ func getRCFile(shell string) string {
 		}
 		// Default to .bashrc
 		return bashrc
+	case "fish":
+		// Fish config is in ~/.config/fish/config.fish
+		configDir := filepath.Join(home, ".config", "fish")
+		configFile := filepath.Join(configDir, "config.fish")
+		// Create directory if it doesn't exist
+		os.MkdirAll(configDir, 0755)
+		return configFile
 	default:
 		return ""
 	}
@@ -218,8 +238,14 @@ func isInstalled(rcFile, hookFile, shell string) (bool, string, error) {
 		fmt.Sprintf(`source "%s"`, hookFile),
 		fmt.Sprintf(`source '%s'`, hookFile),
 		fmt.Sprintf(". %s", hookFile),
-		fmt.Sprintf(`eval "$(clai init %s)"`, shell),
 		"clai init " + shell,
+	}
+
+	// Add shell-specific patterns
+	if shell == "fish" {
+		patterns = append(patterns, "clai init fish | source")
+	} else {
+		patterns = append(patterns, fmt.Sprintf(`eval "$(clai init %s)"`, shell))
 	}
 
 	scanner := bufio.NewScanner(f)

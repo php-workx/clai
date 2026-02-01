@@ -20,9 +20,10 @@ func TestDetectShell(t *testing.T) {
 		{"/bin/bash", "bash"},
 		{"/usr/bin/zsh", "zsh"},
 		{"/usr/local/bin/bash", "bash"},
-		{"/bin/fish", ""}, // fish not supported in install
-		{"/bin/sh", ""},   // sh not supported
-		{"", ""},          // empty
+		{"/bin/fish", "fish"},
+		{"/usr/local/bin/fish", "fish"},
+		{"/bin/sh", ""}, // sh not supported
+		{"", ""},        // empty
 	}
 
 	for _, tt := range tests {
@@ -48,7 +49,7 @@ func TestGetRCFile(t *testing.T) {
 	}{
 		{"zsh", ".zshrc"},
 		{"bash", ".bash"},
-		{"fish", ""}, // Should return empty for unsupported
+		{"fish", "config.fish"},
 	}
 
 	for _, tt := range tests {
@@ -71,7 +72,7 @@ func TestGetRCFile(t *testing.T) {
 }
 
 func TestGetHookContent(t *testing.T) {
-	tests := []string{"zsh", "bash"}
+	tests := []string{"zsh", "bash", "fish"}
 
 	for _, shell := range tests {
 		t.Run(shell, func(t *testing.T) {

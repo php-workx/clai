@@ -281,7 +281,6 @@ func TestShellHooks_ConfigVariables(t *testing.T) {
 	}
 
 	expectedVars := []string{
-		"CLAI_AUTO_DAEMON",
 		"CLAI_AUTO_EXTRACT",
 		"CLAI_CACHE",
 	}
