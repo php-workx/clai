@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/runger/clai/internal/claude"
 	"github.com/runger/clai/internal/config"
+	"github.com/runger/clai/internal/daemon"
 )
 
 var statusCmd = &cobra.Command{
@@ -37,9 +37,9 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%sclai Status%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
 
-	// Daemon status (Claude daemon for fast voice responses)
+	// Daemon status (clai daemon - handles shell integration requests)
 	fmt.Printf("\n%sDaemon:%s\n", colorBold, colorReset)
-	if claude.IsDaemonRunning() {
+	if daemon.IsRunning() {
 		fmt.Printf("  Status:  %srunning%s\n", colorGreen, colorReset)
 	} else {
 		fmt.Printf("  Status:  %snot running%s\n", colorDim, colorReset)
