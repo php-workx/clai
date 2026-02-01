@@ -420,19 +420,16 @@ func TestFish_DoctorShowsCorrectShell(t *testing.T) {
 		t.Skip("skipping interactive test in short mode")
 	}
 	SkipIfShellMissing(t, "fish")
+	SkipIfClaiMissing(t)
 
-	hookFile := FindHookFile("clai.fish")
-	if hookFile == "" {
-		t.Skip("clai.fish hook file not found")
-	}
-
-	session, err := NewSession("fish", WithTimeout(15*time.Second))
+	session, err := NewSession("fish",
+		WithTimeout(15*time.Second),
+		WithClaiInit(),
+	)
 	require.NoError(t, err, "failed to create fish session")
 	defer session.Close()
 
-	// Source the hook file
-	err = session.SendLine("source " + hookFile + " 2>/dev/null")
-	require.NoError(t, err)
+	// Wait for clai to load
 	time.Sleep(500 * time.Millisecond)
 
 	// Run clai doctor with a marker we can detect
@@ -446,6 +443,9 @@ func TestFish_DoctorShowsCorrectShell(t *testing.T) {
 	// Should NOT show zsh or bash
 	assert.NotContains(t, output, "zsh (.zshrc)", "doctor should not show zsh when in fish")
 	assert.NotContains(t, output, "bash (.bashrc)", "doctor should not show bash when in fish")
+
+	// Doctor should detect fish via CLAI_CURRENT_SHELL set by init
+	assert.Contains(t, output, "fish", "doctor should show fish shell integration")
 }
 
 // TestFish_InstallDetectsShell verifies clai install correctly detects fish
@@ -489,19 +489,16 @@ func TestFish_StatusShowsCorrectShell(t *testing.T) {
 		t.Skip("skipping interactive test in short mode")
 	}
 	SkipIfShellMissing(t, "fish")
+	SkipIfClaiMissing(t)
 
-	hookFile := FindHookFile("clai.fish")
-	if hookFile == "" {
-		t.Skip("clai.fish hook file not found")
-	}
-
-	session, err := NewSession("fish", WithTimeout(15*time.Second))
+	session, err := NewSession("fish",
+		WithTimeout(15*time.Second),
+		WithClaiInit(),
+	)
 	require.NoError(t, err, "failed to create fish session")
 	defer session.Close()
 
-	// Source the hook file
-	err = session.SendLine("source " + hookFile + " 2>/dev/null")
-	require.NoError(t, err)
+	// Wait for clai to load
 	time.Sleep(500 * time.Millisecond)
 
 	// Run clai status with a marker we can detect
@@ -515,4 +512,7 @@ func TestFish_StatusShowsCorrectShell(t *testing.T) {
 	// Should NOT show zsh or bash
 	assert.NotContains(t, output, "zsh (.zshrc)", "status should not show zsh when in fish")
 	assert.NotContains(t, output, "bash (.bashrc)", "status should not show bash when in fish")
+
+	// Status should detect fish via CLAI_CURRENT_SHELL set by init
+	assert.Contains(t, output, "fish", "status should show fish shell integration")
 }

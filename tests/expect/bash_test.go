@@ -328,26 +328,23 @@ func TestBash_DoctorShowsCorrectShell(t *testing.T) {
 		t.Skip("skipping interactive test in short mode")
 	}
 	SkipIfShellMissing(t, "bash")
+	SkipIfClaiMissing(t)
 
-	hookFile := FindHookFile("clai.bash")
-	if hookFile == "" {
-		t.Skip("clai.bash hook file not found")
-	}
-
-	session, err := NewSession("bash", WithTimeout(10*time.Second))
+	session, err := NewSession("bash",
+		WithTimeout(10*time.Second),
+		WithClaiInit(),
+	)
 	require.NoError(t, err, "failed to create bash session")
 	defer session.Close()
 
-	// Source the hook file
-	err = session.SendLine("source " + hookFile)
-	require.NoError(t, err)
+	// Wait for clai to load
 	time.Sleep(500 * time.Millisecond)
 
 	// Run clai doctor
 	err = session.SendLine("clai doctor")
 	require.NoError(t, err)
 
-	// Should show bash in shell integration status (or warn if not installed in bashrc)
+	// Should show bash in shell integration status
 	output, err := session.ExpectTimeout("Shell integration", 5*time.Second)
 	require.NoError(t, err, "expected Shell integration in output")
 
@@ -359,9 +356,8 @@ func TestBash_DoctorShowsCorrectShell(t *testing.T) {
 	assert.NotContains(t, combined, "zsh (.zshrc)", "doctor should not show zsh when in bash")
 	assert.NotContains(t, combined, "fish", "doctor should not show fish when in bash")
 
-	// Should either show bash or "Not installed" (if bashrc doesn't have clai)
-	hasBash := assert.ObjectsAreEqual(true, containsAny(combined, "bash", "Not installed"))
-	assert.True(t, hasBash, "doctor should show bash status or not installed")
+	// Doctor should detect bash via CLAI_CURRENT_SHELL set by init
+	assert.Contains(t, combined, "bash", "doctor should show bash shell integration")
 }
 
 // TestBash_InstallDetectsShell verifies clai install correctly detects bash
@@ -401,19 +397,16 @@ func TestBash_StatusShowsCorrectShell(t *testing.T) {
 		t.Skip("skipping interactive test in short mode")
 	}
 	SkipIfShellMissing(t, "bash")
+	SkipIfClaiMissing(t)
 
-	hookFile := FindHookFile("clai.bash")
-	if hookFile == "" {
-		t.Skip("clai.bash hook file not found")
-	}
-
-	session, err := NewSession("bash", WithTimeout(10*time.Second))
+	session, err := NewSession("bash",
+		WithTimeout(10*time.Second),
+		WithClaiInit(),
+	)
 	require.NoError(t, err, "failed to create bash session")
 	defer session.Close()
 
-	// Source the hook file
-	err = session.SendLine("source " + hookFile)
-	require.NoError(t, err)
+	// Wait for clai to load
 	time.Sleep(500 * time.Millisecond)
 
 	// Run clai status
@@ -431,24 +424,7 @@ func TestBash_StatusShowsCorrectShell(t *testing.T) {
 	// Should NOT show zsh or fish
 	assert.NotContains(t, combined, "zsh (.zshrc)", "status should not show zsh when in bash")
 	assert.NotContains(t, combined, "fish", "status should not show fish when in bash")
-}
 
-// containsAny checks if s contains any of the substrings
-func containsAny(s string, substrs ...string) bool {
-	for _, substr := range substrs {
-		if containsString(s, substr) {
-			return true
-		}
-	}
-	return false
-}
-
-// containsString checks if s contains substr
-func containsString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	// Status should detect bash via CLAI_CURRENT_SHELL set by init
+	assert.Contains(t, combined, "bash", "status should show bash shell integration")
 }

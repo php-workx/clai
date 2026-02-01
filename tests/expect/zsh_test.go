@@ -342,15 +342,11 @@ func TestZsh_DoctorShowsCorrectShell(t *testing.T) {
 		t.Skip("skipping interactive test in short mode")
 	}
 	SkipIfShellMissing(t, "zsh")
-
-	hookFile := FindHookFile("clai.zsh")
-	if hookFile == "" {
-		t.Skip("clai.zsh hook file not found")
-	}
+	SkipIfClaiMissing(t)
 
 	session, err := NewSession("zsh",
 		WithTimeout(10*time.Second),
-		WithRCFile(hookFile),
+		WithClaiInit(),
 	)
 	require.NoError(t, err, "failed to create zsh session")
 	defer session.Close()
@@ -367,11 +363,11 @@ func TestZsh_DoctorShowsCorrectShell(t *testing.T) {
 	output, err := session.ExpectTimeout("Shell integration", 5*time.Second)
 	require.NoError(t, err, "expected Shell integration in output")
 
-	// Verify it shows zsh (not bash or fish)
-	// The output should contain "zsh" after "Shell integration"
+	// Get more output - look for the prompt or end of doctor output
 	fullOutput, _ := session.ExpectTimeout("clai binary", 3*time.Second)
 	combined := output + fullOutput
 
+	// Doctor should detect zsh via CLAI_CURRENT_SHELL set by init
 	assert.Contains(t, combined, "zsh", "doctor should show zsh shell integration")
 	assert.NotContains(t, combined, "bash (.bashrc)", "doctor should not show bash when in zsh")
 	assert.NotContains(t, combined, "fish", "doctor should not show fish when in zsh")
@@ -383,15 +379,11 @@ func TestZsh_StatusShowsCorrectShell(t *testing.T) {
 		t.Skip("skipping interactive test in short mode")
 	}
 	SkipIfShellMissing(t, "zsh")
-
-	hookFile := FindHookFile("clai.zsh")
-	if hookFile == "" {
-		t.Skip("clai.zsh hook file not found")
-	}
+	SkipIfClaiMissing(t)
 
 	session, err := NewSession("zsh",
 		WithTimeout(10*time.Second),
-		WithRCFile(hookFile),
+		WithClaiInit(),
 	)
 	require.NoError(t, err, "failed to create zsh session")
 	defer session.Close()
@@ -412,6 +404,7 @@ func TestZsh_StatusShowsCorrectShell(t *testing.T) {
 	moreOutput, _ := session.ExpectTimeout("zsh", 3*time.Second)
 	combined := output + moreOutput
 
+	// Status should detect zsh via CLAI_CURRENT_SHELL set by init
 	assert.Contains(t, combined, "zsh", "status should show zsh shell integration")
 }
 

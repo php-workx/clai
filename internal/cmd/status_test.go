@@ -245,6 +245,85 @@ func TestCheckShellIntegrationWithPaths_NoCurrentShell(t *testing.T) {
 	}
 }
 
+func TestCheckShellIntegrationWithPaths_ActiveSession(t *testing.T) {
+	// When CLAI_CURRENT_SHELL and CLAI_SESSION_ID are set, should detect as active session
+	// without checking RC files (used when running via eval "$(clai init zsh)")
+	tmpDir := t.TempDir()
+	home := tmpDir
+
+	// No rc files exist
+	paths := &config.Paths{
+		BaseDir: tmpDir,
+	}
+
+	// Save and set env
+	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
+	origSessionID := os.Getenv("CLAI_SESSION_ID")
+	origHome := os.Getenv("HOME")
+	defer func() {
+		os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
+		if origSessionID != "" {
+			os.Setenv("CLAI_SESSION_ID", origSessionID)
+		} else {
+			os.Unsetenv("CLAI_SESSION_ID")
+		}
+		os.Setenv("HOME", origHome)
+	}()
+
+	os.Setenv("CLAI_CURRENT_SHELL", "zsh")
+	os.Setenv("CLAI_SESSION_ID", "test-session-123")
+	os.Setenv("HOME", home)
+
+	result := checkShellIntegrationWithPaths(paths)
+
+	// Should find "zsh (active session)"
+	if len(result) != 1 {
+		t.Errorf("expected 1 result for active session, got %v", result)
+	}
+	if len(result) > 0 && result[0] != "zsh (active session)" {
+		t.Errorf("expected 'zsh (active session)', got %q", result[0])
+	}
+}
+
+func TestCheckShellIntegrationWithPaths_SessionIDWithoutShell(t *testing.T) {
+	// When only CLAI_SESSION_ID is set (no CLAI_CURRENT_SHELL), should check RC files
+	tmpDir := t.TempDir()
+	home := tmpDir
+
+	paths := &config.Paths{
+		BaseDir: tmpDir,
+	}
+
+	// Save and set env
+	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
+	origSessionID := os.Getenv("CLAI_SESSION_ID")
+	origHome := os.Getenv("HOME")
+	defer func() {
+		if origClaiShell != "" {
+			os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
+		} else {
+			os.Unsetenv("CLAI_CURRENT_SHELL")
+		}
+		if origSessionID != "" {
+			os.Setenv("CLAI_SESSION_ID", origSessionID)
+		} else {
+			os.Unsetenv("CLAI_SESSION_ID")
+		}
+		os.Setenv("HOME", origHome)
+	}()
+
+	os.Unsetenv("CLAI_CURRENT_SHELL")
+	os.Setenv("CLAI_SESSION_ID", "test-session-123")
+	os.Setenv("HOME", home)
+
+	result := checkShellIntegrationWithPaths(paths)
+
+	// Should return empty since no RC files and no CLAI_CURRENT_SHELL
+	if len(result) != 0 {
+		t.Errorf("expected empty result when CLAI_CURRENT_SHELL unset, got %v", result)
+	}
+}
+
 // contains checks if s contains substr
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsString(s, substr))

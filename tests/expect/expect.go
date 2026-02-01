@@ -49,6 +49,7 @@ type sessionConfig struct {
 	env        []string
 	showOutput bool
 	rcFile     string
+	claiInit   bool // Use eval "$(clai init <shell>)" instead of sourcing RC file
 }
 
 // WithTimeout sets the default timeout for expect operations.
@@ -76,6 +77,14 @@ func WithOutput(show bool) SessionOption {
 func WithRCFile(path string) SessionOption {
 	return func(c *sessionConfig) {
 		c.rcFile = path
+	}
+}
+
+// WithClaiInit uses eval "$(clai init <shell>)" to load shell integration.
+// This is preferred over WithRCFile for tests that need proper session ID generation.
+func WithClaiInit() SessionOption {
+	return func(c *sessionConfig) {
+		c.claiInit = true
 	}
 }
 
@@ -151,8 +160,20 @@ func NewSession(shell string, opts ...SessionOption) (*ShellSession, error) {
 	// Wait for shell to be ready (look for prompt or timeout)
 	time.Sleep(100 * time.Millisecond)
 
-	// Source RC file if specified
-	if cfg.rcFile != "" {
+	// Load shell integration
+	if cfg.claiInit {
+		// Use eval "$(clai init <shell>)" for proper session ID generation
+		var initCmd string
+		switch shell {
+		case "fish":
+			initCmd = "clai init fish | source"
+		default:
+			initCmd = fmt.Sprintf(`eval "$(clai init %s)"`, shell)
+		}
+		session.SendLine(initCmd)
+		time.Sleep(300 * time.Millisecond)
+	} else if cfg.rcFile != "" {
+		// Source RC file directly (legacy, doesn't replace placeholders)
 		absPath, err := filepath.Abs(cfg.rcFile)
 		if err != nil {
 			session.Close()
@@ -292,6 +313,13 @@ func FindHookFile(name string) string {
 func SkipIfShellMissing(t interface{ Skip(args ...interface{}) }, shell string) {
 	if _, err := exec.LookPath(shell); err != nil {
 		t.Skip(fmt.Sprintf("%s not available, skipping", shell))
+	}
+}
+
+// SkipIfClaiMissing skips the test if clai binary is not available.
+func SkipIfClaiMissing(t interface{ Skip(args ...interface{}) }) {
+	if _, err := exec.LookPath("clai"); err != nil {
+		t.Skip("clai not available, skipping")
 	}
 }
 
