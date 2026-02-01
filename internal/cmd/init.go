@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-
-	"github.com/runger/clai/internal/ipc"
 )
 
 //go:embed shell/zsh/clai.zsh
@@ -37,10 +35,9 @@ Add this to your shell configuration file:
 func runInit(cmd *cobra.Command, args []string) error {
 	shell := args[0]
 
-	// Ensure the clai daemon is running (starts in background if needed)
-	// This is done silently - any errors are ignored since the daemon
-	// will be started lazily when needed anyway
-	_ = ipc.EnsureDaemon()
+	// NOTE: We do NOT start the daemon here to avoid blocking shell startup.
+	// The daemon is started lazily by clai-shim when it first connects,
+	// and shell scripts run clai-shim in the background anyway.
 
 	var filename string
 	switch shell {

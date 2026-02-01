@@ -6,49 +6,82 @@ import (
 	"time"
 
 	"github.com/runger/clai/internal/daemon"
+	"github.com/runger/clai/internal/ipc"
 )
 
-// TestDaemonStartsOnInit verifies that the clai daemon starts when clai init is called.
-// This tests the complete flow: clai init → EnsureDaemon → claid spawns
-func TestDaemonStartsOnInit(t *testing.T) {
+// TestInitIsFast verifies that clai init completes quickly and doesn't block on daemon.
+// This is critical for shell startup time - init should take <50ms even with stale socket.
+func TestInitIsFast(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping timing test in short mode")
+	}
+
+	claiPath, err := exec.LookPath("clai")
+	if err != nil {
+		t.Skip("clai binary not found in PATH")
+	}
+
+	// Test init timing - should complete in <50ms even in worst case
+	start := time.Now()
+	cmd := exec.Command(claiPath, "init", "zsh")
+	output, err := cmd.Output()
+	elapsed := time.Since(start)
+
+	if err != nil {
+		t.Fatalf("clai init zsh failed: %v", err)
+	}
+
+	// Should output shell script
+	if len(output) < 100 {
+		t.Error("clai init zsh output too short, expected shell script content")
+	}
+
+	// Should complete quickly (< 100ms even with cold start overhead)
+	if elapsed > 100*time.Millisecond {
+		t.Errorf("clai init took %v, should complete in <100ms to not block shell startup", elapsed)
+	}
+
+	t.Logf("clai init completed in %v", elapsed)
+}
+
+// TestDaemonStartsViaShim verifies that the daemon starts when clai-shim connects.
+// This is the expected startup path: shell script backgrounds clai-shim calls.
+func TestDaemonStartsViaShim(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping daemon lifecycle test in short mode")
 	}
 
-	// Find clai binary
-	claiPath, err := exec.LookPath("clai")
+	// Find required binaries
+	shimPath, err := exec.LookPath("clai-shim")
 	if err != nil {
-		t.Skip("clai binary not found in PATH, skipping test")
+		t.Skip("clai-shim binary not found in PATH")
 	}
 
-	// Find claid binary (required for daemon to spawn)
 	_, err = exec.LookPath("claid")
 	if err != nil {
-		t.Skip("claid binary not found in PATH, skipping test")
+		t.Skip("claid binary not found in PATH")
 	}
 
 	// Check initial daemon state
 	wasRunning := daemon.IsRunning()
 	t.Logf("Daemon was initially running: %v", wasRunning)
 
-	// Run clai init zsh (output is the shell script, we discard it)
-	cmd := exec.Command(claiPath, "init", "zsh")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("clai init zsh failed: %v\nOutput: %s", err, output)
-	}
+	// Call clai-shim (which internally calls EnsureDaemon via NewClient)
+	cmd := exec.Command(shimPath, "suggest",
+		"--session-id=test-session",
+		"--cwd=/tmp",
+		"--buffer=git",
+		"--cursor=3")
+	_, _ = cmd.Output() // Ignore output, just trigger connection
 
-	// Verify output contains expected shell script content
-	if len(output) < 100 {
-		t.Errorf("clai init zsh output too short, expected shell script content")
+	// Give daemon time to start if it wasn't running
+	if !wasRunning {
+		time.Sleep(500 * time.Millisecond)
 	}
-
-	// Give daemon time to start (EnsureDaemon spawns it in background)
-	time.Sleep(500 * time.Millisecond)
 
 	// Verify daemon is now running
-	if !daemon.IsRunning() {
-		t.Error("daemon should be running after clai init, but daemon.IsRunning() returned false")
+	if !daemon.IsRunning() && !ipc.IsDaemonRunning() {
+		t.Error("daemon should be running after clai-shim call")
 	}
 }
 
