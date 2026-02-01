@@ -21,8 +21,10 @@ RUN go mod download
 # Copy the rest of the source
 COPY . .
 
-# Build the clai binary
-RUN go build -o /usr/local/bin/clai ./cmd/clai
+# Build all binaries (clai, claid, clai-shim)
+RUN go build -o /usr/local/bin/clai ./cmd/clai && \
+    go build -o /usr/local/bin/claid ./cmd/claid && \
+    go build -o /usr/local/bin/clai-shim ./cmd/clai-shim
 
 # Default command: run interactive shell tests
 CMD ["go", "test", "-v", "./tests/expect/..."]
