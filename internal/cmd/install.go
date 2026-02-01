@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -145,7 +147,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 }
 
 func detectShell() string {
-	// First check CLAI_CURRENT_SHELL (set by shell integration)
+	// 1. Check CLAI_CURRENT_SHELL (set by shell integration)
 	if current := os.Getenv("CLAI_CURRENT_SHELL"); current != "" {
 		switch current {
 		case "zsh", "bash", "fish":
@@ -153,7 +155,25 @@ func detectShell() string {
 		}
 	}
 
-	// Check SHELL environment variable (login shell)
+	// 2. Check shell-specific version variables (exported by running shell)
+	// These are more reliable than $SHELL for detecting the current interactive shell
+	if os.Getenv("ZSH_VERSION") != "" {
+		return "zsh"
+	}
+	if os.Getenv("BASH_VERSION") != "" {
+		return "bash"
+	}
+	// Note: Fish does NOT export FISH_VERSION, so we check parent process below
+
+	// 3. Check parent process name (reliable for fish and as fallback)
+	if parent := getParentProcessName(); parent != "" {
+		switch parent {
+		case "zsh", "bash", "fish":
+			return parent
+		}
+	}
+
+	// 4. Fall back to SHELL environment variable (login shell - least reliable)
 	shell := os.Getenv("SHELL")
 	if shell != "" {
 		base := filepath.Base(shell)
@@ -163,12 +183,29 @@ func detectShell() string {
 		}
 	}
 
-	// On Windows, default to bash (Git Bash is common)
+	// 5. On Windows, default to bash (Git Bash is common)
 	if runtime.GOOS == "windows" {
 		return "bash"
 	}
 
 	return ""
+}
+
+// getParentProcessName returns the name of the parent process.
+// This is used to detect the current shell when version variables aren't available.
+func getParentProcessName() string {
+	ppid := os.Getppid()
+	// Use ps command (works on macOS and Linux)
+	cmd := exec.Command("ps", "-p", strconv.Itoa(ppid), "-o", "comm=")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	name := strings.TrimSpace(string(output))
+	// Handle paths like /bin/zsh -> zsh, and also -zsh -> zsh (login shell indicator)
+	name = filepath.Base(name)
+	name = strings.TrimPrefix(name, "-") // Remove leading dash from login shells
+	return name
 }
 
 func getRCFile(shell string) string {
