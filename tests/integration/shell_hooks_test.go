@@ -104,7 +104,7 @@ func TestShellHooks_ZshRequiredFunctions(t *testing.T) {
 		"_ai_forward_char",
 		"_ai_precmd",
 		"run()",
-		"history()",
+		"function history", // Uses function keyword to avoid alias expansion
 	}
 
 	for _, fn := range requiredFunctions {

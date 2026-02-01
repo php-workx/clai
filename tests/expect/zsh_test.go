@@ -40,6 +40,48 @@ func TestZsh_SourceWithoutError(t *testing.T) {
 		"should not have command not found errors")
 }
 
+// TestZsh_EvalWithHistoryAlias verifies `eval "$(clai init zsh)"` works when
+// the 'history' alias already exists (common in Oh My Zsh, Prezto, etc.).
+// This caught a real bug where `history()` function definition failed because
+// zsh expands aliases at parse time, before `unalias` can run.
+// The bug only manifests with `eval`, not `source`, because eval parses all
+// content at once before executing any of it.
+func TestZsh_EvalWithHistoryAlias(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "zsh")
+
+	hookFile := FindHookFile("clai.zsh")
+	if hookFile == "" {
+		t.Skip("clai.zsh hook file not found")
+	}
+
+	session, err := NewSession("zsh", WithTimeout(10*time.Second))
+	require.NoError(t, err, "failed to create zsh session")
+	defer session.Close()
+
+	// Simulate Oh My Zsh / common zshrc: alias history to fc -l
+	err = session.SendLine("alias history='fc -l'")
+	require.NoError(t, err)
+
+	// Use eval like the real install does: eval "$(clai init zsh)"
+	// The bug only manifests with eval, not source, because eval parses
+	// all content at once before executing any commands.
+	err = session.SendLine("eval \"$(cat " + hookFile + ")\"")
+	require.NoError(t, err)
+
+	// Wait for output
+	output, err := session.ExpectTimeout("clai [", 5*time.Second)
+	require.NoError(t, err, "expected clai startup message")
+
+	// Verify no parse errors from alias conflict
+	assert.NotContains(t, output, "defining function based on alias",
+		"should not have alias conflict error")
+	assert.NotContains(t, output, "parse error",
+		"should not have parse error")
+}
+
 // TestZsh_SuggestionAppearsInRightPrompt verifies suggestions appear in the right prompt.
 func TestZsh_SuggestionAppearsInRightPrompt(t *testing.T) {
 	if testing.Short() {

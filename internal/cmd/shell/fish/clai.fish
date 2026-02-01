@@ -12,6 +12,9 @@
 # Configuration
 # ============================================
 
+# Export current shell for clai doctor/status detection
+set -gx CLAI_CURRENT_SHELL fish
+
 if not set -q CLAI_AUTO_EXTRACT
     set -gx CLAI_AUTO_EXTRACT true
 end

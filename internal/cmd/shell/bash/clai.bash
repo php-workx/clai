@@ -12,6 +12,9 @@
 # Configuration
 # ============================================
 
+# Export current shell for clai doctor/status detection
+export CLAI_CURRENT_SHELL=bash
+
 : ${CLAI_AUTO_EXTRACT:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 

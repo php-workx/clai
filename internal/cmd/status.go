@@ -93,29 +93,60 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// detectCurrentShell returns the current shell name (zsh, bash, fish, etc.)
+// First checks CLAI_CURRENT_SHELL (set by shell integration scripts),
+// then falls back to SHELL environment variable.
+func detectCurrentShell() string {
+	// CLAI_CURRENT_SHELL is set by shell integration scripts and reflects
+	// the actual running shell, not the login shell
+	if shell := os.Getenv("CLAI_CURRENT_SHELL"); shell != "" {
+		return shell
+	}
+	// Fall back to SHELL (login shell) - less accurate but better than nothing
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		return ""
+	}
+	// Extract shell name from path (e.g., /bin/zsh -> zsh)
+	return filepath.Base(shell)
+}
+
 func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil
 	}
 
+	currentShell := detectCurrentShell()
 	var installed []string
 
 	// Check zsh
-	zshrc := filepath.Join(home, ".zshrc")
-	if ok, _, _ := isInstalled(zshrc, filepath.Join(paths.HooksDir(), "clai.zsh"), "zsh"); ok {
-		installed = append(installed, "zsh (.zshrc)")
+	if currentShell == "" || currentShell == "zsh" {
+		zshrc := filepath.Join(home, ".zshrc")
+		if ok, _, _ := isInstalled(zshrc, filepath.Join(paths.HooksDir(), "clai.zsh"), "zsh"); ok {
+			installed = append(installed, "zsh (.zshrc)")
+		}
 	}
 
 	// Check bash
-	bashrc := filepath.Join(home, ".bashrc")
-	if ok, _, _ := isInstalled(bashrc, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
-		installed = append(installed, "bash (.bashrc)")
+	if currentShell == "" || currentShell == "bash" {
+		bashrc := filepath.Join(home, ".bashrc")
+		if ok, _, _ := isInstalled(bashrc, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
+			installed = append(installed, "bash (.bashrc)")
+		}
+
+		bashProfile := filepath.Join(home, ".bash_profile")
+		if ok, _, _ := isInstalled(bashProfile, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
+			installed = append(installed, "bash (.bash_profile)")
+		}
 	}
 
-	bashProfile := filepath.Join(home, ".bash_profile")
-	if ok, _, _ := isInstalled(bashProfile, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
-		installed = append(installed, "bash (.bash_profile)")
+	// Check fish
+	if currentShell == "" || currentShell == "fish" {
+		fishConfig := filepath.Join(home, ".config", "fish", "config.fish")
+		if ok, _, _ := isInstalled(fishConfig, filepath.Join(paths.HooksDir(), "clai.fish"), "fish"); ok {
+			installed = append(installed, "fish (config.fish)")
+		}
 	}
 
 	return installed

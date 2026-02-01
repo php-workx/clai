@@ -16,6 +16,9 @@
 # Configuration
 # ============================================
 
+# Export current shell for clai doctor/status detection
+export CLAI_CURRENT_SHELL=zsh
+
 : ${CLAI_AUTO_EXTRACT:=true}
 : ${CLAI_AUTO_DAEMON:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
@@ -322,9 +325,11 @@ run() {
 # Intercept history command to show session-specific history
 # Falls back to shell history if no session history available
 # Use `history --global` or `history -g` for shell-native history
-# Note: In zsh, `history` is an alias to `fc -l`, so we unalias it first
+# Note: In zsh, `history` is often aliased to `fc -l`. We must use the
+# `function` keyword to prevent alias expansion during parsing (unalias
+# runs at execution time, but aliases expand at parse time).
 unalias history 2>/dev/null
-history() {
+function history {
     if [[ "$1" == "--global" || "$1" == "-g" ]]; then
         # Pass through to zsh's native history (fc -l)
         shift
