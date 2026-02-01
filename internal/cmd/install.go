@@ -46,7 +46,36 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	// Detect shell if not specified
 	shell := installShell
 	if shell == "" {
-		shell = detectShell()
+		var confident bool
+		shell, confident = detectShell()
+
+		// If detection fell back to $SHELL (login shell), confirm with user
+		if shell != "" && !confident {
+			fmt.Printf("Detected shell: %s (from login shell)\n", shell)
+			fmt.Printf("Is this the shell you want to install for? [Y/n] ")
+
+			reader := bufio.NewReader(os.Stdin)
+			response, _ := reader.ReadString('\n')
+			response = strings.TrimSpace(strings.ToLower(response))
+
+			if response == "n" || response == "no" {
+				for {
+					fmt.Println("\nSupported shells: zsh, bash, fish")
+					fmt.Print("Which shell would you like to install for? ")
+					shell, _ = reader.ReadString('\n')
+					shell = strings.TrimSpace(strings.ToLower(shell))
+
+					switch shell {
+					case "zsh", "bash", "fish":
+						// Valid choice
+					default:
+						fmt.Printf("Invalid shell: %q\n", shell)
+						continue
+					}
+					break
+				}
+			}
+		}
 	}
 
 	if shell == "" {
@@ -146,22 +175,25 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func detectShell() string {
+// detectShell returns the detected shell and whether the detection is confident.
+// confident=true means we detected via version variables or parent process.
+// confident=false means we fell back to $SHELL (login shell) which may differ from current shell.
+func detectShell() (shell string, confident bool) {
 	// 1. Check CLAI_CURRENT_SHELL (set by shell integration)
 	if current := os.Getenv("CLAI_CURRENT_SHELL"); current != "" {
 		switch current {
 		case "zsh", "bash", "fish":
-			return current
+			return current, true
 		}
 	}
 
 	// 2. Check shell-specific version variables (exported by running shell)
 	// These are more reliable than $SHELL for detecting the current interactive shell
 	if os.Getenv("ZSH_VERSION") != "" {
-		return "zsh"
+		return "zsh", true
 	}
 	if os.Getenv("BASH_VERSION") != "" {
-		return "bash"
+		return "bash", true
 	}
 	// Note: Fish does NOT export FISH_VERSION, so we check parent process below
 
@@ -169,26 +201,26 @@ func detectShell() string {
 	if parent := getParentProcessName(); parent != "" {
 		switch parent {
 		case "zsh", "bash", "fish":
-			return parent
+			return parent, true
 		}
 	}
 
 	// 4. Fall back to SHELL environment variable (login shell - least reliable)
-	shell := os.Getenv("SHELL")
-	if shell != "" {
-		base := filepath.Base(shell)
+	shellEnv := os.Getenv("SHELL")
+	if shellEnv != "" {
+		base := filepath.Base(shellEnv)
 		switch base {
 		case "zsh", "bash", "fish":
-			return base
+			return base, false // Not confident - this is login shell, not necessarily current
 		}
 	}
 
 	// 5. On Windows, default to bash (Git Bash is common)
 	if runtime.GOOS == "windows" {
-		return "bash"
+		return "bash", false
 	}
 
-	return ""
+	return "", false
 }
 
 // getParentProcessName returns the name of the parent process.

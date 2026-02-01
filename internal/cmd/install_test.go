@@ -8,30 +8,71 @@ import (
 )
 
 func TestDetectShell(t *testing.T) {
-	// Save original
+	// Save originals
 	origShell := os.Getenv("SHELL")
-	defer os.Setenv("SHELL", origShell)
+	origZshVersion := os.Getenv("ZSH_VERSION")
+	origBashVersion := os.Getenv("BASH_VERSION")
+	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
+	defer func() {
+		os.Setenv("SHELL", origShell)
+		os.Setenv("ZSH_VERSION", origZshVersion)
+		os.Setenv("BASH_VERSION", origBashVersion)
+		os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
+	}()
+
+	// Clear version variables for SHELL fallback tests
+	os.Unsetenv("ZSH_VERSION")
+	os.Unsetenv("BASH_VERSION")
+	os.Unsetenv("CLAI_CURRENT_SHELL")
 
 	tests := []struct {
-		shell    string
-		expected string
+		name            string
+		shell           string
+		zshVersion      string
+		bashVersion     string
+		claiShell       string
+		expected        string
+		expectConfident bool
 	}{
-		{"/bin/zsh", "zsh"},
-		{"/bin/bash", "bash"},
-		{"/usr/bin/zsh", "zsh"},
-		{"/usr/local/bin/bash", "bash"},
-		{"/bin/fish", "fish"},
-		{"/usr/local/bin/fish", "fish"},
-		{"/bin/sh", ""}, // sh not supported
-		{"", ""},        // empty
+		// SHELL fallback tests (not confident)
+		{"shell_zsh", "/bin/zsh", "", "", "", "zsh", false},
+		{"shell_bash", "/bin/bash", "", "", "", "bash", false},
+		{"shell_fish", "/bin/fish", "", "", "", "fish", false},
+		{"shell_sh", "/bin/sh", "", "", "", "", false},
+		{"shell_empty", "", "", "", "", "", false},
+		// Version variable tests (confident)
+		{"zsh_version", "/bin/bash", "5.9", "", "", "zsh", true},
+		{"bash_version", "/bin/zsh", "", "5.1.16", "", "bash", true},
+		// CLAI_CURRENT_SHELL tests (confident)
+		{"clai_zsh", "/bin/bash", "", "", "zsh", "zsh", true},
+		{"clai_fish", "/bin/zsh", "", "", "fish", "fish", true},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.shell, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			os.Setenv("SHELL", tt.shell)
-			got := detectShell()
+			if tt.zshVersion != "" {
+				os.Setenv("ZSH_VERSION", tt.zshVersion)
+			} else {
+				os.Unsetenv("ZSH_VERSION")
+			}
+			if tt.bashVersion != "" {
+				os.Setenv("BASH_VERSION", tt.bashVersion)
+			} else {
+				os.Unsetenv("BASH_VERSION")
+			}
+			if tt.claiShell != "" {
+				os.Setenv("CLAI_CURRENT_SHELL", tt.claiShell)
+			} else {
+				os.Unsetenv("CLAI_CURRENT_SHELL")
+			}
+
+			got, confident := detectShell()
 			if got != tt.expected {
-				t.Errorf("detectShell() with SHELL=%q = %q, want %q", tt.shell, got, tt.expected)
+				t.Errorf("detectShell() shell = %q, want %q", got, tt.expected)
+			}
+			if confident != tt.expectConfident {
+				t.Errorf("detectShell() confident = %v, want %v", confident, tt.expectConfident)
 			}
 		})
 	}
