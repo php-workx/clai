@@ -57,11 +57,10 @@ _clai_completion() {
     fi
 }
 
-# Register as default completion for commands
-complete -D -F _clai_completion
-
-# Also register for specific common commands to ensure it's used
-complete -F _clai_completion git npm yarn docker kubectl
+# Register completion for common commands
+# Note: complete -D (default completion) requires bash 4.0+
+# For compatibility with bash 3.2 (macOS default), we register specific commands
+complete -F _clai_completion git npm yarn docker kubectl make go cargo python pip
 
 # Show AI suggestion in prompt when available (for AI-generated suggestions)
 _ai_show_suggestion() {
@@ -266,6 +265,5 @@ voice() {
 # ============================================
 
 if [[ $- == *i* ]]; then
-    local short_id="${CLAI_SESSION_ID:0:8}"
-    echo -e "\033[2m🤖 clai [$short_id] Tab complete | accept | ?\"describe task\"\033[0m"
+    echo -e "\033[2m🤖 clai [${CLAI_SESSION_ID:0:8}] Tab complete | accept | ?\"describe task\"\033[0m"
 fi
