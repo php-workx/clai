@@ -68,7 +68,18 @@ func TestFindDaemonBinaryNotFound(t *testing.T) {
 	os.Setenv("PATH", "/nonexistent")
 	defer os.Setenv("PATH", oldPath)
 
-	_, err := findDaemonBinary()
+	// Set HOME to temp directory to avoid finding binary in ~/go/bin
+	tmpDir, err := os.MkdirTemp("", "clai-test-*")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
+
+	_, err = findDaemonBinary()
 	if err == nil {
 		t.Error("findDaemonBinary() should fail when binary not found")
 	}
@@ -110,6 +121,11 @@ func TestSpawnDaemonMissingBinary(t *testing.T) {
 	oldXDG := os.Getenv("XDG_RUNTIME_DIR")
 	os.Setenv("XDG_RUNTIME_DIR", tmpDir)
 	defer os.Setenv("XDG_RUNTIME_DIR", oldXDG)
+
+	// Set HOME to temp directory to avoid finding binary in ~/go/bin
+	oldHome := os.Getenv("HOME")
+	os.Setenv("HOME", tmpDir)
+	defer os.Setenv("HOME", oldHome)
 
 	// This should fail because daemon binary doesn't exist
 	err = SpawnDaemon()

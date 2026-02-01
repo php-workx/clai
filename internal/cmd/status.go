@@ -43,7 +43,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		fmt.Printf("  Status:  %srunning%s\n", colorGreen, colorReset)
 	} else {
 		fmt.Printf("  Status:  %snot running%s\n", colorDim, colorReset)
-		fmt.Printf("  Run 'clai daemon start' to enable fast voice responses.\n")
+		fmt.Printf("  Starts automatically when shell integration loads.\n")
 	}
 
 	// Configuration
