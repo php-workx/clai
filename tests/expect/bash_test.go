@@ -321,3 +321,103 @@ func TestBash_PromptCommandSet(t *testing.T) {
 	require.NoError(t, err, "expected prompt command to be set")
 	assert.Contains(t, output, "_ai_prompt_command", "PROMPT_COMMAND should include our function")
 }
+
+// TestBash_DoctorShowsCorrectShell verifies clai doctor detects bash correctly.
+func TestBash_DoctorShowsCorrectShell(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "bash")
+
+	hookFile := FindHookFile("clai.bash")
+	if hookFile == "" {
+		t.Skip("clai.bash hook file not found")
+	}
+
+	session, err := NewSession("bash", WithTimeout(10*time.Second))
+	require.NoError(t, err, "failed to create bash session")
+	defer session.Close()
+
+	// Source the hook file
+	err = session.SendLine("source " + hookFile)
+	require.NoError(t, err)
+	time.Sleep(500 * time.Millisecond)
+
+	// Run clai doctor
+	err = session.SendLine("clai doctor")
+	require.NoError(t, err)
+
+	// Should show bash in shell integration status (or warn if not installed in bashrc)
+	output, err := session.ExpectTimeout("Shell integration", 5*time.Second)
+	require.NoError(t, err, "expected Shell integration in output")
+
+	// Get more output to see the shell status
+	moreOutput, _ := session.ExpectTimeout("Daemon", 3*time.Second)
+	combined := output + moreOutput
+
+	// Should NOT show zsh or fish
+	assert.NotContains(t, combined, "zsh (.zshrc)", "doctor should not show zsh when in bash")
+	assert.NotContains(t, combined, "fish", "doctor should not show fish when in bash")
+
+	// Should either show bash or "Not installed" (if bashrc doesn't have clai)
+	hasBash := assert.ObjectsAreEqual(true, containsAny(combined, "bash", "Not installed"))
+	assert.True(t, hasBash, "doctor should show bash status or not installed")
+}
+
+// TestBash_StatusShowsCorrectShell verifies clai status detects bash correctly.
+func TestBash_StatusShowsCorrectShell(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "bash")
+
+	hookFile := FindHookFile("clai.bash")
+	if hookFile == "" {
+		t.Skip("clai.bash hook file not found")
+	}
+
+	session, err := NewSession("bash", WithTimeout(10*time.Second))
+	require.NoError(t, err, "failed to create bash session")
+	defer session.Close()
+
+	// Source the hook file
+	err = session.SendLine("source " + hookFile)
+	require.NoError(t, err)
+	time.Sleep(500 * time.Millisecond)
+
+	// Run clai status
+	err = session.SendLine("clai status")
+	require.NoError(t, err)
+
+	// Should show Shell Integration section
+	output, err := session.ExpectTimeout("Shell Integration", 5*time.Second)
+	require.NoError(t, err, "expected Shell Integration in output")
+
+	// Get more output
+	moreOutput, _ := session.ExpectTimeout("Quick Stats", 3*time.Second)
+	combined := output + moreOutput
+
+	// Should NOT show zsh or fish
+	assert.NotContains(t, combined, "zsh (.zshrc)", "status should not show zsh when in bash")
+	assert.NotContains(t, combined, "fish", "status should not show fish when in bash")
+}
+
+// containsAny checks if s contains any of the substrings
+func containsAny(s string, substrs ...string) bool {
+	for _, substr := range substrs {
+		if containsString(s, substr) {
+			return true
+		}
+	}
+	return false
+}
+
+// containsString checks if s contains substr
+func containsString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}

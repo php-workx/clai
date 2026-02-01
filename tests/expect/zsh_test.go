@@ -336,6 +336,85 @@ func TestZsh_CtrlSpaceShowsMenu(t *testing.T) {
 	session.SendKey(KeyCtrlC)
 }
 
+// TestZsh_DoctorShowsCorrectShell verifies clai doctor detects zsh correctly.
+func TestZsh_DoctorShowsCorrectShell(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "zsh")
+
+	hookFile := FindHookFile("clai.zsh")
+	if hookFile == "" {
+		t.Skip("clai.zsh hook file not found")
+	}
+
+	session, err := NewSession("zsh",
+		WithTimeout(10*time.Second),
+		WithRCFile(hookFile),
+	)
+	require.NoError(t, err, "failed to create zsh session")
+	defer session.Close()
+
+	// Wait for clai to load
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
+	require.NoError(t, err)
+
+	// Run clai doctor
+	err = session.SendLine("clai doctor")
+	require.NoError(t, err)
+
+	// Should show zsh in shell integration status
+	output, err := session.ExpectTimeout("Shell integration", 5*time.Second)
+	require.NoError(t, err, "expected Shell integration in output")
+
+	// Verify it shows zsh (not bash or fish)
+	// The output should contain "zsh" after "Shell integration"
+	fullOutput, _ := session.ExpectTimeout("clai binary", 3*time.Second)
+	combined := output + fullOutput
+
+	assert.Contains(t, combined, "zsh", "doctor should show zsh shell integration")
+	assert.NotContains(t, combined, "bash (.bashrc)", "doctor should not show bash when in zsh")
+	assert.NotContains(t, combined, "fish", "doctor should not show fish when in zsh")
+}
+
+// TestZsh_StatusShowsCorrectShell verifies clai status detects zsh correctly.
+func TestZsh_StatusShowsCorrectShell(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "zsh")
+
+	hookFile := FindHookFile("clai.zsh")
+	if hookFile == "" {
+		t.Skip("clai.zsh hook file not found")
+	}
+
+	session, err := NewSession("zsh",
+		WithTimeout(10*time.Second),
+		WithRCFile(hookFile),
+	)
+	require.NoError(t, err, "failed to create zsh session")
+	defer session.Close()
+
+	// Wait for clai to load
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
+	require.NoError(t, err)
+
+	// Run clai status
+	err = session.SendLine("clai status")
+	require.NoError(t, err)
+
+	// Should show zsh in shell integration section
+	output, err := session.ExpectTimeout("Shell Integration", 5*time.Second)
+	require.NoError(t, err, "expected Shell Integration in output")
+
+	// Get more output
+	moreOutput, _ := session.ExpectTimeout("zsh", 3*time.Second)
+	combined := output + moreOutput
+
+	assert.Contains(t, combined, "zsh", "status should show zsh shell integration")
+}
+
 // TestZsh_ZLEResetPromptWithWidgetGuard verifies zle reset-prompt is guarded.
 func TestZsh_ZLEResetPromptWithWidgetGuard(t *testing.T) {
 	if testing.Short() {

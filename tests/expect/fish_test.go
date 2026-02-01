@@ -413,3 +413,71 @@ func TestFish_SessionIDExists(t *testing.T) {
 	require.NoError(t, err, "expected CLAI_SESSION_ID to be set")
 	assert.Contains(t, output, "SESSION_SET", "CLAI_SESSION_ID should be set")
 }
+
+// TestFish_DoctorShowsCorrectShell verifies clai doctor detects fish correctly.
+func TestFish_DoctorShowsCorrectShell(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "fish")
+
+	hookFile := FindHookFile("clai.fish")
+	if hookFile == "" {
+		t.Skip("clai.fish hook file not found")
+	}
+
+	session, err := NewSession("fish", WithTimeout(15*time.Second))
+	require.NoError(t, err, "failed to create fish session")
+	defer session.Close()
+
+	// Source the hook file
+	err = session.SendLine("source " + hookFile + " 2>/dev/null")
+	require.NoError(t, err)
+	time.Sleep(500 * time.Millisecond)
+
+	// Run clai doctor with a marker we can detect
+	err = session.SendLine("clai doctor; echo DOCTOR_DONE")
+	require.NoError(t, err)
+
+	// Wait for our marker
+	output, err := session.ExpectTimeout("DOCTOR_DONE", 10*time.Second)
+	require.NoError(t, err, "expected doctor to complete")
+
+	// Should NOT show zsh or bash
+	assert.NotContains(t, output, "zsh (.zshrc)", "doctor should not show zsh when in fish")
+	assert.NotContains(t, output, "bash (.bashrc)", "doctor should not show bash when in fish")
+}
+
+// TestFish_StatusShowsCorrectShell verifies clai status detects fish correctly.
+func TestFish_StatusShowsCorrectShell(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "fish")
+
+	hookFile := FindHookFile("clai.fish")
+	if hookFile == "" {
+		t.Skip("clai.fish hook file not found")
+	}
+
+	session, err := NewSession("fish", WithTimeout(15*time.Second))
+	require.NoError(t, err, "failed to create fish session")
+	defer session.Close()
+
+	// Source the hook file
+	err = session.SendLine("source " + hookFile + " 2>/dev/null")
+	require.NoError(t, err)
+	time.Sleep(500 * time.Millisecond)
+
+	// Run clai status with a marker we can detect
+	err = session.SendLine("clai status; echo STATUS_DONE")
+	require.NoError(t, err)
+
+	// Wait for our marker
+	output, err := session.ExpectTimeout("STATUS_DONE", 10*time.Second)
+	require.NoError(t, err, "expected status to complete")
+
+	// Should NOT show zsh or bash
+	assert.NotContains(t, output, "zsh (.zshrc)", "status should not show zsh when in fish")
+	assert.NotContains(t, output, "bash (.bashrc)", "status should not show bash when in fish")
+}
