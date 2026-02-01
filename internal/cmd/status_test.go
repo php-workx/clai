@@ -8,70 +8,90 @@ import (
 	"github.com/runger/clai/internal/config"
 )
 
-func TestDetectCurrentShell(t *testing.T) {
+func TestDetectShell_Fallback(t *testing.T) {
 	tests := []struct {
 		name             string
-		claiCurrentShell string
 		shell            string
-		want             string
+		claiCurrentShell string
+		sessionID        string
+		wantShell        string
+		wantActive       bool
 	}{
 		{
-			name:             "CLAI_CURRENT_SHELL takes precedence",
-			claiCurrentShell: "fish",
+			name:       "falls back to SHELL env var",
+			shell:      "/bin/bash",
+			wantShell:  "bash",
+			wantActive: false,
+		},
+		{
+			name:       "extracts shell name from full path",
+			shell:      "/usr/local/bin/zsh",
+			wantShell:  "zsh",
+			wantActive: false,
+		},
+		{
+			name:             "active when CLAI_CURRENT_SHELL matches SHELL",
 			shell:            "/bin/zsh",
-			want:             "fish",
-		},
-		{
-			name:             "falls back to SHELL when CLAI_CURRENT_SHELL unset",
-			claiCurrentShell: "",
-			shell:            "/bin/bash",
-			want:             "bash",
-		},
-		{
-			name:             "extracts shell name from full path",
-			claiCurrentShell: "",
-			shell:            "/usr/local/bin/zsh",
-			want:             "zsh",
-		},
-		{
-			name:             "returns empty when both unset",
-			claiCurrentShell: "",
-			shell:            "",
-			want:             "",
-		},
-		{
-			name:             "CLAI_CURRENT_SHELL is already just the name",
 			claiCurrentShell: "zsh",
+			sessionID:        "test-session",
+			wantShell:        "zsh",
+			wantActive:       true,
+		},
+		{
+			name:             "not active when CLAI_CURRENT_SHELL differs from detected shell",
 			shell:            "/bin/bash",
-			want:             "zsh",
+			claiCurrentShell: "zsh",
+			sessionID:        "test-session",
+			wantShell:        "bash",
+			wantActive:       false, // CLAI_CURRENT_SHELL=zsh doesn't match detected shell=bash
+		},
+		{
+			name:             "not active without session ID",
+			shell:            "/bin/zsh",
+			claiCurrentShell: "zsh",
+			sessionID:        "",
+			wantShell:        "zsh",
+			wantActive:       false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save original env
-			origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
 			origShell := os.Getenv("SHELL")
+			origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
+			origSessionID := os.Getenv("CLAI_SESSION_ID")
 			defer func() {
-				os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
-				os.Setenv("SHELL", origShell)
+				restoreEnv("SHELL", origShell)
+				restoreEnv("CLAI_CURRENT_SHELL", origClaiShell)
+				restoreEnv("CLAI_SESSION_ID", origSessionID)
 			}()
 
 			// Set test env
-			if tt.claiCurrentShell != "" {
-				os.Setenv("CLAI_CURRENT_SHELL", tt.claiCurrentShell)
-			} else {
-				os.Unsetenv("CLAI_CURRENT_SHELL")
-			}
 			if tt.shell != "" {
 				os.Setenv("SHELL", tt.shell)
 			} else {
 				os.Unsetenv("SHELL")
 			}
+			if tt.claiCurrentShell != "" {
+				os.Setenv("CLAI_CURRENT_SHELL", tt.claiCurrentShell)
+			} else {
+				os.Unsetenv("CLAI_CURRENT_SHELL")
+			}
+			if tt.sessionID != "" {
+				os.Setenv("CLAI_SESSION_ID", tt.sessionID)
+			} else {
+				os.Unsetenv("CLAI_SESSION_ID")
+			}
 
-			got := detectCurrentShell()
-			if got != tt.want {
-				t.Errorf("detectCurrentShell() = %q, want %q", got, tt.want)
+			// Note: In test environment, parent process detection returns "go" not a shell,
+			// so we're testing the $SHELL fallback path
+			got := DetectShell()
+			if got.Shell != tt.wantShell {
+				t.Errorf("DetectShell().Shell = %q, want %q", got.Shell, tt.wantShell)
+			}
+			if got.Active != tt.wantActive {
+				t.Errorf("DetectShell().Active = %v, want %v", got.Active, tt.wantActive)
 			}
 		})
 	}
@@ -113,44 +133,52 @@ clai init fish | source
 	}
 
 	tests := []struct {
-		name             string
-		claiCurrentShell string
-		wantShells       []string
-		wantEmpty        bool
+		name       string
+		shell      string // SHELL env var - DetectShell() falls back to this in tests
+		wantShells []string
+		wantEmpty  bool
 	}{
 		{
-			name:             "zsh only checks zsh",
-			claiCurrentShell: "zsh",
-			wantShells:       []string{"zsh"},
+			name:       "zsh only checks zsh",
+			shell:      "/bin/zsh",
+			wantShells: []string{"zsh"},
 		},
 		{
-			name:             "bash only checks bash",
-			claiCurrentShell: "bash",
-			wantShells:       []string{"bash"},
+			name:       "bash only checks bash",
+			shell:      "/bin/bash",
+			wantShells: []string{"bash"},
 		},
 		{
-			name:             "fish only checks fish",
-			claiCurrentShell: "fish",
-			wantShells:       []string{"fish"},
+			name:       "fish only checks fish",
+			shell:      "/bin/fish",
+			wantShells: []string{"fish"},
 		},
 		{
-			name:             "unknown shell returns empty",
-			claiCurrentShell: "ksh",
-			wantEmpty:        true,
+			name:       "unknown shell checks all shells",
+			shell:      "/bin/ksh",
+			wantShells: []string{"zsh", "bash", "fish"}, // When shell unknown, check all
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save and set env
+			origShell := os.Getenv("SHELL")
 			origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
+			origSessionID := os.Getenv("CLAI_SESSION_ID")
 			origHome := os.Getenv("HOME")
 			defer func() {
-				os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
+				restoreEnv("SHELL", origShell)
+				restoreEnv("CLAI_CURRENT_SHELL", origClaiShell)
+				restoreEnv("CLAI_SESSION_ID", origSessionID)
 				os.Setenv("HOME", origHome)
 			}()
 
-			os.Setenv("CLAI_CURRENT_SHELL", tt.claiCurrentShell)
+			// Set SHELL for detection (parent process detection returns "go" in tests)
+			os.Setenv("SHELL", tt.shell)
+			// Clear clai env vars to test RC file detection
+			os.Unsetenv("CLAI_CURRENT_SHELL")
+			os.Unsetenv("CLAI_SESSION_ID")
 			os.Setenv("HOME", home)
 
 			result := checkShellIntegrationWithPaths(paths)
@@ -218,15 +246,18 @@ func TestCheckShellIntegrationWithPaths_NoCurrentShell(t *testing.T) {
 
 	// Save and unset env
 	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
+	origSessionID := os.Getenv("CLAI_SESSION_ID")
 	origShell := os.Getenv("SHELL")
 	origHome := os.Getenv("HOME")
 	defer func() {
-		os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
-		os.Setenv("SHELL", origShell)
+		restoreEnv("CLAI_CURRENT_SHELL", origClaiShell)
+		restoreEnv("CLAI_SESSION_ID", origSessionID)
+		restoreEnv("SHELL", origShell)
 		os.Setenv("HOME", origHome)
 	}()
 
 	os.Unsetenv("CLAI_CURRENT_SHELL")
+	os.Unsetenv("CLAI_SESSION_ID")
 	os.Unsetenv("SHELL")
 	os.Setenv("HOME", home)
 
@@ -246,8 +277,10 @@ func TestCheckShellIntegrationWithPaths_NoCurrentShell(t *testing.T) {
 }
 
 func TestCheckShellIntegrationWithPaths_ActiveSession(t *testing.T) {
-	// When running in zsh (ZSH_VERSION set) with CLAI_CURRENT_SHELL=zsh and
-	// CLAI_SESSION_ID set, should detect as active session
+	// When SHELL is zsh, CLAI_CURRENT_SHELL=zsh, and CLAI_SESSION_ID is set,
+	// should detect as active session.
+	// Note: In test environment, parent process detection won't work (parent is "go"),
+	// so we rely on $SHELL fallback.
 	tmpDir := t.TempDir()
 	home := tmpDir
 
@@ -259,17 +292,17 @@ func TestCheckShellIntegrationWithPaths_ActiveSession(t *testing.T) {
 	// Save and set env
 	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
 	origSessionID := os.Getenv("CLAI_SESSION_ID")
-	origZshVersion := os.Getenv("ZSH_VERSION")
+	origShell := os.Getenv("SHELL")
 	origHome := os.Getenv("HOME")
 	defer func() {
 		restoreEnv("CLAI_CURRENT_SHELL", origClaiShell)
 		restoreEnv("CLAI_SESSION_ID", origSessionID)
-		restoreEnv("ZSH_VERSION", origZshVersion)
+		restoreEnv("SHELL", origShell)
 		os.Setenv("HOME", origHome)
 	}()
 
 	// Simulate being in zsh with active clai session
-	os.Setenv("ZSH_VERSION", "5.9")
+	os.Setenv("SHELL", "/bin/zsh")
 	os.Setenv("CLAI_CURRENT_SHELL", "zsh")
 	os.Setenv("CLAI_SESSION_ID", "test-session-123")
 	os.Setenv("HOME", home)
@@ -286,7 +319,7 @@ func TestCheckShellIntegrationWithPaths_ActiveSession(t *testing.T) {
 }
 
 func TestCheckShellIntegrationWithPaths_InheritedSessionNotActive(t *testing.T) {
-	// When in bash (BASH_VERSION set) but CLAI_CURRENT_SHELL=zsh (inherited from parent),
+	// When in bash (detected via SHELL) but CLAI_CURRENT_SHELL=zsh (inherited from parent),
 	// should NOT report active session - the clai session is not active in bash
 	tmpDir := t.TempDir()
 	home := tmpDir
@@ -296,23 +329,21 @@ func TestCheckShellIntegrationWithPaths_InheritedSessionNotActive(t *testing.T) 
 	}
 
 	// Save and set env
+	origShell := os.Getenv("SHELL")
 	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
 	origSessionID := os.Getenv("CLAI_SESSION_ID")
-	origBashVersion := os.Getenv("BASH_VERSION")
-	origZshVersion := os.Getenv("ZSH_VERSION")
 	origHome := os.Getenv("HOME")
 	defer func() {
+		restoreEnv("SHELL", origShell)
 		restoreEnv("CLAI_CURRENT_SHELL", origClaiShell)
 		restoreEnv("CLAI_SESSION_ID", origSessionID)
-		restoreEnv("BASH_VERSION", origBashVersion)
-		restoreEnv("ZSH_VERSION", origZshVersion)
 		os.Setenv("HOME", origHome)
 	}()
 
 	// Simulate being in bash with inherited zsh clai session
-	os.Setenv("BASH_VERSION", "5.2.0")
-	os.Unsetenv("ZSH_VERSION")             // Not in zsh
-	os.Setenv("CLAI_CURRENT_SHELL", "zsh") // Inherited from parent
+	// In tests, parent process detection returns "go", so we rely on $SHELL
+	os.Setenv("SHELL", "/bin/bash")
+	os.Setenv("CLAI_CURRENT_SHELL", "zsh") // Inherited from parent - doesn't match bash
 	os.Setenv("CLAI_SESSION_ID", "test-session-123")
 	os.Setenv("HOME", home)
 

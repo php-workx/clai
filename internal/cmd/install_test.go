@@ -10,71 +10,57 @@ import (
 func TestDetectShell(t *testing.T) {
 	// Save originals
 	origShell := os.Getenv("SHELL")
-	origZshVersion := os.Getenv("ZSH_VERSION")
-	origBashVersion := os.Getenv("BASH_VERSION")
 	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
+	origSessionID := os.Getenv("CLAI_SESSION_ID")
 	defer func() {
-		os.Setenv("SHELL", origShell)
-		os.Setenv("ZSH_VERSION", origZshVersion)
-		os.Setenv("BASH_VERSION", origBashVersion)
-		os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
+		restoreEnvInstall("SHELL", origShell)
+		restoreEnvInstall("CLAI_CURRENT_SHELL", origClaiShell)
+		restoreEnvInstall("CLAI_SESSION_ID", origSessionID)
 	}()
 
-	// Clear version variables for SHELL fallback tests
-	os.Unsetenv("ZSH_VERSION")
-	os.Unsetenv("BASH_VERSION")
+	// Clear env vars for tests
 	os.Unsetenv("CLAI_CURRENT_SHELL")
+	os.Unsetenv("CLAI_SESSION_ID")
 
 	tests := []struct {
 		name            string
 		shell           string
-		zshVersion      string
-		bashVersion     string
-		claiShell       string
 		expected        string
 		expectConfident bool
 	}{
-		// SHELL fallback tests (not confident)
-		{"shell_zsh", "/bin/zsh", "", "", "", "zsh", false},
-		{"shell_bash", "/bin/bash", "", "", "", "bash", false},
-		{"shell_fish", "/bin/fish", "", "", "", "fish", false},
-		{"shell_sh", "/bin/sh", "", "", "", "", false},
-		{"shell_empty", "", "", "", "", "", false},
-		// Version variable tests (confident)
-		{"zsh_version", "/bin/bash", "5.9", "", "", "zsh", true},
-		{"bash_version", "/bin/zsh", "", "5.1.16", "", "bash", true},
-		// CLAI_CURRENT_SHELL tests (confident)
-		{"clai_zsh", "/bin/bash", "", "", "zsh", "zsh", true},
-		{"clai_fish", "/bin/zsh", "", "", "fish", "fish", true},
+		// SHELL fallback tests (not confident - parent process detection returns "go" in test)
+		{"shell_zsh", "/bin/zsh", "zsh", false},
+		{"shell_bash", "/bin/bash", "bash", false},
+		{"shell_fish", "/bin/fish", "fish", false},
+		{"shell_sh", "/bin/sh", "", false},
+		{"shell_empty", "", "", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("SHELL", tt.shell)
-			if tt.zshVersion != "" {
-				os.Setenv("ZSH_VERSION", tt.zshVersion)
+			if tt.shell != "" {
+				os.Setenv("SHELL", tt.shell)
 			} else {
-				os.Unsetenv("ZSH_VERSION")
-			}
-			if tt.bashVersion != "" {
-				os.Setenv("BASH_VERSION", tt.bashVersion)
-			} else {
-				os.Unsetenv("BASH_VERSION")
-			}
-			if tt.claiShell != "" {
-				os.Setenv("CLAI_CURRENT_SHELL", tt.claiShell)
-			} else {
-				os.Unsetenv("CLAI_CURRENT_SHELL")
+				os.Unsetenv("SHELL")
 			}
 
-			got, confident := detectShell()
-			if got != tt.expected {
-				t.Errorf("detectShell() shell = %q, want %q", got, tt.expected)
+			got := DetectShell()
+			if got.Shell != tt.expected {
+				t.Errorf("DetectShell() shell = %q, want %q", got.Shell, tt.expected)
 			}
-			if confident != tt.expectConfident {
-				t.Errorf("detectShell() confident = %v, want %v", confident, tt.expectConfident)
+			if got.Confident != tt.expectConfident {
+				t.Errorf("DetectShell() confident = %v, want %v", got.Confident, tt.expectConfident)
 			}
 		})
+	}
+}
+
+// restoreEnvInstall restores an environment variable to its original value
+func restoreEnvInstall(key, value string) {
+	if value != "" {
+		os.Setenv(key, value)
+	} else {
+		os.Unsetenv(key)
 	}
 }
 
@@ -246,49 +232,37 @@ func TestValidateShellInput(t *testing.T) {
 }
 
 func TestDetectShell_ParentProcessFallback(t *testing.T) {
-	// This test verifies that when version variables aren't set,
-	// we fall back to parent process detection (which should work for the test runner)
+	// This test verifies that when SHELL is set to unsupported shell,
+	// we still try parent process detection first
 
 	// Save and clear all detection variables
 	origShell := os.Getenv("SHELL")
-	origZshVersion := os.Getenv("ZSH_VERSION")
-	origBashVersion := os.Getenv("BASH_VERSION")
 	origClaiShell := os.Getenv("CLAI_CURRENT_SHELL")
 	defer func() {
-		os.Setenv("SHELL", origShell)
-		if origZshVersion != "" {
-			os.Setenv("ZSH_VERSION", origZshVersion)
-		}
-		if origBashVersion != "" {
-			os.Setenv("BASH_VERSION", origBashVersion)
-		}
-		if origClaiShell != "" {
-			os.Setenv("CLAI_CURRENT_SHELL", origClaiShell)
-		}
+		restoreEnvInstall("SHELL", origShell)
+		restoreEnvInstall("CLAI_CURRENT_SHELL", origClaiShell)
 	}()
 
 	// Clear all variables to force parent process detection
 	os.Unsetenv("CLAI_CURRENT_SHELL")
-	os.Unsetenv("ZSH_VERSION")
-	os.Unsetenv("BASH_VERSION")
 	os.Setenv("SHELL", "/bin/sh") // Set to unsupported shell
 
 	// The detection should either:
 	// 1. Detect parent process (if running from zsh/bash/fish) - confident=true
 	// 2. Fall back to SHELL=/bin/sh which is unsupported - shell="", confident=false
-	shell, confident := detectShell()
+	detection := DetectShell()
 
 	// We can't know for sure what the test runner's parent is, but we can verify
 	// the function doesn't crash and returns sensible values
-	t.Logf("detectShell with cleared vars: shell=%q, confident=%v", shell, confident)
+	t.Logf("DetectShell with cleared vars: shell=%q, confident=%v", detection.Shell, detection.Confident)
 
 	// If we got a shell, it should be one of the supported ones
-	if shell != "" {
-		switch shell {
+	if detection.Shell != "" {
+		switch detection.Shell {
 		case "zsh", "bash", "fish":
 			// Valid
 		default:
-			t.Errorf("detected unsupported shell: %q", shell)
+			t.Errorf("detected unsupported shell: %q", detection.Shell)
 		}
 	}
 }
