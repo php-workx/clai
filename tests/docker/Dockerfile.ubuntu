@@ -1,6 +1,6 @@
 # Dockerfile for Ubuntu interactive shell tests
-# Uses official Go image with Ubuntu-like Debian base, then adds shells
-FROM golang:1.24-bookworm
+# Minimal image with shells only - binaries mounted at runtime
+FROM ubuntu:22.04
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -11,20 +11,7 @@ RUN apt-get update && apt-get install -y \
     fish \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
 WORKDIR /app
 
-# Copy go.mod and go.sum first for better caching
-COPY go.mod go.sum ./
-RUN go mod download
-
-# Copy the rest of the source
-COPY . .
-
-# Build all binaries (clai, claid, clai-shim)
-RUN go build -o /usr/local/bin/clai ./cmd/clai && \
-    go build -o /usr/local/bin/claid ./cmd/claid && \
-    go build -o /usr/local/bin/clai-shim ./cmd/clai-shim
-
-# Default command: run interactive shell tests
-CMD ["go", "test", "-v", "./tests/expect/..."]
+# Binaries mounted to /usr/local/bin at runtime via docker-compose
+CMD ["expect.test", "-test.v"]

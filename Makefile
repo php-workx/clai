@@ -6,7 +6,7 @@ GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-all test-interactive test-docker cover fmt lint vuln dev help proto
+.PHONY: all build install install-dev clean test test-all test-interactive test-docker cover fmt lint vuln dev help proto bin/linux
 
 all: build
 
@@ -81,8 +81,16 @@ cover:
 test-interactive:
 	go test -v ./tests/expect/...
 
+## bin/linux: Cross-compile binaries and test runner for Linux (used by Docker tests)
+bin/linux:
+	@mkdir -p bin/linux
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/clai ./cmd/clai
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/claid ./cmd/claid
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/clai-shim ./cmd/clai-shim
+	GOOS=linux GOARCH=amd64 go test -c -o bin/linux/expect.test ./tests/expect
+
 ## test-docker: Run interactive tests in Docker containers (Alpine, Ubuntu, Debian)
-test-docker:
+test-docker: bin/linux
 	@if command -v docker-compose >/dev/null 2>&1; then \
 		docker-compose -f tests/docker/docker-compose.yml build && \
 		docker-compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
