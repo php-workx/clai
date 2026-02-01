@@ -29,9 +29,9 @@ func TestZsh_SourceWithoutError(t *testing.T) {
 	err = session.SendLine("source " + hookFile)
 	require.NoError(t, err)
 
-	// Wait for the loaded message
-	output, err := session.ExpectTimeout("clai loaded", 5*time.Second)
-	require.NoError(t, err, "expected clai loaded message")
+	// Wait for the startup message (shows session ID)
+	output, err := session.ExpectTimeout("clai [", 5*time.Second)
+	require.NoError(t, err, "expected clai startup message")
 
 	// Verify no ZLE errors in output
 	assert.NotContains(t, output, "widgets can only be called when ZLE is active",
@@ -60,8 +60,8 @@ func TestZsh_SuggestionAppearsInRightPrompt(t *testing.T) {
 	defer session.Close()
 
 	// Wait for loaded message
-	_, err = session.ExpectTimeout("clai loaded", 5*time.Second)
-	require.NoError(t, err, "expected clai loaded message")
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
+	require.NoError(t, err, "expected clai startup message")
 
 	// Type a prefix that should trigger a suggestion
 	// Note: This test requires clai binary to be available and return suggestions
@@ -99,7 +99,7 @@ func TestZsh_LongSuggestionTruncated(t *testing.T) {
 	defer session.Close()
 
 	// Wait for loaded message
-	_, err = session.ExpectTimeout("clai loaded", 5*time.Second)
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
 	require.NoError(t, err)
 
 	// The truncation is handled in the shell script at max_suggestion=40 chars
@@ -127,7 +127,7 @@ func TestZsh_RightArrowAcceptsSuggestion(t *testing.T) {
 	defer session.Close()
 
 	// Wait for loaded message
-	_, err = session.ExpectTimeout("clai loaded", 5*time.Second)
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
 	require.NoError(t, err)
 
 	// Type echo as a test
@@ -166,7 +166,7 @@ func TestZsh_EscapeClearsSuggestion(t *testing.T) {
 	defer session.Close()
 
 	// Wait for loaded message
-	_, err = session.ExpectTimeout("clai loaded", 5*time.Second)
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
 	require.NoError(t, err)
 
 	// Type something
@@ -209,7 +209,7 @@ func TestZsh_WorksWithExistingRPS1(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should load without errors
-	output, err := session.ExpectTimeout("clai loaded", 5*time.Second)
+	output, err := session.ExpectTimeout("clai [", 5*time.Second)
 	require.NoError(t, err)
 
 	// Should not have errors
@@ -273,7 +273,7 @@ func TestZsh_CtrlSpaceShowsMenu(t *testing.T) {
 	defer session.Close()
 
 	// Wait for loaded message
-	_, err = session.ExpectTimeout("clai loaded", 5*time.Second)
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
 	require.NoError(t, err)
 
 	// Type a prefix
@@ -317,7 +317,7 @@ func TestZsh_ZLEResetPromptWithWidgetGuard(t *testing.T) {
 	require.NoError(t, err)
 
 	// Wait for output
-	output, _ := session.ExpectTimeout("clai loaded", 5*time.Second)
+	output, _ := session.ExpectTimeout("clai [", 5*time.Second)
 
 	// Verify no ZLE widget errors
 	assert.NotContains(t, strings.ToLower(output), "zle",
