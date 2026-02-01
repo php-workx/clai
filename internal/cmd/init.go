@@ -3,7 +3,10 @@ package cmd
 import (
 	"embed"
 	"fmt"
+	"os"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -56,6 +59,16 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read shell script: %w", err)
 	}
 
-	fmt.Print(string(content))
+	// Generate or reuse session ID
+	// If CLAI_SESSION_ID is already set (re-sourcing), preserve it
+	sessionID := os.Getenv("CLAI_SESSION_ID")
+	if sessionID == "" {
+		sessionID = uuid.New().String()
+	}
+
+	// Replace placeholder with actual session ID export
+	script := strings.Replace(string(content), "{{CLAI_SESSION_ID}}", sessionID, 1)
+
+	fmt.Print(script)
 	return nil
 }
