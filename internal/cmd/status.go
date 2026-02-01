@@ -124,10 +124,15 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 	// even if not installed in RC files (e.g., running via eval "$(clai init zsh)")
 	// Note: We use CLAI_CURRENT_SHELL directly (not detectCurrentShell) because
 	// an "active session" requires the shell integration to have run and set this var.
+	// Only recognize supported shells to avoid false positives.
 	claiCurrentShell := os.Getenv("CLAI_CURRENT_SHELL")
 	if claiCurrentShell != "" && os.Getenv("CLAI_SESSION_ID") != "" {
-		installed = append(installed, fmt.Sprintf("%s (active session)", claiCurrentShell))
-		return installed
+		// Only report active session for supported shells
+		switch claiCurrentShell {
+		case "zsh", "bash", "fish":
+			installed = append(installed, fmt.Sprintf("%s (active session)", claiCurrentShell))
+			return installed
+		}
 	}
 
 	// Check zsh

@@ -2,7 +2,9 @@ package expect
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -181,6 +183,12 @@ func TestPerformance_InitCommandFast(t *testing.T) {
 		t.Skip("clai binary not found in PATH")
 	}
 
+	// Use higher threshold in containers due to overhead
+	threshold := 50 * time.Millisecond
+	if isRunningInContainer() {
+		threshold = 150 * time.Millisecond
+	}
+
 	shells := []string{"zsh", "bash", "fish"}
 
 	for _, shell := range shells {
@@ -204,10 +212,26 @@ func TestPerformance_InitCommandFast(t *testing.T) {
 			t.Logf("clai init %s average time: %v (over %d runs)", shell, avgDuration, iterations)
 
 			// Should complete very quickly - just reading embedded file
-			assert.Less(t, avgDuration, 50*time.Millisecond,
-				"clai init %s took %v, should be <50ms", shell, avgDuration)
+			assert.Less(t, avgDuration, threshold,
+				"clai init %s took %v, should be <%v", shell, avgDuration, threshold)
 		})
 	}
+}
+
+// isRunningInContainer detects if we're running inside a Docker container.
+func isRunningInContainer() bool {
+	// Check for /.dockerenv file (Docker-specific)
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	// Check cgroup for docker/lxc indicators
+	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+		content := string(data)
+		if strings.Contains(content, "docker") || strings.Contains(content, "lxc") {
+			return true
+		}
+	}
+	return false
 }
 
 // TestPerformance_SourceScriptFast measures time to source the shell script directly.
