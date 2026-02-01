@@ -9,7 +9,6 @@
 #   5. Natural language → command with ? prefix (e.g., "?list all files")
 #
 # Configuration (set these BEFORE sourcing):
-#   CLAI_AUTO_DAEMON=true     # Auto-start daemon for fast voice (default: true)
 #   CLAI_MENU_LIMIT=5         # Max suggestions in menu (default: 5)
 
 # ============================================
@@ -20,7 +19,6 @@
 export CLAI_CURRENT_SHELL=zsh
 
 : ${CLAI_AUTO_EXTRACT:=true}
-: ${CLAI_AUTO_DAEMON:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
 
@@ -541,15 +539,7 @@ _ai_cancel_voice_mode() {
 # Daemon Management
 # ============================================
 
-# Start daemon in background for fast voice responses
-_ai_ensure_daemon() {
-    if [[ "$CLAI_AUTO_DAEMON" == "true" ]]; then
-        # Check if daemon is running, start if not (silently in background)
-        (clai daemon start >/dev/null 2>&1 &)
-    fi
-}
-
-# Daemon control commands
+# Daemon control commands (Claude daemon for fast voice, started lazily on first use)
 ai-daemon() {
     case "$1" in
         start)
@@ -577,10 +567,8 @@ ai-daemon() {
 # ============================================
 
 if [[ -o interactive ]]; then
-    # Start daemon if enabled
-    _ai_ensure_daemon
-
     # Notify daemon of new session (fire and forget)
+    # Note: claid starts lazily via clai-shim -> ipc.NewClient() -> EnsureDaemon()
     (clai-shim session-start \
         --session-id="$CLAI_SESSION_ID" \
         --cwd="$PWD" \
