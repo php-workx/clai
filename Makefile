@@ -10,13 +10,17 @@ LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X g
 
 all: build
 
-## build: Build the binary
+## build: Build all binaries (clai, claid, clai-shim)
 build:
-	go build $(LDFLAGS) -o bin/$(BINARY_NAME) ./cmd/clai
+	go build $(LDFLAGS) -o bin/clai ./cmd/clai
+	go build $(LDFLAGS) -o bin/claid ./cmd/claid
+	go build $(LDFLAGS) -o bin/clai-shim ./cmd/clai-shim
 
-## install: Install the binary to $GOPATH/bin
+## install: Install all binaries to $GOPATH/bin
 install:
 	go install $(LDFLAGS) ./cmd/clai
+	go install $(LDFLAGS) ./cmd/claid
+	go install $(LDFLAGS) ./cmd/clai-shim
 
 ## proto: Generate Go code from protobuf definitions
 proto:
