@@ -71,14 +71,33 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		sessionID = os.Getenv("CLAI_SESSION_ID")
 	}
 
-	// Validate session if specified
+	// Validate and resolve session if specified
 	if sessionID != "" {
-		_, err := store.GetSession(ctx, sessionID)
+		session, err := store.GetSession(ctx, sessionID)
 		if err != nil {
 			if errors.Is(err, storage.ErrSessionNotFound) {
-				return fmt.Errorf("session not found (%s)", sessionID)
+				// Try prefix match for short IDs (< 36 chars, full UUID length)
+				if len(sessionID) < 36 {
+					session, err = store.GetSessionByPrefix(ctx, sessionID)
+					if err != nil {
+						if errors.Is(err, storage.ErrSessionNotFound) {
+							return fmt.Errorf("session not found (%s)", sessionID)
+						}
+						if errors.Is(err, storage.ErrAmbiguousSession) {
+							return fmt.Errorf("ambiguous session prefix (%s)", sessionID)
+						}
+						return err
+					}
+					// Use the full session ID for the query
+					sessionID = session.SessionID
+				} else {
+					return fmt.Errorf("session not found (%s)", sessionID)
+				}
+			} else {
+				return err
 			}
-			return err
+		} else {
+			sessionID = session.SessionID
 		}
 	}
 

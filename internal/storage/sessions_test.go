@@ -341,3 +341,96 @@ func TestSQLiteStore_Session_WithEndedAt(t *testing.T) {
 		t.Errorf("EndedAtUnixMs = %d, want %d", *got.EndedAtUnixMs, endTime)
 	}
 }
+
+func TestSQLiteStore_GetSessionByPrefix_Success(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	session := &Session{
+		SessionID:       "abc12345-6789-0def-ghij-klmnopqrstuv",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/home/user",
+	}
+
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Should find by 8-char prefix
+	got, err := store.GetSessionByPrefix(ctx, "abc12345")
+	if err != nil {
+		t.Fatalf("GetSessionByPrefix() error = %v", err)
+	}
+
+	if got.SessionID != session.SessionID {
+		t.Errorf("SessionID = %s, want %s", got.SessionID, session.SessionID)
+	}
+}
+
+func TestSQLiteStore_GetSessionByPrefix_NotFound(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	_, err := store.GetSessionByPrefix(context.Background(), "nonexistent")
+	if !errors.Is(err, ErrSessionNotFound) {
+		t.Errorf("GetSessionByPrefix() error = %v, want ErrSessionNotFound", err)
+	}
+}
+
+func TestSQLiteStore_GetSessionByPrefix_Ambiguous(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create two sessions with same prefix
+	session1 := &Session{
+		SessionID:       "same-prefix-1111-aaaa-bbbb-ccccddddeeee",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/home/user",
+	}
+	session2 := &Session{
+		SessionID:       "same-prefix-2222-aaaa-bbbb-ccccddddeeee",
+		StartedAtUnixMs: 1700000001000,
+		Shell:           "bash",
+		OS:              "linux",
+		InitialCWD:      "/tmp",
+	}
+
+	if err := store.CreateSession(ctx, session1); err != nil {
+		t.Fatalf("CreateSession(1) error = %v", err)
+	}
+	if err := store.CreateSession(ctx, session2); err != nil {
+		t.Fatalf("CreateSession(2) error = %v", err)
+	}
+
+	// Should return ambiguous error
+	_, err := store.GetSessionByPrefix(ctx, "same-prefix")
+	if !errors.Is(err, ErrAmbiguousSession) {
+		t.Errorf("GetSessionByPrefix() error = %v, want ErrAmbiguousSession", err)
+	}
+}
+
+func TestSQLiteStore_GetSessionByPrefix_EmptyPrefix(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	_, err := store.GetSessionByPrefix(context.Background(), "")
+	if err == nil {
+		t.Error("Expected error for empty prefix")
+	}
+}

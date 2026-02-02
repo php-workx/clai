@@ -46,6 +46,22 @@ func (m *mockStore) GetSession(ctx context.Context, sessionID string) (*storage.
 	return nil, storage.ErrSessionNotFound
 }
 
+func (m *mockStore) GetSessionByPrefix(ctx context.Context, prefix string) (*storage.Session, error) {
+	var matches []*storage.Session
+	for id, s := range m.sessions {
+		if len(id) >= len(prefix) && id[:len(prefix)] == prefix {
+			matches = append(matches, s)
+		}
+	}
+	if len(matches) == 0 {
+		return nil, storage.ErrSessionNotFound
+	}
+	if len(matches) > 1 {
+		return nil, storage.ErrAmbiguousSession
+	}
+	return matches[0], nil
+}
+
 func (m *mockStore) CreateCommand(ctx context.Context, c *storage.Command) error {
 	m.commands[c.CommandID] = c
 	return nil

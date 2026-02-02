@@ -122,6 +122,78 @@ func (s *SQLiteStore) GetSession(ctx context.Context, sessionID string) (*Sessio
 	return &session, nil
 }
 
+// ErrAmbiguousSession is returned when a prefix matches multiple sessions.
+var ErrAmbiguousSession = errors.New("ambiguous session prefix")
+
+// GetSessionByPrefix retrieves a session by ID prefix.
+// Returns ErrSessionNotFound if no session matches.
+// Returns ErrAmbiguousSession if multiple sessions match.
+func (s *SQLiteStore) GetSessionByPrefix(ctx context.Context, prefix string) (*Session, error) {
+	if prefix == "" {
+		return nil, errors.New("prefix is required")
+	}
+
+	// Query for sessions matching the prefix
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT session_id, started_at_unix_ms, ended_at_unix_ms,
+		       shell, os, hostname, username, initial_cwd
+		FROM sessions WHERE session_id LIKE ? || '%'
+		ORDER BY started_at_unix_ms DESC
+		LIMIT 2
+	`, prefix)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query sessions: %w", err)
+	}
+	defer rows.Close()
+
+	var sessions []Session
+	for rows.Next() {
+		var session Session
+		var endedAt sql.NullInt64
+		var hostname, username sql.NullString
+
+		err := rows.Scan(
+			&session.SessionID,
+			&session.StartedAtUnixMs,
+			&endedAt,
+			&session.Shell,
+			&session.OS,
+			&hostname,
+			&username,
+			&session.InitialCWD,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan session: %w", err)
+		}
+
+		if endedAt.Valid {
+			session.EndedAtUnixMs = &endedAt.Int64
+		}
+		if hostname.Valid {
+			session.Hostname = hostname.String
+		}
+		if username.Valid {
+			session.Username = username.String
+		}
+
+		sessions = append(sessions, session)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate sessions: %w", err)
+	}
+
+	if len(sessions) == 0 {
+		return nil, ErrSessionNotFound
+	}
+
+	if len(sessions) > 1 {
+		return nil, ErrAmbiguousSession
+	}
+
+	return &sessions[0], nil
+}
+
 // nullableString converts an empty string to a nil sql.NullString.
 func nullableString(s string) sql.NullString {
 	if s == "" {

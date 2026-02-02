@@ -11,6 +11,7 @@ type Store interface {
 	CreateSession(ctx context.Context, s *Session) error
 	EndSession(ctx context.Context, sessionID string, endTime int64) error
 	GetSession(ctx context.Context, sessionID string) (*Session, error)
+	GetSessionByPrefix(ctx context.Context, prefix string) (*Session, error)
 
 	// Commands
 	CreateCommand(ctx context.Context, c *Command) error
