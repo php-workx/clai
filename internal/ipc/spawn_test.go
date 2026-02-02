@@ -11,7 +11,8 @@ func TestPidPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserHomeDir() error = %v", err)
 	}
-	expected := filepath.Join(home, ".clai", "run", "clai.pid")
+	// Must match config.Paths.PIDFile()
+	expected := filepath.Join(home, ".clai", "clai.pid")
 
 	path := PidPath()
 	if path != expected {
@@ -24,7 +25,8 @@ func TestLogPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UserHomeDir() error = %v", err)
 	}
-	expected := filepath.Join(home, ".clai", "run", "clai.log")
+	// Must match where daemon log file goes
+	expected := filepath.Join(home, ".clai", "clai.log")
 
 	path := LogPath()
 	if path != expected {

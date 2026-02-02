@@ -39,7 +39,8 @@ func SocketPath() string {
 	if err != nil {
 		home = "/tmp"
 	}
-	return filepath.Join(home, ".clai", "run", "clai.sock")
+	// Must match config.Paths.SocketFile()
+	return filepath.Join(home, ".clai", "clai.sock")
 }
 
 // RunDir returns the directory containing runtime files (socket, pid)
@@ -48,7 +49,8 @@ func RunDir() string {
 	if err != nil {
 		home = "/tmp"
 	}
-	return filepath.Join(home, ".clai", "run")
+	// Must match config.Paths.BaseDir
+	return filepath.Join(home, ".clai")
 }
 
 // SocketExists checks if the daemon socket file exists

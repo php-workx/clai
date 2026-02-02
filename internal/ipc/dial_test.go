@@ -12,7 +12,8 @@ func TestSocketPath(t *testing.T) {
 	if err != nil {
 		home = "/tmp"
 	}
-	expected := filepath.Join(home, ".clai", "run", "clai.sock")
+	// Must match config.Paths.SocketFile()
+	expected := filepath.Join(home, ".clai", "clai.sock")
 
 	path := SocketPath()
 	if path != expected {
@@ -38,7 +39,8 @@ func TestRunDir(t *testing.T) {
 	if err != nil {
 		home = "/tmp"
 	}
-	expected := filepath.Join(home, ".clai", "run")
+	// Must match config.Paths.BaseDir
+	expected := filepath.Join(home, ".clai")
 
 	dir := RunDir()
 	if dir != expected {
