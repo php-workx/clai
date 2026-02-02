@@ -53,6 +53,19 @@ type Command struct {
 	CommandHash   string
 	ExitCode      *int
 	IsSuccess     *bool // nil = unknown (treated as success), false = failure, true = success
+
+	// Git context (captured at command start)
+	GitBranch   *string
+	GitRepoName *string
+	GitRepoRoot *string
+
+	// Sequence tracking
+	PrevCommandID *string
+
+	// Derived metadata (computed from command text)
+	IsSudo    bool
+	PipeCount int
+	WordCount int
 }
 
 // CommandQuery defines parameters for querying commands.

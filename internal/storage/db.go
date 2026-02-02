@@ -166,6 +166,10 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 			version: 1,
 			sql:     migrationV1,
 		},
+		{
+			version: 2,
+			sql:     migrationV2,
+		},
 	}
 
 	for _, m := range migrations {
@@ -272,4 +276,24 @@ CREATE TABLE IF NOT EXISTS ai_cache (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_cache_expires ON ai_cache(expires_at_unix_ms);
+`
+
+// migrationV2 adds extended command metadata.
+const migrationV2 = `
+-- Git context
+ALTER TABLE commands ADD COLUMN git_branch TEXT;
+ALTER TABLE commands ADD COLUMN git_repo_name TEXT;
+ALTER TABLE commands ADD COLUMN git_repo_root TEXT;
+
+-- Sequence tracking
+ALTER TABLE commands ADD COLUMN prev_command_id TEXT;
+
+-- Derived metadata
+ALTER TABLE commands ADD COLUMN is_sudo INTEGER DEFAULT 0;
+ALTER TABLE commands ADD COLUMN pipe_count INTEGER DEFAULT 0;
+ALTER TABLE commands ADD COLUMN word_count INTEGER DEFAULT 0;
+
+-- Indexes for common queries
+CREATE INDEX IF NOT EXISTS idx_commands_git_branch ON commands(git_branch);
+CREATE INDEX IF NOT EXISTS idx_commands_git_repo ON commands(git_repo_name);
 `

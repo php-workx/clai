@@ -271,12 +271,18 @@ func (x *SessionEndRequest) GetEndedAtUnixMs() int64 {
 }
 
 type CommandStartRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	CommandId     string                 `protobuf:"bytes,2,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"` // UUID v4
-	TsUnixMs      int64                  `protobuf:"varint,3,opt,name=ts_unix_ms,json=tsUnixMs,proto3" json:"ts_unix_ms,omitempty"`
-	Cwd           string                 `protobuf:"bytes,4,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	Command       string                 `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"` // Raw command string
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	CommandId string                 `protobuf:"bytes,2,opt,name=command_id,json=commandId,proto3" json:"command_id,omitempty"` // UUID v4
+	TsUnixMs  int64                  `protobuf:"varint,3,opt,name=ts_unix_ms,json=tsUnixMs,proto3" json:"ts_unix_ms,omitempty"`
+	Cwd       string                 `protobuf:"bytes,4,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	Command   string                 `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"` // Raw command string
+	// Git context (optional, captured by shell shim)
+	GitBranch   string `protobuf:"bytes,6,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
+	GitRepoName string `protobuf:"bytes,7,opt,name=git_repo_name,json=gitRepoName,proto3" json:"git_repo_name,omitempty"`
+	GitRepoRoot string `protobuf:"bytes,8,opt,name=git_repo_root,json=gitRepoRoot,proto3" json:"git_repo_root,omitempty"`
+	// Sequence tracking
+	PrevCommandId string `protobuf:"bytes,9,opt,name=prev_command_id,json=prevCommandId,proto3" json:"prev_command_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -342,6 +348,34 @@ func (x *CommandStartRequest) GetCwd() string {
 func (x *CommandStartRequest) GetCommand() string {
 	if x != nil {
 		return x.Command
+	}
+	return ""
+}
+
+func (x *CommandStartRequest) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
+	}
+	return ""
+}
+
+func (x *CommandStartRequest) GetGitRepoName() string {
+	if x != nil {
+		return x.GitRepoName
+	}
+	return ""
+}
+
+func (x *CommandStartRequest) GetGitRepoRoot() string {
+	if x != nil {
+		return x.GitRepoRoot
+	}
+	return ""
+}
+
+func (x *CommandStartRequest) GetPrevCommandId() string {
+	if x != nil {
+		return x.PrevCommandId
 	}
 	return ""
 }
@@ -1086,7 +1120,7 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\x11SessionEndRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12'\n" +
-	"\x10ended_at_unix_ms\x18\x02 \x01(\x03R\rendedAtUnixMs\"\x9d\x01\n" +
+	"\x10ended_at_unix_ms\x18\x02 \x01(\x03R\rendedAtUnixMs\"\xac\x02\n" +
 	"\x13CommandStartRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1d\n" +
@@ -1095,7 +1129,12 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\n" +
 	"ts_unix_ms\x18\x03 \x01(\x03R\btsUnixMs\x12\x10\n" +
 	"\x03cwd\x18\x04 \x01(\tR\x03cwd\x12\x18\n" +
-	"\acommand\x18\x05 \x01(\tR\acommand\"\xad\x01\n" +
+	"\acommand\x18\x05 \x01(\tR\acommand\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\x06 \x01(\tR\tgitBranch\x12\"\n" +
+	"\rgit_repo_name\x18\a \x01(\tR\vgitRepoName\x12\"\n" +
+	"\rgit_repo_root\x18\b \x01(\tR\vgitRepoRoot\x12&\n" +
+	"\x0fprev_command_id\x18\t \x01(\tR\rprevCommandId\"\xad\x01\n" +
 	"\x11CommandEndRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1d\n" +

@@ -51,12 +51,19 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 		isSuccess = &v
 	}
 
+	// Compute derived metadata from command text
+	cmd.IsSudo = cmdutil.IsSudo(cmd.Command)
+	cmd.PipeCount = cmdutil.CountPipes(cmd.Command)
+	cmd.WordCount = cmdutil.CountWords(cmd.Command)
+
 	result, err := s.db.ExecContext(ctx, `
 		INSERT INTO commands (
 			command_id, session_id, ts_start_unix_ms, ts_end_unix_ms,
 			duration_ms, cwd, command, command_norm, command_hash,
-			exit_code, is_success
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			exit_code, is_success,
+			git_branch, git_repo_name, git_repo_root, prev_command_id,
+			is_sudo, pipe_count, word_count
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`,
 		cmd.CommandID,
 		cmd.SessionID,
@@ -69,6 +76,13 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 		cmd.CommandHash,
 		cmd.ExitCode,
 		isSuccess,
+		cmd.GitBranch,
+		cmd.GitRepoName,
+		cmd.GitRepoRoot,
+		cmd.PrevCommandID,
+		cmd.IsSudo,
+		cmd.PipeCount,
+		cmd.WordCount,
 	)
 	if err != nil {
 		// Check for foreign key violation (invalid session_id)
@@ -126,7 +140,9 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 	query := `
 		SELECT id, command_id, session_id, ts_start_unix_ms, ts_end_unix_ms,
 		       duration_ms, cwd, command, command_norm, command_hash,
-		       exit_code, is_success
+		       exit_code, is_success,
+		       git_branch, git_repo_name, git_repo_root, prev_command_id,
+		       is_sudo, pipe_count, word_count
 		FROM commands
 		WHERE 1=1
 	`
@@ -182,6 +198,8 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 		var endTime, duration sql.NullInt64
 		var exitCode sql.NullInt32
 		var isSuccess sql.NullInt32
+		var gitBranch, gitRepoName, gitRepoRoot, prevCommandID sql.NullString
+		var isSudo, pipeCount, wordCount sql.NullInt32
 
 		err := rows.Scan(
 			&cmd.ID,
@@ -196,6 +214,13 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 			&cmd.CommandHash,
 			&exitCode,
 			&isSuccess,
+			&gitBranch,
+			&gitRepoName,
+			&gitRepoRoot,
+			&prevCommandID,
+			&isSudo,
+			&pipeCount,
+			&wordCount,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan command: %w", err)
@@ -214,6 +239,27 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 		if isSuccess.Valid {
 			v := isSuccess.Int32 == 1
 			cmd.IsSuccess = &v
+		}
+		if gitBranch.Valid {
+			cmd.GitBranch = &gitBranch.String
+		}
+		if gitRepoName.Valid {
+			cmd.GitRepoName = &gitRepoName.String
+		}
+		if gitRepoRoot.Valid {
+			cmd.GitRepoRoot = &gitRepoRoot.String
+		}
+		if prevCommandID.Valid {
+			cmd.PrevCommandID = &prevCommandID.String
+		}
+		if isSudo.Valid {
+			cmd.IsSudo = isSudo.Int32 == 1
+		}
+		if pipeCount.Valid {
+			cmd.PipeCount = int(pipeCount.Int32)
+		}
+		if wordCount.Valid {
+			cmd.WordCount = int(wordCount.Int32)
 		}
 
 		commands = append(commands, cmd)

@@ -30,16 +30,20 @@ var (
 
 // Flag name constants to avoid duplication
 const (
-	flagSessionID = "session-id"
-	flagCommandID = "command-id"
-	flagCwd       = "cwd"
-	flagShell     = "shell"
-	flagCommand   = "command"
-	flagBuffer    = "buffer"
-	flagCursor    = "cursor"
-	flagPrompt    = "prompt"
-	flagExitCode  = "exit-code"
-	flagDuration  = "duration"
+	flagSessionID     = "session-id"
+	flagCommandID     = "command-id"
+	flagCwd           = "cwd"
+	flagShell         = "shell"
+	flagCommand       = "command"
+	flagBuffer        = "buffer"
+	flagCursor        = "cursor"
+	flagPrompt        = "prompt"
+	flagExitCode      = "exit-code"
+	flagDuration      = "duration"
+	flagGitBranch     = "git-branch"
+	flagGitRepoName   = "git-repo-name"
+	flagGitRepoRoot   = "git-repo-root"
+	flagPrevCommandID = "prev-command-id"
 )
 
 func main() {
@@ -98,7 +102,9 @@ Usage: clai-shim <command> [flags...]
 Commands:
   session-start --session-id=ID --cwd=PATH --shell=SHELL  Notify new shell session
   session-end --session-id=ID                              Notify session ending
-  log-start --session-id=ID --command-id=ID --cwd=PATH --command="CMD"  Log command start
+  log-start --session-id=ID --command-id=ID --cwd=PATH --command="CMD"
+            [--git-branch=BRANCH] [--git-repo-name=NAME] [--git-repo-root=PATH]
+            [--prev-command-id=ID]                        Log command start
   log-end --session-id=ID --command-id=ID --exit-code=N --duration=MS   Log command end
   suggest --session-id=ID --cwd=PATH --buffer="TEXT" [--cursor=N] [--limit=N]  Get suggestions
   text-to-command --session-id=ID --cwd=PATH --prompt="TEXT"            Text to command
@@ -187,6 +193,8 @@ func runSessionEnd() {
 
 // runLogStart handles the log-start command
 // Flags: --session-id, --command-id, --cwd, --command
+//
+//	--git-branch, --git-repo-name, --git-repo-root, --prev-command-id
 func runLogStart() {
 	flags := parseFlags(os.Args[2:])
 
@@ -208,7 +216,15 @@ func runLogStart() {
 	}
 	defer client.Close()
 
-	client.LogStart(sessionID, commandID, cwd, command)
+	// Build command context with git info if provided
+	ctx := &ipc.CommandContext{
+		GitBranch:     flags[flagGitBranch],
+		GitRepoName:   flags[flagGitRepoName],
+		GitRepoRoot:   flags[flagGitRepoRoot],
+		PrevCommandID: flags[flagPrevCommandID],
+	}
+
+	client.LogStartWithContext(sessionID, commandID, cwd, command, ctx)
 }
 
 // runLogEnd handles the log-end command

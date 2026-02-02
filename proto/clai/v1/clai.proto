@@ -46,6 +46,14 @@ message CommandStartRequest {
   int64 ts_unix_ms = 3;
   string cwd = 4;
   string command = 5;       // Raw command string
+
+  // Git context (optional, captured by shell shim)
+  string git_branch = 6;
+  string git_repo_name = 7;
+  string git_repo_root = 8;
+
+  // Sequence tracking
+  string prev_command_id = 9;
 }
 
 message CommandEndRequest {

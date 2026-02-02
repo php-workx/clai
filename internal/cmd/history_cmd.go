@@ -203,11 +203,24 @@ func printCommand(c storage.Command) {
 		duration = formatDurationMs(*c.DurationMs)
 	}
 
+	// Format git context (branch @ repo)
+	gitContext := ""
+	if c.GitBranch != nil && *c.GitBranch != "" {
+		gitContext = *c.GitBranch
+		if c.GitRepoName != nil && *c.GitRepoName != "" {
+			gitContext += " @ " + *c.GitRepoName
+		}
+	}
+
 	// Print formatted line
 	fmt.Printf("%s%s%s  [%s]  %s", colorDim, timestamp, colorReset, exitCode, c.Command)
 
 	if duration != "" {
 		fmt.Printf("  %s(%s)%s", colorDim, duration, colorReset)
+	}
+
+	if gitContext != "" {
+		fmt.Printf("  %s%s%s", colorCyan, gitContext, colorReset)
 	}
 
 	fmt.Println()

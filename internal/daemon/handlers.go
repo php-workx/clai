@@ -128,6 +128,20 @@ func (s *Server) CommandStarted(ctx context.Context, req *pb.CommandStartRequest
 		IsSuccess:     boolPtr(true), // Assume success until CommandEnded
 	}
 
+	// Add git context if provided
+	if req.GitBranch != "" {
+		cmd.GitBranch = &req.GitBranch
+	}
+	if req.GitRepoName != "" {
+		cmd.GitRepoName = &req.GitRepoName
+	}
+	if req.GitRepoRoot != "" {
+		cmd.GitRepoRoot = &req.GitRepoRoot
+	}
+	if req.PrevCommandId != "" {
+		cmd.PrevCommandID = &req.PrevCommandId
+	}
+
 	if err := s.store.CreateCommand(ctx, cmd); err != nil {
 		s.logger.Warn("failed to create command",
 			"command_id", req.CommandId,

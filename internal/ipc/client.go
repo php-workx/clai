@@ -87,9 +87,23 @@ func (c *Client) SessionEnd(sessionID string) {
 
 // --- Command Lifecycle (Fire-and-Forget) ---
 
+// CommandContext contains optional context for a command execution.
+type CommandContext struct {
+	GitBranch     string // Current git branch
+	GitRepoName   string // Git repo basename
+	GitRepoRoot   string // Git repo full path
+	PrevCommandID string // Previous command ID in session
+}
+
 // LogStart logs the start of a command execution.
 // Uses fire-and-forget semantics - errors are silently ignored.
 func (c *Client) LogStart(sessionID, commandID, cwd, command string) {
+	c.LogStartWithContext(sessionID, commandID, cwd, command, nil)
+}
+
+// LogStartWithContext logs the start of a command execution with additional context.
+// Uses fire-and-forget semantics - errors are silently ignored.
+func (c *Client) LogStartWithContext(sessionID, commandID, cwd, command string, ctx_info *CommandContext) {
 	ctx, cancel := context.WithTimeout(context.Background(), FireAndForgetTimeout)
 	defer cancel()
 
@@ -99,6 +113,14 @@ func (c *Client) LogStart(sessionID, commandID, cwd, command string) {
 		TsUnixMs:  time.Now().UnixMilli(),
 		Cwd:       cwd,
 		Command:   command,
+	}
+
+	// Add optional context if provided
+	if ctx_info != nil {
+		req.GitBranch = ctx_info.GitBranch
+		req.GitRepoName = ctx_info.GitRepoName
+		req.GitRepoRoot = ctx_info.GitRepoRoot
+		req.PrevCommandId = ctx_info.PrevCommandID
 	}
 
 	// Fire and forget - ignore errors
