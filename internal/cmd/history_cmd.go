@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ var (
 	historyLimit   int
 	historyCWD     string
 	historySession string
+	historyGlobal  bool
 )
 
 var historyCmd = &cobra.Command{
@@ -24,26 +26,27 @@ var historyCmd = &cobra.Command{
 	GroupID: groupCore,
 	Long: `Show command history from the clai database.
 
-Without arguments, shows the most recent commands.
+Without arguments, shows the most recent commands from the current session.
 With a query argument, filters commands matching the prefix.
 
-The history is stored in the local SQLite database and includes
-commands from all shell sessions by default. Use --session to
-filter to a specific session.
+By default, history is scoped to the current shell session (using $CLAI_SESSION_ID).
+Use -g/--global to show history across all sessions.
 
 Examples:
-  clai history                    # Show last 20 commands
+  clai history                    # Show last 20 commands (current session)
+  clai history -g                 # Show history across all sessions
   clai history --limit=50         # Show last 50 commands
   clai history git                # Show commands starting with "git"
-  clai history --cwd=/tmp         # Show commands from /tmp directory
-  clai history --session=$CLAI_SESSION_ID  # Show current session only`,
+  clai history -c /tmp            # Show commands from /tmp directory
+  clai history -s <session-id>    # Show specific session`,
 	RunE: runHistory,
 }
 
 func init() {
 	historyCmd.Flags().IntVarP(&historyLimit, "limit", "n", 20, "Maximum number of commands to show")
-	historyCmd.Flags().StringVar(&historyCWD, "cwd", "", "Filter by working directory")
-	historyCmd.Flags().StringVar(&historySession, "session", "", "Filter by session ID (use $CLAI_SESSION_ID for current session)")
+	historyCmd.Flags().StringVarP(&historyCWD, "cwd", "c", "", "Filter by working directory")
+	historyCmd.Flags().StringVarP(&historySession, "session", "s", "", "Filter by specific session ID")
+	historyCmd.Flags().BoolVarP(&historyGlobal, "global", "g", false, "Show history across all sessions")
 }
 
 func runHistory(cmd *cobra.Command, args []string) error {
@@ -56,6 +59,27 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 	defer store.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Determine session ID to use
+	sessionID := historySession
+	if sessionID == "" && !historyGlobal {
+		// Default to current session from environment
+		sessionID = os.Getenv("CLAI_SESSION_ID")
+	}
+
+	// Validate session if specified
+	if sessionID != "" {
+		session, err := store.GetSession(ctx, sessionID)
+		if err != nil {
+			return fmt.Errorf("failed to validate session: %w", err)
+		}
+		if session == nil {
+			return fmt.Errorf("session not found: %s", sessionID)
+		}
+	}
 
 	// Build query
 	query := storage.CommandQuery{
@@ -73,31 +97,29 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	// Add session filter if provided
-	if historySession != "" {
-		query.SessionID = &historySession
+	if sessionID != "" {
+		query.SessionID = &sessionID
 	}
 
 	// Execute query
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	commands, err := store.QueryCommands(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to query history: %w", err)
 	}
 
 	if len(commands) == 0 {
-		if historySession != "" {
-			// Session-specific query returned no results
-			if len(args) > 0 {
-				fmt.Printf("No commands matching '%s' in this session.\n", args[0])
-			} else {
-				fmt.Println("No commands logged in this session yet.")
-			}
-			fmt.Println("Tip: Use 'history --global' for shell's native history.")
-		} else if len(args) > 0 {
-			fmt.Printf("No commands found matching '%s'\n", args[0])
-		} else {
+		// Show appropriate message based on filters used
+		if historyCWD != "" {
+			fmt.Printf("%sWarning: No commands found in directory: %s%s\n", colorYellow, historyCWD, colorReset)
+		}
+		if len(args) > 0 {
+			fmt.Printf("%sWarning: No commands found matching '%s'%s\n", colorYellow, args[0], colorReset)
+		}
+
+		if sessionID != "" && historyCWD == "" && len(args) == 0 {
+			fmt.Println("No commands logged in this session yet.")
+			fmt.Println("Tip: Use 'clai history -g' to show history across all sessions.")
+		} else if historyCWD == "" && len(args) == 0 {
 			fmt.Println("No command history available.")
 		}
 		return nil
@@ -111,7 +133,13 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Println()
-	fmt.Printf("%sShowing %d command(s)%s\n", colorDim, len(commands), colorReset)
+	scope := ""
+	if sessionID != "" {
+		scope = " (current session)"
+	} else {
+		scope = " (all sessions)"
+	}
+	fmt.Printf("%sShowing %d command(s)%s%s\n", colorDim, len(commands), scope, colorReset)
 
 	return nil
 }
