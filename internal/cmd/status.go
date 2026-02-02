@@ -40,13 +40,16 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%sclai status%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
 
-	checks := make([]statusCheck, 0, 5)
+	checks := make([]statusCheck, 0, 6)
 
 	// Check Claude CLI
 	checks = append(checks, checkClaudeCLI())
 
 	// Check shell integration
 	checks = append(checks, checkShellStatus(paths))
+
+	// Check session ID
+	checks = append(checks, checkSessionID())
 
 	// Check daemon
 	checks = append(checks, checkDaemonStatus())
@@ -123,6 +126,27 @@ func checkShellStatus(paths *config.Paths) statusCheck {
 		name:    "Shell",
 		status:  "ok",
 		message: strings.Join(shells, ", "),
+	}
+}
+
+func checkSessionID() statusCheck {
+	sessionID := os.Getenv("CLAI_SESSION_ID")
+	if sessionID == "" {
+		return statusCheck{
+			name:    "Session",
+			status:  "warn",
+			message: "not set (shell integration not active)",
+		}
+	}
+	// Show shortened session ID for readability
+	shortID := sessionID
+	if len(sessionID) > 8 {
+		shortID = sessionID[:8]
+	}
+	return statusCheck{
+		name:    "Session",
+		status:  "ok",
+		message: shortID,
 	}
 }
 
