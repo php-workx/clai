@@ -1,7 +1,12 @@
 package cmd
 
 import (
+	"context"
+	"errors"
+	"path/filepath"
 	"testing"
+
+	"github.com/runger/clai/internal/storage"
 )
 
 func TestFormatDurationMs(t *testing.T) {
@@ -70,5 +75,143 @@ func TestHistoryCmd_GlobalDefault(t *testing.T) {
 	}
 	if flag.DefValue != "false" {
 		t.Errorf("Expected default global=false, got %s", flag.DefValue)
+	}
+}
+
+// Integration tests for session ID resolution
+
+func newTestStore(t *testing.T) *storage.SQLiteStore {
+	t.Helper()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+	store, err := storage.NewSQLiteStore(dbPath)
+	if err != nil {
+		t.Fatalf("NewSQLiteStore() error = %v", err)
+	}
+	return store
+}
+
+func TestHistoryCmd_ShortSessionID_Resolution(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create a session with a known ID
+	session := &storage.Session{
+		SessionID:       "abc12345-6789-0def-ghij-klmnopqrstuv",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/home/user",
+	}
+
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Test: 8-character prefix should resolve to full session
+	shortID := "abc12345"
+	resolved, err := store.GetSessionByPrefix(ctx, shortID)
+	if err != nil {
+		t.Fatalf("GetSessionByPrefix(%q) error = %v", shortID, err)
+	}
+
+	if resolved.SessionID != session.SessionID {
+		t.Errorf("Resolved session ID = %q, want %q", resolved.SessionID, session.SessionID)
+	}
+}
+
+func TestHistoryCmd_ShortSessionID_NotFound(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Test: Non-existent prefix should return error
+	_, err := store.GetSessionByPrefix(ctx, "nonexist")
+	if err == nil {
+		t.Error("GetSessionByPrefix() should return error for non-existent session")
+	}
+	if !errors.Is(err, storage.ErrSessionNotFound) {
+		t.Errorf("GetSessionByPrefix() error = %v, want ErrSessionNotFound", err)
+	}
+}
+
+func TestHistoryCmd_ShortSessionID_Ambiguous(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create two sessions with same prefix
+	session1 := &storage.Session{
+		SessionID:       "same1234-aaaa-bbbb-cccc-ddddeeeeffffgggg",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/home/user",
+	}
+	session2 := &storage.Session{
+		SessionID:       "same1234-xxxx-yyyy-zzzz-111122223333",
+		StartedAtUnixMs: 1700000001000,
+		Shell:           "bash",
+		OS:              "linux",
+		InitialCWD:      "/tmp",
+	}
+
+	if err := store.CreateSession(ctx, session1); err != nil {
+		t.Fatalf("CreateSession(1) error = %v", err)
+	}
+	if err := store.CreateSession(ctx, session2); err != nil {
+		t.Fatalf("CreateSession(2) error = %v", err)
+	}
+
+	// Test: Ambiguous prefix should return error
+	_, err := store.GetSessionByPrefix(ctx, "same1234")
+	if err == nil {
+		t.Error("GetSessionByPrefix() should return error for ambiguous prefix")
+	}
+	if !errors.Is(err, storage.ErrAmbiguousSession) {
+		t.Errorf("GetSessionByPrefix() error = %v, want ErrAmbiguousSession", err)
+	}
+}
+
+func TestHistoryCmd_FullSessionID_StillWorks(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create a session
+	fullID := "full1234-5678-90ab-cdef-ghijklmnopqr"
+	session := &storage.Session{
+		SessionID:       fullID,
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/home/user",
+	}
+
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Test: Full session ID should work via exact match
+	resolved, err := store.GetSession(ctx, fullID)
+	if err != nil {
+		t.Fatalf("GetSession(%q) error = %v", fullID, err)
+	}
+
+	if resolved.SessionID != fullID {
+		t.Errorf("Resolved session ID = %q, want %q", resolved.SessionID, fullID)
 	}
 }
