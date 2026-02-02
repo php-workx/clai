@@ -724,3 +724,216 @@ func generateTestCommandID(n int) string {
 func boolPtr(b bool) *bool {
 	return &b
 }
+
+func TestSQLiteStore_QueryCommands_SuccessOnly(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create session
+	session := &Session{
+		SessionID:       "success-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Create commands with different success states
+	commands := []struct {
+		id        string
+		cmd       string
+		exitCode  int
+		isSuccess bool
+	}{
+		{"success-cmd-1", "ls", 0, true},
+		{"success-cmd-2", "pwd", 0, true},
+		{"success-cmd-3", "nonexistent-cmd", 127, false},
+		{"success-cmd-4", "false", 1, false},
+	}
+
+	for _, c := range commands {
+		cmd := &Command{
+			CommandID:     c.id,
+			SessionID:     "success-session",
+			TsStartUnixMs: 1700000001000,
+			CWD:           "/tmp",
+			Command:       c.cmd,
+			IsSuccess:     boolPtr(c.isSuccess),
+		}
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand() error = %v", err)
+		}
+		// Update with exit code
+		if err := store.UpdateCommandEnd(ctx, c.id, c.exitCode, 1700000002000, 100); err != nil {
+			t.Fatalf("UpdateCommandEnd() error = %v", err)
+		}
+	}
+
+	// Query successful commands only
+	cmds, err := store.QueryCommands(ctx, CommandQuery{
+		SessionID:   strPtr("success-session"),
+		SuccessOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands() error = %v", err)
+	}
+
+	if len(cmds) != 2 {
+		t.Errorf("Got %d commands, want 2 (success only)", len(cmds))
+	}
+
+	// Verify all returned commands are successful
+	for _, cmd := range cmds {
+		if cmd.IsSuccess == nil || !*cmd.IsSuccess {
+			t.Errorf("Expected successful command, got IsSuccess=%v", cmd.IsSuccess)
+		}
+	}
+}
+
+func TestSQLiteStore_QueryCommands_FailureOnly(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create session
+	session := &Session{
+		SessionID:       "failure-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Create commands with different success states
+	commands := []struct {
+		id        string
+		cmd       string
+		exitCode  int
+		isSuccess bool
+	}{
+		{"failure-cmd-1", "ls", 0, true},
+		{"failure-cmd-2", "pwd", 0, true},
+		{"failure-cmd-3", "nonexistent-cmd", 127, false},
+		{"failure-cmd-4", "false", 1, false},
+		{"failure-cmd-5", "permission-denied", 126, false},
+	}
+
+	for _, c := range commands {
+		cmd := &Command{
+			CommandID:     c.id,
+			SessionID:     "failure-session",
+			TsStartUnixMs: 1700000001000,
+			CWD:           "/tmp",
+			Command:       c.cmd,
+			IsSuccess:     boolPtr(c.isSuccess),
+		}
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand() error = %v", err)
+		}
+		// Update with exit code
+		if err := store.UpdateCommandEnd(ctx, c.id, c.exitCode, 1700000002000, 100); err != nil {
+			t.Fatalf("UpdateCommandEnd() error = %v", err)
+		}
+	}
+
+	// Query failed commands only
+	cmds, err := store.QueryCommands(ctx, CommandQuery{
+		SessionID:   strPtr("failure-session"),
+		FailureOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands() error = %v", err)
+	}
+
+	if len(cmds) != 3 {
+		t.Errorf("Got %d commands, want 3 (failure only)", len(cmds))
+	}
+
+	// Verify all returned commands are failures
+	for _, cmd := range cmds {
+		if cmd.IsSuccess == nil || *cmd.IsSuccess {
+			t.Errorf("Expected failed command, got IsSuccess=%v", cmd.IsSuccess)
+		}
+	}
+}
+
+func TestSQLiteStore_QueryCommands_StatusWithOtherFilters(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create session
+	session := &Session{
+		SessionID:       "combo-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Create commands with different combinations
+	commands := []struct {
+		id        string
+		cmd       string
+		cwd       string
+		exitCode  int
+		isSuccess bool
+	}{
+		{"combo-cmd-1", "git status", "/project", 0, true},
+		{"combo-cmd-2", "git push", "/project", 1, false}, // git push failed
+		{"combo-cmd-3", "git pull", "/project", 0, true},
+		{"combo-cmd-4", "ls", "/tmp", 0, true},
+		{"combo-cmd-5", "git commit", "/project", 1, false}, // git commit failed
+	}
+
+	for _, c := range commands {
+		cmd := &Command{
+			CommandID:     c.id,
+			SessionID:     "combo-session",
+			TsStartUnixMs: 1700000001000,
+			CWD:           c.cwd,
+			Command:       c.cmd,
+			IsSuccess:     boolPtr(c.isSuccess),
+		}
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand() error = %v", err)
+		}
+		if err := store.UpdateCommandEnd(ctx, c.id, c.exitCode, 1700000002000, 100); err != nil {
+			t.Fatalf("UpdateCommandEnd() error = %v", err)
+		}
+	}
+
+	// Query: git commands that failed in /project
+	cwd := "/project"
+	cmds, err := store.QueryCommands(ctx, CommandQuery{
+		CWD:         &cwd,
+		Prefix:      "git",
+		FailureOnly: true,
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands() error = %v", err)
+	}
+
+	if len(cmds) != 2 {
+		t.Errorf("Got %d commands, want 2 (git failures in /project)", len(cmds))
+	}
+}

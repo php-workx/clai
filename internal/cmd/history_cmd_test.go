@@ -42,8 +42,9 @@ func TestHistoryCmd_Flags(t *testing.T) {
 	}{
 		{"limit", "n"},
 		{"cwd", "c"},
-		{"session", "s"},
+		{"session", ""},
 		{"global", "g"},
+		{"status", "s"},
 	}
 
 	for _, f := range expectedFlags {
@@ -53,7 +54,7 @@ func TestHistoryCmd_Flags(t *testing.T) {
 			continue
 		}
 		if flag.Shorthand != f.shorthand {
-			t.Errorf("Flag --%s: expected shorthand -%s, got -%s", f.name, f.shorthand, flag.Shorthand)
+			t.Errorf("Flag --%s: expected shorthand %q, got %q", f.name, f.shorthand, flag.Shorthand)
 		}
 	}
 }
@@ -75,6 +76,19 @@ func TestHistoryCmd_GlobalDefault(t *testing.T) {
 	}
 	if flag.DefValue != "false" {
 		t.Errorf("Expected default global=false, got %s", flag.DefValue)
+	}
+}
+
+func TestHistoryCmd_StatusDefault(t *testing.T) {
+	flag := historyCmd.Flags().Lookup("status")
+	if flag == nil {
+		t.Fatal("status flag not found")
+	}
+	if flag.DefValue != "" {
+		t.Errorf("Expected default status=\"\", got %q", flag.DefValue)
+	}
+	if flag.Shorthand != "s" {
+		t.Errorf("Expected status shorthand -s, got -%s", flag.Shorthand)
 	}
 }
 

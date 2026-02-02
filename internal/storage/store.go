@@ -62,6 +62,8 @@ type CommandQuery struct {
 	CWD              *string
 	Prefix           string
 	Limit            int
+	SuccessOnly      bool // Only return successful commands (exit code 0)
+	FailureOnly      bool // Only return failed commands (exit code != 0)
 }
 
 // CacheEntry represents a cached AI response.

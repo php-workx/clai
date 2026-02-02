@@ -19,6 +19,7 @@ var (
 	historyCWD     string
 	historySession string
 	historyGlobal  bool
+	historyStatus  string
 )
 
 var historyCmd = &cobra.Command{
@@ -39,15 +40,18 @@ Examples:
   clai history --limit=50         # Show last 50 commands
   clai history git                # Show commands starting with "git"
   clai history -c /tmp            # Show commands from /tmp directory
-  clai history -s <session-id>    # Show specific session`,
+  clai history --session=abc123   # Show specific session (8+ char prefix)
+  clai history -s success         # Show only successful commands
+  clai history -s failure         # Show only failed commands`,
 	RunE: runHistory,
 }
 
 func init() {
 	historyCmd.Flags().IntVarP(&historyLimit, "limit", "n", 20, "Maximum number of commands to show")
 	historyCmd.Flags().StringVarP(&historyCWD, "cwd", "c", "", "Filter by working directory")
-	historyCmd.Flags().StringVarP(&historySession, "session", "s", "", "Filter by specific session ID")
+	historyCmd.Flags().StringVar(&historySession, "session", "", "Filter by specific session ID")
 	historyCmd.Flags().BoolVarP(&historyGlobal, "global", "g", false, "Show history across all sessions")
+	historyCmd.Flags().StringVarP(&historyStatus, "status", "s", "", "Filter by status: 'success' or 'failure'")
 }
 
 func runHistory(cmd *cobra.Command, args []string) error {
@@ -104,6 +108,18 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	// Build query
 	query := storage.CommandQuery{
 		Limit: historyLimit,
+	}
+
+	// Add status filter if provided
+	switch historyStatus {
+	case "success":
+		query.SuccessOnly = true
+	case "failure":
+		query.FailureOnly = true
+	case "":
+		// No filter - show all
+	default:
+		return fmt.Errorf("invalid status: %s (use 'success' or 'failure')", historyStatus)
 	}
 
 	// Add prefix filter if provided

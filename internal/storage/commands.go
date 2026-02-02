@@ -152,6 +152,14 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 		args = append(args, q.Prefix+"%")
 	}
 
+	if q.SuccessOnly {
+		query += " AND is_success = 1"
+	}
+
+	if q.FailureOnly {
+		query += " AND is_success = 0"
+	}
+
 	query += " ORDER BY ts_start_unix_ms DESC"
 
 	if q.Limit > 0 {
