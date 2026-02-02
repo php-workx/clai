@@ -13,8 +13,9 @@ import (
 )
 
 var doctorCmd = &cobra.Command{
-	Use:   "doctor",
-	Short: "Check clai installation and dependencies",
+	Use:    "doctor",
+	Short:  "Check clai installation and dependencies",
+	Hidden: true,
 	Long: `Run diagnostic checks on your clai installation.
 
 This command checks:

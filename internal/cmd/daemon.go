@@ -9,8 +9,9 @@ import (
 )
 
 var daemonCmd = &cobra.Command{
-	Use:   "daemon",
-	Short: "Manage the background Claude daemon for faster responses",
+	Use:    "daemon",
+	Short:  "Manage the background Claude daemon for faster responses",
+	Hidden: true,
 	Long: `Manage the background Claude daemon process.
 
 The daemon keeps a Claude CLI process running in the background to eliminate

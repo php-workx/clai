@@ -2,38 +2,11 @@ package cmd
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/runger/clai/internal/cache"
 	"github.com/runger/clai/internal/extract"
 )
-
-func TestDiagnoseCmd_RequiresArgs(t *testing.T) {
-	// Test that diagnose requires at least one argument
-	err := diagnoseCmd.Args(diagnoseCmd, []string{})
-	if err == nil {
-		t.Error("diagnose should require at least 1 argument")
-	}
-
-	// Test that diagnose accepts 1 argument
-	err = diagnoseCmd.Args(diagnoseCmd, []string{"npm run build"})
-	if err != nil {
-		t.Errorf("diagnose should accept 1 argument, got error: %v", err)
-	}
-
-	// Test that diagnose accepts 2 arguments
-	err = diagnoseCmd.Args(diagnoseCmd, []string{"npm run build", "1"})
-	if err != nil {
-		t.Errorf("diagnose should accept 2 arguments, got error: %v", err)
-	}
-
-	// Test that diagnose rejects 3+ arguments
-	err = diagnoseCmd.Args(diagnoseCmd, []string{"a", "b", "c"})
-	if err == nil {
-		t.Error("diagnose should reject more than 2 arguments")
-	}
-}
 
 func TestAskCmd_RequiresArgs(t *testing.T) {
 	// Test that ask requires at least one argument
@@ -78,7 +51,7 @@ func TestInitCmd_InvalidShell(t *testing.T) {
 	}
 }
 
-func TestExtractCmd_WithExtractPackage(t *testing.T) {
+func TestExtractPackage_Suggestions(t *testing.T) {
 	// Test extract logic directly using the extract package
 	tests := []struct {
 		name           string
@@ -163,32 +136,7 @@ func TestCacheIntegration(t *testing.T) {
 	}
 }
 
-func TestDiagnoseCmd_ReadsCache(t *testing.T) {
-	// Set up temp cache dir
-	tmpDir := t.TempDir()
-	os.Setenv("CLAI_CACHE", tmpDir)
-	defer os.Unsetenv("CLAI_CACHE")
-
-	// Write mock error output
-	mockOutput := "npm ERR! code ENOENT\nnpm ERR! missing script: build"
-	err := cache.WriteLastOutput(mockOutput)
-	if err != nil {
-		t.Fatalf("Failed to write mock output: %v", err)
-	}
-
-	// Verify cache file exists
-	lastOutputFile := filepath.Join(tmpDir, "last_output")
-	data, err := os.ReadFile(lastOutputFile)
-	if err != nil {
-		t.Fatalf("Failed to read cache file: %v", err)
-	}
-
-	if string(data) != mockOutput {
-		t.Errorf("Cache file content = %q, want %q", string(data), mockOutput)
-	}
-}
-
-func TestExtractCmd_CachesOutput(t *testing.T) {
+func TestCacheWorkflow(t *testing.T) {
 	// Set up temp cache dir
 	tmpDir := t.TempDir()
 	os.Setenv("CLAI_CACHE", tmpDir)

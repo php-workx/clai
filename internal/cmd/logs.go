@@ -18,8 +18,9 @@ var (
 )
 
 var logsCmd = &cobra.Command{
-	Use:   "logs",
-	Short: "View daemon logs",
+	Use:    "logs",
+	Short:  "View daemon logs",
+	Hidden: true,
 	Long: `View the clai daemon log file.
 
 By default, shows the last 50 lines of the log file.

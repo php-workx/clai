@@ -72,22 +72,22 @@ func TestCleanCommand(t *testing.T) {
 	}
 }
 
-func TestVoiceCmd_RequiresArgs(t *testing.T) {
-	// Test that voice requires at least one argument
-	err := voiceCmd.Args(voiceCmd, []string{})
+func TestCmdCmd_RequiresArgs(t *testing.T) {
+	// Test that cmd requires at least one argument
+	err := cmdCmd.Args(cmdCmd, []string{})
 	if err == nil {
-		t.Error("voice should require at least 1 argument")
+		t.Error("cmd should require at least 1 argument")
 	}
 
-	// Test that voice accepts arguments
-	err = voiceCmd.Args(voiceCmd, []string{"list all files"})
+	// Test that cmd accepts arguments
+	err = cmdCmd.Args(cmdCmd, []string{"list all files"})
 	if err != nil {
-		t.Errorf("voice should accept arguments, got error: %v", err)
+		t.Errorf("cmd should accept arguments, got error: %v", err)
 	}
 
-	// Test that voice accepts multiple arguments (they get joined)
-	err = voiceCmd.Args(voiceCmd, []string{"list", "all", "files"})
+	// Test that cmd accepts multiple arguments (they get joined)
+	err = cmdCmd.Args(cmdCmd, []string{"list", "all", "files"})
 	if err != nil {
-		t.Errorf("voice should accept multiple arguments, got error: %v", err)
+		t.Errorf("cmd should accept multiple arguments, got error: %v", err)
 	}
 }

@@ -178,16 +178,19 @@ func TestPerformance_InitCommandFast(t *testing.T) {
 		t.Skip("skipping performance test in short mode")
 	}
 
+	// Skip in containers - absolute timing is meaningless due to container overhead.
+	// The relative overhead tests (IntegrationOverhead, SourceScriptFast) still run
+	// and catch real performance issues since container overhead cancels out.
+	if isRunningInContainer() {
+		t.Skip("skipping absolute timing test in container - use relative overhead tests instead")
+	}
+
 	claiPath, err := exec.LookPath("clai")
 	if err != nil {
 		t.Skip("clai binary not found in PATH")
 	}
 
-	// Use higher threshold in containers due to overhead
 	threshold := 50 * time.Millisecond
-	if isRunningInContainer() {
-		threshold = 150 * time.Millisecond
-	}
 
 	shells := []string{"zsh", "bash", "fish"}
 

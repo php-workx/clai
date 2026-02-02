@@ -61,7 +61,7 @@ type PrivacyConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Daemon: DaemonConfig{
-			IdleTimeoutMins: 20,
+			IdleTimeoutMins: 0,  // Never timeout - daemon runs until shell exits
 			SocketPath:      "", // Use default from paths
 			LogLevel:        "info",
 			LogFile:         "", // Use default from paths
@@ -445,25 +445,11 @@ func isValidProvider(provider string) bool {
 	}
 }
 
-// ListKeys returns all valid configuration keys.
+// ListKeys returns user-facing configuration keys.
+// Internal settings (daemon, client, ai, privacy) are not exposed.
 func ListKeys() []string {
 	return []string{
-		"daemon.idle_timeout_mins",
-		"daemon.socket_path",
-		"daemon.log_level",
-		"daemon.log_file",
-		"client.suggest_timeout_ms",
-		"client.connect_timeout_ms",
-		"client.fire_and_forget",
-		"client.auto_start_daemon",
-		"ai.enabled",
-		"ai.provider",
-		"ai.model",
-		"ai.auto_diagnose",
-		"ai.cache_ttl_hours",
 		"suggestions.max_history",
-		"suggestions.max_ai",
 		"suggestions.show_risk_warning",
-		"privacy.sanitize_ai_calls",
 	}
 }

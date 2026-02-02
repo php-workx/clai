@@ -1,27 +1,23 @@
 package cmd
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/runger/clai/internal/config"
 )
 
 func TestConfigCmd_List(t *testing.T) {
-	// The config command should list all keys when called with no args
-	// We test against the actual production key list from the config package
+	// The config command should list user-facing keys only
 	keys := config.ListKeys()
 
-	// Verify we have a reasonable number of keys
-	if len(keys) == 0 {
-		t.Error("config.ListKeys() returned empty list")
+	// Should have exactly the user-facing keys
+	expectedKeys := []string{
+		"suggestions.max_history",
+		"suggestions.show_risk_warning",
 	}
 
-	// Verify some expected core keys are present
-	expectedKeys := []string{
-		"daemon.idle_timeout_mins",
-		"ai.enabled",
-		"privacy.sanitize_ai_calls",
+	if len(keys) != len(expectedKeys) {
+		t.Errorf("Expected %d keys, got %d: %v", len(expectedKeys), len(keys), keys)
 	}
 
 	for _, expected := range expectedKeys {
@@ -34,23 +30,6 @@ func TestConfigCmd_List(t *testing.T) {
 		}
 		if !found {
 			t.Errorf("Expected key %q to be in config.ListKeys() result", expected)
-		}
-	}
-}
-
-func TestFormatBool(t *testing.T) {
-	tests := []struct {
-		input    bool
-		contains string
-	}{
-		{true, "enabled"},
-		{false, "disabled"},
-	}
-
-	for _, tt := range tests {
-		result := formatBool(tt.input)
-		if !strings.Contains(result, tt.contains) {
-			t.Errorf("formatBool(%v) = %q, should contain %q", tt.input, result, tt.contains)
 		}
 	}
 }

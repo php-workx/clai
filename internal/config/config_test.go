@@ -10,8 +10,8 @@ func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
 
 	// Check defaults
-	if cfg.Daemon.IdleTimeoutMins != 20 {
-		t.Errorf("Expected idle_timeout_mins=20, got %d", cfg.Daemon.IdleTimeoutMins)
+	if cfg.Daemon.IdleTimeoutMins != 0 {
+		t.Errorf("Expected idle_timeout_mins=0, got %d", cfg.Daemon.IdleTimeoutMins)
 	}
 	if cfg.Daemon.LogLevel != "info" {
 		t.Errorf("Expected log_level=info, got %s", cfg.Daemon.LogLevel)
@@ -46,7 +46,7 @@ func TestConfigGet(t *testing.T) {
 		key      string
 		expected string
 	}{
-		{"daemon.idle_timeout_mins", "20"},
+		{"daemon.idle_timeout_mins", "0"},
 		{"daemon.log_level", "info"},
 		{"client.suggest_timeout_ms", "50"},
 		{"client.fire_and_forget", "true"},
@@ -220,8 +220,8 @@ func TestLoadFromFile_NonExistent(t *testing.T) {
 	}
 
 	// Should have default values
-	if cfg.Daemon.IdleTimeoutMins != 20 {
-		t.Errorf("Expected default idle_timeout_mins=20, got %d", cfg.Daemon.IdleTimeoutMins)
+	if cfg.Daemon.IdleTimeoutMins != 0 {
+		t.Errorf("Expected default idle_timeout_mins=0, got %d", cfg.Daemon.IdleTimeoutMins)
 	}
 }
 
@@ -272,11 +272,15 @@ func TestListKeys(t *testing.T) {
 		t.Error("ListKeys returned empty list")
 	}
 
-	// Check some expected keys are present
+	// Check that only user-facing keys are present
+	// Internal settings (daemon, client, ai, privacy) are not exposed
 	expectedKeys := []string{
-		"daemon.idle_timeout_mins",
-		"ai.enabled",
-		"privacy.sanitize_ai_calls",
+		"suggestions.max_history",
+		"suggestions.show_risk_warning",
+	}
+
+	if len(keys) != len(expectedKeys) {
+		t.Errorf("ListKeys returned %d keys, want %d: %v", len(keys), len(expectedKeys), keys)
 	}
 
 	for _, expected := range expectedKeys {
@@ -1139,8 +1143,8 @@ func TestLoadFromFile_EmptyFile(t *testing.T) {
 	}
 
 	// Should have default values
-	if cfg.Daemon.IdleTimeoutMins != 20 {
-		t.Errorf("Expected default idle_timeout_mins=20, got %d", cfg.Daemon.IdleTimeoutMins)
+	if cfg.Daemon.IdleTimeoutMins != 0 {
+		t.Errorf("Expected default idle_timeout_mins=0, got %d", cfg.Daemon.IdleTimeoutMins)
 	}
 }
 
@@ -1280,33 +1284,15 @@ func TestLoadFromFile_ReadError(t *testing.T) {
 func TestListKeysComplete(t *testing.T) {
 	keys := ListKeys()
 
+	// Only user-facing keys are exposed via ListKeys()
+	// Internal settings (daemon, client, ai, privacy) are not exposed
 	expectedKeys := []string{
-		// Daemon keys
-		"daemon.idle_timeout_mins",
-		"daemon.socket_path",
-		"daemon.log_level",
-		"daemon.log_file",
-		// Client keys
-		"client.suggest_timeout_ms",
-		"client.connect_timeout_ms",
-		"client.fire_and_forget",
-		"client.auto_start_daemon",
-		// AI keys
-		"ai.enabled",
-		"ai.provider",
-		"ai.model",
-		"ai.auto_diagnose",
-		"ai.cache_ttl_hours",
-		// Suggestions keys
 		"suggestions.max_history",
-		"suggestions.max_ai",
 		"suggestions.show_risk_warning",
-		// Privacy keys
-		"privacy.sanitize_ai_calls",
 	}
 
 	if len(keys) != len(expectedKeys) {
-		t.Errorf("ListKeys returned %d keys, want %d", len(keys), len(expectedKeys))
+		t.Errorf("ListKeys returned %d keys, want %d: %v", len(keys), len(expectedKeys), keys)
 	}
 
 	keySet := make(map[string]bool)
@@ -1338,25 +1324,11 @@ func TestListKeysAllGettable(t *testing.T) {
 func TestListKeysAllSettable(t *testing.T) {
 	keys := ListKeys()
 
-	// Map of keys to valid test values
+	// Map of user-facing keys to valid test values
+	// Only the keys exposed by ListKeys() need to be here
 	testValues := map[string]string{
-		"daemon.idle_timeout_mins":      "30",
-		"daemon.socket_path":            "/tmp/test.sock",
-		"daemon.log_level":              "debug",
-		"daemon.log_file":               "/tmp/test.log",
-		"client.suggest_timeout_ms":     "100",
-		"client.connect_timeout_ms":     "20",
-		"client.fire_and_forget":        "false",
-		"client.auto_start_daemon":      "false",
-		"ai.enabled":                    "true",
-		"ai.provider":                   "anthropic",
-		"ai.model":                      "test-model",
-		"ai.auto_diagnose":              "true",
-		"ai.cache_ttl_hours":            "48",
 		"suggestions.max_history":       "10",
-		"suggestions.max_ai":            "5",
 		"suggestions.show_risk_warning": "false",
-		"privacy.sanitize_ai_calls":     "false",
 	}
 
 	for _, key := range keys {
@@ -1389,7 +1361,7 @@ func TestDefaultConfigValues(t *testing.T) {
 		expected interface{}
 	}{
 		// Daemon defaults
-		{"Daemon.IdleTimeoutMins", cfg.Daemon.IdleTimeoutMins, 20},
+		{"Daemon.IdleTimeoutMins", cfg.Daemon.IdleTimeoutMins, 0},
 		{"Daemon.SocketPath", cfg.Daemon.SocketPath, ""},
 		{"Daemon.LogLevel", cfg.Daemon.LogLevel, "info"},
 		{"Daemon.LogFile", cfg.Daemon.LogFile, ""},

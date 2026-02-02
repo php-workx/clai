@@ -18,11 +18,9 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.AddCommand(diagnoseCmd)
-	rootCmd.AddCommand(extractCmd)
 	rootCmd.AddCommand(askCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(voiceCmd)
+	rootCmd.AddCommand(cmdCmd)
 	rootCmd.AddCommand(daemonCmd)
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -16,10 +17,10 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show clai status",
 	Long: `Show the current status of clai, including:
-- Daemon status (running/stopped)
-- Configuration file location
-- Database location
+- Binary and Claude CLI availability
 - Shell integration status
+- Daemon status
+- Storage and configuration
 
 Examples:
   clai status`,
@@ -30,67 +31,180 @@ func init() {
 	rootCmd.AddCommand(statusCmd)
 }
 
+type statusCheck struct {
+	name    string
+	status  string // "ok", "warn", "error"
+	message string
+}
+
 func runStatus(cmd *cobra.Command, args []string) error {
 	paths := config.DefaultPaths()
-	cfg, _ := config.Load() // Ignore error, use defaults
 
-	fmt.Printf("%sclai Status%s\n", colorBold, colorReset)
+	fmt.Printf("%sclai status%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
 
-	// Daemon status (clai daemon - handles shell integration requests)
-	fmt.Printf("\n%sDaemon:%s\n", colorBold, colorReset)
-	if daemon.IsRunning() {
-		fmt.Printf("  Status:  %srunning%s\n", colorGreen, colorReset)
-	} else {
-		fmt.Printf("  Status:  %snot running%s\n", colorDim, colorReset)
-		fmt.Printf("  Starts automatically when shell integration loads.\n")
-	}
+	checks := make([]statusCheck, 0, 5)
 
-	// Configuration
-	fmt.Printf("\n%sConfiguration:%s\n", colorBold, colorReset)
-	configFile := paths.ConfigFile()
-	if _, err := os.Stat(configFile); err == nil {
-		fmt.Printf("  File:    %s\n", configFile)
-	} else {
-		fmt.Printf("  File:    %s (not found, using defaults)\n", configFile)
-	}
-	fmt.Printf("  AI:      %s\n", formatBool(cfg.AI.Enabled))
-	fmt.Printf("  Provider: %s\n", cfg.AI.Provider)
+	// Check Claude CLI
+	checks = append(checks, checkClaudeCLI())
 
-	// Storage
-	fmt.Printf("\n%sStorage:%s\n", colorBold, colorReset)
-	dbFile := paths.DatabaseFile()
-	if info, err := os.Stat(dbFile); err == nil {
-		fmt.Printf("  Database: %s (%s)\n", dbFile, formatSize(info.Size()))
-	} else {
-		fmt.Printf("  Database: %s (not created)\n", dbFile)
-	}
+	// Check shell integration
+	checks = append(checks, checkShellStatus(paths))
 
-	// Cache
-	cacheDir := paths.CacheDir()
-	if info, err := os.Stat(cacheDir); err == nil && info.IsDir() {
-		fmt.Printf("  Cache:    %s\n", cacheDir)
-	}
+	// Check daemon
+	checks = append(checks, checkDaemonStatus())
 
-	// Shell integration
-	fmt.Printf("\n%sShell Integration:%s\n", colorBold, colorReset)
-	shells := checkShellIntegrationWithPaths(paths)
-	if len(shells) == 0 {
-		fmt.Printf("  Status:  %snot installed%s\n", colorDim, colorReset)
-		fmt.Printf("  Run 'clai install' to set up shell integration.\n")
-	} else {
-		fmt.Printf("  Status:  %sinstalled%s\n", colorGreen, colorReset)
-		for _, s := range shells {
-			fmt.Printf("  - %s\n", s)
+	// Check storage
+	checks = append(checks, checkStorage(paths))
+
+	// Check configuration
+	checks = append(checks, checkConfig(paths))
+
+	// Print results
+	hasErrors := false
+	hasWarnings := false
+
+	for _, c := range checks {
+		var statusIcon string
+		switch c.status {
+		case "ok":
+			statusIcon = colorGreen + "[OK]" + colorReset
+		case "warn":
+			statusIcon = colorYellow + "[WARN]" + colorReset
+			hasWarnings = true
+		case "error":
+			statusIcon = colorRed + "[ERROR]" + colorReset
+			hasErrors = true
 		}
+
+		fmt.Printf("  %s %-12s %s%s%s\n", statusIcon, c.name, colorDim, c.message, colorReset)
 	}
 
-	// Quick stats if database exists
-	if _, err := os.Stat(dbFile); err == nil {
-		printQuickStats(paths)
+	fmt.Println()
+
+	if hasErrors {
+		fmt.Printf("%sSome checks failed.%s\n", colorRed, colorReset)
+		return fmt.Errorf("status check found errors")
+	}
+
+	if hasWarnings {
+		fmt.Printf("%sAll critical checks passed.%s\n", colorYellow, colorReset)
+	} else {
+		fmt.Printf("%sAll checks passed!%s\n", colorGreen, colorReset)
 	}
 
 	return nil
+}
+
+func checkClaudeCLI() statusCheck {
+	path, err := exec.LookPath("claude")
+	if err != nil {
+		return statusCheck{
+			name:    "Claude CLI",
+			status:  "error",
+			message: "not found (install from claude.ai/cli)",
+		}
+	}
+	return statusCheck{
+		name:    "Claude CLI",
+		status:  "ok",
+		message: path,
+	}
+}
+
+func checkShellStatus(paths *config.Paths) statusCheck {
+	shells := checkShellIntegrationWithPaths(paths)
+	if len(shells) == 0 {
+		return statusCheck{
+			name:    "Shell",
+			status:  "warn",
+			message: "not installed (run 'clai install')",
+		}
+	}
+	// Compact format - just show the shell names
+	return statusCheck{
+		name:    "Shell",
+		status:  "ok",
+		message: strings.Join(shells, ", "),
+	}
+}
+
+func checkDaemonStatus() statusCheck {
+	if daemon.IsRunning() {
+		return statusCheck{
+			name:    "Daemon",
+			status:  "ok",
+			message: "running",
+		}
+	}
+	return statusCheck{
+		name:    "Daemon",
+		status:  "warn",
+		message: "not running (starts automatically)",
+	}
+}
+
+func checkStorage(paths *config.Paths) statusCheck {
+	baseDir := paths.BaseDir
+	dbFile := paths.DatabaseFile()
+
+	// Check if base directory exists
+	if _, err := os.Stat(baseDir); os.IsNotExist(err) {
+		return statusCheck{
+			name:    "Storage",
+			status:  "warn",
+			message: fmt.Sprintf("%s (will be created)", baseDir),
+		}
+	}
+
+	// Check database size
+	dbSize := ""
+	if info, err := os.Stat(dbFile); err == nil {
+		dbSize = fmt.Sprintf(" (db: %s)", formatSize(info.Size()))
+	}
+
+	return statusCheck{
+		name:    "Storage",
+		status:  "ok",
+		message: baseDir + dbSize,
+	}
+}
+
+func checkConfig(paths *config.Paths) statusCheck {
+	configFile := paths.ConfigFile()
+
+	// Try to load and validate config
+	cfg, err := config.LoadFromFile(configFile)
+	if err != nil {
+		return statusCheck{
+			name:    "Config",
+			status:  "error",
+			message: fmt.Sprintf("failed to load: %v", err),
+		}
+	}
+
+	if err := cfg.Validate(); err != nil {
+		return statusCheck{
+			name:    "Config",
+			status:  "error",
+			message: fmt.Sprintf("invalid: %v", err),
+		}
+	}
+
+	// Check if config file exists
+	if _, err := os.Stat(configFile); os.IsNotExist(err) {
+		return statusCheck{
+			name:    "Config",
+			status:  "ok",
+			message: "using defaults",
+		}
+	}
+
+	return statusCheck{
+		name:    "Config",
+		status:  "ok",
+		message: configFile,
+	}
 }
 
 func checkShellIntegrationWithPaths(paths *config.Paths) []string {
@@ -105,7 +219,7 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 
 	// Check if clai integration is active in THIS shell
 	if detection.Active {
-		installed = append(installed, fmt.Sprintf("%s (active session)", detection.Shell))
+		installed = append(installed, fmt.Sprintf("%s (active)", detection.Shell))
 		return installed
 	}
 
@@ -116,7 +230,7 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 	if shellToCheck == "" || shellToCheck == "zsh" {
 		zshrc := filepath.Join(home, ".zshrc")
 		if ok, _, _ := isInstalled(zshrc, filepath.Join(paths.HooksDir(), "clai.zsh"), "zsh"); ok {
-			installed = append(installed, "zsh (.zshrc)")
+			installed = append(installed, "zsh")
 		}
 	}
 
@@ -124,12 +238,14 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 	if shellToCheck == "" || shellToCheck == "bash" {
 		bashrc := filepath.Join(home, ".bashrc")
 		if ok, _, _ := isInstalled(bashrc, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
-			installed = append(installed, "bash (.bashrc)")
+			installed = append(installed, "bash")
 		}
 
 		bashProfile := filepath.Join(home, ".bash_profile")
 		if ok, _, _ := isInstalled(bashProfile, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
-			installed = append(installed, "bash (.bash_profile)")
+			if len(installed) == 0 || installed[len(installed)-1] != "bash" {
+				installed = append(installed, "bash")
+			}
 		}
 	}
 
@@ -137,7 +253,7 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 	if shellToCheck == "" || shellToCheck == "fish" {
 		fishConfig := filepath.Join(home, ".config", "fish", "config.fish")
 		if ok, _, _ := isInstalled(fishConfig, filepath.Join(paths.HooksDir(), "clai.fish"), "fish"); ok {
-			installed = append(installed, "fish (config.fish)")
+			installed = append(installed, "fish")
 		}
 	}
 
@@ -146,19 +262,6 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 
 func checkShellIntegration() []string {
 	return checkShellIntegrationWithPaths(config.DefaultPaths())
-}
-
-func printQuickStats(paths *config.Paths) {
-	// This would ideally query the database, but for now we'll keep it simple
-	fmt.Printf("\n%sQuick Stats:%s\n", colorBold, colorReset)
-	fmt.Printf("  Run 'clai history --limit=5' to see recent commands.\n")
-}
-
-func formatBool(b bool) string {
-	if b {
-		return colorGreen + "enabled" + colorReset
-	}
-	return colorDim + "disabled" + colorReset
 }
 
 func formatSize(bytes int64) string {

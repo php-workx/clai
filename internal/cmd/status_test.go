@@ -309,12 +309,12 @@ func TestCheckShellIntegrationWithPaths_ActiveSession(t *testing.T) {
 
 	result := checkShellIntegrationWithPaths(paths)
 
-	// Should find "zsh (active session)"
+	// Should find "zsh (active)"
 	if len(result) != 1 {
 		t.Errorf("expected 1 result for active session, got %v", result)
 	}
-	if len(result) > 0 && result[0] != "zsh (active session)" {
-		t.Errorf("expected 'zsh (active session)', got %q", result[0])
+	if len(result) > 0 && result[0] != "zsh (active)" {
+		t.Errorf("expected 'zsh (active)', got %q", result[0])
 	}
 }
 

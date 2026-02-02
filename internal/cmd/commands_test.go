@@ -10,11 +10,10 @@ func TestRootCmd_HasCommands(t *testing.T) {
 	// Verify expected commands are registered
 	expectedCommands := []string{
 		"ask",
+		"cmd",
 		"config",
 		"daemon",
-		"diagnose",
 		"doctor",
-		"extract",
 		"history",
 		"init",
 		"install",
@@ -23,7 +22,6 @@ func TestRootCmd_HasCommands(t *testing.T) {
 		"suggest",
 		"uninstall",
 		"version",
-		"voice",
 	}
 
 	commands := rootCmd.Commands()

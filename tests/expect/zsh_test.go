@@ -396,16 +396,16 @@ func TestZsh_StatusShowsCorrectShell(t *testing.T) {
 	err = session.SendLine("clai status")
 	require.NoError(t, err)
 
-	// Should show zsh in shell integration section
-	output, err := session.ExpectTimeout("Shell Integration", 5*time.Second)
-	require.NoError(t, err, "expected Shell Integration in output")
+	// Should show shell status line with zsh
+	output, err := session.ExpectTimeout("Shell", 5*time.Second)
+	require.NoError(t, err, "expected Shell in output")
 
 	// Get more output
 	moreOutput, _ := session.ExpectTimeout("zsh", 3*time.Second)
 	combined := output + moreOutput
 
 	// Status should detect zsh via CLAI_CURRENT_SHELL set by init
-	assert.Contains(t, combined, "zsh", "status should show zsh shell integration")
+	assert.Contains(t, combined, "zsh", "status should show zsh shell")
 }
 
 // TestZsh_InstallDetectsShell verifies clai install correctly detects zsh
