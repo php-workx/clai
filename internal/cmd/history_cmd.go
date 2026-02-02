@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -72,12 +73,12 @@ func runHistory(cmd *cobra.Command, args []string) error {
 
 	// Validate session if specified
 	if sessionID != "" {
-		session, err := store.GetSession(ctx, sessionID)
+		_, err := store.GetSession(ctx, sessionID)
 		if err != nil {
-			return fmt.Errorf("failed to validate session: %w", err)
-		}
-		if session == nil {
-			return fmt.Errorf("session not found: %s", sessionID)
+			if errors.Is(err, storage.ErrSessionNotFound) {
+				return fmt.Errorf("session not found (%s)", sessionID)
+			}
+			return err
 		}
 	}
 
