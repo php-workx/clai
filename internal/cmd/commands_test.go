@@ -76,5 +76,97 @@ func TestDaemonCmd_HasSubcommands(t *testing.T) {
 	}
 }
 
+func TestRootCmd_CommandGroups(t *testing.T) {
+	// Verify command groups are defined
+	groups := rootCmd.Groups()
+	if len(groups) != 2 {
+		t.Errorf("Expected 2 command groups, got %d", len(groups))
+	}
+
+	groupIDs := make(map[string]bool)
+	for _, g := range groups {
+		groupIDs[g.ID] = true
+	}
+
+	if !groupIDs["core"] {
+		t.Error("Expected 'core' command group")
+	}
+	if !groupIDs["setup"] {
+		t.Error("Expected 'setup' command group")
+	}
+}
+
+func TestRootCmd_HiddenCommands(t *testing.T) {
+	// These commands should be hidden but still functional
+	hiddenCommands := []string{"daemon", "logs", "doctor"}
+
+	for _, name := range hiddenCommands {
+		var found *cobra.Command
+		for _, cmd := range rootCmd.Commands() {
+			if cmd.Name() == name {
+				found = cmd
+				break
+			}
+		}
+
+		if found == nil {
+			t.Errorf("Hidden command %q should still be registered", name)
+			continue
+		}
+
+		if !found.Hidden {
+			t.Errorf("Command %q should be hidden", name)
+		}
+	}
+}
+
+func TestRootCmd_CoreCommandsGrouped(t *testing.T) {
+	// Core commands should be in the core group
+	coreCommands := []string{"ask", "cmd", "suggest", "history"}
+
+	for _, name := range coreCommands {
+		var found *cobra.Command
+		for _, cmd := range rootCmd.Commands() {
+			if cmd.Name() == name {
+				found = cmd
+				break
+			}
+		}
+
+		if found == nil {
+			t.Errorf("Core command %q not found", name)
+			continue
+		}
+
+		if found.GroupID != groupCore {
+			t.Errorf("Command %q should be in group %q, got %q", name, groupCore, found.GroupID)
+		}
+	}
+}
+
+func TestRootCmd_SetupCommandsGrouped(t *testing.T) {
+	// Setup commands should be in the setup group
+	setupCommands := []string{"status", "config", "install", "uninstall", "init", "version"}
+
+	for _, name := range setupCommands {
+		var found *cobra.Command
+		for _, cmd := range rootCmd.Commands() {
+			if cmd.Name() == name {
+				found = cmd
+				break
+			}
+		}
+
+		if found == nil {
+			t.Errorf("Setup command %q not found", name)
+			continue
+		}
+
+		if found.GroupID != groupSetup {
+			t.Errorf("Command %q should be in group %q, got %q", name, groupSetup, found.GroupID)
+		}
+	}
+}
+
 // Ensure cobra is used
 var _ *cobra.Command = nil

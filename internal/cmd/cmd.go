@@ -14,8 +14,9 @@ import (
 )
 
 var cmdCmd = &cobra.Command{
-	Use:   "cmd <natural language>",
-	Short: "Convert natural language to a terminal command",
+	Use:     "cmd <natural language>",
+	Short:   "Convert natural language to a terminal command",
+	GroupID: groupCore,
 	Long: `Convert natural language input into a terminal command.
 
 The converted command is also cached for Tab completion.

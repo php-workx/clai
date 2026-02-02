@@ -10,8 +10,9 @@ import (
 )
 
 var configCmd = &cobra.Command{
-	Use:   "config [key] [value]",
-	Short: "Get or set configuration values",
+	Use:     "config [key] [value]",
+	Short:   "Get or set configuration values",
+	GroupID: groupSetup,
 	Long: `Get or set clai configuration values.
 
 Without arguments, lists all configuration keys.
@@ -30,10 +31,6 @@ Examples:
   clai config daemon.idle_timeout_mins 30`,
 	Args: cobra.MaximumNArgs(2),
 	RunE: runConfig,
-}
-
-func init() {
-	rootCmd.AddCommand(configCmd)
 }
 
 func runConfig(cmd *cobra.Command, args []string) error {

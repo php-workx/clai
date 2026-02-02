@@ -19,8 +19,9 @@ var (
 )
 
 var historyCmd = &cobra.Command{
-	Use:   "history [query]",
-	Short: "Show command history",
+	Use:     "history [query]",
+	Short:   "Show command history",
+	GroupID: groupCore,
 	Long: `Show command history from the clai database.
 
 Without arguments, shows the most recent commands.
@@ -43,7 +44,6 @@ func init() {
 	historyCmd.Flags().IntVarP(&historyLimit, "limit", "n", 20, "Maximum number of commands to show")
 	historyCmd.Flags().StringVar(&historyCWD, "cwd", "", "Filter by working directory")
 	historyCmd.Flags().StringVar(&historySession, "session", "", "Filter by session ID (use $CLAI_SESSION_ID for current session)")
-	rootCmd.AddCommand(historyCmd)
 }
 
 func runHistory(cmd *cobra.Command, args []string) error {

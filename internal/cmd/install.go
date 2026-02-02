@@ -18,8 +18,9 @@ var (
 )
 
 var installCmd = &cobra.Command{
-	Use:   "install",
-	Short: "Install shell integration",
+	Use:     "install",
+	Short:   "Install shell integration",
+	GroupID: groupSetup,
 	Long: `Install clai shell integration into your shell configuration file.
 
 This command adds a source line to your shell's rc file (.zshrc, .bashrc, etc.)
@@ -37,7 +38,6 @@ Examples:
 
 func init() {
 	installCmd.Flags().StringVar(&installShell, "shell", "", "Shell to install for (zsh, bash, fish)")
-	rootCmd.AddCommand(installCmd)
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {

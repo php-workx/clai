@@ -14,8 +14,9 @@ import (
 )
 
 var statusCmd = &cobra.Command{
-	Use:   "status",
-	Short: "Show clai status",
+	Use:     "status",
+	Short:   "Show clai status",
+	GroupID: groupSetup,
 	Long: `Show the current status of clai, including:
 - Binary and Claude CLI availability
 - Shell integration status
@@ -25,10 +26,6 @@ var statusCmd = &cobra.Command{
 Examples:
   clai status`,
 	RunE: runStatus,
-}
-
-func init() {
-	rootCmd.AddCommand(statusCmd)
 }
 
 type statusCheck struct {

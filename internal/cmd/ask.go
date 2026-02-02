@@ -15,8 +15,9 @@ import (
 )
 
 var askCmd = &cobra.Command{
-	Use:   "ask <question>",
-	Short: "Ask Claude a question with terminal context",
+	Use:     "ask <question>",
+	Short:   "Ask Claude a question with terminal context",
+	GroupID: groupCore,
 	Long: `Ask Claude a question, automatically including terminal context
 like working directory and shell information.
 

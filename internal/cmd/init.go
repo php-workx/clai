@@ -16,8 +16,9 @@ import (
 var shellScripts embed.FS
 
 var initCmd = &cobra.Command{
-	Use:   "init <shell>",
-	Short: "Output shell integration script",
+	Use:     "init <shell>",
+	Short:   "Output shell integration script",
+	GroupID: groupSetup,
 	Long: `Output the shell integration script for your shell.
 
 Add this to your shell configuration file:

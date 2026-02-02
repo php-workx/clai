@@ -13,8 +13,9 @@ import (
 )
 
 var uninstallCmd = &cobra.Command{
-	Use:   "uninstall",
-	Short: "Remove shell integration",
+	Use:     "uninstall",
+	Short:   "Remove shell integration",
+	GroupID: groupSetup,
 	Long: `Remove clai shell integration from your shell configuration file.
 
 This command removes the source line from your shell's rc file (.zshrc, .bashrc, etc.)
@@ -23,10 +24,6 @@ and optionally removes the hook files.
 Examples:
   clai uninstall`,
 	RunE: runUninstall,
-}
-
-func init() {
-	rootCmd.AddCommand(uninstallCmd)
 }
 
 func runUninstall(cmd *cobra.Command, args []string) error {

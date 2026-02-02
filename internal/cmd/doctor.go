@@ -31,10 +31,6 @@ Examples:
 	RunE: runDoctor,
 }
 
-func init() {
-	rootCmd.AddCommand(doctorCmd)
-}
-
 type checkResult struct {
 	name    string
 	status  string // "ok", "warn", "error"

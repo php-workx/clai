@@ -17,8 +17,9 @@ var (
 )
 
 var suggestCmd = &cobra.Command{
-	Use:   "suggest [prefix]",
-	Short: "Get command suggestion from session history or shell history",
+	Use:     "suggest [prefix]",
+	Short:   "Get command suggestion from session history or shell history",
+	GroupID: groupCore,
 	Long: `Get a command suggestion based on the current input prefix.
 
 When the daemon is running, returns session-aware suggestions.
@@ -37,7 +38,6 @@ Examples:
 
 func init() {
 	suggestCmd.Flags().IntVarP(&suggestLimit, "limit", "n", 1, "maximum number of suggestions to return")
-	rootCmd.AddCommand(suggestCmd)
 }
 
 func runSuggest(cmd *cobra.Command, args []string) error {

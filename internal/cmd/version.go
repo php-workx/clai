@@ -14,8 +14,9 @@ var (
 )
 
 var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print version information",
+	Use:     "version",
+	Short:   "Print version information",
+	GroupID: groupSetup,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Printf("clai %s\n", Version)
 		fmt.Printf("  commit: %s\n", GitCommit)
