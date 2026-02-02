@@ -215,3 +215,117 @@ func TestHistoryCmd_FullSessionID_StillWorks(t *testing.T) {
 		t.Errorf("Resolved session ID = %q, want %q", resolved.SessionID, fullID)
 	}
 }
+
+func TestHistoryCmd_FullSessionID_NotFound(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Test: Full UUID that doesn't exist should return error
+	fullID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	_, err := store.GetSession(ctx, fullID)
+	if err == nil {
+		t.Error("GetSession() should return error for non-existent full UUID")
+	}
+	if !errors.Is(err, storage.ErrSessionNotFound) {
+		t.Errorf("GetSession() error = %v, want ErrSessionNotFound", err)
+	}
+}
+
+// resolveSessionID mimics the history command's session resolution logic
+func resolveSessionID(ctx context.Context, store *storage.SQLiteStore, sessionID string) (string, error) {
+	session, err := store.GetSession(ctx, sessionID)
+	if err != nil {
+		if errors.Is(err, storage.ErrSessionNotFound) {
+			// Try prefix match for short IDs (< 36 chars, full UUID length)
+			if len(sessionID) < 36 {
+				session, err = store.GetSessionByPrefix(ctx, sessionID)
+				if err != nil {
+					return "", err
+				}
+				return session.SessionID, nil
+			}
+			return "", storage.ErrSessionNotFound
+		}
+		return "", err
+	}
+	return session.SessionID, nil
+}
+
+func TestHistoryCmd_SessionResolution_ShortToFull(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create a session with a full UUID
+	fullID := "12345678-1234-5678-9abc-def012345678"
+	session := &storage.Session{
+		SessionID:       fullID,
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/home/user",
+	}
+
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Test: Short prefix should resolve to full UUID
+	resolved, err := resolveSessionID(ctx, store, "12345678")
+	if err != nil {
+		t.Fatalf("resolveSessionID(%q) error = %v", "12345678", err)
+	}
+	if resolved != fullID {
+		t.Errorf("resolveSessionID(%q) = %q, want %q", "12345678", resolved, fullID)
+	}
+
+	// Test: Full UUID should resolve to itself
+	resolved, err = resolveSessionID(ctx, store, fullID)
+	if err != nil {
+		t.Fatalf("resolveSessionID(%q) error = %v", fullID, err)
+	}
+	if resolved != fullID {
+		t.Errorf("resolveSessionID(%q) = %q, want %q", fullID, resolved, fullID)
+	}
+}
+
+func TestHistoryCmd_SessionResolution_FullUUID_NoFallback(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create a session
+	existingID := "abcd1234-5678-90ab-cdef-ghijklmnopqr"
+	session := &storage.Session{
+		SessionID:       existingID,
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/home/user",
+	}
+
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Test: Non-existent full UUID should NOT fall back to prefix matching
+	// Even though "abcd1234" prefix exists, the full UUID lookup should fail
+	nonExistentFullID := "abcd1234-0000-0000-0000-000000000000"
+	_, err := resolveSessionID(ctx, store, nonExistentFullID)
+	if err == nil {
+		t.Error("resolveSessionID() should return error for non-existent full UUID")
+	}
+	if !errors.Is(err, storage.ErrSessionNotFound) {
+		t.Errorf("resolveSessionID() error = %v, want ErrSessionNotFound", err)
+	}
+}
