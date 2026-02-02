@@ -4,16 +4,28 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
 
+const (
+	// walCheckpointInterval is how often we checkpoint the WAL file
+	// to prevent unbounded growth during long-running daemon sessions.
+	walCheckpointInterval = 5 * time.Minute
+)
+
 // SQLiteStore implements the Store interface using SQLite.
 type SQLiteStore struct {
-	db *sql.DB
+	db        *sql.DB
+	stopCh    chan struct{} // signals background goroutines to stop
+	stoppedCh chan struct{} // signals background goroutines have stopped
+	closeOnce sync.Once     // ensures Close() is idempotent
+	closeErr  error         // stores the error from Close()
 }
 
 // DefaultDBPath returns the default database path (~/.clai/state.db).
@@ -62,7 +74,11 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	store := &SQLiteStore{db: db}
+	store := &SQLiteStore{
+		db:        db,
+		stopCh:    make(chan struct{}),
+		stoppedCh: make(chan struct{}),
+	}
 
 	// Run migrations
 	if err := store.migrate(context.Background()); err != nil {
@@ -70,20 +86,55 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
+	// Start background WAL checkpointing
+	go store.walCheckpointLoop()
+
 	return store, nil
 }
 
 // Close closes the database connection.
+// It is safe to call Close multiple times.
 func (s *SQLiteStore) Close() error {
-	if s.db != nil {
-		return s.db.Close()
-	}
-	return nil
+	s.closeOnce.Do(func() {
+		// Stop the background checkpoint goroutine
+		if s.stopCh != nil {
+			close(s.stopCh)
+			<-s.stoppedCh // wait for goroutine to finish
+		}
+
+		if s.db != nil {
+			// Final checkpoint before closing to merge WAL into main db
+			_, _ = s.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
+			s.closeErr = s.db.Close()
+		}
+	})
+	return s.closeErr
 }
 
 // DB returns the underlying database connection for advanced use cases.
 func (s *SQLiteStore) DB() *sql.DB {
 	return s.db
+}
+
+// walCheckpointLoop periodically checkpoints the WAL file to prevent
+// unbounded growth during long-running daemon sessions.
+func (s *SQLiteStore) walCheckpointLoop() {
+	defer close(s.stoppedCh)
+
+	ticker := time.NewTicker(walCheckpointInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case <-ticker.C:
+			// TRUNCATE mode: checkpoint and truncate WAL to zero size
+			if _, err := s.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+				log.Printf("WAL checkpoint failed: %v", err)
+			}
+		}
+	}
 }
 
 // migrate runs database migrations to ensure the schema is up to date.
