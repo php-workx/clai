@@ -729,8 +729,12 @@ func TestServer_WatchIdle_NoShutdownWithActiveSessions(t *testing.T) {
 	defer cancel()
 
 	// Start watchIdle
+	done := make(chan struct{})
 	server.wg.Add(1)
-	go server.watchIdle(ctx)
+	go func() {
+		server.watchIdle(ctx)
+		close(done)
+	}()
 
 	// Wait a bit and verify shutdown wasn't triggered
 	select {
@@ -738,6 +742,13 @@ func TestServer_WatchIdle_NoShutdownWithActiveSessions(t *testing.T) {
 		t.Error("shutdown should not be triggered when there are active sessions")
 	case <-ctx.Done():
 		// Good - no shutdown was triggered during the test window
+	}
+
+	// Ensure the goroutine exits before test ends
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Error("watchIdle did not exit after context timeout")
 	}
 }
 
