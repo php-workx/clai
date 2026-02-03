@@ -35,8 +35,11 @@ mkdir -p $CLAI_CACHE
 set -g _AI_SUGGEST_FILE "$CLAI_CACHE/suggestion"
 set -g _AI_LAST_OUTPUT "$CLAI_CACHE/last_output"
 
-# Disable native autosuggestions while clai is active
-set -g fish_autosuggestion_enabled 0
+# Disable native autosuggestions only when clai is enabled
+# (leave native suggestions working when CLAI_OFF=1 or session-off)
+if test "$CLAI_OFF" != "1"; and not test -f "$CLAI_CACHE/off"
+    set -g fish_autosuggestion_enabled 0
+end
 
 function _clai_session_off
     test -f "$CLAI_CACHE/off"
