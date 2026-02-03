@@ -247,7 +247,11 @@ end
 
 function _clai_picker_next
     if test "$_CLAI_PICKER_ACTIVE" = "true"
-        if test $_CLAI_PICKER_INDEX -lt (count $_CLAI_PICKER_ITEMS)
+        set -l item_count (count $_CLAI_PICKER_ITEMS)
+        if test $item_count -eq 0
+            return
+        end
+        if test $_CLAI_PICKER_INDEX -lt $item_count
             set -g _CLAI_PICKER_INDEX (math $_CLAI_PICKER_INDEX + 1)
         else
             set -g _CLAI_PICKER_INDEX 1
@@ -258,10 +262,14 @@ end
 
 function _clai_picker_prev
     if test "$_CLAI_PICKER_ACTIVE" = "true"
+        set -l item_count (count $_CLAI_PICKER_ITEMS)
+        if test $item_count -eq 0
+            return
+        end
         if test $_CLAI_PICKER_INDEX -gt 1
             set -g _CLAI_PICKER_INDEX (math $_CLAI_PICKER_INDEX - 1)
         else
-            set -g _CLAI_PICKER_INDEX (count $_CLAI_PICKER_ITEMS)
+            set -g _CLAI_PICKER_INDEX $item_count
         end
         _clai_picker_apply
     end
