@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/runger/clai/internal/sanitize"
@@ -15,6 +16,7 @@ import (
 type AnthropicProvider struct {
 	sanitizer *sanitize.Sanitizer
 	cliPath   string
+	cliOnce   sync.Once
 	model     string
 }
 
@@ -41,11 +43,12 @@ func (p *AnthropicProvider) Name() string {
 
 // Available checks if Claude CLI is available
 func (p *AnthropicProvider) Available() bool {
-	if path, err := exec.LookPath("claude"); err == nil {
-		p.cliPath = path
-		return true
-	}
-	return false
+	p.cliOnce.Do(func() {
+		if path, err := exec.LookPath("claude"); err == nil {
+			p.cliPath = path
+		}
+	})
+	return p.cliPath != ""
 }
 
 // TextToCommand converts natural language to shell commands
@@ -143,7 +146,7 @@ func (p *AnthropicProvider) query(ctx context.Context, prompt string) (string, e
 		args = append(args, "--model", p.model)
 	}
 
-	cmd := exec.CommandContext(ctx, "claude", args...)
+	cmd := exec.CommandContext(ctx, p.cliPath, args...)
 	cmd.Stdin = strings.NewReader(prompt)
 
 	var stdout, stderr bytes.Buffer
