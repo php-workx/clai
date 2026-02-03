@@ -522,10 +522,10 @@ _clai_picker_render() {
 _clai_picker_open() {
     local mode="$1"
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-        return
+        return 1
     fi
     if ! _clai_config_enabled; then
-        return
+        return 1
     fi
 
     _CLAI_PICKER_MODE="$mode"
@@ -606,7 +606,7 @@ _clai_picker_down() {
 }
 
 _clai_picker_suggest() {
-    _clai_picker_open suggest
+    _clai_picker_open suggest || return
 }
 
 _clai_history_scope_session() {
