@@ -292,8 +292,6 @@ bindkey '^M' _ai_voice_accept_line    # Enter
 # Users can rebind this or use their speech-to-text tool's hotkey
 bindkey '^X^V' _ai_enter_voice_mode   # Ctrl+X Ctrl+V
 
-# Escape is left unbound so terminals with extended key sequences don't leak CSI bytes
-
 # ============================================
 # Feature 2: Command Logging Hooks
 # ============================================
@@ -524,7 +522,8 @@ _clai_picker_render() {
         ((i++))
     done
     POSTDISPLAY=""
-    zle -M "$header (↑↓, Enter, Esc):$menu_text"
+    region_highlight=()
+    zle -M "$header (↑↓, Enter, Ctrl+C):$menu_text"
 }
 
 _clai_picker_open() {
@@ -582,13 +581,7 @@ _clai_picker_accept() {
 }
 
 _clai_picker_up() {
-    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || ! _clai_config_enabled; then
-        if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
-            _clai_picker_close
-        fi
-        zle .up-line-or-history
-        return
-    fi
+    # Fast path: if picker is already open, navigate without external commands
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         if [[ $_CLAI_PICKER_INDEX -gt 0 ]]; then
             ((_CLAI_PICKER_INDEX--))
@@ -596,6 +589,11 @@ _clai_picker_up() {
             _CLAI_PICKER_INDEX=$((${#_CLAI_PICKER_ITEMS[@]} - 1))
         fi
         _clai_picker_render
+        return
+    fi
+    # Not in picker - check config before opening (expensive, runs once)
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || ! _clai_config_enabled; then
+        zle .up-line-or-history
         return
     fi
     _clai_picker_open history
@@ -648,7 +646,8 @@ _clai_history_scope_global() {
     fi
 }
 
-_clai_picker_escape() {
+# Cancel picker or send-break (overrides default send-break for Ctrl+C/Ctrl+G)
+_clai_picker_break() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         _clai_picker_cancel
         return
@@ -663,16 +662,20 @@ zle -N _clai_picker_accept
 zle -N _clai_history_scope_session
 zle -N _clai_history_scope_cwd
 zle -N _clai_history_scope_global
-zle -N _clai_picker_escape
+zle -N send-break _clai_picker_break
 
 bindkey '^I' _clai_picker_suggest      # Tab
-bindkey '^[[A' _clai_picker_up         # Up arrow
-bindkey '^[[B' _clai_picker_down       # Down arrow
+bindkey '^[[A' _clai_picker_up         # Up arrow (CSI mode)
+bindkey '^[OA' _clai_picker_up         # Up arrow (application mode)
+bindkey '^[[B' _clai_picker_down       # Down arrow (CSI mode)
+bindkey '^[OB' _clai_picker_down       # Down arrow (application mode)
 bindkey '^M' _clai_picker_accept       # Enter
 bindkey '^Xs' _clai_history_scope_session
 bindkey '^Xd' _clai_history_scope_cwd
 bindkey '^Xg' _clai_history_scope_global
-bindkey '\e' _clai_picker_escape
+# Note: bare '\e' binding removed — it intercepts arrow key sequences when
+# KEYTIMEOUT is low (common in oh-my-zsh, vi-mode configs). Picker cancel
+# is handled via send-break (Ctrl+C / Ctrl+G) instead.
 
 # ============================================
 # Daemon Management
