@@ -236,13 +236,17 @@ func getRCFile(shell string) string {
 }
 
 func getHookContent(shell string) (string, error) {
-	// Use the embedded shell scripts
-	filename := fmt.Sprintf("shell/%s/clai.%s", shell, shell)
-	content, err := shellScripts.ReadFile(filename)
-	if err != nil {
-		return "", fmt.Errorf("shell script not found: %s", filename)
+	// Write a thin loader that delegates to `clai init <shell>`.
+	// This ensures template replacement (e.g. {{CLAI_SESSION_ID}})
+	// happens at shell startup time so each session gets a unique ID.
+	switch shell {
+	case "fish":
+		return "# clai shell integration (loader)\nclai init fish | source\n", nil
+	case "zsh", "bash":
+		return fmt.Sprintf("# clai shell integration (loader)\neval \"$(clai init %s)\"\n", shell), nil
+	default:
+		return "", fmt.Errorf("unsupported shell: %s", shell)
 	}
-	return string(content), nil
 }
 
 func isInstalled(rcFile, hookFile, shell string) (bool, string, error) {

@@ -99,19 +99,37 @@ func TestGetRCFile(t *testing.T) {
 }
 
 func TestGetHookContent(t *testing.T) {
-	tests := []string{"zsh", "bash", "fish"}
+	tests := []struct {
+		shell    string
+		contains string
+	}{
+		{"zsh", `eval "$(clai init zsh)"`},
+		{"bash", `eval "$(clai init bash)"`},
+		{"fish", "clai init fish | source"},
+	}
 
-	for _, shell := range tests {
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			content, err := getHookContent(tt.shell)
+			if err != nil {
+				t.Fatalf("getHookContent(%q) error: %v", tt.shell, err)
+			}
+			if !strings.Contains(content, tt.contains) {
+				t.Errorf("getHookContent(%q) = %q, want it to contain %q", tt.shell, content, tt.contains)
+			}
+		})
+	}
+}
+
+func TestGetHookContent_NoRawPlaceholders(t *testing.T) {
+	for _, shell := range []string{"zsh", "bash", "fish"} {
 		t.Run(shell, func(t *testing.T) {
 			content, err := getHookContent(shell)
 			if err != nil {
 				t.Fatalf("getHookContent(%q) error: %v", shell, err)
 			}
-			if content == "" {
-				t.Errorf("getHookContent(%q) returned empty content", shell)
-			}
-			if len(content) < 100 {
-				t.Errorf("getHookContent(%q) content too short: %d bytes", shell, len(content))
+			if strings.Contains(content, "{{CLAI_SESSION_ID}}") {
+				t.Errorf("getHookContent(%q) contains raw {{CLAI_SESSION_ID}} placeholder", shell)
 			}
 		})
 	}

@@ -68,7 +68,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Replace placeholder with actual session ID export
-	script := strings.Replace(string(content), "{{CLAI_SESSION_ID}}", sessionID, 1)
+	script := strings.ReplaceAll(string(content), "{{CLAI_SESSION_ID}}", sessionID)
 
 	fmt.Print(script)
 	return nil
