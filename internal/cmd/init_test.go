@@ -317,6 +317,31 @@ func TestZshScript_ForwardCharValidatesSuggestionPrefix(t *testing.T) {
 	}
 }
 
+// TestBashScript_NoDirectBindXEscapeSequences verifies that the bash script
+// does not use `bind -x` with escape sequences like \e[A. Bash 3.2 (macOS
+// default) fails with "cannot find keymap for command" for these. Arrow keys
+// must be mapped via readline macros to Ctrl-X prefixed sequences first.
+func TestBashScript_NoDirectBindXEscapeSequences(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
+	if err != nil {
+		t.Fatalf("Failed to read bash script: %v", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	badPattern := regexp.MustCompile(`^\s*bind\s+-x\s+['"](\\e|\\033|\x1b)`)
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if badPattern.MatchString(line) {
+			t.Errorf("line %d: bind -x with escape sequence breaks bash 3.2: %s", i+1, trimmed)
+		}
+	}
+}
+
 // TestZshScript_AcceptLineClearsGhostText verifies that the Enter handler
 // clears POSTDISPLAY and region_highlight before executing the command.
 // Without this, ghost text from inline suggestions remains visible after

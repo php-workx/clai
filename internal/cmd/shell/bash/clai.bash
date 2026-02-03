@@ -328,10 +328,15 @@ _clai_history_scope_global() {
 }
 
 # Bindings: Up/Down for history picker, Ctrl+G cancels, Ctrl+x s/d/g switches scope
-# Note: raw "\e" binding is avoided because it swallows multi-byte escape
-# sequences (arrow keys, Home, End, etc.) before readline can parse them.
-bind -x '"\e[A": _clai_history_up'
-bind -x '"\e[B": _clai_history_down'
+#
+# Arrow keys: bash 3.2 (macOS default) doesn't support `bind -x` with escape
+# sequences — it fails with "cannot find keymap for command". Work around by
+# using a readline macro to translate arrow escapes to Ctrl-X prefixed
+# sequences, then bind those with -x.
+bind '"\e[A": "\C-x\C-p"'
+bind '"\e[B": "\C-x\C-n"'
+bind -x '"\C-x\C-p": _clai_history_up'
+bind -x '"\C-x\C-n": _clai_history_down'
 bind -x '"\C-g": _clai_picker_cancel'
 bind -x '"\C-xs": _clai_history_scope_session'
 bind -x '"\C-xd": _clai_history_scope_cwd'
