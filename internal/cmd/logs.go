@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -50,7 +51,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	}
 
 	if logsFollow {
-		return followLogs(logFile)
+		return followLogs(cmd.Context(), logFile)
 	}
 
 	return tailLogs(logFile, logsLines)
@@ -150,7 +151,7 @@ func splitLines(s string) []string {
 	return lines
 }
 
-func followLogs(filename string) error {
+func followLogs(ctx context.Context, filename string) error {
 	// Open file
 	f, err := os.Open(filename)
 	if err != nil {
@@ -170,11 +171,24 @@ func followLogs(filename string) error {
 	reader := bufio.NewReader(f)
 
 	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err == io.EOF {
-				// Wait and try again
-				time.Sleep(100 * time.Millisecond)
+				// Print any partial fragment before waiting
+				if line != "" {
+					fmt.Print(line)
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(100 * time.Millisecond):
+				}
 				continue
 			}
 			return fmt.Errorf("error reading log: %w", err)
