@@ -54,6 +54,7 @@ _CLAI_LAST_COMMAND=""
 
 # Current suggestion state
 _AI_CURRENT_SUGGESTION=""
+_AI_IN_PASTE=false
 
 # Update suggestion based on current buffer
 _ai_update_suggestion() {
@@ -106,6 +107,9 @@ _ai_update_suggestion() {
 # ZLE widget: Update suggestion after each character
 _ai_self_insert() {
     zle .self-insert
+    if [[ "$_AI_IN_PASTE" == "true" ]]; then
+        return
+    fi
     _ai_update_suggestion
 }
 zle -N self-insert _ai_self_insert
@@ -116,6 +120,15 @@ _ai_backward_delete_char() {
     _ai_update_suggestion
 }
 zle -N backward-delete-char _ai_backward_delete_char
+
+# ZLE widget: Handle bracketed paste as a single update
+_ai_bracketed_paste() {
+    _AI_IN_PASTE=true
+    zle .bracketed-paste
+    _AI_IN_PASTE=false
+    _ai_update_suggestion
+}
+zle -N bracketed-paste _ai_bracketed_paste
 
 # ZLE widget: Accept suggestion with right arrow
 _ai_forward_char() {
@@ -144,7 +157,7 @@ _ai_clear_suggestion() {
 }
 zle -N _ai_clear_suggestion
 
-# Note: Escape is bound later to _ai_cancel_voice_mode which calls _ai_clear_suggestion
+# Note: Escape is intentionally not bound by clai to avoid key sequence conflicts.
 
 # ============================================
 # Feature 3: Voice Mode
@@ -220,8 +233,7 @@ bindkey '^M' _ai_voice_accept_line    # Enter
 # Users can rebind this or use their speech-to-text tool's hotkey
 bindkey '^X^V' _ai_enter_voice_mode   # Ctrl+X Ctrl+V
 
-# Override escape to also cancel voice mode
-bindkey '^[' _ai_cancel_voice_mode    # Escape
+# Escape is left unbound so terminals with extended key sequences don't leak CSI bytes
 
 # ============================================
 # Feature 2: Command Logging Hooks
@@ -503,7 +515,7 @@ bindkey '^[[B' _ai_menu_down   # Down arrow
 # Override Enter when menu is active
 bindkey '^M' _ai_menu_accept
 
-# Cancel voice mode and/or menu with Escape
+# Cancel voice mode and/or menu when invoked (not bound by default)
 _ai_cancel_voice_mode() {
     if [[ "$_AI_MENU_ACTIVE" == "true" ]]; then
         _ai_menu_cancel

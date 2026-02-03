@@ -188,8 +188,8 @@ func TestZsh_RightArrowAcceptsSuggestion(t *testing.T) {
 	session.SendKey(KeyCtrlC)
 }
 
-// TestZsh_EscapeClearsSuggestion verifies Escape clears the current suggestion.
-func TestZsh_EscapeClearsSuggestion(t *testing.T) {
+// TestZsh_EscapeNotBound verifies clai does not bind bare Escape in zsh.
+func TestZsh_EscapeNotBound(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -211,17 +211,13 @@ func TestZsh_EscapeClearsSuggestion(t *testing.T) {
 	_, err = session.ExpectTimeout("clai [", 5*time.Second)
 	require.NoError(t, err)
 
-	// Type something
-	err = session.Send("git")
+	// Check that Escape isn't bound to clai's widget
+	err = session.SendLine("bindkey '^['; echo ESC_BIND_DONE")
 	require.NoError(t, err)
-	time.Sleep(200 * time.Millisecond)
-
-	// Press Escape to clear
-	err = session.SendKey(KeyEscape)
+	output, err := session.ExpectTimeout("ESC_BIND_DONE", 3*time.Second)
 	require.NoError(t, err)
+	assert.NotContains(t, output, "_ai_cancel_voice_mode")
 
-	// The suggestion should be cleared (RPS1 should be empty)
-	// This is hard to verify directly, but we can check no errors occurred
 	session.SendKey(KeyCtrlC)
 }
 
@@ -332,7 +328,6 @@ func TestZsh_CtrlSpaceShowsMenu(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Clean up
-	session.SendKey(KeyEscape)
 	session.SendKey(KeyCtrlC)
 }
 
