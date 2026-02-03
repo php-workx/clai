@@ -570,7 +570,7 @@ ai-daemon() {
 # Cleanup function for shell exit
 _clai_cleanup() {
     # Notify daemon session is ending
-    clai-shim session-end --session-id="$CLAI_SESSION_ID" >/dev/null 2>&1
+    clai-shim session-end --session-id="$CLAI_SESSION_ID" >/dev/null 2>&1 &!
 }
 
 if [[ -o interactive ]]; then
