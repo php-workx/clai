@@ -96,9 +96,14 @@ set -g _CLAI_PICKER_ORIG_BUFFER ""
 set -g _CLAI_PICKER_ITEMS
 set -g _CLAI_HISTORY_SCOPE session
 
+set -g _CLAI_SUGGESTIONS_ENABLED ""
+
 function _clai_config_enabled
-    set -l enabled (clai config suggestions.enabled 2>/dev/null)
-    if test "$enabled" = "false"
+    # Cache the config value on first call to avoid invoking clai on every keypress
+    if test -z "$_CLAI_SUGGESTIONS_ENABLED"
+        set -g _CLAI_SUGGESTIONS_ENABLED (clai config suggestions.enabled 2>/dev/null)
+    end
+    if test "$_CLAI_SUGGESTIONS_ENABLED" = "false"
         return 1
     end
     return 0
