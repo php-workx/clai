@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/runger/clai/internal/config"
 )
 
 // Default timeouts for different operation types
@@ -30,27 +31,15 @@ const (
 
 // SocketPath returns the path to the daemon Unix socket
 func SocketPath() string {
-	// Allow override via environment variable
 	if path := os.Getenv("CLAI_SOCKET"); path != "" {
 		return path
 	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "/tmp"
-	}
-	// Must match config.Paths.SocketFile()
-	return filepath.Join(home, ".clai", "clai.sock")
+	return config.DefaultPaths().SocketFile()
 }
 
 // RunDir returns the directory containing runtime files (socket, pid)
 func RunDir() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		home = "/tmp"
-	}
-	// Must match config.Paths.BaseDir
-	return filepath.Join(home, ".clai")
+	return config.DefaultPaths().BaseDir
 }
 
 // SocketExists checks if the daemon socket file exists

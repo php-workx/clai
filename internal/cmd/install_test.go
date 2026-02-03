@@ -203,34 +203,6 @@ func TestIsInstalled_NonExistentFile(t *testing.T) {
 	}
 }
 
-func TestValidateShellInput(t *testing.T) {
-	// Test that only valid shells are accepted
-	validShells := []string{"zsh", "bash", "fish"}
-	invalidShells := []string{"sh", "csh", "tcsh", "ksh", "powershell", "", "invalid", "ZSH", "BASH"}
-
-	for _, shell := range validShells {
-		t.Run("valid_"+shell, func(t *testing.T) {
-			switch shell {
-			case "zsh", "bash", "fish":
-				// These should be valid - test passes
-			default:
-				t.Errorf("shell %q should be valid", shell)
-			}
-		})
-	}
-
-	for _, shell := range invalidShells {
-		t.Run("invalid_"+shell, func(t *testing.T) {
-			switch shell {
-			case "zsh", "bash", "fish":
-				t.Errorf("shell %q should be invalid", shell)
-			default:
-				// These should be invalid - test passes
-			}
-		})
-	}
-}
-
 func TestDetectShell_ParentProcessFallback(t *testing.T) {
 	// This test verifies that when SHELL is set to unsupported shell,
 	// we still try parent process detection first

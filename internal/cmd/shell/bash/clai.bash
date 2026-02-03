@@ -38,25 +38,28 @@ _clai_completion() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
 
     # Only enhance first word (command) completion
+    # Note: mapfile requires bash 4.0+
     if [[ $COMP_CWORD -eq 0 && -n "$cur" ]]; then
         # Get clai suggestion from history
-        local suggestion=$(clai suggest "$cur" 2>/dev/null)
+        local suggestion
+        suggestion=$(clai suggest "$cur" 2>/dev/null)
 
         # Get default command completions
-        local defaults=$(compgen -c -- "$cur" 2>/dev/null | head -20)
+        local -a defaults
+        mapfile -t defaults < <(compgen -c -- "$cur" 2>/dev/null | head -20)
 
         # Combine: clai suggestion first (if different from cur)
         if [[ -n "$suggestion" && "$suggestion" != "$cur" ]]; then
-            COMPREPLY=("$suggestion" $defaults)
+            COMPREPLY=("$suggestion" "${defaults[@]}")
         else
-            COMPREPLY=($defaults)
+            COMPREPLY=("${defaults[@]}")
         fi
 
         # Deduplicate while preserving order
-        COMPREPLY=($(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++'))
+        mapfile -t COMPREPLY < <(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++')
     else
         # For arguments, use default file completion
-        COMPREPLY=($(compgen -f -- "$cur"))
+        mapfile -t COMPREPLY < <(compgen -f -- "$cur")
     fi
 }
 
@@ -218,7 +221,7 @@ history() {
         # Try clai session history first, fall back to shell history
         local output
         output=$(clai history --session="$CLAI_SESSION_ID" "$@" 2>/dev/null)
-        if [[ -n "$output" && "$output" != *"No command"* ]]; then
+        if [[ $? -eq 0 && -n "$output" ]]; then
             echo "$output"
         else
             # Fall back to shell's native history

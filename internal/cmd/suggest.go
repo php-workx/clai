@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -93,8 +94,9 @@ func getSuggestionsFromDaemon(prefix string, limit int) []string {
 	}
 	defer client.Close()
 
-	// Get suggestions from daemon
-	ctx := context.Background()
+	// Get suggestions from daemon (short timeout for shell integration responsiveness)
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
 	daemonSuggestions := client.Suggest(ctx, sessionID, cwd, prefix, len(prefix), false, limit)
 	if len(daemonSuggestions) == 0 {
 		return nil

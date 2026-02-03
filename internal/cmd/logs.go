@@ -58,9 +58,8 @@ func runLogs(cmd *cobra.Command, args []string) error {
 }
 
 func tailLogs(filename string, n int) error {
-	// Validate n to prevent panic on negative capacity
 	if n <= 0 {
-		return nil
+		return fmt.Errorf("lines must be a positive number")
 	}
 
 	f, err := os.Open(filename)

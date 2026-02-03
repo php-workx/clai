@@ -213,16 +213,6 @@ _ai_voice_accept_line() {
 }
 zle -N _ai_voice_accept_line
 
-# ZLE widget: Cancel voice mode with Escape
-_ai_cancel_voice_mode() {
-    if [[ "$_AI_VOICE_MODE" == "true" ]]; then
-        _AI_VOICE_MODE=false
-    fi
-    # Clear suggestions
-    _ai_clear_suggestion
-}
-zle -N _ai_cancel_voice_mode
-
 # Bind Enter to voice-aware accept
 bindkey '^M' _ai_voice_accept_line    # Enter
 
@@ -341,7 +331,7 @@ function history {
         # Try clai session history first, fall back to shell history
         local output
         output=$(clai history --session="$CLAI_SESSION_ID" "$@" 2>/dev/null)
-        if [[ -n "$output" && "$output" != *"No command"* ]]; then
+        if [[ $? -eq 0 && -n "$output" ]]; then
             echo "$output"
         else
             # Fall back to shell's native history
@@ -513,7 +503,7 @@ bindkey '^[[B' _ai_menu_down   # Down arrow
 # Override Enter when menu is active
 bindkey '^M' _ai_menu_accept
 
-# Escape cancels menu (already bound to _ai_cancel_voice_mode, update it)
+# Cancel voice mode and/or menu with Escape
 _ai_cancel_voice_mode() {
     if [[ "$_AI_MENU_ACTIVE" == "true" ]]; then
         _ai_menu_cancel
@@ -525,6 +515,7 @@ _ai_cancel_voice_mode() {
     # Clear suggestions
     _ai_clear_suggestion
 }
+zle -N _ai_cancel_voice_mode
 
 # ============================================
 # Daemon Management
@@ -557,6 +548,12 @@ ai-daemon() {
 # Startup
 # ============================================
 
+# Cleanup function for shell exit
+_clai_cleanup() {
+    # Notify daemon session is ending
+    clai-shim session-end --session-id="$CLAI_SESSION_ID" >/dev/null 2>&1
+}
+
 if [[ -o interactive ]]; then
     # Notify daemon of new session (fire and forget)
     # Note: claid starts lazily via clai-shim -> ipc.NewClient() -> EnsureDaemon()
@@ -565,15 +562,8 @@ if [[ -o interactive ]]; then
         --cwd="$PWD" \
         --shell=zsh >/dev/null 2>&1 &)
 
-    # Register cleanup on shell exit
     trap '_clai_cleanup' EXIT HUP
 
     local short_id="${CLAI_SESSION_ID:0:8}"
     echo -e "\033[2m🤖 clai [$short_id] ↑↓ history | → accept | ?\"describe task\"\033[0m"
 fi
-
-# Cleanup function for shell exit
-_clai_cleanup() {
-    # Notify daemon session is ending
-    clai-shim session-end --session-id="$CLAI_SESSION_ID" >/dev/null 2>&1
-}

@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/runger/clai/internal/config"
@@ -54,35 +55,6 @@ func TestCheckDirectories(t *testing.T) {
 			t.Error("results[0].message should not be empty")
 		}
 	}
-}
-
-func TestCheckDirectoriesScenarios(t *testing.T) {
-	// Create temp directories for testing
-	tmpDir := t.TempDir()
-
-	// Create test paths config
-	testPaths := &config.Paths{
-		BaseDir: filepath.Join(tmpDir, "clai"),
-	}
-
-	t.Run("existing_directory", func(t *testing.T) {
-		if err := os.MkdirAll(testPaths.BaseDir, 0755); err != nil {
-			t.Fatalf("failed to create test dir: %v", err)
-		}
-
-		_, err := os.Stat(testPaths.BaseDir)
-		if err != nil {
-			t.Errorf("expected directory to exist: %v", err)
-		}
-	})
-
-	t.Run("missing_directory", func(t *testing.T) {
-		missingPath := filepath.Join(tmpDir, "nonexistent")
-		_, err := os.Stat(missingPath)
-		if !os.IsNotExist(err) {
-			t.Error("expected directory to not exist")
-		}
-	})
 }
 
 func TestCheckConfiguration(t *testing.T) {
@@ -334,14 +306,8 @@ func TestRunDoctorOutput(t *testing.T) {
 	}
 }
 
-// containsString checks if a string contains a substring
 func containsString(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
+	return strings.Contains(s, substr)
 }
 
 func TestDoctorCmdRegistration(t *testing.T) {
