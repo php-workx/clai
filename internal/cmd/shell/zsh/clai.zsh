@@ -56,6 +56,11 @@ _CLAI_LAST_COMMAND=""
 _AI_CURRENT_SUGGESTION=""
 _AI_IN_PASTE=false
 
+# Preserve the user's original right prompt so we can restore it
+if [[ -z "${_AI_ORIG_RPS1+x}" ]]; then
+    _AI_ORIG_RPS1="${RPS1:-}"
+fi
+
 # Update suggestion based on current buffer
 _ai_update_suggestion() {
     local suggestion=""
@@ -85,19 +90,21 @@ _ai_update_suggestion() {
             display_suggestion="${display_suggestion:0:$max_suggestion}…"
         fi
 
+        local clai_hint
         if [[ -z "$BUFFER" ]]; then
             # No input yet - show full suggestion
-            RPS1="%F{242}($display_suggestion)%f"
+            clai_hint="%F{242}($display_suggestion)%f"
         else
             # Truncate long prefix to just "..."
             if [[ ${#display_prefix} -gt $max_prefix ]]; then
                 display_prefix="…"
             fi
             # Show (partial → full) format
-            RPS1="%F{242}($display_prefix → $display_suggestion)%f"
+            clai_hint="%F{242}($display_prefix → $display_suggestion)%f"
         fi
+        RPS1="${_AI_ORIG_RPS1:+${_AI_ORIG_RPS1} }${clai_hint}"
     else
-        RPS1=""
+        RPS1="$_AI_ORIG_RPS1"
     fi
 
     # Force prompt redraw to show updated RPS1 (only when in ZLE context)
@@ -136,7 +143,7 @@ _ai_forward_char() {
         # At end of buffer with suggestion - accept it
         BUFFER="$_AI_CURRENT_SUGGESTION"
         CURSOR=${#BUFFER}
-        RPS1=""
+        RPS1="$_AI_ORIG_RPS1"
         _AI_CURRENT_SUGGESTION=""
         # Clear AI suggestion file if we used it
         > "$_AI_SUGGEST_FILE"
@@ -150,7 +157,7 @@ zle -N forward-char _ai_forward_char
 
 # ZLE widget: Clear suggestion with Escape
 _ai_clear_suggestion() {
-    RPS1=""
+    RPS1="$_AI_ORIG_RPS1"
     _AI_CURRENT_SUGGESTION=""
     > "$_AI_SUGGEST_FILE"
     zle reset-prompt
