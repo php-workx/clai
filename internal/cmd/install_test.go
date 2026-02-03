@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -95,6 +96,17 @@ func TestGetRCFile(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestGetRCFile_DarwinBashProfile(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS-specific test")
+	}
+
+	got := getRCFile("bash")
+	if !strings.Contains(got, ".bash_profile") {
+		t.Errorf("getRCFile(bash) on macOS = %q, want .bash_profile (login shells don't read .bashrc)", got)
 	}
 }
 

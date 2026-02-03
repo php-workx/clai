@@ -26,7 +26,7 @@ Add this to your shell configuration file:
   # For Zsh (~/.zshrc):
   eval "$(clai init zsh)"
 
-  # For Bash (~/.bashrc):
+  # For Bash (~/.bashrc or ~/.bash_profile on macOS):
   eval "$(clai init bash)"
 
   # For Fish (~/.config/fish/config.fish):

@@ -207,19 +207,21 @@ func getRCFile(shell string) string {
 		// Create .zshrc if it doesn't exist
 		return zshrc
 	case "bash":
-		// Check for .bashrc first
 		bashrc := filepath.Join(home, ".bashrc")
-		if _, err := os.Stat(bashrc); err == nil {
-			return bashrc
-		}
-		// On macOS, check .bash_profile
+		bashProfile := filepath.Join(home, ".bash_profile")
 		if runtime.GOOS == "darwin" {
-			bashProfile := filepath.Join(home, ".bash_profile")
+			// macOS Terminal.app opens login shells, which read
+			// .bash_profile but NOT .bashrc. Prefer .bash_profile
+			// so the hook actually runs.
 			if _, err := os.Stat(bashProfile); err == nil {
 				return bashProfile
 			}
+			return bashProfile // create it if missing
 		}
-		// Default to .bashrc
+		// Linux: .bashrc is sourced by interactive non-login shells
+		if _, err := os.Stat(bashrc); err == nil {
+			return bashrc
+		}
 		return bashrc
 	case "fish":
 		// Fish config is in ~/.config/fish/config.fish
