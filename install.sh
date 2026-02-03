@@ -23,7 +23,7 @@ echo -e "${YELLOW}Checking prerequisites...${RESET}"
 
 # Check for Go
 if ! command -v go &> /dev/null; then
-    echo -e "${RED}Error: Go not found. Install from: https://go.dev/dl/${RESET}"
+    echo -e "${RED}Error: Go not found. Install from: https://go.dev/dl/${RESET}" >&2
     exit 1
 fi
 echo "  ✓ Go found: $(go version | cut -d' ' -f3)"
@@ -59,8 +59,10 @@ echo ""
 
 # Detect shell and configure
 detect_shell() {
-    local shell_name=$(basename "$SHELL")
+    local shell_name
+    shell_name=$(basename "$SHELL")
     echo "$shell_name"
+    return 0
 }
 
 CURRENT_SHELL=$(detect_shell)

@@ -3,7 +3,10 @@ package cmd
 import (
 	"embed"
 	"fmt"
+	"os"
+	"strings"
 
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 )
 
@@ -13,8 +16,9 @@ import (
 var shellScripts embed.FS
 
 var initCmd = &cobra.Command{
-	Use:   "init <shell>",
-	Short: "Output shell integration script",
+	Use:     "init <shell>",
+	Short:   "Output shell integration script",
+	GroupID: groupSetup,
 	Long: `Output the shell integration script for your shell.
 
 Add this to your shell configuration file:
@@ -35,6 +39,10 @@ Add this to your shell configuration file:
 func runInit(cmd *cobra.Command, args []string) error {
 	shell := args[0]
 
+	// NOTE: We do NOT start the daemon here to avoid blocking shell startup.
+	// The daemon is started lazily by clai-shim when it first connects,
+	// and shell scripts run clai-shim in the background anyway.
+
 	var filename string
 	switch shell {
 	case "zsh":
@@ -52,6 +60,16 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to read shell script: %w", err)
 	}
 
-	fmt.Print(string(content))
+	// Generate or reuse session ID
+	// If CLAI_SESSION_ID is already set (re-sourcing), preserve it
+	sessionID := os.Getenv("CLAI_SESSION_ID")
+	if sessionID == "" {
+		sessionID = uuid.New().String()
+	}
+
+	// Replace placeholder with actual session ID export
+	script := strings.Replace(string(content), "{{CLAI_SESSION_ID}}", sessionID, 1)
+
+	fmt.Print(script)
 	return nil
 }

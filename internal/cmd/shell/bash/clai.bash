@@ -12,6 +12,9 @@
 # Configuration
 # ============================================
 
+# Export current shell for clai doctor/status detection
+export CLAI_CURRENT_SHELL=bash
+
 : ${CLAI_AUTO_EXTRACT:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 
@@ -26,20 +29,81 @@ _AI_SUGGEST_FILE="$CLAI_CACHE/suggestion"
 _AI_LAST_OUTPUT="$CLAI_CACHE/last_output"
 
 # ============================================
-# Feature 1: Command Suggestion
+# Feature 1: Enhanced Tab Completion
 # ============================================
+# Adds clai history suggestions to Tab completion menu
+# Our suggestions appear first, followed by defaults
 
-# Show suggestion in prompt when available
-_ai_show_suggestion() {
-    if [[ -s "$_AI_SUGGEST_FILE" ]]; then
-        local suggestion=$(cat "$_AI_SUGGEST_FILE")
-        if [[ -n "$suggestion" ]]; then
-            echo -e "\033[38;5;242m→ $suggestion (use 'accept' to run)\033[0m"
+# Portable alternative to mapfile for Bash 3.2 (macOS default)
+# Usage: _clai_read_lines arrayname < <(command)
+_clai_read_lines() {
+    local _varname="$1"
+    eval "$_varname=()"
+    local _line
+    while IFS= read -r _line; do
+        eval "$_varname+=(\"\$_line\")"
+    done
+}
+
+_clai_completion() {
+    local cur="${COMP_WORDS[COMP_CWORD]}"
+
+    # Only enhance first word (command) completion
+    if [[ $COMP_CWORD -eq 0 && -n "$cur" ]]; then
+        # Get clai suggestion from history
+        local suggestion
+        suggestion=$(clai suggest "$cur" 2>/dev/null)
+
+        # Get default command completions
+        local -a defaults
+        if ((BASH_VERSINFO[0] >= 4)); then
+            mapfile -t defaults < <(compgen -c -- "$cur" 2>/dev/null | head -20)
+        else
+            _clai_read_lines defaults < <(compgen -c -- "$cur" 2>/dev/null | head -20)
+        fi
+
+        # Combine: clai suggestion first (if different from cur)
+        if [[ -n "$suggestion" && "$suggestion" != "$cur" ]]; then
+            COMPREPLY=("$suggestion" "${defaults[@]}")
+        else
+            COMPREPLY=("${defaults[@]}")
+        fi
+
+        # Deduplicate while preserving order
+        if ((BASH_VERSINFO[0] >= 4)); then
+            mapfile -t COMPREPLY < <(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++')
+        else
+            local -a _deduped
+            _clai_read_lines _deduped < <(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++')
+            COMPREPLY=("${_deduped[@]}")
+        fi
+    else
+        # For arguments, use default file completion
+        if ((BASH_VERSINFO[0] >= 4)); then
+            mapfile -t COMPREPLY < <(compgen -f -- "$cur")
+        else
+            _clai_read_lines COMPREPLY < <(compgen -f -- "$cur")
         fi
     fi
 }
 
-# Accept suggestion command
+# Register completion for common commands
+# Note: complete -D (default completion) requires bash 4.0+
+# For compatibility with bash 3.2 (macOS default), we register specific commands
+complete -F _clai_completion git npm yarn docker kubectl make go cargo python pip
+
+# Show AI suggestion in prompt when available (for AI-generated suggestions)
+_ai_show_suggestion() {
+    if [[ -s "$_AI_SUGGEST_FILE" ]]; then
+        local suggestion
+        suggestion=$(cat "$_AI_SUGGEST_FILE")
+        if [[ -n "$suggestion" ]]; then
+            echo -e "\033[38;5;242m($suggestion) - use 'accept' to run\033[0m"
+        fi
+    fi
+}
+
+# Accept AI suggestion command
 accept() {
     if [[ -s "$_AI_SUGGEST_FILE" ]]; then
         local suggestion=$(cat "$_AI_SUGGEST_FILE")
@@ -80,20 +144,21 @@ else
 fi
 
 # ============================================
-# Feature 3: Voice Mode (` prefix)
+# Feature 3: Natural Language to Command (? prefix)
 # ============================================
-# Lines starting with ` are treated as voice/natural language input
-# Example: `list all files → ls -la
+# Lines starting with ? are treated as natural language input
+# Example: ?list all files → ls -la
 
-# Check for ` prefix and convert voice input
-_ai_check_voice_prefix() {
+# Check for ? prefix and convert to command
+_ai_check_nl_prefix() {
     local cmd="$1"
-    if [[ "$cmd" == '`'* && ${#cmd} -gt 1 ]]; then
-        local voice_input="${cmd#\`}"      # Remove the ` prefix
-        voice_input="${voice_input## }"    # Remove leading space if any
+    if [[ "$cmd" == '?'* && ${#cmd} -gt 1 ]]; then
+        local nl_input="${cmd#\?}"         # Remove the ? prefix
+        nl_input="${nl_input## }"          # Remove leading space if any
 
-        echo "🎤 Converting: $voice_input"
-        local result=$(clai voice "$voice_input" 2>/dev/null)
+        echo "? $nl_input"
+        local result
+        result=$(clai voice "$nl_input" 2>/dev/null)
         if [[ -n "$result" ]]; then
             echo "→ $result"
             # Cache for 'accept' command
@@ -102,21 +167,21 @@ _ai_check_voice_prefix() {
         fi
         return 0  # Handled
     fi
-    return 1  # Not a voice command
+    return 1  # Not a natural language command
 }
 
-# Hook into DEBUG trap to catch ` prefix before execution
+# Hook into DEBUG trap to catch ? prefix before execution
 # Note: extdebug must be enabled for the trap to block command execution
 _ai_debug_trap() {
-    # Check for voice prefix first
-    if _ai_check_voice_prefix "$BASH_COMMAND"; then
+    # Check for natural language prefix first
+    if _ai_check_nl_prefix "$BASH_COMMAND"; then
         # Prevent the original command from running (requires extdebug)
         return 1
     fi
     return 0
 }
 
-# Save current extdebug state and enable it for voice prefix blocking
+# Save current extdebug state and enable it for ? prefix blocking
 _AI_EXTDEBUG_WAS_ON=false
 if shopt -q extdebug; then
     _AI_EXTDEBUG_WAS_ON=true
@@ -147,12 +212,71 @@ run() {
 }
 
 # ============================================
+# Session Tracking
+# ============================================
+# Session ID for this shell instance (generated by clai init)
+export CLAI_SESSION_ID="{{CLAI_SESSION_ID}}"
+
+# ============================================
 # Manual Commands
 # ============================================
 
+# Intercept history command to show session-specific history
+# Falls back to shell history if no session history available
+# Use `history --global` or `history -g` for shell-native history
+history() {
+    if [[ "$1" == "--global" || "$1" == "-g" ]]; then
+        # Pass through to builtin history (remove the --global flag)
+        shift
+        builtin history "$@"
+    elif [[ "$1" == "--help" || "$1" == "-h" ]]; then
+        echo "Usage: history [options] [query]"
+        echo ""
+        echo "Shows command history (session-specific if available, else shell history)."
+        echo ""
+        echo "Options:"
+        echo "  -g, --global    Always use shell's native history"
+        echo "  -n, --limit N   Maximum number of commands to show (default: 20)"
+        echo "  --cwd PATH      Filter by working directory"
+        echo ""
+        echo "Examples:"
+        echo "  history              # Show session or shell history"
+        echo "  history git          # Filter to git commands"
+        echo "  history --global     # Force shell's native history"
+    else
+        # Try clai session history first, fall back to shell history
+        local output
+        output=$(clai history --session="$CLAI_SESSION_ID" "$@" 2>/dev/null)
+        if [[ $? -eq 0 && -n "$output" ]]; then
+            echo "$output"
+        else
+            # Fall back to shell's native history, stripping clai-only flags
+            local safe_args=()
+            local skip_next=false
+            for arg in "$@"; do
+                if $skip_next; then
+                    skip_next=false
+                    continue
+                fi
+                case "$arg" in
+                    --limit|--cwd|-n|--session)
+                        skip_next=true
+                        ;;
+                    --limit=*|--cwd=*|--session=*)
+                        ;;
+                    *)
+                        safe_args+=("$arg")
+                        ;;
+                esac
+            done
+            builtin history "${safe_args[@]}"
+        fi
+    fi
+}
+
 # Manually diagnose last command
 ai-fix() {
-    local cmd="${1:-$(history 1 | sed 's/^[ ]*[0-9]*[ ]*//')}"
+    local cmd="${1:-$(builtin history 1 | sed 's/^[ ]*[0-9]*[ ]*//')}"
     clai diagnose "$cmd" "1"
 }
 
@@ -163,7 +287,8 @@ ai() {
         return 1
     fi
 
-    local recent_cmds=$(history 5 | sed 's/^[ ]*[0-9]*[ ]*//' | tr '\n' ';')
+    local recent_cmds
+    recent_cmds=$(builtin history 5 | sed 's/^[ ]*[0-9]*[ ]*//' | tr '\n' ';')
     clai ask --context "$recent_cmds" "$@"
 }
 
@@ -182,5 +307,6 @@ voice() {
 # ============================================
 
 if [[ $- == *i* ]]; then
-    echo -e "\033[2m🤖 clai loaded. Commands: ai-fix, ai, voice, run, accept | \` prefix for voice mode\033[0m"
+    # Use printf for better portability across bash versions
+    printf '\033[2m🤖 clai [%s] Tab complete | accept cmd | ?"describe task"\033[0m\n' "${CLAI_SESSION_ID:0:8}"
 fi

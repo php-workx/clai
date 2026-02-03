@@ -6,17 +6,35 @@ GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-race cover fmt lint vuln dev help
+.PHONY: all build install install-dev clean test test-all test-interactive test-docker cover fmt lint vuln dev help proto bin/linux
 
 all: build
 
-## build: Build the binary
+## build: Build all binaries (clai, claid, clai-shim)
 build:
-	go build $(LDFLAGS) -o bin/$(BINARY_NAME) ./cmd/clai
+	go build $(LDFLAGS) -o bin/clai ./cmd/clai
+	go build $(LDFLAGS) -o bin/claid ./cmd/claid
+	go build $(LDFLAGS) -o bin/clai-shim ./cmd/clai-shim
 
-## install: Install the binary to $GOPATH/bin
+## install: Install all binaries to $GOPATH/bin
 install:
 	go install $(LDFLAGS) ./cmd/clai
+	go install $(LDFLAGS) ./cmd/claid
+	go install $(LDFLAGS) ./cmd/clai-shim
+
+## proto: Generate Go code from protobuf definitions
+proto:
+	@echo "Generating protobuf code..."
+	@if ! command -v protoc >/dev/null 2>&1; then \
+		echo "Error: protoc not found. Please install the protobuf compiler. See: https://grpc.io/docs/protoc-installation/"; \
+		exit 1; \
+	fi
+	@mkdir -p gen
+	protoc --go_out=gen --go_opt=paths=source_relative \
+		--go-grpc_out=gen --go-grpc_opt=paths=source_relative \
+		-I proto \
+		proto/clai/v1/clai.proto
+	@echo "Generated code in gen/"
 
 ## install-dev: Install development dependencies
 install-dev:
@@ -24,6 +42,8 @@ install-dev:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	go install golang.org/x/tools/cmd/goimports@latest
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 	@echo "Installing pre-commit..."
 	@if command -v pipx >/dev/null 2>&1; then \
 		pipx install pre-commit || pipx upgrade pre-commit; \
@@ -44,23 +64,43 @@ clean:
 	rm -rf bin/
 	go clean
 
-## test: Run unit tests (fast, skips integration tests)
+## test: Run all tests with race detector
 test:
-	go test -short -v ./...
+	go test -race -v ./...
 
-## test-all: Run all tests including integration tests (slow, requires Claude CLI)
-test-all:
-	go test -v ./...
+## test-all: Run all tests including Docker containers
+test-all: test test-docker
 
-## test-race: Run unit tests with race detector
-test-race:
-	go test -short -race -v ./...
-
-## cover: Run unit tests with coverage
+## cover: Run all tests with coverage
 cover:
-	go test -short -race -coverprofile=coverage.out -covermode=atomic ./...
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
+
+## test-interactive: Run interactive shell tests (requires zsh, bash, fish)
+test-interactive:
+	go test -v ./tests/expect/...
+
+## bin/linux: Cross-compile binaries and test runner for Linux (used by Docker tests)
+bin/linux:
+	@mkdir -p bin/linux
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/clai ./cmd/clai
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/claid ./cmd/claid
+	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/clai-shim ./cmd/clai-shim
+	GOOS=linux GOARCH=amd64 go test -c -o bin/linux/expect.test ./tests/expect
+
+## test-docker: Run interactive tests in Docker containers (Alpine, Ubuntu, Debian)
+test-docker: bin/linux
+	@if command -v docker-compose >/dev/null 2>&1; then \
+		docker-compose -f tests/docker/docker-compose.yml build && \
+		docker-compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
+	elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
+		docker compose -f tests/docker/docker-compose.yml build && \
+		docker compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
+	else \
+		echo "Error: docker-compose or docker compose not found"; \
+		exit 1; \
+	fi
 
 ## fmt: Format code
 fmt:
@@ -83,7 +123,7 @@ vuln:
 	fi
 
 ## dev: Run all checks (fmt, lint, test, vuln)
-dev: fmt lint test-race vuln
+dev: fmt lint test vuln
 	@echo "All checks passed!"
 
 ## deps: Download dependencies

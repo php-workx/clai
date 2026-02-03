@@ -3,6 +3,10 @@
 firebase-debug.log
 bin/
 
+# Built binaries in project root
+/clai
+/clai-shim
+
 # Test coverage
 coverage.out
 coverage.html

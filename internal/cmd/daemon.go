@@ -9,17 +9,13 @@ import (
 )
 
 var daemonCmd = &cobra.Command{
-	Use:   "daemon",
-	Short: "Manage the background Claude daemon for faster responses",
+	Use:    "daemon",
+	Short:  "Manage the background Claude daemon for faster responses",
+	Hidden: true,
 	Long: `Manage the background Claude daemon process.
 
 The daemon keeps a Claude CLI process running in the background to eliminate
-startup overhead for subsequent queries (especially useful for voice commands).
-
-Subcommands:
-  start  - Start the daemon (runs in background)
-  stop   - Stop the daemon
-  status - Check if daemon is running`,
+startup overhead for subsequent queries (especially useful for voice commands).`,
 }
 
 var daemonStartCmd = &cobra.Command{

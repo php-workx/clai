@@ -1,0 +1,36 @@
+# Docker Compose for running interactive shell tests across multiple Linux distributions
+#
+# Prerequisites:
+#   make bin/linux    # Cross-compile binaries for Linux
+#
+# Usage:
+#   docker-compose -f tests/docker/docker-compose.yml build
+#   docker-compose -f tests/docker/docker-compose.yml up --abort-on-container-exit
+#
+# Or use the Makefile target:
+#   make test-docker
+
+services:
+  alpine:
+    build:
+      context: ../..
+      dockerfile: tests/docker/Dockerfile.alpine
+    volumes:
+      - ../../bin/linux:/usr/local/bin:ro
+      - ../../internal/cmd/shell:/app/internal/cmd/shell:ro
+
+  ubuntu:
+    build:
+      context: ../..
+      dockerfile: tests/docker/Dockerfile.ubuntu
+    volumes:
+      - ../../bin/linux:/usr/local/bin:ro
+      - ../../internal/cmd/shell:/app/internal/cmd/shell:ro
+
+  debian:
+    build:
+      context: ../..
+      dockerfile: tests/docker/Dockerfile.debian
+    volumes:
+      - ../../bin/linux:/usr/local/bin:ro
+      - ../../internal/cmd/shell:/app/internal/cmd/shell:ro

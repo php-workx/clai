@@ -4,13 +4,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Command group IDs
+const (
+	groupCore  = "core"
+	groupSetup = "setup"
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "clai",
-	Short: "AI-powered terminal assistant",
-	Long: `AI Terminal integrates Claude into your shell to provide:
-- Automatic error diagnosis for failed commands
-- Command suggestion extraction from output
-- Natural language questions with terminal context`,
+	Short: "fish-like intelligence for any shell",
+	Long: `clai - fish-like intelligence for any shell
+  - ?describe task → get the right command
+  - ↑↓ smart suggestions matching context`,
 }
 
 // Execute runs the root command
@@ -19,11 +24,28 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.AddCommand(diagnoseCmd)
-	rootCmd.AddCommand(extractCmd)
+	// Define command groups
+	rootCmd.AddGroup(
+		&cobra.Group{ID: groupCore, Title: "Core Commands:"},
+		&cobra.Group{ID: groupSetup, Title: "Setup & Configuration:"},
+	)
+
+	// Core commands
 	rootCmd.AddCommand(askCmd)
+	rootCmd.AddCommand(cmdCmd)
+	rootCmd.AddCommand(suggestCmd)
+	rootCmd.AddCommand(historyCmd)
+
+	// Setup commands
+	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(configCmd)
+	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(uninstallCmd)
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(voiceCmd)
+
+	// Hidden commands (still functional but not shown in help)
 	rootCmd.AddCommand(daemonCmd)
+	rootCmd.AddCommand(logsCmd)
+	rootCmd.AddCommand(doctorCmd)
 }

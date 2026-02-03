@@ -13,26 +13,24 @@ import (
 	"github.com/runger/clai/internal/claude"
 )
 
-var voiceCmd = &cobra.Command{
-	Use:   "voice <natural language input>",
-	Short: "Convert natural language to a terminal command",
-	Long: `Convert speech-to-text or natural language input into proper terminal commands.
-
-This is useful when using voice input, as speech-to-text often produces
-natural language like "list all files" instead of actual commands.
+var cmdCmd = &cobra.Command{
+	Use:     "cmd <natural language>",
+	Short:   "Convert natural language to a terminal command",
+	GroupID: groupCore,
+	Long: `Convert natural language input into a terminal command.
 
 The converted command is also cached for Tab completion.
 
 Examples:
-  clai voice "list all files in the current directory"
-  clai voice "show me the git status"
-  clai voice "find all Python files"
-  clai voice "install the requests package with pip"`,
+  clai cmd "list all files in the current directory"
+  clai cmd "show me the git status"
+  clai cmd "find all Python files"
+  clai cmd "install the requests package with pip"`,
 	Args: cobra.MinimumNArgs(1),
-	RunE: runVoice,
+	RunE: runCmd,
 }
 
-func runVoice(cmd *cobra.Command, args []string) error {
+func runCmd(cmd *cobra.Command, args []string) error {
 	input := strings.Join(args, " ")
 
 	// Get system info for context

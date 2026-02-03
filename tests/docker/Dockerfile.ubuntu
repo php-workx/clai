@@ -1,0 +1,17 @@
+# Dockerfile for Ubuntu interactive shell tests
+# Minimal image with shells only - binaries mounted at runtime
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install shells
+RUN apt-get update && apt-get install -y \
+    zsh \
+    fish \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Binaries mounted to /usr/local/bin at runtime via docker-compose
+CMD ["expect.test", "-test.v"]

@@ -1,0 +1,11 @@
+# Dockerfile for Alpine Linux interactive shell tests
+# Minimal image with shells only - binaries mounted at runtime
+FROM alpine:3.19
+
+# Install shells
+RUN apk add --no-cache zsh bash fish
+
+WORKDIR /app
+
+# Binaries mounted to /usr/local/bin at runtime via docker-compose
+CMD ["expect.test", "-test.v"]
