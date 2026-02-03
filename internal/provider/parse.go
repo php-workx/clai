@@ -6,6 +6,24 @@ import (
 	"github.com/runger/clai/internal/sanitize"
 )
 
+// isCodeFence returns true if the line is a markdown code-fence marker
+// (e.g. "```", "```bash") but not an inline backtick-wrapped command (e.g. "```ls```").
+func isCodeFence(line string) bool {
+	if !strings.HasPrefix(line, "```") {
+		return false
+	}
+	rest := line[3:]
+	// Pure closing/opening fence: just backticks
+	if rest == "" {
+		return true
+	}
+	// Fence with language tag: ```bash, ```sh, etc. (no closing backticks)
+	if !strings.Contains(rest, "`") {
+		return true
+	}
+	return false
+}
+
 // skipLinePrefixes contains common non-command line prefixes to skip during parsing
 var skipLinePrefixes = []string{
 	"#",
@@ -96,6 +114,11 @@ func ParseCommandResponse(response string) []Suggestion {
 			continue
 		}
 
+		// Skip code-fence markers (e.g. ```bash, ```) but not inline backtick-wrapped commands (e.g. ```ls```)
+		if isCodeFence(line) {
+			continue
+		}
+
 		// Skip common non-command prefixes
 		if shouldSkipLine(line) {
 			continue
@@ -130,6 +153,11 @@ func ParseDiagnoseResponse(response string) (string, []Suggestion) {
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" {
+			continue
+		}
+
+		// Skip code-fence markers (e.g. ```bash, ```) but not inline backtick-wrapped commands (e.g. ```ls```)
+		if isCodeFence(line) {
 			continue
 		}
 
