@@ -601,6 +601,7 @@ run_trivy() {
 
     local docker_cfg
     docker_cfg="$(mktemp -d)"
+    trap "rm -rf '$docker_cfg'" RETURN
 
     local cache_dir="$OUTPUT_DIR/.trivy-cache"
     mkdir -p "$cache_dir"
@@ -617,7 +618,6 @@ run_trivy() {
         --format json \
         "${db_flag[@]}" \
         > "$output_file" 2> "$stderr_file" || true
-    rm -rf "$docker_cfg"
 
     # In sandboxed / offline environments, allow trivy to be skipped gracefully.
     if [[ -s "$stderr_file" ]] && grep -qiE 'no such host|dial tcp|lookup .*: no such host' "$stderr_file"; then
