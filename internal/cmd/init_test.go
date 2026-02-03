@@ -190,6 +190,99 @@ func TestZshScript_NoEscapeSequencesInPOSTDISPLAY(t *testing.T) {
 	}
 }
 
+// TestZshScript_NoBareEscapeBinding verifies that the zsh script does not bind
+// bare '\e' (Escape) to a widget. A bare \e binding intercepts the first byte
+// of multi-byte escape sequences (arrow keys, Alt+key) when KEYTIMEOUT is low,
+// breaking picker navigation.
+func TestZshScript_NoBareEscapeBinding(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	// Match bindkey lines that bind bare \e or '^[' without additional characters.
+	// OK: bindkey '^[[A' ... (CSI sequence), bindkey '^[OA' ... (application mode)
+	// BAD: bindkey '\e' ... or bindkey '^[' ... (bare escape)
+	bareEscape := regexp.MustCompile(`^\s*bindkey\s+["']\\e["']\s+`)
+	bareCaret := regexp.MustCompile(`^\s*bindkey\s+["']\^?\[["']\s+`)
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if bareEscape.MatchString(line) {
+			t.Errorf("line %d: bare \\e binding breaks arrow keys with low KEYTIMEOUT: %s", i+1, trimmed)
+		}
+		if bareCaret.MatchString(line) && !strings.Contains(line, "^[[") && !strings.Contains(line, "^[O") {
+			t.Errorf("line %d: bare ^[ binding breaks arrow keys with low KEYTIMEOUT: %s", i+1, trimmed)
+		}
+	}
+}
+
+// TestZshScript_ApplicationModeArrowBindings verifies that both CSI-mode (^[[A)
+// and application-mode (^[OA) arrow key sequences are bound for the picker.
+// Some terminals send SS3 sequences; missing bindings cause navigation to fail.
+func TestZshScript_ApplicationModeArrowBindings(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+
+	output := string(content)
+
+	requiredBindings := []string{
+		"^[[A", // Up arrow CSI mode
+		"^[OA", // Up arrow application mode
+		"^[[B", // Down arrow CSI mode
+		"^[OB", // Down arrow application mode
+	}
+
+	for _, binding := range requiredBindings {
+		if !strings.Contains(output, binding) {
+			t.Errorf("zsh script missing arrow key binding %q", binding)
+		}
+	}
+}
+
+// TestZshScript_EditingWidgetsDismissPicker verifies that all editing and
+// cursor-movement ZLE widgets call _clai_dismiss_picker to close the
+// suggestion menu when the user starts editing.
+func TestZshScript_EditingWidgetsDismissPicker(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+
+	output := string(content)
+
+	// These widgets modify the buffer or cursor position; they must dismiss
+	// the picker so stale suggestions don't remain visible.
+	widgets := []string{
+		"_ai_self_insert",
+		"_ai_backward_delete_char",
+		"_ai_backward_char",
+		"_ai_beginning_of_line",
+		"_ai_end_of_line",
+		"_ai_bracketed_paste",
+	}
+
+	for _, widget := range widgets {
+		// Find the function body and check it calls _clai_dismiss_picker
+		funcPattern := regexp.MustCompile(`(?s)` + regexp.QuoteMeta(widget) + `\(\)\s*\{([^}]+)\}`)
+		match := funcPattern.FindStringSubmatch(output)
+		if match == nil {
+			t.Errorf("widget function %s() not found in zsh script", widget)
+			continue
+		}
+		if !strings.Contains(match[1], "_clai_dismiss_picker") {
+			t.Errorf("widget %s() does not call _clai_dismiss_picker", widget)
+		}
+	}
+}
+
 func TestShellScripts_Embedded(t *testing.T) {
 	// Verify all shell scripts are properly embedded
 	shells := []string{
