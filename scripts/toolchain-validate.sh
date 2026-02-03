@@ -126,6 +126,8 @@ tool_key() {
     echo "${1//-/_}"
 }
 
+# Bash 3.2 compatible pseudo-associative array using dynamic variable names.
+# Status values are script-controlled, so eval is safe here.
 set_tool_status() {
     local key
     key="$(tool_key "$1")"
