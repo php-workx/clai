@@ -443,8 +443,8 @@ run_pytest() {
 
     if ! run_tool "pytest" pytest; then return 0; fi
 
-    # Check if there are test files
-    if ! find "$REPO_ROOT" -name "test_*.py" -o -name "*_test.py" | head -1 | grep -q .; then
+    # Check if there are test files (parens group the -o so both patterns are matched)
+    if ! find "$REPO_ROOT" \( -name "test_*.py" -o -name "*_test.py" \) | head -1 | grep -q .; then
         echo "NO_TEST_FILES" > "$output_file"
         set_tool_status "pytest" "skipped"
         return 0
