@@ -116,4 +116,3 @@ rm -rf ~/.clai
 
 - [Quick Start](quickstart.md) - Get started with clai
 - [Shell Integration](shell-integration.md) - Advanced shell configuration
-- [AI Providers](ai-providers.md) - Set up AI features

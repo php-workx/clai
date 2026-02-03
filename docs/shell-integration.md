@@ -209,5 +209,4 @@ export CLAI_DISABLE_SESSION=1
 ## Next Steps
 
 - [Configuration](configuration.md) - All configuration options
-- [AI Providers](ai-providers.md) - Enable AI features
 - [Troubleshooting](troubleshooting.md) - Common issues

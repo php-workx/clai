@@ -20,23 +20,6 @@ clai status
 
 ## Configuration Reference
 
-### Daemon Settings
-
-Control the background daemon behavior.
-
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| `daemon.idle_timeout_mins` | int | `20` | Auto-shutdown after idle (0 = never) |
-| `daemon.socket_path` | string | `""` | Unix socket path (empty = default) |
-| `daemon.log_level` | string | `"info"` | Log level: debug, info, warn, error |
-| `daemon.log_file` | string | `""` | Log file path (empty = default) |
-
-```yaml
-daemon:
-  idle_timeout_mins: 20
-  log_level: info
-```
-
 ### Client Settings
 
 Control how the shell client communicates with the daemon.
@@ -177,6 +160,5 @@ clai doctor
 
 ## Next Steps
 
-- [AI Providers](ai-providers.md) - Configure AI features
 - [Shell Integration](shell-integration.md) - Shell-specific settings
 - [Troubleshooting](troubleshooting.md) - Common issues

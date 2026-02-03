@@ -146,5 +146,4 @@ clai daemon stop
 
 - [Configuration](configuration.md) - All configuration options
 - [Shell Integration](shell-integration.md) - Advanced shell setup
-- [AI Providers](ai-providers.md) - Set up AI features
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
