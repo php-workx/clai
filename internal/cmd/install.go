@@ -208,7 +208,9 @@ func getRCFile(shell string) string {
 		configDir := filepath.Join(home, ".config", "fish")
 		configFile := filepath.Join(configDir, "config.fish")
 		// Create directory if it doesn't exist
-		os.MkdirAll(configDir, 0755)
+		if err := os.MkdirAll(configDir, 0755); err != nil {
+			return ""
+		}
 		return configFile
 	default:
 		return ""

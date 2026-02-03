@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -299,6 +300,7 @@ func TestRunDoctorOutput(t *testing.T) {
 
 	// Save original stdout
 	origStdout := os.Stdout
+	defer func() { os.Stdout = origStdout }()
 
 	// Create a pipe to capture output
 	r, w, err := os.Pipe()
@@ -311,14 +313,15 @@ func TestRunDoctorOutput(t *testing.T) {
 	// Run doctor (ignore error since checks may fail)
 	_ = runDoctor(doctorCmd, []string{})
 
-	// Restore stdout and close writer
+	// Close writer so ReadAll doesn't block
 	w.Close()
-	os.Stdout = origStdout
 
 	// Read captured output
-	buf := make([]byte, 4096)
-	n, _ := r.Read(buf)
-	output := string(buf[:n])
+	outBytes, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("failed to read captured output: %v", err)
+	}
+	output := string(outBytes)
 
 	// Verify output contains expected headers
 	if len(output) == 0 {

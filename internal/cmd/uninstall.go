@@ -84,12 +84,19 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 }
 
 func removeFromRCFile(rcFile, hooksDir string) (bool, error) {
-	// Read the file
-	content, err := os.ReadFile(rcFile)
+	// Stat the file to preserve permissions
+	info, err := os.Stat(rcFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		}
+		return false, err
+	}
+	fileMode := info.Mode()
+
+	// Read the file
+	content, err := os.ReadFile(rcFile)
+	if err != nil {
 		return false, err
 	}
 
@@ -146,7 +153,7 @@ func removeFromRCFile(rcFile, hooksDir string) (bool, error) {
 		newContent += "\n"
 	}
 
-	if err := os.WriteFile(rcFile, []byte(newContent), 0644); err != nil {
+	if err := os.WriteFile(rcFile, []byte(newContent), fileMode.Perm()); err != nil {
 		return false, err
 	}
 

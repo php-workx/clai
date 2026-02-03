@@ -18,6 +18,13 @@ type Paths struct {
 // Unix: ~/.clai
 // Windows: %APPDATA%\clai
 func DefaultPaths() *Paths {
+	// Check for CLAI_HOME override first (works on all platforms)
+	if claiHome := os.Getenv("CLAI_HOME"); claiHome != "" {
+		return &Paths{
+			BaseDir: claiHome,
+		}
+	}
+
 	home := homeDir()
 
 	if runtime.GOOS == "windows" {
@@ -27,13 +34,6 @@ func DefaultPaths() *Paths {
 		}
 		return &Paths{
 			BaseDir: filepath.Join(appData, "clai"),
-		}
-	}
-
-	// Check for CLAI_HOME override
-	if claiHome := os.Getenv("CLAI_HOME"); claiHome != "" {
-		return &Paths{
-			BaseDir: claiHome,
 		}
 	}
 

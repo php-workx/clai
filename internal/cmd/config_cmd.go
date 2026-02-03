@@ -19,7 +19,7 @@ Without arguments, lists all configuration keys.
 With one argument, shows the value of that key.
 With two arguments, sets the key to the value.
 
-Configuration is stored in ~/.config/clai/config.yaml (XDG compliant).
+Configuration is stored in ~/.clai/config.yaml.
 
 Keys are in the format: section.key
 Sections: daemon, client, ai, suggestions, privacy

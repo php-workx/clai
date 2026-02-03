@@ -58,22 +58,22 @@ clai logs --follow
 
 1. Check for stale socket/PID files:
    ```bash
-   rm -f ~/.local/state/clai/clai.sock ~/.local/state/clai/clai.pid
+   rm -f ~/.clai/clai.sock ~/.clai/clai.pid
    ```
 
 2. Check logs for errors:
    ```bash
-   cat ~/.local/state/clai/clai.log
+   clai logs
    ```
 
 3. Start daemon manually to see errors:
    ```bash
-   clai daemon start --foreground
+   clai daemon start
    ```
 
 4. Check permissions:
    ```bash
-   ls -la ~/.local/state/clai/
+   ls -la ~/.clai/
    # Should be owned by you with rwx permissions
    ```
 
@@ -171,7 +171,7 @@ clai logs --follow
 1. Check daemon idle timeout:
    ```bash
    clai config daemon.idle_timeout_mins
-   # Default 20 - daemon stops after idle
+   # Default 0 (never) - daemon runs until shell exits
    ```
 
 2. Restart daemon:
@@ -205,7 +205,7 @@ clai logs --follow
 
 3. Check socket permissions:
    ```bash
-   ls -la ~/.local/state/clai/clai.sock
+   ls -la ~/.clai/clai.sock
    # Should be srwxr-xr-x owned by you
    ```
 
