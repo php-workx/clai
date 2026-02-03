@@ -69,6 +69,17 @@ func zshHistoryPath() string {
 	return filepath.Join(home, ".zsh_history")
 }
 
+// hasUnescapedTrailingBackslash returns true if s ends with an odd number
+// of backslashes (i.e. the final backslash is a line-continuation marker,
+// not an escaped literal backslash).
+func hasUnescapedTrailingBackslash(s string) bool {
+	n := 0
+	for i := len(s) - 1; i >= 0 && s[i] == '\\'; i-- {
+		n++
+	}
+	return n%2 == 1
+}
+
 // historyParser accumulates parsed history entries, handling multiline commands
 type historyParser struct {
 	multilineCmd strings.Builder
@@ -86,8 +97,8 @@ func (p *historyParser) processLine(line string) {
 
 // continueMultiline appends to an in-progress multiline command
 func (p *historyParser) continueMultiline(line string) {
-	if strings.HasSuffix(line, "\\") {
-		p.multilineCmd.WriteString(strings.TrimSuffix(line, "\\"))
+	if hasUnescapedTrailingBackslash(line) {
+		p.multilineCmd.WriteString(line[:len(line)-1])
 		p.multilineCmd.WriteString("\n")
 		return
 	}
@@ -109,8 +120,8 @@ func (p *historyParser) parseFreshLine(line string) {
 
 // addCommand adds a command, starting a multiline accumulation if it ends with backslash
 func (p *historyParser) addCommand(cmd string) {
-	if strings.HasSuffix(cmd, "\\") {
-		p.multilineCmd.WriteString(strings.TrimSuffix(cmd, "\\"))
+	if hasUnescapedTrailingBackslash(cmd) {
+		p.multilineCmd.WriteString(cmd[:len(cmd)-1])
 		p.multilineCmd.WriteString("\n")
 		return
 	}

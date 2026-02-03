@@ -206,6 +206,62 @@ func TestSuggestions_Multiple(t *testing.T) {
 	}
 }
 
+func TestHasUnescapedTrailingBackslash(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected bool
+	}{
+		{`hello\`, true},     // single trailing backslash = continuation
+		{`hello\\`, false},   // two trailing backslashes = escaped, not continuation
+		{`hello\\\`, true},   // three = escaped + continuation
+		{`hello\\\\`, false}, // four = two escaped
+		{`hello`, false},     // no backslash
+		{`\`, true},          // just a backslash
+		{`\\`, false},        // just an escaped backslash
+		{"", false},          // empty string
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := hasUnescapedTrailingBackslash(tt.input)
+			if got != tt.expected {
+				t.Errorf("hasUnescapedTrailingBackslash(%q) = %v, want %v", tt.input, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSuggestion_EscapedBackslash(t *testing.T) {
+	// A line ending with \\ (escaped backslash) should NOT be treated as continuation
+	tmpDir := t.TempDir()
+	histFile := filepath.Join(tmpDir, ".zsh_history")
+
+	// echo "foo\\" ends with literal backslash, not a continuation
+	histContent := `: 1706000001:0;echo "foo\\"
+: 1706000002:0;git status
+`
+	if err := os.WriteFile(histFile, []byte(histContent), 0644); err != nil {
+		t.Fatalf("Failed to write test history: %v", err)
+	}
+
+	oldHistFile := os.Getenv("HISTFILE")
+	os.Setenv("HISTFILE", histFile)
+	defer os.Setenv("HISTFILE", oldHistFile)
+
+	// echo "foo\\" should be a single entry, not start a multiline accumulation
+	result := Suggestion("echo")
+	expected := `echo "foo\\"`
+	if result != expected {
+		t.Errorf("Suggestion(\"echo\") = %q, want %q", result, expected)
+	}
+
+	// git status should be its own entry, not swallowed by multiline
+	result = Suggestion("git")
+	if result != "git status" {
+		t.Errorf("Suggestion(\"git\") = %q, want \"git status\"", result)
+	}
+}
+
 func TestSuggestions_Deduplication(t *testing.T) {
 	// Test that duplicate commands are deduplicated
 	tmpDir := t.TempDir()
