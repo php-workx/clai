@@ -198,52 +198,6 @@ func historySource(global bool, cwd, session string) string {
 	return "session"
 }
 
-func printCommand(c storage.Command) {
-	// Format timestamp
-	t := time.UnixMilli(c.TsStartUnixMs)
-	timestamp := t.Format("2006-01-02 15:04:05")
-
-	// Format exit code
-	exitCode := ""
-	if c.ExitCode != nil {
-		if *c.ExitCode == 0 {
-			exitCode = colorGreen + "0" + colorReset
-		} else {
-			exitCode = colorRed + fmt.Sprintf("%d", *c.ExitCode) + colorReset
-		}
-	} else {
-		exitCode = colorDim + "-" + colorReset
-	}
-
-	// Format duration
-	duration := ""
-	if c.DurationMs != nil {
-		duration = formatDurationMs(*c.DurationMs)
-	}
-
-	// Format git context (branch @ repo)
-	gitContext := ""
-	if c.GitBranch != nil && *c.GitBranch != "" {
-		gitContext = *c.GitBranch
-		if c.GitRepoName != nil && *c.GitRepoName != "" {
-			gitContext += " @ " + *c.GitRepoName
-		}
-	}
-
-	// Print formatted line
-	fmt.Printf("%s%s%s  [%s]  %s", colorDim, timestamp, colorReset, exitCode, c.Command)
-
-	if duration != "" {
-		fmt.Printf("  %s(%s)%s", colorDim, duration, colorReset)
-	}
-
-	if gitContext != "" {
-		fmt.Printf("  %s%s%s", colorCyan, gitContext, colorReset)
-	}
-
-	fmt.Println()
-}
-
 func formatDurationMs(ms int64) string {
 	if ms < 1000 {
 		return fmt.Sprintf("%dms", ms)
