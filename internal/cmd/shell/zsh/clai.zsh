@@ -480,6 +480,9 @@ _clai_picker_load() {
         if [[ -n "$BUFFER" ]]; then
             items=(${(f)"$(clai suggest --limit "$CLAI_MENU_LIMIT" "$BUFFER" 2>/dev/null)"})
         else
+            # Intentional: with empty BUFFER, 'clai suggest' only returns the
+            # single cached AI suggestion which isn't useful for a picker list.
+            # Fall back to recent session history instead.
             items=(${(f)"$(clai history --limit "$CLAI_MENU_LIMIT" --session="$CLAI_SESSION_ID" 2>/dev/null)"})
         fi
     else
