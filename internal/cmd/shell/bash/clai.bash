@@ -250,8 +250,26 @@ history() {
         if [[ $? -eq 0 && -n "$output" ]]; then
             echo "$output"
         else
-            # Fall back to shell's native history
-            builtin history "$@"
+            # Fall back to shell's native history, stripping clai-only flags
+            local safe_args=()
+            local skip_next=false
+            for arg in "$@"; do
+                if $skip_next; then
+                    skip_next=false
+                    continue
+                fi
+                case "$arg" in
+                    --limit|--cwd|-n|--session)
+                        skip_next=true
+                        ;;
+                    --limit=*|--cwd=*|--session=*)
+                        ;;
+                    *)
+                        safe_args+=("$arg")
+                        ;;
+                esac
+            done
+            builtin history "${safe_args[@]}"
         fi
     fi
 }
