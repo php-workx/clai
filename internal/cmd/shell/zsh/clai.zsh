@@ -119,6 +119,7 @@ _ai_update_suggestion() {
 
 # ZLE widget: Update suggestion after each character
 _ai_self_insert() {
+    _clai_dismiss_picker
     zle .self-insert
     if [[ "$_AI_IN_PASTE" == "true" ]]; then
         return
@@ -127,8 +128,16 @@ _ai_self_insert() {
 }
 zle -N self-insert _ai_self_insert
 
+# Dismiss picker if active (called by editing/movement widgets).
+# Uses _clai_picker_close (defined in picker section) via forward reference;
+# safe because widgets are only invoked after full script is sourced.
+_clai_dismiss_picker() {
+    [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] && _clai_picker_close
+}
+
 # ZLE widget: Update suggestion after backspace
 _ai_backward_delete_char() {
+    _clai_dismiss_picker
     zle .backward-delete-char
     _ai_update_suggestion
 }
@@ -136,18 +145,21 @@ zle -N backward-delete-char _ai_backward_delete_char
 
 # ZLE widget: Update suggestion after cursor movement
 _ai_backward_char() {
+    _clai_dismiss_picker
     zle .backward-char
     _ai_update_suggestion
 }
 zle -N backward-char _ai_backward_char
 
 _ai_beginning_of_line() {
+    _clai_dismiss_picker
     zle .beginning-of-line
     _ai_update_suggestion
 }
 zle -N beginning-of-line _ai_beginning_of_line
 
 _ai_end_of_line() {
+    _clai_dismiss_picker
     zle .end-of-line
     _ai_update_suggestion
 }
@@ -155,6 +167,7 @@ zle -N end-of-line _ai_end_of_line
 
 # ZLE widget: Handle bracketed paste as a single update
 _ai_bracketed_paste() {
+    _clai_dismiss_picker
     _AI_IN_PASTE=true
     zle .bracketed-paste
     _AI_IN_PASTE=false
