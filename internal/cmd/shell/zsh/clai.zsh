@@ -449,6 +449,7 @@ _CLAI_PICKER_INDEX=0
 _CLAI_PICKER_ACTIVE=false
 _CLAI_PICKER_MODE=""
 _CLAI_PICKER_ORIG_BUFFER=""
+_CLAI_PICKER_ORIG_CURSOR=0
 _CLAI_HISTORY_SCOPE="session"
 
 _clai_config_enabled() {
@@ -533,6 +534,7 @@ _clai_picker_open() {
 
     _CLAI_PICKER_MODE="$mode"
     _CLAI_PICKER_ORIG_BUFFER="$BUFFER"
+    _CLAI_PICKER_ORIG_CURSOR=$CURSOR
     _CLAI_PICKER_ACTIVE=true
     _CLAI_PICKER_INDEX=0
 
@@ -555,7 +557,7 @@ _clai_picker_close() {
 _clai_picker_cancel() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         BUFFER="$_CLAI_PICKER_ORIG_BUFFER"
-        CURSOR=${#BUFFER}
+        CURSOR=$_CLAI_PICKER_ORIG_CURSOR
         _clai_picker_close
         _ai_update_suggestion
         zle redisplay
