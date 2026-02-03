@@ -612,6 +612,7 @@ _clai_picker_suggest() {
 _clai_history_scope_session() {
     _CLAI_HISTORY_SCOPE="session"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        _CLAI_PICKER_INDEX=0
         _clai_picker_load && _clai_picker_render
     else
         zle -M "History scope: session"
@@ -621,6 +622,7 @@ _clai_history_scope_session() {
 _clai_history_scope_cwd() {
     _CLAI_HISTORY_SCOPE="cwd"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        _CLAI_PICKER_INDEX=0
         _clai_picker_load && _clai_picker_render
     else
         zle -M "History scope: cwd"
@@ -630,6 +632,7 @@ _clai_history_scope_cwd() {
 _clai_history_scope_global() {
     _CLAI_HISTORY_SCOPE="global"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        _CLAI_PICKER_INDEX=0
         _clai_picker_load && _clai_picker_render
     else
         zle -M "History scope: global"
