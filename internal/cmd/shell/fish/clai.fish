@@ -71,7 +71,16 @@ function _ai_clear_suggestion
     set -g _AI_VOICE_MODE false
     commandline -f repaint
 end
-bind \e _ai_clear_suggestion
+
+# Unified Escape handler: cancel picker if active, otherwise clear suggestion
+function _clai_escape
+    if test "$_CLAI_PICKER_ACTIVE" = "true"
+        _clai_picker_cancel
+    else
+        _ai_clear_suggestion
+    end
+end
+bind \e _clai_escape
 
 # ============================================
 # Feature 2: Suggestion & History Pickers
@@ -278,7 +287,7 @@ end
 bind \t _clai_suggest_tab
 bind \e\[A _clai_history_up
 bind \e\[B _clai_picker_down
-bind \e _clai_picker_cancel
+# Escape is bound above via _clai_escape (unified handler)
 bind \cx\cs _clai_history_scope_session
 bind \cx\cd _clai_history_scope_cwd
 bind \cx\cg _clai_history_scope_global
