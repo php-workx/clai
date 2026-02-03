@@ -93,11 +93,14 @@ function _clai_config_enabled
 end
 
 function _clai_history_args
+    # Each argument on its own line so fish command-substitution splits correctly
+    # (spaces in $PWD would break single-line echo splitting)
     switch $_CLAI_HISTORY_SCOPE
         case session
             echo "--session=$CLAI_SESSION_ID"
         case cwd
-            echo "--session=$CLAI_SESSION_ID" "--cwd=$PWD"
+            echo "--session=$CLAI_SESSION_ID"
+            echo "--cwd=$PWD"
         case global
             echo "--global"
         case '*'
