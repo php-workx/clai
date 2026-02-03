@@ -133,6 +133,7 @@ The suggestion picker displays multiple ranked suggestions in a menu area below 
 - `↑` (Up Arrow) opens the history picker
 - The history picker uses the same menu area and navigation keys as the suggestion picker
 - When clai is active, history navigation uses the clai picker (shell-native history navigation is overridden)
+- This is an intentional UX change from inline history stepping in fish/zsh defaults
 
 ### 5.2 Prefix Filtering
 
@@ -220,6 +221,7 @@ Initial scope is current session history. Inside the picker, scope can be cycled
 - `menu-complete` binding enables single-Tab cycling through suggestions
 - Clai suggestions appear first in COMPREPLY, followed by native completions
 - Avoid blocking Tab: prefer cached suggestions or prefetch to keep completion responsive
+- If cache is empty or slow, return native completions immediately (bounded time budget, e.g., 20ms)
 
 ---
 
@@ -259,6 +261,7 @@ Initial scope is current session history. Inside the picker, scope can be cycled
 - Bash path completion should remain visible; clai suggestions are ranked first but not exclusive
 - Tab hijacking is mitigated by merging native completions into the picker instead of replacing them
 - UI must remain responsive under latency; stale or slow responses are discarded
+- Multi-line prompts or resizes can cause picker layout glitches; clear and redraw or hide the picker when rendering is unstable
 
 ---
 
