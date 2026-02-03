@@ -65,12 +65,14 @@ Control command suggestions.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| `suggestions.enabled` | bool | `true` | Enable suggestion UX |
 | `suggestions.max_history` | int | `5` | Max history-based suggestions |
 | `suggestions.max_ai` | int | `3` | Max AI-generated suggestions |
 | `suggestions.show_risk_warning` | bool | `true` | Highlight destructive commands |
 
 ```yaml
 suggestions:
+  enabled: true
   max_history: 5
   max_ai: 3
   show_risk_warning: true

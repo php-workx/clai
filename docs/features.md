@@ -17,7 +17,7 @@ git c█
   git cherry-pick abc123
 ```
 
-Just start typing and suggestions appear. Press **Tab** to accept.
+Just start typing and suggestions appear. Press **Tab** to open the suggestion picker, **Right Arrow** to accept ghost text.
 
 ## Inline Suggestions
 
@@ -27,9 +27,9 @@ Like fish shell's autosuggestions, but for Zsh and Bash too. You see a dimmed pr
 
 | Shell | Accept Full | Accept Word |
 |-------|-------------|-------------|
-| Zsh   | Tab or →    | Ctrl+→      |
-| Bash  | Tab         | —           |
-| Fish  | Tab or →    | Alt+→       |
+| Zsh   | →           | Alt+→       |
+| Bash  | Enter (picker) | —        |
+| Fish  | →           | Alt+→       |
 
 ## Session-Based History
 

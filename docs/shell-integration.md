@@ -71,9 +71,11 @@ $ git ch[suggestions appear above]
 ```
 
 **Keybindings:**
-- **Tab** - Cycle through suggestions
-- **Right Arrow** - Accept suggestion
-- **Escape** - Dismiss suggestions
+- **Tab** - Open suggestion picker
+- **Up Arrow** - Open history picker
+- **Right Arrow** - Accept ghost text
+- **Alt+Right** - Accept next token
+- **Escape** - Cancel picker / clear suggestion
 
 ### Voice Mode (AI Required)
 

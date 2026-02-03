@@ -39,6 +39,30 @@ Search command history.
 clai history              # Show recent commands
 clai history "git"        # Search for git commands
 clai history --session    # Current session only
+clai history --global     # Across all sessions
+clai history --cwd /tmp   # Filter by working directory
+clai history --format json
+```
+
+### `clai suggest`
+
+Get command suggestions for the current prefix.
+
+```bash
+clai suggest "git st"           # Top suggestion
+clai suggest --limit 5 "git"    # Up to 5 suggestions
+clai suggest --json "git"       # JSON output for picker use
+```
+
+### `clai on` / `clai off`
+
+Enable or disable suggestion UX.
+
+```bash
+clai off           # Disable suggestions globally
+clai on            # Re-enable globally
+clai off --session # Disable only in current shell
+clai on --session  # Re-enable for current shell
 ```
 
 ## Daemon

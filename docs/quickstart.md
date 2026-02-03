@@ -39,7 +39,7 @@ git c[TAB]           # Shows: git commit, git checkout, git clone
 docker r[TAB]        # Shows: docker run, docker rm, docker restart
 ```
 
-Press **Tab** to cycle through suggestions, **Right Arrow** to accept.
+Press **Tab** to open the suggestion picker, **Right Arrow** to accept the ghost text.
 
 ### View Command History
 
