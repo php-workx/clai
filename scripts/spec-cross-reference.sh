@@ -79,6 +79,8 @@ trap "rm -f $TEMP_REFS" EXIT
 # Use sed to extract content between backticks that looks like identifiers
 sed -n 's/.*`\([A-Z][a-zA-Z0-9_]*\)`.*/\1/p' "$SPEC_FILE" | sort -u > "$TEMP_REFS"
 sed -n 's/.*`\([a-z]*[A-Z][a-zA-Z0-9_]*\)`.*/\1/p' "$SPEC_FILE" | sort -u >> "$TEMP_REFS"
+# Also match snake_case identifiers (e.g., `my_function`, `some_var`)
+sed -n 's/.*`\([a-z_][a-z0-9_]*\)`.*/\1/p' "$SPEC_FILE" | sort -u >> "$TEMP_REFS"
 sort -u "$TEMP_REFS" -o "$TEMP_REFS"
 
 if [[ ! -s "$TEMP_REFS" ]]; then
@@ -91,7 +93,7 @@ else
         [[ -z "$name" ]] && continue
 
         # Search for common definition patterns
-        location=$(grep -rn \
+        location=$(grep -rnw \
             -e "func $name" \
             -e "func ($name" \
             -e "type $name " \
@@ -99,7 +101,7 @@ else
             -e "def $name" \
             -e "const $name " \
             -e "interface $name" \
-            --include="*.go" --include="*.py" --include="*.ts" --include="*.js" \
+            --include="*.go" --include="*.py" --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" \
             . 2>/dev/null | head -1 || true)
 
         if [[ -n "$location" ]]; then
