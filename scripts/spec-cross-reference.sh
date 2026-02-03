@@ -42,6 +42,9 @@ echo ""
 echo "| Path | Exists? | Line in Spec |"
 echo "|------|---------|--------------|"
 
+# Directory of the spec file, for resolving relative paths
+SPEC_DIR="$(cd "$(dirname "$SPEC_FILE")" && pwd)"
+
 # Extract file paths with common extensions
 grep -noE '[a-zA-Z0-9_/.=-]+\.(go|py|ts|tsx|js|jsx|sh|md|yaml|yml|json|toml)' "$SPEC_FILE" 2>/dev/null | while IFS=: read -r line_num path; do
     # Skip if it's a URL
@@ -49,7 +52,8 @@ grep -noE '[a-zA-Z0-9_/.=-]+\.(go|py|ts|tsx|js|jsx|sh|md|yaml|yml|json|toml)' "$
         continue
     fi
 
-    if [[ -f "$path" ]]; then
+    # Check from CWD first, then relative to the spec file's directory
+    if [[ -f "$path" ]] || [[ -f "$SPEC_DIR/$path" ]]; then
         printf '| `%s` | YES | %s |\n' "$path" "$line_num"
     else
         printf '| `%s` | **NO** | %s |\n' "$path" "$line_num"
@@ -126,12 +130,15 @@ else
     echo "|-------------|---------|"
 
     echo "$links" | while read -r link; do
-        # Skip anchors
+        # Skip pure anchors (links to headings within same doc)
         if [[ "$link" == \#* ]]; then
             continue
         fi
 
-        if [[ -e "$link" ]]; then
+        # Strip anchor fragment before checking file existence
+        file_path="${link%%#*}"
+
+        if [[ -e "$file_path" ]]; then
             printf '| `%s` | YES |\n' "$link"
         else
             printf '| `%s` | **NO** |\n' "$link"
