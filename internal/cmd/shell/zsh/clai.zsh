@@ -3,8 +3,8 @@
 #
 # Features:
 #   1. Session tracking (commands logged for context-aware suggestions)
-#   2. Inline command suggestions (history + AI) with right-arrow to accept
-#   3. Menu selection with ↓ arrow (up/down to navigate, Enter to select)
+#   2. Inline ghost text suggestions (history + AI) with right-arrow to accept
+#   3. Suggestion picker (Tab) + history picker (↑) with menu navigation
 #   4. Error diagnosis with `run` wrapper (captures output for analysis)
 #   5. Natural language → command with ? prefix (e.g., "?list all files")
 #
@@ -51,63 +51,65 @@ _CLAI_LAST_COMMAND=""
 # - While typing: matches against shell history
 # - Empty buffer: shows AI suggestion if available
 # - Right-arrow to accept
+# - Alt+Right to accept next token
 
 # Current suggestion state
 _AI_CURRENT_SUGGESTION=""
 _AI_IN_PASTE=false
 
-# Preserve the user's original right prompt so we can restore it
-if [[ -z "${_AI_ORIG_RPS1+x}" ]]; then
-    _AI_ORIG_RPS1="${RPS1:-}"
+# Disable zsh-autosuggestions when clai is active
+_CLAI_ZSH_AUTOSUGGEST_PRESENT=false
+if (( ${+functions[_zsh_autosuggest_start]} )); then
+    _CLAI_ZSH_AUTOSUGGEST_PRESENT=true
 fi
+_CLAI_ZSH_AUTOSUGGEST_ORIG="${ZSH_AUTOSUGGEST_DISABLE:-}"
+
+_clai_zsh_autosuggest_disable() {
+    if [[ "$_CLAI_ZSH_AUTOSUGGEST_PRESENT" == "true" ]]; then
+        export ZSH_AUTOSUGGEST_DISABLE=1
+    fi
+}
+
+_clai_zsh_autosuggest_restore() {
+    if [[ "$_CLAI_ZSH_AUTOSUGGEST_PRESENT" == "true" ]]; then
+        if [[ -n "$_CLAI_ZSH_AUTOSUGGEST_ORIG" ]]; then
+            export ZSH_AUTOSUGGEST_DISABLE="$_CLAI_ZSH_AUTOSUGGEST_ORIG"
+        else
+            unset ZSH_AUTOSUGGEST_DISABLE
+        fi
+    fi
+}
+
+# Session-level disable flag
+_clai_session_off() {
+    [[ -f "$CLAI_CACHE/off" ]]
+}
 
 # Update suggestion based on current buffer
 _ai_update_suggestion() {
     local suggestion=""
 
-    if [[ -z "$BUFFER" ]]; then
-        # Empty buffer - check for cached AI suggestion
-        suggestion=$(clai suggest 2>/dev/null)
-    else
-        # Has content - clai handles daemon vs history fallback
-        suggestion=$(clai suggest "$BUFFER" 2>/dev/null)
+    # Hide ghost text when disabled, picker active, buffer empty, or cursor not at EOL
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] || [[ -z "$BUFFER" ]] || [[ $CURSOR -ne ${#BUFFER} ]]; then
+        _clai_zsh_autosuggest_restore
+        _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
+        return
     fi
 
-    _AI_CURRENT_SUGGESTION="$suggestion"
+    _clai_zsh_autosuggest_disable
+    # Has content - clai handles daemon vs history fallback
+    suggestion=$(clai suggest "$BUFFER" 2>/dev/null)
 
-    # Clear ghost text (we use right prompt now)
-    POSTDISPLAY=""
-
-    # Show suggestion in right prompt
-    if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" ]]; then
-        local display_suggestion="$suggestion"
-        local display_prefix="$BUFFER"
-        local max_suggestion=40  # Max length for suggestion
-        local max_prefix=10      # Max length for prefix display
-
-        # Truncate long suggestions
-        if [[ ${#display_suggestion} -gt $max_suggestion ]]; then
-            display_suggestion="${display_suggestion:0:$max_suggestion}…"
-        fi
-
-        local clai_hint
-        if [[ -z "$BUFFER" ]]; then
-            # No input yet - show full suggestion
-            clai_hint="%F{242}($display_suggestion)%f"
-        else
-            # Truncate long prefix to just "..."
-            if [[ ${#display_prefix} -gt $max_prefix ]]; then
-                display_prefix="…"
-            fi
-            # Show (partial → full) format
-            clai_hint="%F{242}($display_prefix → $display_suggestion)%f"
-        fi
-        RPS1="${_AI_ORIG_RPS1:+${_AI_ORIG_RPS1} }${clai_hint}"
+    if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" && "$suggestion" == "$BUFFER"* ]]; then
+        _AI_CURRENT_SUGGESTION="$suggestion"
+        local ghost="${suggestion:${#BUFFER}}"
+        POSTDISPLAY="%F{242}${ghost}%f"
     else
-        RPS1="$_AI_ORIG_RPS1"
+        _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
     fi
 
-    # Force prompt redraw to show updated RPS1 (only when in ZLE context)
     [[ -n "$WIDGET" ]] && zle reset-prompt
 }
 
@@ -128,6 +130,25 @@ _ai_backward_delete_char() {
 }
 zle -N backward-delete-char _ai_backward_delete_char
 
+# ZLE widget: Update suggestion after cursor movement
+_ai_backward_char() {
+    zle .backward-char
+    _ai_update_suggestion
+}
+zle -N backward-char _ai_backward_char
+
+_ai_beginning_of_line() {
+    zle .beginning-of-line
+    _ai_update_suggestion
+}
+zle -N beginning-of-line _ai_beginning_of_line
+
+_ai_end_of_line() {
+    zle .end-of-line
+    _ai_update_suggestion
+}
+zle -N end-of-line _ai_end_of_line
+
 # ZLE widget: Handle bracketed paste as a single update
 _ai_bracketed_paste() {
     _AI_IN_PASTE=true
@@ -143,7 +164,6 @@ _ai_forward_char() {
         # At end of buffer with suggestion - accept it
         BUFFER="$_AI_CURRENT_SUGGESTION"
         CURSOR=${#BUFFER}
-        RPS1="$_AI_ORIG_RPS1"
         _AI_CURRENT_SUGGESTION=""
         # Clear AI suggestion file if we used it
         > "$_AI_SUGGEST_FILE"
@@ -155,16 +175,44 @@ _ai_forward_char() {
 }
 zle -N forward-char _ai_forward_char
 
-# ZLE widget: Clear suggestion with Escape
+# ZLE widget: Accept next token from ghost text (Alt+Right)
+_ai_accept_token() {
+    if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} && "$_AI_CURRENT_SUGGESTION" == "$BUFFER"* ]]; then
+        local remainder="${_AI_CURRENT_SUGGESTION:$CURSOR}"
+        local leading="${remainder%%[![:space:]]*}"
+        remainder="${remainder#$leading}"
+        if [[ -z "$remainder" ]]; then
+            return
+        fi
+        local ws_part="${remainder%%[[:space:]]*}"
+        local slash_part="${remainder%%/*}"
+        local token="$ws_part"
+        if [[ "$remainder" == *"/"* ]] && (( ${#slash_part} < ${#ws_part} )); then
+            token="${slash_part}/"
+        fi
+        local after="${remainder#$token}"
+        local trailing="${after%%[![:space:]]*}"
+        local insert="${leading}${token}${trailing}"
+        BUFFER+="$insert"
+        CURSOR=${#BUFFER}
+        _ai_update_suggestion
+        return
+    fi
+    zle .forward-word
+}
+zle -N _ai_accept_token
+
+# Bind Alt+Right to accept next token (common escape sequence)
+bindkey '\e[1;3C' _ai_accept_token
+
+# ZLE widget: Clear suggestion
 _ai_clear_suggestion() {
-    RPS1="$_AI_ORIG_RPS1"
     _AI_CURRENT_SUGGESTION=""
+    POSTDISPLAY=""
     > "$_AI_SUGGEST_FILE"
     zle reset-prompt
 }
 zle -N _ai_clear_suggestion
-
-# Note: Escape is intentionally not bound by clai to avoid key sequence conflicts.
 
 # ============================================
 # Feature 3: Voice Mode
@@ -388,153 +436,224 @@ voice() {
 
 
 # ============================================
-# Feature 4: Menu Selection (↓ or Ctrl+Space)
+# Feature 4: Suggestion + History Pickers
 # ============================================
-# Shows multiple suggestions in a selectable menu
-# - Down arrow (when typing): Show suggestion menu
-# - Ctrl+Space: Alternative way to show menu
-# - Up/Down arrows: Navigate menu once open
-# - Enter: Accept selection
-# - Escape: Cancel
+# - Tab opens suggestion picker
+# - Up arrow opens history picker
+# - Up/Down navigate while picker is open
+# - Enter accepts selection (insert only)
+# - Esc cancels and restores original buffer
 
-# Menu state
-_AI_MENU_SUGGESTIONS=()
-_AI_MENU_INDEX=0
-_AI_MENU_ACTIVE=false
+_CLAI_PICKER_ITEMS=()
+_CLAI_PICKER_INDEX=0
+_CLAI_PICKER_ACTIVE=false
+_CLAI_PICKER_MODE=""
+_CLAI_PICKER_ORIG_BUFFER=""
+_CLAI_HISTORY_SCOPE="session"
 
-# Fetch suggestions and show menu
-_ai_show_menu() {
-    local prefix="$BUFFER"
-
-    # Get multiple suggestions (clai handles daemon vs history fallback)
-    local -a suggestions
-    if [[ -n "$prefix" ]]; then
-        suggestions=(${(f)"$(clai suggest --limit "$CLAI_MENU_LIMIT" "$prefix" 2>/dev/null)"})
-    fi
-
-    if [[ ${#suggestions} -eq 0 ]]; then
-        zle -M "No suggestions for: $prefix"
-        return
-    fi
-
-    # Store suggestions and activate menu
-    _AI_MENU_SUGGESTIONS=("${suggestions[@]}")
-    _AI_MENU_INDEX=0
-    _AI_MENU_ACTIVE=true
-
-    # Render the menu
-    _ai_render_menu
+_clai_config_enabled() {
+    local enabled
+    enabled=$(clai config suggestions.enabled 2>/dev/null)
+    [[ "$enabled" != "false" ]]
 }
 
-# Render the current menu state
-_ai_render_menu() {
+_clai_history_args() {
+    case "$_CLAI_HISTORY_SCOPE" in
+        session)
+            echo "--session=$CLAI_SESSION_ID"
+            ;;
+        cwd)
+            echo "--session=$CLAI_SESSION_ID --cwd=$PWD"
+            ;;
+        global)
+            echo "--global"
+            ;;
+        *)
+            echo "--session=$CLAI_SESSION_ID"
+            ;;
+    esac
+}
+
+_clai_picker_load() {
+    local -a items
+    if [[ "$_CLAI_PICKER_MODE" == "suggest" ]]; then
+        if [[ -n "$BUFFER" ]]; then
+            items=(${(f)"$(clai suggest --limit "$CLAI_MENU_LIMIT" "$BUFFER" 2>/dev/null)"})
+        else
+            items=(${(f)"$(clai history --limit "$CLAI_MENU_LIMIT" --session="$CLAI_SESSION_ID" 2>/dev/null)"})
+        fi
+    else
+        local -a args
+        args=(${(z)$(_clai_history_args)})
+        if [[ -n "$BUFFER" ]]; then
+            items=(${(f)"$(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$BUFFER" 2>/dev/null)"})
+        else
+            items=(${(f)"$(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" 2>/dev/null)"})
+        fi
+    fi
+
+    _CLAI_PICKER_ITEMS=("${items[@]}")
+    if [[ ${#_CLAI_PICKER_ITEMS[@]} -eq 0 ]]; then
+        return 1
+    fi
+    return 0
+}
+
+_clai_picker_render() {
     local menu_text=""
     local i=0
+    local header="Suggestions"
+    if [[ "$_CLAI_PICKER_MODE" == "history" ]]; then
+        header="History (${_CLAI_HISTORY_SCOPE})"
+    fi
 
-    for suggestion in "${_AI_MENU_SUGGESTIONS[@]}"; do
-        if [[ $i -eq $_AI_MENU_INDEX ]]; then
-            # Highlighted selection
-            menu_text+=$'\n'" → $suggestion"
+    for item in "${_CLAI_PICKER_ITEMS[@]}"; do
+        if [[ $i -eq $_CLAI_PICKER_INDEX ]]; then
+            menu_text+=$'\n'" → $item"
         else
-            menu_text+=$'\n'"   $suggestion"
+            menu_text+=$'\n'"   $item"
         fi
         ((i++))
     done
-
-    # Show menu below prompt
-    zle -M "Suggestions (↑↓ to navigate, Enter to select, Esc to cancel):$menu_text"
+    POSTDISPLAY=""
+    zle -M "$header (↑↓, Enter, Esc):$menu_text"
 }
 
-# Navigate menu up
-_ai_menu_up() {
-    if [[ "$_AI_MENU_ACTIVE" == "true" ]]; then
-        if [[ $_AI_MENU_INDEX -gt 0 ]]; then
-            ((_AI_MENU_INDEX--))
-        else
-            # Wrap to bottom
-            _AI_MENU_INDEX=$((${#_AI_MENU_SUGGESTIONS[@]} - 1))
-        fi
-        _ai_render_menu
-    elif [[ -n "$BUFFER" ]]; then
-        # Has input - show menu (symmetric with down arrow)
-        _ai_show_menu
-    else
-        # Empty buffer - normal history navigation
-        zle .up-line-or-history
+_clai_picker_open() {
+    local mode="$1"
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        return
+    fi
+    if ! _clai_config_enabled; then
+        return
+    fi
+
+    _CLAI_PICKER_MODE="$mode"
+    _CLAI_PICKER_ORIG_BUFFER="$BUFFER"
+    _CLAI_PICKER_ACTIVE=true
+    _CLAI_PICKER_INDEX=0
+
+    if ! _clai_picker_load; then
+        _CLAI_PICKER_ACTIVE=false
+        zle -M "No ${mode} items"
+        return
+    fi
+    _clai_picker_render
+}
+
+_clai_picker_close() {
+    _CLAI_PICKER_ACTIVE=false
+    _CLAI_PICKER_ITEMS=()
+    _CLAI_PICKER_INDEX=0
+    _CLAI_PICKER_MODE=""
+    zle -M ""
+}
+
+_clai_picker_cancel() {
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        BUFFER="$_CLAI_PICKER_ORIG_BUFFER"
+        CURSOR=${#BUFFER}
+        _clai_picker_close
+        _ai_update_suggestion
+        zle redisplay
     fi
 }
 
-# Navigate menu down (or open menu if typing)
-_ai_menu_down() {
-    if [[ "$_AI_MENU_ACTIVE" == "true" ]]; then
-        # Menu active - navigate down
-        if [[ $_AI_MENU_INDEX -lt $((${#_AI_MENU_SUGGESTIONS[@]} - 1)) ]]; then
-            ((_AI_MENU_INDEX++))
-        else
-            # Wrap to top
-            _AI_MENU_INDEX=0
-        fi
-        _ai_render_menu
-    elif [[ -n "$BUFFER" ]]; then
-        # Has input - show menu (arrow down is safe to override here)
-        _ai_show_menu
-    else
-        # Empty buffer - normal history navigation
-        zle .down-line-or-history
-    fi
-}
-
-# Accept menu selection
-_ai_menu_accept() {
-    if [[ "$_AI_MENU_ACTIVE" == "true" ]]; then
-        local selected="${_AI_MENU_SUGGESTIONS[$_AI_MENU_INDEX + 1]}"  # zsh arrays are 1-indexed
+_clai_picker_accept() {
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        local selected="${_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX + 1]}"
         BUFFER="$selected"
         CURSOR=${#BUFFER}
-        _ai_menu_cancel
+        _clai_picker_close
+        _ai_update_suggestion
         zle redisplay
     else
-        # Pass through to normal accept (voice-aware)
         _ai_voice_accept_line
     fi
 }
 
-# Cancel menu
-_ai_menu_cancel() {
-    _AI_MENU_ACTIVE=false
-    _AI_MENU_SUGGESTIONS=()
-    _AI_MENU_INDEX=0
-    zle -M ""  # Clear message
-}
-
-# Register menu widgets
-zle -N _ai_show_menu
-zle -N _ai_menu_up
-zle -N _ai_menu_down
-zle -N _ai_menu_accept
-
-# Bind Ctrl+Space to show menu
-bindkey '^ ' _ai_show_menu
-
-# Override up/down arrows when menu is active
-bindkey '^[[A' _ai_menu_up     # Up arrow
-bindkey '^[[B' _ai_menu_down   # Down arrow
-
-# Override Enter when menu is active
-bindkey '^M' _ai_menu_accept
-
-# Cancel voice mode and/or menu when invoked (not bound by default)
-_ai_cancel_voice_mode() {
-    if [[ "$_AI_MENU_ACTIVE" == "true" ]]; then
-        _ai_menu_cancel
+_clai_picker_up() {
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        if [[ $_CLAI_PICKER_INDEX -gt 0 ]]; then
+            ((_CLAI_PICKER_INDEX--))
+        else
+            _CLAI_PICKER_INDEX=$((${#_CLAI_PICKER_ITEMS[@]} - 1))
+        fi
+        _clai_picker_render
         return
     fi
-    if [[ "$_AI_VOICE_MODE" == "true" ]]; then
-        _AI_VOICE_MODE=false
-    fi
-    # Clear suggestions
-    _ai_clear_suggestion
+    _clai_picker_open history
 }
-zle -N _ai_cancel_voice_mode
+
+_clai_picker_down() {
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        if [[ $_CLAI_PICKER_INDEX -lt $((${#_CLAI_PICKER_ITEMS[@]} - 1)) ]]; then
+            ((_CLAI_PICKER_INDEX++))
+        else
+            _CLAI_PICKER_INDEX=0
+        fi
+        _clai_picker_render
+        return
+    fi
+    zle .down-line-or-history
+}
+
+_clai_picker_suggest() {
+    _clai_picker_open suggest
+}
+
+_clai_history_scope_session() {
+    _CLAI_HISTORY_SCOPE="session"
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        _clai_picker_load && _clai_picker_render
+    else
+        zle -M "History scope: session"
+    fi
+}
+
+_clai_history_scope_cwd() {
+    _CLAI_HISTORY_SCOPE="cwd"
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        _clai_picker_load && _clai_picker_render
+    else
+        zle -M "History scope: cwd"
+    fi
+}
+
+_clai_history_scope_global() {
+    _CLAI_HISTORY_SCOPE="global"
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        _clai_picker_load && _clai_picker_render
+    else
+        zle -M "History scope: global"
+    fi
+}
+
+_clai_picker_escape() {
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        _clai_picker_cancel
+        return
+    fi
+    zle .send-break
+}
+
+zle -N _clai_picker_suggest
+zle -N _clai_picker_up
+zle -N _clai_picker_down
+zle -N _clai_picker_accept
+zle -N _clai_history_scope_session
+zle -N _clai_history_scope_cwd
+zle -N _clai_history_scope_global
+zle -N _clai_picker_escape
+
+bindkey '^I' _clai_picker_suggest      # Tab
+bindkey '^[[A' _clai_picker_up         # Up arrow
+bindkey '^[[B' _clai_picker_down       # Down arrow
+bindkey '^M' _clai_picker_accept       # Enter
+bindkey '^Xs' _clai_history_scope_session
+bindkey '^Xd' _clai_history_scope_cwd
+bindkey '^Xg' _clai_history_scope_global
+bindkey '\e' _clai_picker_escape
 
 # ============================================
 # Daemon Management
@@ -584,5 +703,5 @@ if [[ -o interactive ]]; then
     trap '_clai_cleanup' EXIT HUP
 
     local short_id="${CLAI_SESSION_ID:0:8}"
-    echo -e "\033[2m🤖 clai [$short_id] ↑↓ history | → accept | ?\"describe task\"\033[0m"
+    echo -e "\033[2m🤖 clai [$short_id] Tab suggestions | ↑ history | → accept | ?\"describe task\"\033[0m"
 fi
