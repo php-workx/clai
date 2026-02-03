@@ -72,7 +72,7 @@ func cleanCommandPrefix(line string) string {
 	if len(line) >= 3 && line[0] >= '1' && line[0] <= '9' {
 		if line[1] == '.' || line[1] == ')' {
 			line = strings.TrimSpace(line[2:])
-		} else if len(line) >= 4 && line[2] == '.' || line[2] == ')' {
+		} else if len(line) >= 4 && (line[2] == '.' || line[2] == ')') {
 			line = strings.TrimSpace(line[3:])
 		}
 	}

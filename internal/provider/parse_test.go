@@ -214,6 +214,33 @@ $ fix3`
 	}
 }
 
+// TestCleanCommandPrefix_TwoDigit tests two-digit numbered prefix handling
+func TestCleanCommandPrefix_TwoDigit(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"1. ls -la", "ls -la"},
+		{"1) ls -la", "ls -la"},
+		{"12. ls -la", "ls -la"},
+		{"12) ls -la", "ls -la"},
+		{"99. pwd", "pwd"},
+		// Short inputs — too short to match numbered prefix pattern
+		{"1)", "1)"},
+		{"1.", "1."},
+		{"12", "12"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			result := cleanCommandPrefix(tt.input)
+			if result != tt.expected {
+				t.Errorf("cleanCommandPrefix(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
+
 // TestShouldSkipLine tests the shouldSkipLine helper function
 func TestShouldSkipLine(t *testing.T) {
 	tests := []struct {
