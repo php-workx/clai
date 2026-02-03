@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -27,6 +28,7 @@ func TestRunInit_Zsh(t *testing.T) {
 		"clai ask",
 		"clai suggest",
 		"POSTDISPLAY",
+		"region_highlight",
 		"pipestatus",
 		"ai-fix",
 		"run()",
@@ -151,6 +153,40 @@ func TestShellScripts_AllHaveCommonFeatures(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestZshScript_NoEscapeSequencesInPOSTDISPLAY verifies that POSTDISPLAY
+// assignments use plain text only (colored via region_highlight), not prompt
+// escapes (%F{...}) or ANSI escapes (\e[...) which ZLE renders literally.
+func TestZshScript_NoEscapeSequencesInPOSTDISPLAY(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+
+	lines := strings.Split(string(content), "\n")
+
+	// Patterns that should never appear in a POSTDISPLAY= assignment line.
+	// These cause literal escape characters to show as ghost text.
+	badPatterns := []*regexp.Regexp{
+		regexp.MustCompile(`POSTDISPLAY=.*%F\{`),     // zsh prompt escapes
+		regexp.MustCompile(`POSTDISPLAY=.*%f`),       // zsh prompt reset
+		regexp.MustCompile(`POSTDISPLAY=.*\\e\[`),    // ANSI escapes (literal \e)
+		regexp.MustCompile(`POSTDISPLAY=.*\$'\\e\[`), // ANSI escapes ($'\e[...')
+	}
+
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		for _, pat := range badPatterns {
+			if pat.MatchString(line) {
+				t.Errorf("line %d: POSTDISPLAY assignment contains escape sequences "+
+					"(use region_highlight instead): %s", i+1, trimmed)
+			}
+		}
 	}
 }
 
