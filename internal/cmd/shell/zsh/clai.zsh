@@ -177,16 +177,21 @@ zle -N bracketed-paste _ai_bracketed_paste
 
 # ZLE widget: Accept suggestion with right arrow
 _ai_forward_char() {
-    if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} ]]; then
-        # At end of buffer with suggestion - accept it
+    if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} && "$_AI_CURRENT_SUGGESTION" == "$BUFFER"* ]]; then
+        # At end of buffer with valid suggestion prefix - accept it
         BUFFER="$_AI_CURRENT_SUGGESTION"
         CURSOR=${#BUFFER}
         _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
+        region_highlight=()
         # Clear AI suggestion file if we used it
         > "$_AI_SUGGEST_FILE"
         zle reset-prompt
     else
-        # Normal forward char
+        # Normal forward char (or stale suggestion - ignore it)
+        _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
+        region_highlight=()
         zle .forward-char
     fi
 }

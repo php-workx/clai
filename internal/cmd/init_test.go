@@ -283,6 +283,40 @@ func TestZshScript_EditingWidgetsDismissPicker(t *testing.T) {
 	}
 }
 
+// TestZshScript_ForwardCharValidatesSuggestionPrefix verifies that the
+// right-arrow accept widget checks that _AI_CURRENT_SUGGESTION starts with
+// BUFFER before accepting. Without this check, a stale suggestion after
+// backspace can append incorrect characters (e.g., "source ~/.zshrcrc").
+func TestZshScript_ForwardCharValidatesSuggestionPrefix(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+
+	output := string(content)
+
+	// Find the _ai_forward_char function and verify it contains a prefix check.
+	// The function has nested braces so we look for the pattern between function
+	// start and the next zle -N registration.
+	start := strings.Index(output, "_ai_forward_char()")
+	if start == -1 {
+		t.Fatal("_ai_forward_char() not found in zsh script")
+	}
+
+	// Extract until the next "zle -N" line (function boundary)
+	rest := output[start:]
+	end := strings.Index(rest, "zle -N forward-char")
+	if end == -1 {
+		t.Fatal("could not find end of _ai_forward_char function")
+	}
+	body := rest[:end]
+
+	if !strings.Contains(body, `"$_AI_CURRENT_SUGGESTION" == "$BUFFER"*`) {
+		t.Error("_ai_forward_char() does not validate suggestion is a prefix of BUFFER; " +
+			"stale suggestions after backspace will accept incorrect text")
+	}
+}
+
 func TestShellScripts_Embedded(t *testing.T) {
 	// Verify all shell scripts are properly embedded
 	shells := []string{
