@@ -56,7 +56,7 @@ Ghost text is the primary suggestion UI. It is rendered as dimmed (gray) text ap
 **Per-shell rendering strategy:**
 
 - **Zsh:** Render ghost text via `POSTDISPLAY` or equivalent ZLE buffer overlay. If `zsh-autosuggestions` is detected, temporarily disable it while clai suggestions are active to avoid duplicates.
-- **Fish:** Provide suggestions via fish's autosuggestion hook. Suppress fish's native autosuggestions while clai is active to avoid duplicates.
+- **Fish:** Provide suggestions via fish's autosuggestion hook. Suppress fish's native autosuggestions while clai is active to avoid duplicates (for example, by setting `fish_autosuggestion_enabled=0` while clai is active).
 - **Bash:** No ghost text. Bash's readline does not support inline overlays without corrupting cursor positioning. Suggestions are only visible via the Tab-triggered picker (see Section 4.2).
 
 ### 3.3 Visibility Rules
@@ -187,6 +187,7 @@ Initial scope is current session history. Inside the picker, scope can be cycled
 
 - If `zsh-autosuggestions` is detected, disable it while clai suggestions are active
 - Tab is owned by clai; native completions are merged into the picker results
+- clai should be sourced after `zsh-autosuggestions` and `zsh-syntax-highlighting` to minimize POSTDISPLAY or highlight conflicts
 - Must respect user custom keymaps
 
 ---
@@ -218,6 +219,7 @@ Initial scope is current session history. Inside the picker, scope can be cycled
 - Requires Bash 3.2+ (macOS default)
 - `menu-complete` binding enables single-Tab cycling through suggestions
 - Clai suggestions appear first in COMPREPLY, followed by native completions
+- Avoid blocking Tab: prefer cached suggestions or prefetch to keep completion responsive
 
 ---
 
@@ -251,6 +253,15 @@ Initial scope is current session history. Inside the picker, scope can be cycled
 
 ---
 
+### 6.4 Compatibility Notes
+
+- Zsh ghost text can conflict with prompt/highlighting plugins; load order and temporary suppression of other autosuggestion sources are required
+- Bash path completion should remain visible; clai suggestions are ranked first but not exclusive
+- Tab hijacking is mitigated by merging native completions into the picker instead of replacing them
+- UI must remain responsive under latency; stale or slow responses are discarded
+
+---
+
 ## 7. Concurrency & Debounce
 
 ### 7.1 Debounce
@@ -268,6 +279,8 @@ Each suggestion response is tagged with the prefix it was requested for. If the 
 ### 7.4 Non-Blocking
 
 Ghost text updates and picker rendering must never block typing. All suggestion fetches run asynchronously. If the daemon is slow or unavailable, the shell remains fully responsive with no visible delay.
+
+For bash Tab completion, if suggestions are not ready, fall back to native completions without delay.
 
 ### 7.5 Ordering
 
