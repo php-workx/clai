@@ -156,15 +156,57 @@ function _clai_picker_load_history
     return 0
 end
 
+set -g _CLAI_PICKER_LINE_COUNT 0
+
+function _clai_picker_render
+    set -l header "Suggestions"
+    if test "$_CLAI_PICKER_MODE" = "history"
+        set header "History ($_CLAI_HISTORY_SCOPE)"
+    end
+
+    # Build menu lines
+    set -l menu_lines "$header (↑↓, Enter, Esc):"
+    set -l i 1
+    for item in $_CLAI_PICKER_ITEMS
+        if test $i -eq $_CLAI_PICKER_INDEX
+            set -a menu_lines " → $item"
+        else
+            set -a menu_lines "   $item"
+        end
+        set i (math $i + 1)
+    end
+
+    set -g _CLAI_PICKER_LINE_COUNT (count $menu_lines)
+
+    # Draw below command line using terminal escape sequences
+    printf '\e[s' >&2              # save cursor position
+    printf '\n\e[J' >&2            # newline + clear to end of screen
+    for line in $menu_lines
+        printf '%s\n' "$line" >&2
+    end
+    printf '\e[u' >&2              # restore cursor position
+end
+
+function _clai_picker_clear_menu
+    if test $_CLAI_PICKER_LINE_COUNT -gt 0
+        printf '\e[s' >&2          # save cursor
+        printf '\n\e[J' >&2        # newline + clear to end of screen
+        printf '\e[u' >&2          # restore cursor
+        set -g _CLAI_PICKER_LINE_COUNT 0
+    end
+end
+
 function _clai_picker_apply
     set -l selected $_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX]
     if test -n "$selected"
         commandline -r -- $selected
         commandline -f end-of-line
     end
+    _clai_picker_render
 end
 
 function _clai_picker_close
+    _clai_picker_clear_menu
     set -g _CLAI_PICKER_ACTIVE false
     set -g _CLAI_PICKER_MODE ""
     set -g _CLAI_PICKER_ITEMS
@@ -321,6 +363,12 @@ function _ai_enter_voice_mode
 end
 
 function _ai_voice_execute
+    # If picker is open, accept the current selection (don't execute)
+    if test "$_CLAI_PICKER_ACTIVE" = "true"
+        _clai_picker_close
+        return
+    end
+
     set -l current_cmd (commandline)
 
     # Check for ? prefix (natural language input marker)
@@ -360,6 +408,7 @@ function _ai_voice_execute
 
     # Normal execute
     set -g _AI_VOICE_MODE false
+    _clai_picker_clear_menu
     commandline -f execute
 end
 
