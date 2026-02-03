@@ -196,12 +196,15 @@ _clai_fallback_history_down() {
 }
 
 _clai_history_args() {
+    # Each argument on its own line so newline-based splitting works
+    # correctly even when $PWD contains spaces.
     case "$_CLAI_HISTORY_SCOPE" in
         session)
             echo "--session=$CLAI_SESSION_ID"
             ;;
         cwd)
-            echo "--session=$CLAI_SESSION_ID --cwd=$PWD"
+            echo "--session=$CLAI_SESSION_ID"
+            echo "--cwd=$PWD"
             ;;
         global)
             echo "--global"
@@ -214,7 +217,9 @@ _clai_history_args() {
 
 _clai_picker_load_history() {
     local -a args
+    local IFS=$'\n'
     args=($(_clai_history_args))
+    unset IFS
     if ((BASH_VERSINFO[0] >= 4)); then
         mapfile -t _CLAI_PICKER_ITEMS < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
     else
