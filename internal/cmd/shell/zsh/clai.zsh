@@ -573,6 +573,13 @@ _clai_picker_accept() {
 }
 
 _clai_picker_up() {
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || ! _clai_config_enabled; then
+        if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+            _clai_picker_close
+        fi
+        zle .up-line-or-history
+        return
+    fi
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         if [[ $_CLAI_PICKER_INDEX -gt 0 ]]; then
             ((_CLAI_PICKER_INDEX--))

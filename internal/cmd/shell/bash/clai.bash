@@ -117,6 +117,83 @@ _CLAI_PICKER_INDEX=0
 _CLAI_PICKER_ORIG_LINE=""
 _CLAI_PICKER_ITEMS=()
 _CLAI_HISTORY_SCOPE="session"
+_CLAI_FALLBACK_ACTIVE=false
+_CLAI_FALLBACK_INDEX=0
+_CLAI_FALLBACK_ORIG_LINE=""
+_CLAI_FALLBACK_ITEMS=()
+
+_clai_fallback_reset() {
+    _CLAI_FALLBACK_ACTIVE=false
+    _CLAI_FALLBACK_INDEX=0
+    _CLAI_FALLBACK_ORIG_LINE=""
+    _CLAI_FALLBACK_ITEMS=()
+}
+
+_clai_fallback_load_history() {
+    local -a entries
+    if ((BASH_VERSINFO[0] >= 4)); then
+        mapfile -t entries < <(history | sed -E 's/^ *[0-9]+[[:space:]]+//')
+    else
+        _clai_read_lines entries < <(history | sed -E 's/^ *[0-9]+[[:space:]]+//')
+    fi
+
+    _CLAI_FALLBACK_ITEMS=()
+    local entry
+    for entry in "${entries[@]}"; do
+        if [[ -n "$entry" ]]; then
+            _CLAI_FALLBACK_ITEMS+=("$entry")
+        fi
+    done
+
+    if [[ ${#_CLAI_FALLBACK_ITEMS[@]} -eq 0 ]]; then
+        return 1
+    fi
+    return 0
+}
+
+_clai_fallback_apply() {
+    local selected="${_CLAI_FALLBACK_ITEMS[$_CLAI_FALLBACK_INDEX]}"
+    if [[ -n "$selected" ]]; then
+        READLINE_LINE="$selected"
+        READLINE_POINT=${#READLINE_LINE}
+    fi
+}
+
+_clai_fallback_history_up() {
+    if [[ "$_CLAI_FALLBACK_ACTIVE" != "true" ]]; then
+        if ! _clai_fallback_load_history; then
+            return 0
+        fi
+        _CLAI_FALLBACK_ORIG_LINE="$READLINE_LINE"
+        _CLAI_FALLBACK_INDEX=$((${#_CLAI_FALLBACK_ITEMS[@]} - 1))
+        _CLAI_FALLBACK_ACTIVE=true
+        _clai_fallback_apply
+        return 0
+    fi
+
+    if [[ $_CLAI_FALLBACK_INDEX -gt 0 ]]; then
+        ((_CLAI_FALLBACK_INDEX--))
+    else
+        _CLAI_FALLBACK_INDEX=0
+    fi
+    _clai_fallback_apply
+}
+
+_clai_fallback_history_down() {
+    if [[ "$_CLAI_FALLBACK_ACTIVE" != "true" ]]; then
+        return 0
+    fi
+
+    if [[ $_CLAI_FALLBACK_INDEX -lt $((${#_CLAI_FALLBACK_ITEMS[@]} - 1)) ]]; then
+        ((_CLAI_FALLBACK_INDEX++))
+        _clai_fallback_apply
+        return 0
+    fi
+
+    READLINE_LINE="$_CLAI_FALLBACK_ORIG_LINE"
+    READLINE_POINT=${#READLINE_LINE}
+    _clai_fallback_reset
+}
 
 _clai_history_args() {
     case "$_CLAI_HISTORY_SCOPE" in
@@ -159,7 +236,14 @@ _clai_picker_apply() {
 
 _clai_history_up() {
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+            _clai_picker_cancel
+        fi
+        _clai_fallback_history_up
         return 0
+    fi
+    if [[ "$_CLAI_FALLBACK_ACTIVE" == "true" ]]; then
+        _clai_fallback_reset
     fi
     if [[ "$_CLAI_PICKER_ACTIVE" != "true" || "$_CLAI_PICKER_MODE" != "history" ]]; then
         _CLAI_PICKER_ORIG_LINE="$READLINE_LINE"
@@ -183,6 +267,16 @@ _clai_history_up() {
 }
 
 _clai_history_down() {
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+            _clai_picker_cancel
+        fi
+        _clai_fallback_history_down
+        return 0
+    fi
+    if [[ "$_CLAI_FALLBACK_ACTIVE" == "true" ]]; then
+        _clai_fallback_reset
+    fi
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         if [[ $_CLAI_PICKER_INDEX -gt 0 ]]; then
             ((_CLAI_PICKER_INDEX--))

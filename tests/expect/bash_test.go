@@ -424,3 +424,50 @@ func TestBash_StatusShowsCorrectShell(t *testing.T) {
 	// Status should detect bash via CLAI_CURRENT_SHELL set by init
 	assert.Contains(t, combined, "bash", "status should show bash shell")
 }
+
+// TestBash_HistoryFallbackWhenDisabled verifies Up/Down history works when clai is disabled.
+func TestBash_HistoryFallbackWhenDisabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "bash")
+
+	hookFile := FindHookFile("clai.bash")
+	if hookFile == "" {
+		t.Skip("clai.bash hook file not found")
+	}
+
+	session, err := NewSession("bash",
+		WithTimeout(10*time.Second),
+		WithRCFile(hookFile),
+		WithEnv("CLAI_OFF=1"),
+	)
+	require.NoError(t, err, "failed to create bash session")
+	defer session.Close()
+
+	// Confirm clai is disabled
+	err = session.SendLine("echo $CLAI_OFF")
+	require.NoError(t, err)
+	_, err = session.ExpectTimeout("1", 2*time.Second)
+	require.NoError(t, err, "expected CLAI_OFF=1")
+
+	// Populate history
+	err = session.SendLine("echo FIRST")
+	require.NoError(t, err)
+	_, err = session.ExpectTimeout("FIRST", 2*time.Second)
+	require.NoError(t, err)
+
+	err = session.SendLine("echo SECOND")
+	require.NoError(t, err)
+	_, err = session.ExpectTimeout("SECOND", 2*time.Second)
+	require.NoError(t, err)
+
+	// Navigate history: Up, Up, Down -> should land on SECOND
+	require.NoError(t, session.SendKey(KeyUp))
+	require.NoError(t, session.SendKey(KeyUp))
+	require.NoError(t, session.SendKey(KeyDown))
+	require.NoError(t, session.SendKey(KeyEnter))
+
+	_, err = session.ExpectTimeout("SECOND", 2*time.Second)
+	require.NoError(t, err, "expected history fallback to replay last command")
+}

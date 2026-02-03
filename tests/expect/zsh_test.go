@@ -467,3 +467,54 @@ func TestZsh_ZLEResetPromptWithWidgetGuard(t *testing.T) {
 	assert.NotContains(t, strings.ToLower(output), "widget",
 		"should not have widget errors during source")
 }
+
+// TestZsh_HistoryFallbackWhenDisabled verifies Up arrow uses default history when clai is disabled.
+func TestZsh_HistoryFallbackWhenDisabled(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "zsh")
+
+	hookFile := FindHookFile("clai.zsh")
+	if hookFile == "" {
+		t.Skip("clai.zsh hook file not found")
+	}
+
+	session, err := NewSession("zsh",
+		WithTimeout(10*time.Second),
+		WithRCFile(hookFile),
+		WithEnv("CLAI_OFF=1"),
+	)
+	require.NoError(t, err, "failed to create zsh session")
+	defer session.Close()
+
+	// Wait for loaded message
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
+	require.NoError(t, err)
+
+	// Confirm clai is disabled
+	err = session.SendLine("echo $CLAI_OFF")
+	require.NoError(t, err)
+	_, err = session.ExpectTimeout("1", 2*time.Second)
+	require.NoError(t, err, "expected CLAI_OFF=1")
+
+	// Populate history
+	err = session.SendLine("echo FIRST")
+	require.NoError(t, err)
+	_, err = session.ExpectTimeout("FIRST", 2*time.Second)
+	require.NoError(t, err)
+
+	err = session.SendLine("echo SECOND")
+	require.NoError(t, err)
+	_, err = session.ExpectTimeout("SECOND", 2*time.Second)
+	require.NoError(t, err)
+
+	// Navigate history: Up, Up, Down -> should land on SECOND
+	require.NoError(t, session.SendKey(KeyUp))
+	require.NoError(t, session.SendKey(KeyUp))
+	require.NoError(t, session.SendKey(KeyDown))
+	require.NoError(t, session.SendKey(KeyEnter))
+
+	_, err = session.ExpectTimeout("SECOND", 2*time.Second)
+	require.NoError(t, err, "expected history fallback to replay last command")
+}
