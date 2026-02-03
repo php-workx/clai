@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -403,20 +404,24 @@ func TestServer_CommandsLogged_ReadWhileWrite(t *testing.T) {
 	}
 
 	// Readers
+	var sawNegative atomic.Bool
 	for i := 0; i < numReaders; i++ {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < operations; j++ {
 				count := server.getCommandsLogged()
-				// Count should never be negative
 				if count < 0 {
-					t.Errorf("commands logged should never be negative, got %d", count)
+					sawNegative.Store(true)
 				}
 			}
 		}()
 	}
 
 	wg.Wait()
+
+	if sawNegative.Load() {
+		t.Errorf("commands logged was negative at some point during concurrent access")
+	}
 }
 
 // TestServer_WritePIDFile verifies PID file is written correctly.
