@@ -94,6 +94,7 @@ _ai_update_suggestion() {
         _clai_zsh_autosuggest_restore
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
+        region_highlight=()
         return
     fi
 
@@ -104,10 +105,13 @@ _ai_update_suggestion() {
     if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" && "$suggestion" == "$BUFFER"* ]]; then
         _AI_CURRENT_SUGGESTION="$suggestion"
         local ghost="${suggestion:${#BUFFER}}"
-        POSTDISPLAY="%F{242}${ghost}%f"
+        POSTDISPLAY="${ghost}"
+        # region_highlight colors POSTDISPLAY; positions past ${#BUFFER} target it
+        region_highlight=("${#BUFFER} $((${#BUFFER} + ${#ghost})) fg=242")
     else
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
+        region_highlight=()
     fi
 
     [[ -n "$WIDGET" ]] && zle reset-prompt
