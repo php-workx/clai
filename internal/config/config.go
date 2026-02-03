@@ -219,6 +219,9 @@ func (c *Config) setDaemonField(field, value string) error {
 		if err != nil {
 			return fmt.Errorf("invalid value for idle_timeout_mins: %w", err)
 		}
+		if v < 0 {
+			return fmt.Errorf("invalid idle_timeout_mins: must be non-negative")
+		}
 		c.Daemon.IdleTimeoutMins = v
 	case "socket_path":
 		c.Daemon.SocketPath = value
@@ -257,11 +260,17 @@ func (c *Config) setClientField(field, value string) error {
 		if err != nil {
 			return fmt.Errorf("invalid value for suggest_timeout_ms: %w", err)
 		}
+		if v < 0 {
+			return fmt.Errorf("invalid suggest_timeout_ms: must be non-negative")
+		}
 		c.Client.SuggestTimeoutMs = v
 	case "connect_timeout_ms":
 		v, err := strconv.Atoi(value)
 		if err != nil {
 			return fmt.Errorf("invalid value for connect_timeout_ms: %w", err)
+		}
+		if v < 0 {
+			return fmt.Errorf("invalid connect_timeout_ms: must be non-negative")
 		}
 		c.Client.ConnectTimeoutMs = v
 	case "fire_and_forget":
@@ -325,6 +334,9 @@ func (c *Config) setAIField(field, value string) error {
 		if err != nil {
 			return fmt.Errorf("invalid value for cache_ttl_hours: %w", err)
 		}
+		if v < 0 {
+			return fmt.Errorf("invalid cache_ttl_hours: must be non-negative")
+		}
 		c.AI.CacheTTLHours = v
 	default:
 		return fmt.Errorf("unknown field: ai.%s", field)
@@ -352,11 +364,17 @@ func (c *Config) setSuggestionsField(field, value string) error {
 		if err != nil {
 			return fmt.Errorf("invalid value for max_history: %w", err)
 		}
+		if v < 0 {
+			return fmt.Errorf("invalid max_history: must be non-negative")
+		}
 		c.Suggestions.MaxHistory = v
 	case "max_ai":
 		v, err := strconv.Atoi(value)
 		if err != nil {
 			return fmt.Errorf("invalid value for max_ai: %w", err)
+		}
+		if v < 0 {
+			return fmt.Errorf("invalid max_ai: must be non-negative")
 		}
 		c.Suggestions.MaxAI = v
 	case "show_risk_warning":
