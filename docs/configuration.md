@@ -111,6 +111,7 @@ ai:
   cache_ttl_hours: 48
 
 suggestions:
+  enabled: true
   max_history: 10
   max_ai: 5
   show_risk_warning: true
