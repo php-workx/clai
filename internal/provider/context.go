@@ -83,7 +83,7 @@ func (b *ContextBuilder) BuildDiagnosePrompt(command string, exitCode int, stder
 	sb.WriteString(fmt.Sprintf("Exit code: %d\n", exitCode))
 
 	if stderr != "" {
-		sb.WriteString(fmt.Sprintf("\nError output:\n%s\n", stderr))
+		sb.WriteString(fmt.Sprintf("\nError output:\n%s\n", truncateStderr(stderr)))
 	}
 
 	if len(b.recentCmds) > 0 {
@@ -98,6 +98,18 @@ func (b *ContextBuilder) BuildDiagnosePrompt(command string, exitCode int, stder
 	sb.WriteString("2. 1-3 fix commands, each on its own line starting with '$ '\n")
 
 	return sb.String()
+}
+
+// maxStderrLen is the maximum number of characters of stderr to include in prompts.
+// The tail is kept since the most relevant error info is typically at the end.
+const maxStderrLen = 4096
+
+// truncateStderr keeps the tail of stderr if it exceeds maxStderrLen.
+func truncateStderr(s string) string {
+	if len(s) <= maxStderrLen {
+		return s
+	}
+	return "…" + s[len(s)-maxStderrLen:]
 }
 
 // MaxRecentCommands is the maximum number of recent commands to include in context
