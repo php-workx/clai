@@ -221,15 +221,10 @@ type claudeProcess struct {
 	mu      sync.Mutex
 }
 
-// RunDaemon runs the daemon server (called by "daemon run" command)
-func RunDaemon() error {
-	// Remove old socket if exists
-	os.Remove(socketPath())
-
+// startClaudeProcess starts the Claude CLI and waits for initialization
+func startClaudeProcess() (*claudeProcess, error) {
 	fmt.Println("Starting Claude process...")
 
-	// Start Claude process with an initial message to trigger initialization
-	// Use Haiku model for fast responses (voice commands, quick tasks)
 	cmd := exec.Command("claude",
 		"--print",
 		"--verbose",
@@ -240,46 +235,64 @@ func RunDaemon() error {
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("failed to create stdin pipe: %w", err)
+		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		stdin.Close()
-		return fmt.Errorf("failed to create stdout pipe: %w", err)
+		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
-	cmd.Stderr = os.Stderr // Log stderr for debugging
+	cmd.Stderr = os.Stderr
 
 	if err := cmd.Start(); err != nil {
 		stdin.Close()
-		return fmt.Errorf("failed to start claude: %w", err)
+		return nil, fmt.Errorf("failed to start claude: %w", err)
 	}
-	defer cmd.Process.Kill()
 
 	scanner := bufio.NewScanner(stdout)
-	// Increase scanner buffer for large responses
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
 
+	if err := sendInitMessage(stdin); err != nil {
+		cmd.Process.Kill()
+		return nil, err
+	}
+
+	if err := waitForInit(scanner); err != nil {
+		cmd.Process.Kill()
+		return nil, err
+	}
+
+	if err := waitForResult(scanner); err != nil {
+		cmd.Process.Kill()
+		return nil, err
+	}
+
+	return &claudeProcess{cmd: cmd, stdin: stdin, scanner: scanner}, nil
+}
+
+// sendInitMessage sends the initial message to trigger Claude startup
+func sendInitMessage(stdin io.Writer) error {
 	fmt.Println("Sending init message to trigger Claude startup...")
 
-	// Send an initial message to trigger Claude startup
-	initMsg := StreamMessage{Type: "user"}
-	initMsg.Message.Role = "user"
-	initMsg.Message.Content = "Ready"
+	msg := StreamMessage{Type: "user"}
+	msg.Message.Role = "user"
+	msg.Message.Content = "Ready"
 
-	initBytes, _ := json.Marshal(initMsg)
+	initBytes, _ := json.Marshal(msg)
 	if _, err := stdin.Write(append(initBytes, '\n')); err != nil {
 		return fmt.Errorf("failed to send init message: %w", err)
 	}
+	return nil
+}
 
+// waitForInit reads stream lines until the system init message is received
+func waitForInit(scanner *bufio.Scanner) error {
 	fmt.Println("Waiting for Claude initialization...")
 
-	// Wait for initialization by reading lines until we get the init message
-	initialized := false
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Log first 200 chars of each line for debugging
 		logLine := line
 		if len(logLine) > 200 {
 			logLine = logLine[:200] + "..."
@@ -291,21 +304,21 @@ func RunDaemon() error {
 			continue
 		}
 		if resp.Type == "system" && resp.Subtype == "init" {
-			initialized = true
 			fmt.Println("Claude initialized successfully")
-			break
+			return nil
 		}
 	}
 
-	if !initialized {
-		if err := scanner.Err(); err != nil {
-			return fmt.Errorf("scanner error during init: %w", err)
-		}
-		return fmt.Errorf("claude initialization failed: unexpected end of stream")
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("scanner error during init: %w", err)
 	}
+	return fmt.Errorf("claude initialization failed: unexpected end of stream")
+}
 
-	// Now read through the init response until we get the result
+// waitForResult reads stream lines until the result message is received
+func waitForResult(scanner *bufio.Scanner) error {
 	fmt.Println("Reading init response...")
+
 	for scanner.Scan() {
 		line := scanner.Text()
 		var resp StreamResponse
@@ -314,11 +327,57 @@ func RunDaemon() error {
 		}
 		if resp.Type == "result" {
 			fmt.Println("Init response complete")
-			break
+			return nil
 		}
 	}
+	return scanner.Err()
+}
 
-	// Now create the socket - Claude is ready
+// handleDaemonConn handles a single client connection to the daemon
+func handleDaemonConn(c net.Conn, claude *claudeProcess, activityMu *sync.Mutex, lastActivity *time.Time) {
+	defer c.Close()
+
+	activityMu.Lock()
+	*lastActivity = time.Now()
+	activityMu.Unlock()
+
+	var req DaemonRequest
+	if err := json.NewDecoder(c).Decode(&req); err != nil {
+		json.NewEncoder(c).Encode(DaemonResponse{Error: err.Error()})
+		return
+	}
+
+	logPrompt := req.Prompt
+	if len(logPrompt) > 50 {
+		logPrompt = logPrompt[:50] + "..."
+	}
+	fmt.Printf("Received request: %s\n", logPrompt)
+
+	result, err := claude.query(req.Prompt)
+	if err != nil {
+		json.NewEncoder(c).Encode(DaemonResponse{Error: err.Error()})
+		return
+	}
+
+	logResult := result
+	if len(logResult) > 50 {
+		logResult = logResult[:50] + "..."
+	}
+	fmt.Printf("Sending response: %s\n", logResult)
+
+	json.NewEncoder(c).Encode(DaemonResponse{Result: result})
+}
+
+// RunDaemon runs the daemon server (called by "daemon run" command)
+func RunDaemon() error {
+	os.Remove(socketPath())
+
+	claude, err := startClaudeProcess()
+	if err != nil {
+		return err
+	}
+	defer claude.cmd.Process.Kill()
+
 	listener, err := net.Listen("unix", socketPath())
 	if err != nil {
 		return fmt.Errorf("failed to create socket: %w", err)
@@ -326,17 +385,9 @@ func RunDaemon() error {
 	defer listener.Close()
 	defer os.Remove(socketPath())
 
-	// Create the claude process wrapper
-	claude := &claudeProcess{
-		cmd:     cmd,
-		stdin:   stdin,
-		scanner: scanner,
-	}
-
 	lastActivity := time.Now()
 	var activityMu sync.Mutex
 
-	// Idle timeout goroutine
 	go func() {
 		for {
 			time.Sleep(30 * time.Second)
@@ -346,7 +397,7 @@ func RunDaemon() error {
 
 			if idle > idleTimeout() {
 				fmt.Println("Idle timeout, shutting down")
-				listener.Close() // This will cause Accept to fail
+				listener.Close()
 				return
 			}
 		}
@@ -354,53 +405,26 @@ func RunDaemon() error {
 
 	fmt.Println("Daemon ready, accepting connections")
 
-	// Handle connections
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Printf("Accept error: %v\n", err)
-			return nil // Shutdown
+			return nil
 		}
 
-		// Handle connection synchronously to avoid scanner race conditions
-		go func(c net.Conn) {
-			defer c.Close()
-
-			// Update activity
-			activityMu.Lock()
-			lastActivity = time.Now()
-			activityMu.Unlock()
-
-			// Read request
-			var req DaemonRequest
-			if err := json.NewDecoder(c).Decode(&req); err != nil {
-				json.NewEncoder(c).Encode(DaemonResponse{Error: err.Error()})
-				return
-			}
-
-			logPrompt := req.Prompt
-			if len(logPrompt) > 50 {
-				logPrompt = logPrompt[:50] + "..."
-			}
-			fmt.Printf("Received request: %s\n", logPrompt)
-
-			// Process request with mutex to serialize Claude access
-			result, err := claude.query(req.Prompt)
-			if err != nil {
-				json.NewEncoder(c).Encode(DaemonResponse{Error: err.Error()})
-				return
-			}
-
-			logResult := result
-			if len(logResult) > 50 {
-				logResult = logResult[:50] + "..."
-			}
-			fmt.Printf("Sending response: %s\n", logResult)
-
-			// Send response
-			json.NewEncoder(c).Encode(DaemonResponse{Result: result})
-		}(conn)
+		go handleDaemonConn(conn, claude, &activityMu, &lastActivity)
 	}
+}
+
+// extractResponseText extracts text content from a stream response message
+func extractResponseText(resp StreamResponse) string {
+	var text string
+	for _, content := range resp.Message.Content {
+		if content.Type == "text" {
+			text += content.Text
+		}
+	}
+	return text
 }
 
 // query sends a prompt to Claude and returns the response
@@ -408,7 +432,6 @@ func (c *claudeProcess) query(prompt string) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Send prompt to Claude
 	msg := StreamMessage{Type: "user"}
 	msg.Message.Role = "user"
 	msg.Message.Content = prompt
@@ -422,22 +445,15 @@ func (c *claudeProcess) query(prompt string) (string, error) {
 		return "", fmt.Errorf("failed to write to claude: %w", err)
 	}
 
-	// Read response
 	var result string
 	for c.scanner.Scan() {
-		line := c.scanner.Text()
-
 		var resp StreamResponse
-		if err := json.Unmarshal([]byte(line), &resp); err != nil {
+		if err := json.Unmarshal([]byte(c.scanner.Text()), &resp); err != nil {
 			continue
 		}
 
-		if resp.Type == "assistant" && len(resp.Message.Content) > 0 {
-			for _, content := range resp.Message.Content {
-				if content.Type == "text" {
-					result += content.Text
-				}
-			}
+		if resp.Type == "assistant" {
+			result += extractResponseText(resp)
 		}
 
 		if resp.Type == "result" {

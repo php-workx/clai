@@ -69,6 +69,56 @@ func zshHistoryPath() string {
 	return filepath.Join(home, ".zsh_history")
 }
 
+// historyParser accumulates parsed history entries, handling multiline commands
+type historyParser struct {
+	multilineCmd strings.Builder
+	entries      []string
+}
+
+// processLine parses a single history file line, accumulating entries
+func (p *historyParser) processLine(line string) {
+	if p.multilineCmd.Len() > 0 {
+		p.continueMultiline(line)
+		return
+	}
+	p.parseFreshLine(line)
+}
+
+// continueMultiline appends to an in-progress multiline command
+func (p *historyParser) continueMultiline(line string) {
+	if strings.HasSuffix(line, "\\") {
+		p.multilineCmd.WriteString(strings.TrimSuffix(line, "\\"))
+		p.multilineCmd.WriteString("\n")
+		return
+	}
+	p.multilineCmd.WriteString(line)
+	p.entries = append(p.entries, p.multilineCmd.String())
+	p.multilineCmd.Reset()
+}
+
+// parseFreshLine handles a line that is not part of an ongoing multiline command
+func (p *historyParser) parseFreshLine(line string) {
+	if strings.HasPrefix(line, ": ") {
+		if idx := strings.Index(line, ";"); idx != -1 {
+			p.addCommand(line[idx+1:])
+			return
+		}
+	}
+	p.addCommand(line)
+}
+
+// addCommand adds a command, starting a multiline accumulation if it ends with backslash
+func (p *historyParser) addCommand(cmd string) {
+	if strings.HasSuffix(cmd, "\\") {
+		p.multilineCmd.WriteString(strings.TrimSuffix(cmd, "\\"))
+		p.multilineCmd.WriteString("\n")
+		return
+	}
+	if cmd != "" {
+		p.entries = append(p.entries, cmd)
+	}
+}
+
 // readZshHistory reads and parses zsh history file
 // Handles the extended history format: : timestamp:0;command
 func readZshHistory(path string) ([]string, error) {
@@ -78,64 +128,18 @@ func readZshHistory(path string) ([]string, error) {
 	}
 	defer file.Close()
 
-	var entries []string
 	scanner := bufio.NewScanner(file)
-
-	// Increase buffer size for long commands
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
-	var multilineCmd strings.Builder
-
+	var p historyParser
 	for scanner.Scan() {
-		line := scanner.Text()
-
-		// Handle multiline commands (lines ending with \)
-		if multilineCmd.Len() > 0 {
-			// Continue multiline
-			if strings.HasSuffix(line, "\\") {
-				multilineCmd.WriteString(strings.TrimSuffix(line, "\\"))
-				multilineCmd.WriteString("\n")
-				continue
-			}
-			// End of multiline
-			multilineCmd.WriteString(line)
-			entries = append(entries, multilineCmd.String())
-			multilineCmd.Reset()
-			continue
-		}
-
-		// Parse zsh extended history format: : timestamp:0;command
-		if strings.HasPrefix(line, ": ") {
-			if idx := strings.Index(line, ";"); idx != -1 {
-				cmd := line[idx+1:]
-				if strings.HasSuffix(cmd, "\\") {
-					// Start of multiline command
-					multilineCmd.WriteString(strings.TrimSuffix(cmd, "\\"))
-					multilineCmd.WriteString("\n")
-					continue
-				}
-				entries = append(entries, cmd)
-				continue
-			}
-		}
-
-		// Plain history format (no timestamp)
-		if strings.HasSuffix(line, "\\") {
-			multilineCmd.WriteString(strings.TrimSuffix(line, "\\"))
-			multilineCmd.WriteString("\n")
-			continue
-		}
-
-		if line != "" {
-			entries = append(entries, line)
-		}
+		p.processLine(scanner.Text())
 	}
 
-	// Handle trailing unfinished multiline command
-	if multilineCmd.Len() > 0 {
-		entries = append(entries, strings.TrimSuffix(multilineCmd.String(), "\n"))
+	if p.multilineCmd.Len() > 0 {
+		p.entries = append(p.entries, strings.TrimSuffix(p.multilineCmd.String(), "\n"))
 	}
 
-	return entries, scanner.Err()
+	return p.entries, scanner.Err()
 }
