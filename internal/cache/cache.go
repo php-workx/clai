@@ -30,6 +30,31 @@ func LastOutputFile() string {
 	return filepath.Join(Dir(), "last_output")
 }
 
+// OffFile returns the path to the session disable flag.
+func OffFile() string {
+	return filepath.Join(Dir(), "off")
+}
+
+// SessionOff reports whether session suggestions are disabled.
+func SessionOff() bool {
+	_, err := os.Stat(OffFile())
+	return err == nil
+}
+
+// SetSessionOff toggles the session disable flag.
+func SetSessionOff(off bool) error {
+	if off {
+		if err := EnsureDir(); err != nil {
+			return err
+		}
+		return os.WriteFile(OffFile(), []byte("1"), 0644)
+	}
+	if err := os.Remove(OffFile()); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
 // ReadSuggestion reads the current suggestion from cache
 func ReadSuggestion() (string, error) {
 	data, err := os.ReadFile(SuggestionFile())

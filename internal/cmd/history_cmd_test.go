@@ -45,6 +45,7 @@ func TestHistoryCmd_Flags(t *testing.T) {
 		{"session", ""},
 		{"global", "g"},
 		{"status", "s"},
+		{"format", ""},
 	}
 
 	for _, f := range expectedFlags {
@@ -89,6 +90,16 @@ func TestHistoryCmd_StatusDefault(t *testing.T) {
 	}
 	if flag.Shorthand != "s" {
 		t.Errorf("Expected status shorthand -s, got -%s", flag.Shorthand)
+	}
+}
+
+func TestHistoryCmd_FormatDefault(t *testing.T) {
+	flag := historyCmd.Flags().Lookup("format")
+	if flag == nil {
+		t.Fatal("format flag not found")
+	}
+	if flag.DefValue != "raw" {
+		t.Errorf("Expected default format=raw, got %s", flag.DefValue)
 	}
 }
 

@@ -35,6 +35,8 @@ func init() {
 	rootCmd.AddCommand(cmdCmd)
 	rootCmd.AddCommand(suggestCmd)
 	rootCmd.AddCommand(historyCmd)
+	rootCmd.AddCommand(onCmd)
+	rootCmd.AddCommand(offCmd)
 
 	// Setup commands
 	rootCmd.AddCommand(statusCmd)

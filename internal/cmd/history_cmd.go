@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -20,6 +21,7 @@ var (
 	historySession string
 	historyGlobal  bool
 	historyStatus  string
+	historyFormat  string
 )
 
 var historyCmd = &cobra.Command{
@@ -42,7 +44,8 @@ Examples:
   clai history -c /tmp            # Show commands from /tmp directory
   clai history --session=abc123   # Show specific session (8+ char prefix)
   clai history -s success         # Show only successful commands
-  clai history -s failure         # Show only failed commands`,
+  clai history -s failure         # Show only failed commands
+  clai history --format json      # Emit JSON entries for picker use`,
 	RunE: runHistory,
 }
 
@@ -52,6 +55,7 @@ func init() {
 	historyCmd.Flags().StringVar(&historySession, "session", "", "Filter by specific session ID")
 	historyCmd.Flags().BoolVarP(&historyGlobal, "global", "g", false, "Show history across all sessions")
 	historyCmd.Flags().StringVarP(&historyStatus, "status", "s", "", "Filter by status: 'success' or 'failure'")
+	historyCmd.Flags().StringVar(&historyFormat, "format", "raw", "Output format: raw or json")
 }
 
 func runHistory(cmd *cobra.Command, args []string) error {
@@ -143,41 +147,55 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to query history: %w", err)
 	}
 
-	if len(commands) == 0 {
-		// Show appropriate message based on filters used
-		if historyCWD != "" {
-			fmt.Printf("%sWarning: No commands found in directory: %s%s\n", colorYellow, historyCWD, colorReset)
-		}
-		if len(args) > 0 {
-			fmt.Printf("%sWarning: No commands found matching '%s'%s\n", colorYellow, args[0], colorReset)
-		}
-
-		if sessionID != "" && historyCWD == "" && len(args) == 0 {
-			fmt.Println("No commands logged in this session yet.")
-			fmt.Println("Tip: Use 'clai history -g' to show history across all sessions.")
-		} else if historyCWD == "" && len(args) == 0 {
-			fmt.Println("No command history available.")
+	format := strings.ToLower(strings.TrimSpace(historyFormat))
+	if format == "" {
+		format = "raw"
+	}
+	switch format {
+	case "raw":
+		for _, c := range commands {
+			fmt.Println(c.Command)
 		}
 		return nil
+	case "json":
+		entries := make([]historyOutput, 0, len(commands))
+		source := historySource(historyGlobal, historyCWD, historySession)
+		for _, c := range commands {
+			entries = append(entries, historyOutput{
+				Text:     c.Command,
+				Cwd:      c.CWD,
+				TsUnixMs: c.TsStartUnixMs,
+				ExitCode: c.ExitCode,
+				Source:   source,
+			})
+		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetEscapeHTML(false)
+		return enc.Encode(entries)
+	default:
+		return fmt.Errorf("invalid format: %s (use raw or json)", historyFormat)
 	}
+}
 
-	// Print commands (most recent last for typical terminal usage)
-	// Reverse the order since we want oldest at top
-	for i := len(commands) - 1; i >= 0; i-- {
-		c := commands[i]
-		printCommand(c)
+type historyOutput struct {
+	Text     string `json:"text"`
+	Cwd      string `json:"cwd"`
+	TsUnixMs int64  `json:"ts_unix_ms"`
+	ExitCode *int   `json:"exit_code"`
+	Source   string `json:"source"`
+}
+
+func historySource(global bool, cwd, session string) string {
+	if session != "" {
+		return "session"
 	}
-
-	fmt.Println()
-	scope := ""
-	if sessionID != "" {
-		scope = " (current session)"
-	} else {
-		scope = " (all sessions)"
+	if cwd != "" {
+		return "cwd"
 	}
-	fmt.Printf("%sShowing %d command(s)%s%s\n", colorDim, len(commands), scope, colorReset)
-
-	return nil
+	if global {
+		return "global"
+	}
+	return "session"
 }
 
 func printCommand(c storage.Command) {

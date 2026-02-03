@@ -12,6 +12,7 @@ func TestConfigCmd_List(t *testing.T) {
 
 	// Should have exactly the user-facing keys
 	expectedKeys := []string{
+		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
 	}
