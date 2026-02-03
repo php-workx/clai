@@ -322,10 +322,12 @@ _clai_history_scope_global() {
     fi
 }
 
-# Bindings: Up/Down for history picker, Esc cancels, Ctrl+x s/d/g switches scope
+# Bindings: Up/Down for history picker, Ctrl+G cancels, Ctrl+x s/d/g switches scope
+# Note: raw "\e" binding is avoided because it swallows multi-byte escape
+# sequences (arrow keys, Home, End, etc.) before readline can parse them.
 bind -x '"\e[A": _clai_history_up'
 bind -x '"\e[B": _clai_history_down'
-bind -x '"\e": _clai_picker_cancel'
+bind -x '"\C-g": _clai_picker_cancel'
 bind -x '"\C-xs": _clai_history_scope_session'
 bind -x '"\C-xd": _clai_history_scope_cwd'
 bind -x '"\C-xg": _clai_history_scope_global'
