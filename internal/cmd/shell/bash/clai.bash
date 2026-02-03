@@ -426,7 +426,11 @@ _ai_debug_trap() {
     return 0
 }
 
-# Save current extdebug state and enable it for ? prefix blocking
+# Save current extdebug state and enable it for ? prefix blocking.
+# Side effects: extdebug causes DEBUG/RETURN/ERR traps to be inherited by
+# shell functions, command substitutions, and subshells. This is required
+# for the ? prefix interception (returning 1 from DEBUG trap skips the
+# command). The original state is saved and restored in _clai_cleanup.
 _AI_EXTDEBUG_WAS_ON=false
 if shopt -q extdebug; then
     _AI_EXTDEBUG_WAS_ON=true
