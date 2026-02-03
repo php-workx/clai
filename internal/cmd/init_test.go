@@ -317,6 +317,39 @@ func TestZshScript_ForwardCharValidatesSuggestionPrefix(t *testing.T) {
 	}
 }
 
+// TestZshScript_AcceptLineClearsGhostText verifies that the Enter handler
+// clears POSTDISPLAY and region_highlight before executing the command.
+// Without this, ghost text from inline suggestions remains visible after
+// the command output prints.
+func TestZshScript_AcceptLineClearsGhostText(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+
+	output := string(content)
+
+	// Find the _ai_voice_accept_line function body up to its zle -N registration
+	start := strings.Index(output, "_ai_voice_accept_line()")
+	if start == -1 {
+		t.Fatal("_ai_voice_accept_line() not found in zsh script")
+	}
+	rest := output[start:]
+	end := strings.Index(rest, "zle -N _ai_voice_accept_line")
+	if end == -1 {
+		t.Fatal("could not find end of _ai_voice_accept_line function")
+	}
+	body := rest[:end]
+
+	// The normal accept-line path must clear ghost text state
+	for _, required := range []string{`POSTDISPLAY=""`, "region_highlight=()"} {
+		if !strings.Contains(body, required) {
+			t.Errorf("_ai_voice_accept_line() missing %q before accept-line; "+
+				"ghost text will persist after Enter", required)
+		}
+	}
+}
+
 func TestShellScripts_Embedded(t *testing.T) {
 	// Verify all shell scripts are properly embedded
 	shells := []string{

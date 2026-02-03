@@ -299,6 +299,9 @@ _ai_voice_accept_line() {
     fi
     # Normal accept-line behavior
     _AI_VOICE_MODE=false
+    _AI_CURRENT_SUGGESTION=""
+    POSTDISPLAY=""
+    region_highlight=()
     zle accept-line
 }
 zle -N _ai_voice_accept_line
