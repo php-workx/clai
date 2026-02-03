@@ -735,15 +735,13 @@ run_hadolint() {
 
     if ! run_tool "hadolint" hadolint; then return 0; fi
 
-    local dockerfiles
-    dockerfiles=$(find "$REPO_ROOT" -name "Dockerfile*" -type f 2>/dev/null)
-    if [[ -z "$dockerfiles" ]]; then
+    if ! find "$REPO_ROOT" -name "Dockerfile*" -type f -print -quit 2>/dev/null | grep -q .; then
         echo "NO_DOCKERFILES" > "$output_file"
         set_tool_status "hadolint" "skipped"
         return 0
     fi
 
-    if echo "$dockerfiles" | xargs hadolint --format json > "$output_file" 2>&1; then
+    if find "$REPO_ROOT" -name "Dockerfile*" -type f -print0 2>/dev/null | xargs -0 hadolint --format json > "$output_file" 2>&1; then
         set_tool_status "hadolint" "pass"
     else
         local errors warnings
