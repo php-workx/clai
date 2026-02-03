@@ -34,11 +34,21 @@ _AI_LAST_OUTPUT="$CLAI_CACHE/last_output"
 # Adds clai history suggestions to Tab completion menu
 # Our suggestions appear first, followed by defaults
 
+# Portable alternative to mapfile for Bash 3.2 (macOS default)
+# Usage: _clai_read_lines arrayname < <(command)
+_clai_read_lines() {
+    local _varname="$1"
+    eval "$_varname=()"
+    local _line
+    while IFS= read -r _line; do
+        eval "$_varname+=(\"\$_line\")"
+    done
+}
+
 _clai_completion() {
     local cur="${COMP_WORDS[COMP_CWORD]}"
 
     # Only enhance first word (command) completion
-    # Note: mapfile requires bash 4.0+
     if [[ $COMP_CWORD -eq 0 && -n "$cur" ]]; then
         # Get clai suggestion from history
         local suggestion
@@ -46,7 +56,11 @@ _clai_completion() {
 
         # Get default command completions
         local -a defaults
-        mapfile -t defaults < <(compgen -c -- "$cur" 2>/dev/null | head -20)
+        if ((BASH_VERSINFO[0] >= 4)); then
+            mapfile -t defaults < <(compgen -c -- "$cur" 2>/dev/null | head -20)
+        else
+            _clai_read_lines defaults < <(compgen -c -- "$cur" 2>/dev/null | head -20)
+        fi
 
         # Combine: clai suggestion first (if different from cur)
         if [[ -n "$suggestion" && "$suggestion" != "$cur" ]]; then
@@ -56,10 +70,20 @@ _clai_completion() {
         fi
 
         # Deduplicate while preserving order
-        mapfile -t COMPREPLY < <(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++')
+        if ((BASH_VERSINFO[0] >= 4)); then
+            mapfile -t COMPREPLY < <(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++')
+        else
+            local -a _deduped
+            _clai_read_lines _deduped < <(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++')
+            COMPREPLY=("${_deduped[@]}")
+        fi
     else
         # For arguments, use default file completion
-        mapfile -t COMPREPLY < <(compgen -f -- "$cur")
+        if ((BASH_VERSINFO[0] >= 4)); then
+            mapfile -t COMPREPLY < <(compgen -f -- "$cur")
+        else
+            _clai_read_lines COMPREPLY < <(compgen -f -- "$cur")
+        fi
     fi
 }
 
@@ -71,7 +95,8 @@ complete -F _clai_completion git npm yarn docker kubectl make go cargo python pi
 # Show AI suggestion in prompt when available (for AI-generated suggestions)
 _ai_show_suggestion() {
     if [[ -s "$_AI_SUGGEST_FILE" ]]; then
-        local suggestion=$(cat "$_AI_SUGGEST_FILE")
+        local suggestion
+        suggestion=$(cat "$_AI_SUGGEST_FILE")
         if [[ -n "$suggestion" ]]; then
             echo -e "\033[38;5;242m($suggestion) - use 'accept' to run\033[0m"
         fi
@@ -132,7 +157,8 @@ _ai_check_nl_prefix() {
         nl_input="${nl_input## }"          # Remove leading space if any
 
         echo "? $nl_input"
-        local result=$(clai voice "$nl_input" 2>/dev/null)
+        local result
+        result=$(clai voice "$nl_input" 2>/dev/null)
         if [[ -n "$result" ]]; then
             echo "→ $result"
             # Cache for 'accept' command
@@ -243,7 +269,8 @@ ai() {
         return 1
     fi
 
-    local recent_cmds=$(builtin history 5 | sed 's/^[ ]*[0-9]*[ ]*//' | tr '\n' ';')
+    local recent_cmds
+    recent_cmds=$(builtin history 5 | sed 's/^[ ]*[0-9]*[ ]*//' | tr '\n' ';')
     clai ask --context "$recent_cmds" "$@"
 }
 
