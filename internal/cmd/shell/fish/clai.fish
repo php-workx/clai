@@ -125,6 +125,12 @@ function _clai_history_args
     end
 end
 
+function _clai_dedup
+    # Deduplicate a list preserving first-occurrence order
+    # Usage: set -l unique (_clai_dedup $items)
+    printf '%s\n' $argv | awk '!seen[$0]++'
+end
+
 function _clai_picker_load_suggest
     set -l current (commandline)
     set -l items
@@ -136,7 +142,7 @@ function _clai_picker_load_suggest
     if test (count $items) -eq 0
         return 1
     end
-    set -g _CLAI_PICKER_ITEMS $items
+    set -g _CLAI_PICKER_ITEMS (_clai_dedup $items)
     return 0
 end
 
@@ -152,7 +158,7 @@ function _clai_picker_load_history
     if test (count $items) -eq 0
         return 1
     end
-    set -g _CLAI_PICKER_ITEMS $items
+    set -g _CLAI_PICKER_ITEMS (_clai_dedup $items)
     return 0
 end
 

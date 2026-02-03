@@ -519,7 +519,8 @@ _clai_picker_load() {
         fi
     fi
 
-    _CLAI_PICKER_ITEMS=("${items[@]}")
+    # Deduplicate while preserving order (zsh unique flag)
+    _CLAI_PICKER_ITEMS=("${(u)items[@]}")
     if [[ ${#_CLAI_PICKER_ITEMS[@]} -eq 0 ]]; then
         return 1
     fi

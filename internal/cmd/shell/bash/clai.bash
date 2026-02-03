@@ -216,14 +216,20 @@ _clai_history_args() {
 }
 
 _clai_picker_load_history() {
-    local -a args
+    local -a args raw
     local IFS=$'\n'
     args=($(_clai_history_args))
     unset IFS
     if ((BASH_VERSINFO[0] >= 4)); then
-        mapfile -t _CLAI_PICKER_ITEMS < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
+        mapfile -t raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
     else
-        _clai_read_lines _CLAI_PICKER_ITEMS < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
+        _clai_read_lines raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
+    fi
+    # Deduplicate preserving order
+    if ((BASH_VERSINFO[0] >= 4)); then
+        mapfile -t _CLAI_PICKER_ITEMS < <(printf '%s\n' "${raw[@]}" | awk '!seen[$0]++')
+    else
+        _clai_read_lines _CLAI_PICKER_ITEMS < <(printf '%s\n' "${raw[@]}" | awk '!seen[$0]++')
     fi
     if [[ ${#_CLAI_PICKER_ITEMS[@]} -eq 0 ]]; then
         return 1
