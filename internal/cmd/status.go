@@ -234,47 +234,36 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 		return nil
 	}
 
-	// Use consolidated shell detection
 	detection := DetectShell()
-	var installed []string
-
-	// Check if clai integration is active in THIS shell
 	if detection.Active {
-		installed = append(installed, fmt.Sprintf("%s (active)", detection.Shell))
-		return installed
+		return []string{fmt.Sprintf("%s (active)", detection.Shell)}
 	}
 
-	// Not an active session - check RC files for the current shell only
-	shellToCheck := detection.Shell
-
-	// Check zsh
-	if shellToCheck == "" || shellToCheck == "zsh" {
-		zshrc := filepath.Join(home, ".zshrc")
-		if ok, _, _ := isInstalled(zshrc, filepath.Join(paths.HooksDir(), "clai.zsh"), "zsh"); ok {
-			installed = append(installed, "zsh")
-		}
+	type shellConfig struct {
+		name    string
+		rcFiles []string
 	}
 
-	// Check bash
-	if shellToCheck == "" || shellToCheck == "bash" {
-		bashrc := filepath.Join(home, ".bashrc")
-		if ok, _, _ := isInstalled(bashrc, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
-			installed = append(installed, "bash")
-		}
+	shells := []shellConfig{
+		{"zsh", []string{filepath.Join(home, ".zshrc")}},
+		{"bash", []string{
+			filepath.Join(home, ".bashrc"),
+			filepath.Join(home, ".bash_profile"),
+		}},
+		{"fish", []string{filepath.Join(home, ".config", "fish", "config.fish")}},
+	}
 
-		bashProfile := filepath.Join(home, ".bash_profile")
-		if ok, _, _ := isInstalled(bashProfile, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
-			if len(installed) == 0 || installed[len(installed)-1] != "bash" {
-				installed = append(installed, "bash")
+	var installed []string
+	for _, sh := range shells {
+		if detection.Shell != "" && detection.Shell != sh.name {
+			continue
+		}
+		hookFile := filepath.Join(paths.HooksDir(), "clai."+sh.name)
+		for _, rc := range sh.rcFiles {
+			if ok, _, _ := isInstalled(rc, hookFile, sh.name); ok {
+				installed = append(installed, sh.name)
+				break
 			}
-		}
-	}
-
-	// Check fish
-	if shellToCheck == "" || shellToCheck == "fish" {
-		fishConfig := filepath.Join(home, ".config", "fish", "config.fish")
-		if ok, _, _ := isInstalled(fishConfig, filepath.Join(paths.HooksDir(), "clai.fish"), "fish"); ok {
-			installed = append(installed, "fish")
 		}
 	}
 

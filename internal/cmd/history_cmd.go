@@ -61,7 +61,6 @@ func init() {
 func runHistory(cmd *cobra.Command, args []string) error {
 	paths := config.DefaultPaths()
 
-	// Open database
 	store, err := storage.NewSQLiteStore(paths.DatabaseFile())
 	if err != nil {
 		fmt.Printf("No history available. Database not found at: %s\n", paths.DatabaseFile())
@@ -72,81 +71,85 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Determine session ID to use
 	sessionID := historySession
 	if sessionID == "" && !historyGlobal {
-		// Default to current session from environment
 		sessionID = os.Getenv("CLAI_SESSION_ID")
 	}
 
-	// Validate and resolve session if specified
 	if sessionID != "" {
-		session, err := store.GetSession(ctx, sessionID)
+		sessionID, err = resolveSessionID(ctx, store, sessionID)
 		if err != nil {
-			if errors.Is(err, storage.ErrSessionNotFound) {
-				// Try prefix match for short IDs (< 36 chars, full UUID length)
-				if len(sessionID) < 36 {
-					session, err = store.GetSessionByPrefix(ctx, sessionID)
-					if err != nil {
-						if errors.Is(err, storage.ErrSessionNotFound) {
-							return fmt.Errorf("session not found (%s)", sessionID)
-						}
-						if errors.Is(err, storage.ErrAmbiguousSession) {
-							return fmt.Errorf("ambiguous session prefix (%s)", sessionID)
-						}
-						return err
-					}
-					// Use the full session ID for the query
-					sessionID = session.SessionID
-				} else {
-					return fmt.Errorf("session not found (%s)", sessionID)
-				}
-			} else {
-				return err
-			}
-		} else {
-			sessionID = session.SessionID
+			return err
 		}
 	}
 
-	// Build query
+	query, err := buildHistoryQuery(args)
+	if err != nil {
+		return err
+	}
+	if sessionID != "" {
+		query.SessionID = &sessionID
+	}
+
+	commands, err := store.QueryCommands(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to query history: %w", err)
+	}
+
+	return outputHistory(commands)
+}
+
+func resolveSessionID(ctx context.Context, store *storage.SQLiteStore, rawID string) (string, error) {
+	session, err := store.GetSession(ctx, rawID)
+	if err == nil {
+		return session.SessionID, nil
+	}
+	if !errors.Is(err, storage.ErrSessionNotFound) {
+		return "", err
+	}
+	if len(rawID) >= 36 {
+		return "", fmt.Errorf("session not found (%s): %w", rawID, storage.ErrSessionNotFound)
+	}
+	session, err = store.GetSessionByPrefix(ctx, rawID)
+	if err == nil {
+		return session.SessionID, nil
+	}
+	if errors.Is(err, storage.ErrSessionNotFound) {
+		return "", fmt.Errorf("session not found (%s): %w", rawID, storage.ErrSessionNotFound)
+	}
+	if errors.Is(err, storage.ErrAmbiguousSession) {
+		return "", fmt.Errorf("ambiguous session prefix (%s): %w", rawID, storage.ErrAmbiguousSession)
+	}
+	return "", err
+}
+
+func buildHistoryQuery(args []string) (storage.CommandQuery, error) {
 	query := storage.CommandQuery{
 		Limit: historyLimit,
 	}
 
-	// Add status filter if provided
 	switch historyStatus {
 	case "success":
 		query.SuccessOnly = true
 	case "failure":
 		query.FailureOnly = true
 	case "":
-		// No filter - show all
+		// No filter
 	default:
-		return fmt.Errorf("invalid status: %s (use 'success' or 'failure')", historyStatus)
+		return query, fmt.Errorf("invalid status: %s (use 'success' or 'failure')", historyStatus)
 	}
 
-	// Add prefix filter if provided
 	if len(args) > 0 {
 		query.Prefix = strings.ToLower(args[0])
 	}
-
-	// Add CWD filter if provided
 	if historyCWD != "" {
 		query.CWD = &historyCWD
 	}
 
-	// Add session filter if provided
-	if sessionID != "" {
-		query.SessionID = &sessionID
-	}
+	return query, nil
+}
 
-	// Execute query
-	commands, err := store.QueryCommands(ctx, query)
-	if err != nil {
-		return fmt.Errorf("failed to query history: %w", err)
-	}
-
+func outputHistory(commands []storage.Command) error {
 	format := strings.ToLower(strings.TrimSpace(historyFormat))
 	if format == "" {
 		format = "raw"

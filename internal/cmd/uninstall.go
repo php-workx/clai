@@ -84,7 +84,6 @@ func runUninstall(cmd *cobra.Command, args []string) error {
 }
 
 func removeFromRCFile(rcFile, hooksDir string) (bool, error) {
-	// Stat the file to preserve permissions
 	info, err := os.Stat(rcFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -92,16 +91,34 @@ func removeFromRCFile(rcFile, hooksDir string) (bool, error) {
 		}
 		return false, err
 	}
-	fileMode := info.Mode()
 
-	// Read the file
 	content, err := os.ReadFile(rcFile)
 	if err != nil {
 		return false, err
 	}
 
-	// Patterns to remove
-	patterns := []string{
+	patterns := claiRCPatterns(hooksDir)
+	newLines, removed := filterClaiLines(string(content), patterns)
+	if !removed {
+		return false, nil
+	}
+
+	newLines = trimTrailingEmptyLines(newLines)
+
+	newContent := strings.Join(newLines, "\n")
+	if len(newLines) > 0 {
+		newContent += "\n"
+	}
+
+	if err := os.WriteFile(rcFile, []byte(newContent), info.Mode().Perm()); err != nil {
+		return false, err
+	}
+
+	return true, nil
+}
+
+func claiRCPatterns(hooksDir string) []string {
+	return []string{
 		"source \"" + hooksDir,
 		"source '" + hooksDir,
 		". " + hooksDir,
@@ -111,51 +128,37 @@ func removeFromRCFile(rcFile, hooksDir string) (bool, error) {
 		"clai init fish",
 		"# clai shell integration",
 	}
+}
 
-	// Process line by line
-	var newLines []string
+func filterClaiLines(content string, patterns []string) ([]string, bool) {
+	var kept []string
 	removed := false
-	scanner := bufio.NewScanner(strings.NewReader(string(content)))
+	scanner := bufio.NewScanner(strings.NewReader(content))
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		shouldRemove := false
-
-		for _, pattern := range patterns {
-			if strings.Contains(line, pattern) {
-				shouldRemove = true
-				removed = true
-				break
-			}
+		if lineMatchesAny(line, patterns) {
+			removed = true
+			continue
 		}
+		kept = append(kept, line)
+	}
 
-		if !shouldRemove {
-			newLines = append(newLines, line)
+	return kept, removed
+}
+
+func lineMatchesAny(line string, patterns []string) bool {
+	for _, p := range patterns {
+		if strings.Contains(line, p) {
+			return true
 		}
 	}
+	return false
+}
 
-	if err := scanner.Err(); err != nil {
-		return false, err
+func trimTrailingEmptyLines(lines []string) []string {
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
 	}
-
-	if !removed {
-		return false, nil
-	}
-
-	// Remove consecutive empty lines at the end
-	for len(newLines) > 0 && strings.TrimSpace(newLines[len(newLines)-1]) == "" {
-		newLines = newLines[:len(newLines)-1]
-	}
-
-	// Write back
-	newContent := strings.Join(newLines, "\n")
-	if len(newLines) > 0 {
-		newContent += "\n"
-	}
-
-	if err := os.WriteFile(rcFile, []byte(newContent), fileMode.Perm()); err != nil {
-		return false, err
-	}
-
-	return true, nil
+	return lines
 }

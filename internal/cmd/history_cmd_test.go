@@ -262,25 +262,7 @@ func TestHistoryCmd_FullSessionID_NotFound(t *testing.T) {
 	}
 }
 
-// resolveSessionID mimics the history command's session resolution logic
-func resolveSessionID(ctx context.Context, store *storage.SQLiteStore, sessionID string) (string, error) {
-	session, err := store.GetSession(ctx, sessionID)
-	if err != nil {
-		if errors.Is(err, storage.ErrSessionNotFound) {
-			// Try prefix match for short IDs (< 36 chars, full UUID length)
-			if len(sessionID) < 36 {
-				session, err = store.GetSessionByPrefix(ctx, sessionID)
-				if err != nil {
-					return "", err
-				}
-				return session.SessionID, nil
-			}
-			return "", storage.ErrSessionNotFound
-		}
-		return "", err
-	}
-	return session.SessionID, nil
-}
+// Tests below use the production resolveSessionID from history_cmd.go.
 
 func TestHistoryCmd_SessionResolution_ShortToFull(t *testing.T) {
 	t.Parallel()

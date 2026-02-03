@@ -41,61 +41,16 @@ func init() {
 }
 
 func runInstall(cmd *cobra.Command, args []string) error {
-	// Detect shell if not specified
-	shell := installShell
-	if shell == "" {
-		detection := DetectShell()
-		shell = detection.Shell
-
-		// If detection fell back to $SHELL (login shell), confirm with user
-		if shell != "" && !detection.Confident {
-			fmt.Printf("Detected shell: %s (from login shell)\n", shell)
-			fmt.Printf("Is this the shell you want to install for? [Y/n] ")
-
-			reader := bufio.NewReader(os.Stdin)
-			response, _ := reader.ReadString('\n')
-			response = strings.TrimSpace(strings.ToLower(response))
-
-			if response == "n" || response == "no" {
-				for {
-					fmt.Println("\nSupported shells: zsh, bash, fish")
-					fmt.Print("Which shell would you like to install for? ")
-					shell, _ = reader.ReadString('\n')
-					shell = strings.TrimSpace(strings.ToLower(shell))
-
-					switch shell {
-					case "zsh", "bash", "fish":
-						// Valid choice
-					default:
-						fmt.Printf("Invalid shell: %q\n", shell)
-						continue
-					}
-					break
-				}
-			}
-		}
-	}
-
-	if shell == "" {
-		return fmt.Errorf("could not detect shell, please specify with --shell=zsh or --shell=bash")
-	}
-
-	// Validate shell
-	switch shell {
-	case "zsh", "bash", "fish":
-		// OK
-	default:
-		return fmt.Errorf("unsupported shell: %s (supported: zsh, bash, fish)", shell)
+	shell, err := resolveInstallShell()
+	if err != nil {
+		return err
 	}
 
 	paths := config.DefaultPaths()
-
-	// Ensure directories exist
 	if err := paths.EnsureDirectories(); err != nil {
 		return fmt.Errorf("failed to create directories: %w", err)
 	}
 
-	// Write hook file
 	hookFile := filepath.Join(paths.HooksDir(), fmt.Sprintf("clai.%s", shell))
 	hookContent, err := getHookContent(shell)
 	if err != nil {
@@ -107,69 +62,132 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("Wrote hook file: %s\n", hookFile)
 
-	// Get rc file path
 	rcFile := getRCFile(shell)
 	if rcFile == "" {
 		return fmt.Errorf("could not determine rc file for %s", shell)
 	}
 
-	// Check if already installed
 	sourceLine := fmt.Sprintf(`source "%s"`, hookFile)
-	var evalLine string
-	if shell == "fish" {
-		evalLine = "clai init fish | source"
-	} else {
-		evalLine = fmt.Sprintf(`eval "$(clai init %s)"`, shell)
-	}
-
 	installed, installedLine, err := isInstalled(rcFile, hookFile, shell)
 	if err != nil {
 		return fmt.Errorf("failed to check rc file: %w", err)
 	}
-
 	if installed {
 		fmt.Printf("clai is already installed in %s\n", rcFile)
 		fmt.Printf("  Line: %s\n", installedLine)
 		return nil
 	}
 
-	// Append source line to rc file
-	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", rcFile, err)
-	}
-	defer f.Close()
-
-	// Add newline before if file doesn't end with one
-	info, err := f.Stat()
-	if err != nil {
-		return fmt.Errorf("failed to stat %s: %w", rcFile, err)
-	}
-	if info.Size() > 0 {
-		// Read last byte to check for newline
-		content, err := os.ReadFile(rcFile)
-		if err != nil {
-			return fmt.Errorf("failed to read %s: %w", rcFile, err)
-		}
-		if len(content) > 0 && content[len(content)-1] != '\n' {
-			if _, err := f.WriteString("\n"); err != nil {
-				return fmt.Errorf("failed to write to %s: %w", rcFile, err)
-			}
-		}
-	}
-
-	// Write the source line with a comment
-	installLine := fmt.Sprintf("\n# clai shell integration\n%s\n", sourceLine)
-	if _, err := f.WriteString(installLine); err != nil {
-		return fmt.Errorf("failed to write to %s: %w", rcFile, err)
+	if err := appendToRCFile(rcFile, sourceLine); err != nil {
+		return err
 	}
 
 	fmt.Printf("%sInstalled successfully!%s\n", colorGreen, colorReset)
 	fmt.Printf("  Added to: %s\n", rcFile)
 	fmt.Printf("\nTo activate, either:\n")
 	fmt.Printf("  1. Start a new terminal session, or\n")
-	fmt.Printf("  2. Run: %s%s%s\n", colorCyan, evalLine, colorReset)
+	fmt.Printf("  2. Run: %s%s%s\n", colorCyan, evalCommand(shell), colorReset)
 
+	return nil
+}
+
+func resolveInstallShell() (string, error) {
+	shell := installShell
+	if shell == "" {
+		detection := DetectShell()
+		shell = detection.Shell
+		if shell != "" && !detection.Confident {
+			var err error
+			shell, err = confirmShellChoice(shell)
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+
+	if shell == "" {
+		return "", fmt.Errorf("could not detect shell, please specify with --shell=zsh or --shell=bash")
+	}
+
+	switch shell {
+	case "zsh", "bash", "fish":
+		return shell, nil
+	default:
+		return "", fmt.Errorf("unsupported shell: %s (supported: zsh, bash, fish)", shell)
+	}
+}
+
+func confirmShellChoice(detected string) (string, error) {
+	fmt.Printf("Detected shell: %s (from login shell)\n", detected)
+	fmt.Printf("Is this the shell you want to install for? [Y/n] ")
+
+	reader := bufio.NewReader(os.Stdin)
+	response, _ := reader.ReadString('\n')
+	response = strings.TrimSpace(strings.ToLower(response))
+
+	if response != "n" && response != "no" {
+		return detected, nil
+	}
+
+	for {
+		fmt.Println("\nSupported shells: zsh, bash, fish")
+		fmt.Print("Which shell would you like to install for? ")
+		shell, _ := reader.ReadString('\n')
+		shell = strings.TrimSpace(strings.ToLower(shell))
+
+		switch shell {
+		case "zsh", "bash", "fish":
+			return shell, nil
+		default:
+			fmt.Printf("Invalid shell: %q\n", shell)
+		}
+	}
+}
+
+func evalCommand(shell string) string {
+	if shell == "fish" {
+		return "clai init fish | source"
+	}
+	return fmt.Sprintf(`eval "$(clai init %s)"`, shell)
+}
+
+func appendToRCFile(rcFile, sourceLine string) error {
+	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open %s: %w", rcFile, err)
+	}
+	defer f.Close()
+
+	if err := ensureTrailingNewline(f, rcFile); err != nil {
+		return err
+	}
+
+	installLine := fmt.Sprintf("\n# clai shell integration\n%s\n", sourceLine)
+	if _, err := f.WriteString(installLine); err != nil {
+		return fmt.Errorf("failed to write to %s: %w", rcFile, err)
+	}
+
+	return nil
+}
+
+func ensureTrailingNewline(f *os.File, rcFile string) error {
+	info, err := f.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat %s: %w", rcFile, err)
+	}
+	if info.Size() == 0 {
+		return nil
+	}
+
+	content, err := os.ReadFile(rcFile)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", rcFile, err)
+	}
+	if len(content) > 0 && content[len(content)-1] != '\n' {
+		if _, err := f.WriteString("\n"); err != nil {
+			return fmt.Errorf("failed to write to %s: %w", rcFile, err)
+		}
+	}
 	return nil
 }
 
