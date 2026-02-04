@@ -106,7 +106,26 @@ fi
 
 # Enable menu-complete cycling on Tab
 bind "set show-all-if-ambiguous on"
-bind '"\t": menu-complete'
+
+# Tab handler: cycle history scopes when picker is active, else menu-complete.
+# Uses same macro pattern as Enter: Tab → macro → bind-x handler → conditional follow-up.
+_clai_tab_handler() {
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        case "$_CLAI_HISTORY_SCOPE" in
+            session) _CLAI_HISTORY_SCOPE="global" ;;
+            *)       _CLAI_HISTORY_SCOPE="session" ;;
+        esac
+        _CLAI_PICKER_INDEX=0
+        _clai_picker_load_history && _clai_picker_apply
+        # Swallow the follow-up so menu-complete doesn't fire
+        bind '"\C-x\C-t": ""'
+    else
+        # Let menu-complete fire via the follow-up key
+        bind '"\C-x\C-t": menu-complete'
+    fi
+}
+bind -x '"\C-x\C-i": _clai_tab_handler'
+bind '"\t": "\C-x\C-i\C-x\C-t"'
 
 # ============================================
 # Feature 1b-a: TUI Picker (clai-picker)
@@ -275,8 +294,9 @@ _clai_picker_render() {
     fi
 
     local menu_text="$header (↑↓, Enter, Ctrl+G):"
+    menu_text+=$'\n'"────────────────────────────────"
     local i=0
-    local line_count=1
+    local line_count=2
     for item in "${_CLAI_PICKER_ITEMS[@]}"; do
         if [[ $i -eq $_CLAI_PICKER_INDEX ]]; then
             menu_text+=$'\n'" → $item"
@@ -686,6 +706,8 @@ _clai_disable() {
     # Remove custom key bindings
     bind -r '\C-x\C-a'
     bind -r '\C-x\C-b'
+    bind -r '\C-x\C-i'
+    bind -r '\C-x\C-t'
     bind -r '\C-x\C-p'
     bind -r '\C-x\C-n'
     bind -r '\C-g'

@@ -204,7 +204,7 @@ function _clai_picker_render
     end
 
     # Build menu lines
-    set -l menu_lines "$header (↑↓, Enter, Esc):"
+    set -l menu_lines "$header (↑↓, Enter, Esc):" "────────────────────────────────"
     set -l i 1
     for item in $_CLAI_PICKER_ITEMS
         if test $i -eq $_CLAI_PICKER_INDEX
@@ -267,6 +267,20 @@ function _clai_suggest_tab
     end
     if not _clai_config_enabled
         commandline -f complete
+        return
+    end
+    # When history picker is active, Tab cycles scopes
+    if test "$_CLAI_PICKER_ACTIVE" = "true" -a "$_CLAI_PICKER_MODE" = "history"
+        switch $_CLAI_HISTORY_SCOPE
+            case session
+                set -g _CLAI_HISTORY_SCOPE global
+            case '*'
+                set -g _CLAI_HISTORY_SCOPE session
+        end
+        set -g _CLAI_PICKER_INDEX 1
+        if _clai_picker_load_history
+            _clai_picker_apply
+        end
         return
     end
     if test "$_CLAI_PICKER_ACTIVE" != "true" -o "$_CLAI_PICKER_MODE" != "suggest"

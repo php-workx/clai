@@ -573,6 +573,8 @@ _clai_picker_render() {
         header="History (${_CLAI_HISTORY_SCOPE})"
     fi
 
+    menu_text+=$'\n'"────────────────────────────────"
+
     # Render items in reversed order: last array item at top, first at bottom.
     # Index 0 is the closest/newest match and appears at the bottom of the menu.
     local count=${#_CLAI_PICKER_ITEMS[@]}
@@ -708,6 +710,18 @@ _clai_picker_down() {
 }
 
 _clai_picker_suggest() {
+    # When history picker is active, Tab cycles scopes instead of opening suggest
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        case "$_CLAI_HISTORY_SCOPE" in
+            session) _CLAI_HISTORY_SCOPE="global" ;;
+            *)       _CLAI_HISTORY_SCOPE="session" ;;
+        esac
+        _CLAI_PICKER_INDEX=0
+        _CLAI_PICKER_PAGE=0
+        _CLAI_PICKER_AT_END=false
+        _clai_picker_load 0 && _clai_picker_render
+        return
+    fi
     _clai_picker_open suggest || zle expand-or-complete
 }
 
