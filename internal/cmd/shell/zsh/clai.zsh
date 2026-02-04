@@ -610,8 +610,7 @@ _clai_picker_open() {
 
     if ! _clai_picker_load 0; then
         _CLAI_PICKER_ACTIVE=false
-        zle -M "No ${mode} items"
-        return
+        return 1
     fi
     _clai_picker_render
 }
@@ -709,7 +708,7 @@ _clai_picker_down() {
 }
 
 _clai_picker_suggest() {
-    _clai_picker_open suggest || return
+    _clai_picker_open suggest || zle expand-or-complete
 }
 
 _clai_history_scope_session() {
@@ -843,11 +842,11 @@ _clai_enable() {
 clai() {
     case "$1" in
         off)
-            command clai off --session
+            command clai "$@"
             _clai_disable
             ;;
         on)
-            command clai on --session
+            command clai "$@"
             _clai_enable
             ;;
         *)

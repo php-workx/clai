@@ -52,7 +52,7 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 		prefix = args[0]
 	}
 
-	if suggestionsDisabled() {
+	if integrationDisabled() {
 		if suggestJSON {
 			return writeSuggestJSON(nil)
 		}
@@ -186,7 +186,7 @@ func getSuggestionsFromDaemon(prefix string, limit int) []suggestOutput {
 	return results
 }
 
-func suggestionsDisabled() bool {
+func integrationDisabled() bool {
 	if os.Getenv("CLAI_OFF") == "1" {
 		return true
 	}

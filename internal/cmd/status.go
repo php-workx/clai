@@ -104,7 +104,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 }
 
 func checkOnOff() statusCheck {
-	if suggestionsDisabled() {
+	if integrationDisabled() {
 		return statusCheck{
 			name:    "Status",
 			status:  "off",

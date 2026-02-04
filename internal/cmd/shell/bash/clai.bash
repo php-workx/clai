@@ -731,11 +731,11 @@ _clai_enable() {
 clai() {
     case "$1" in
         off)
-            command clai off --session
+            command clai "$@"
             _clai_disable
             ;;
         on)
-            command clai on --session
+            command clai "$@"
             _clai_enable
             ;;
         *)

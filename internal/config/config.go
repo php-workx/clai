@@ -48,7 +48,7 @@ type AIConfig struct {
 
 // SuggestionsConfig holds suggestion-related settings.
 type SuggestionsConfig struct {
-	Enabled         bool `yaml:"enabled"`           // Enable suggestion UX
+	Enabled         bool `yaml:"enabled"`           // Master toggle for shell integration (on/off)
 	MaxHistory      int  `yaml:"max_history"`       // Max history-based suggestions
 	MaxAI           int  `yaml:"max_ai"`            // Max AI-generated suggestions
 	ShowRiskWarning bool `yaml:"show_risk_warning"` // Highlight destructive commands

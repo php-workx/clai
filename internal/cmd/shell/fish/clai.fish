@@ -646,10 +646,10 @@ end
 function clai --wraps=clai
     switch $argv[1]
         case off
-            command clai off --session
+            command clai $argv
             _clai_disable
         case on
-            command clai on --session
+            command clai $argv
             _clai_enable
         case '*'
             command clai $argv
