@@ -42,6 +42,7 @@ install-dev:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	go install golang.org/x/tools/cmd/goimports@latest
+	go install gotest.tools/gotestsum@latest
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 	@echo "Installing pre-commit..."
@@ -66,7 +67,11 @@ clean:
 
 ## test: Run all tests with race detector
 test:
-	go test -race -v ./...
+	@if command -v gotestsum >/dev/null 2>&1; then \
+		gotestsum --format testdox -- -race ./...; \
+	else \
+		go test -race -v ./...; \
+	fi
 
 ## test-all: Run all tests including Docker containers
 test-all: test test-docker
@@ -79,7 +84,11 @@ cover:
 
 ## test-interactive: Run interactive shell tests (requires zsh, bash, fish)
 test-interactive:
-	go test -v ./tests/expect/...
+	@if command -v gotestsum >/dev/null 2>&1; then \
+		gotestsum --format testdox -- -v ./tests/expect/...; \
+	else \
+		go test -v ./tests/expect/...; \
+	fi
 
 ## bin/linux: Cross-compile binaries and test runner for Linux (used by Docker tests)
 bin/linux:
@@ -93,10 +102,10 @@ bin/linux:
 test-docker: bin/linux
 	@if command -v docker-compose >/dev/null 2>&1; then \
 		docker-compose -f tests/docker/docker-compose.yml build && \
-		docker-compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
+		docker-compose -f tests/docker/docker-compose.yml up; \
 	elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
 		docker compose -f tests/docker/docker-compose.yml build && \
-		docker compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
+		docker compose -f tests/docker/docker-compose.yml up; \
 	else \
 		echo "Error: docker-compose or docker compose not found"; \
 		exit 1; \
