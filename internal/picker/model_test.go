@@ -967,3 +967,94 @@ func TestBottomUp_ListHeight_AccountsForSeparator(t *testing.T) {
 	// BottomUp has 1 extra chrome row for separator.
 	assert.Equal(t, topDownHeight-1, bottomUpHeight)
 }
+
+// --- highlightQuery tests ---
+
+func TestHighlightQuery_EmptyQuery(t *testing.T) {
+	result := highlightQuery("foobar", "", normalStyle, matchStyle)
+	expected := normalStyle.Render("foobar")
+	assert.Equal(t, expected, result)
+}
+
+func TestHighlightQuery_NoMatch(t *testing.T) {
+	result := highlightQuery("foobar", "xyz", normalStyle, matchStyle)
+	expected := normalStyle.Render("foobar")
+	assert.Equal(t, expected, result)
+}
+
+func TestHighlightQuery_BasicMatch(t *testing.T) {
+	result := highlightQuery("foobar", "foo", normalStyle, matchStyle)
+	expected := matchStyle.Render("foo") + normalStyle.Render("bar")
+	assert.Equal(t, expected, result)
+}
+
+func TestHighlightQuery_MatchAtEnd(t *testing.T) {
+	result := highlightQuery("foobar", "bar", normalStyle, matchStyle)
+	expected := normalStyle.Render("foo") + matchStyle.Render("bar")
+	assert.Equal(t, expected, result)
+}
+
+func TestHighlightQuery_MatchInMiddle(t *testing.T) {
+	result := highlightQuery("abcdef", "cd", normalStyle, matchStyle)
+	expected := normalStyle.Render("ab") + matchStyle.Render("cd") + normalStyle.Render("ef")
+	assert.Equal(t, expected, result)
+}
+
+func TestHighlightQuery_CaseInsensitive(t *testing.T) {
+	result := highlightQuery("FooBar", "foo", normalStyle, matchStyle)
+	// The original case is preserved in the highlight.
+	expected := matchStyle.Render("Foo") + normalStyle.Render("Bar")
+	assert.Equal(t, expected, result)
+}
+
+func TestHighlightQuery_MultipleMatches(t *testing.T) {
+	result := highlightQuery("abXabXab", "ab", normalStyle, matchStyle)
+	expected := matchStyle.Render("ab") + normalStyle.Render("X") +
+		matchStyle.Render("ab") + normalStyle.Render("X") +
+		matchStyle.Render("ab")
+	assert.Equal(t, expected, result)
+}
+
+func TestHighlightQuery_EntireString(t *testing.T) {
+	result := highlightQuery("foo", "foo", normalStyle, matchStyle)
+	expected := matchStyle.Render("foo")
+	assert.Equal(t, expected, result)
+}
+
+func TestHighlightQuery_SelectedStyle(t *testing.T) {
+	result := highlightQuery("foobar", "foo", selectedStyle, matchSelectedStyle)
+	expected := matchSelectedStyle.Render("foo") + selectedStyle.Render("bar")
+	assert.Equal(t, expected, result)
+}
+
+func TestViewList_HighlightsQuery(t *testing.T) {
+	p := &mockProvider{items: []string{"make build", "make test", "go build"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	// Set a query to trigger highlighting.
+	m.textInput.SetValue("build")
+
+	view := m.viewList()
+
+	// The matched "build" portions should be rendered with matchStyle (yellow).
+	// The non-matched portions should be rendered with normalStyle/selectedStyle.
+	yellowRendered := matchStyle.Render("build")
+	yellowSelectedRendered := matchSelectedStyle.Render("build")
+
+	// "make build" is selected (index 0), so its "build" gets matchSelectedStyle.
+	assert.Contains(t, view, yellowSelectedRendered)
+
+	// "go build" is not selected, so its "build" gets matchStyle.
+	assert.Contains(t, view, yellowRendered)
+
+	// "make test" has no match — should NOT contain yellow "build".
+	lines := strings.Split(view, "\n")
+	// Find the "make test" line (index 1, not selected).
+	for _, line := range lines {
+		if strings.Contains(line, "make test") {
+			assert.NotContains(t, line, yellowRendered)
+			assert.NotContains(t, line, yellowSelectedRendered)
+		}
+	}
+}

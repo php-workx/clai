@@ -366,13 +366,15 @@ func (m Model) separatorWidth() int {
 // --- View rendering ---
 
 var (
-	activeTabStyle   = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")).Background(lipgloss.Color("62"))
-	inactiveTabStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	selectedStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
-	normalStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
-	queryStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	errorStyle       = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	dimStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	activeTabStyle     = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")).Background(lipgloss.Color("62"))
+	inactiveTabStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	selectedStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15"))
+	normalStyle        = lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	matchStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	matchSelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
+	queryStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	errorStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	dimStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
 // View implements tea.Model.
@@ -456,6 +458,7 @@ func (m Model) viewList() string {
 	}
 
 	// Build rendered lines for visible items.
+	query := m.textInput.Value()
 	lines := make([]string, 0, n)
 	for i := 0; i < n; i++ {
 		display := m.items[i]
@@ -463,9 +466,9 @@ func (m Model) viewList() string {
 			display = MiddleTruncate(StripANSI(display), m.width-4)
 		}
 		if i == m.selection {
-			lines = append(lines, selectedStyle.Render("> "+display))
+			lines = append(lines, selectedStyle.Render("> ")+highlightQuery(display, query, selectedStyle, matchSelectedStyle))
 		} else {
-			lines = append(lines, normalStyle.Render("  "+display))
+			lines = append(lines, normalStyle.Render("  ")+highlightQuery(display, query, normalStyle, matchStyle))
 		}
 	}
 
@@ -486,6 +489,34 @@ func (m Model) viewList() string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// highlightQuery renders display text with occurrences of query highlighted.
+// Matching is case-insensitive. Non-matching segments use base style;
+// matching segments use highlight style.
+func highlightQuery(display, query string, base, highlight lipgloss.Style) string {
+	if query == "" {
+		return base.Render(display)
+	}
+	lower := strings.ToLower(display)
+	lowerQuery := strings.ToLower(query)
+
+	var b strings.Builder
+	pos := 0
+	for {
+		idx := strings.Index(lower[pos:], lowerQuery)
+		if idx == -1 {
+			b.WriteString(base.Render(display[pos:]))
+			break
+		}
+		if idx > 0 {
+			b.WriteString(base.Render(display[pos : pos+idx]))
+		}
+		matchEnd := pos + idx + len(lowerQuery)
+		b.WriteString(highlight.Render(display[pos+idx : matchEnd]))
+		pos = matchEnd
+	}
+	return b.String()
 }
 
 // viewQuery renders the query input line.
