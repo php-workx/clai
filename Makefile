@@ -5,22 +5,25 @@ VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
+PICKER_LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
 .PHONY: all build install install-dev clean test test-all test-interactive test-docker cover fmt lint vuln dev help proto bin/linux
 
 all: build
 
-## build: Build all binaries (clai, claid, clai-shim)
+## build: Build all binaries (clai, claid, clai-shim, clai-picker)
 build:
 	go build $(LDFLAGS) -o bin/clai ./cmd/clai
 	go build $(LDFLAGS) -o bin/claid ./cmd/claid
 	go build $(LDFLAGS) -o bin/clai-shim ./cmd/clai-shim
+	go build $(PICKER_LDFLAGS) -o bin/clai-picker ./cmd/clai-picker
 
 ## install: Install all binaries to $GOPATH/bin
 install:
 	go install $(LDFLAGS) ./cmd/clai
 	go install $(LDFLAGS) ./cmd/claid
 	go install $(LDFLAGS) ./cmd/clai-shim
+	go install $(PICKER_LDFLAGS) ./cmd/clai-picker
 
 ## proto: Generate Go code from protobuf definitions
 proto:
@@ -96,16 +99,17 @@ bin/linux:
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/clai ./cmd/clai
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/claid ./cmd/claid
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/clai-shim ./cmd/clai-shim
+	GOOS=linux GOARCH=amd64 go build $(PICKER_LDFLAGS) -o bin/linux/clai-picker ./cmd/clai-picker
 	GOOS=linux GOARCH=amd64 go test -c -o bin/linux/expect.test ./tests/expect
 
 ## test-docker: Run interactive tests in Docker containers (Alpine, Ubuntu, Debian)
 test-docker: bin/linux
 	@if command -v docker-compose >/dev/null 2>&1; then \
 		docker-compose -f tests/docker/docker-compose.yml build && \
-		docker-compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
+		docker-compose -f tests/docker/docker-compose.yml up; \
 	elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
 		docker compose -f tests/docker/docker-compose.yml build && \
-		docker compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
+		docker compose -f tests/docker/docker-compose.yml up; \
 	else \
 		echo "Error: docker-compose or docker compose not found"; \
 		exit 1; \
