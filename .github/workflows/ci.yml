@@ -27,7 +27,7 @@ jobs:
         run: go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
 
       - name: Run tests with race detector
-        run: go test -short -race -json -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
+        run: set -o pipefail && go test -short -race -json -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -109,7 +109,7 @@ jobs:
         run: go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@latest
 
       - name: Run interactive shell tests
-        run: go test -json -v ./tests/expect/... 2>&1 | tee /tmp/gotest.log | gotestfmt
+        run: set -o pipefail && go test -json -v ./tests/expect/... 2>&1 | tee /tmp/gotest.log | gotestfmt
 
   build:
     name: Build
