@@ -116,7 +116,7 @@ func TestIntegration_GoBuildCompiles(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
-	cmd := exec.Command("go", "build", "./cmd/clai-picker")
+	cmd := exec.Command("go", "build", "-o", os.DevNull, "./cmd/clai-picker")
 	cmd.Dir = findModuleRoot(t)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
