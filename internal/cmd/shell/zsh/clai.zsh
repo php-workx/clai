@@ -477,6 +477,10 @@ _clai_tui_picker_open() {
     result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
     exit_code=$?
     if [[ $exit_code -eq 0 ]]; then
+        # Clear ghost text before setting the new buffer.
+        _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
+        region_highlight=()
         BUFFER="$result"
         CURSOR=${#BUFFER}
     elif [[ $exit_code -eq 2 ]]; then
