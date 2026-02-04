@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/picker"
@@ -289,6 +290,11 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 		return exitError
 	}
 	defer tty.Close()
+
+	// Set the default lipgloss renderer to use the tty for color detection.
+	// Without this, lipgloss detects color profile from stdout which is a pipe
+	// when invoked via $(clai-picker ...) in shell, resulting in no colors.
+	lipgloss.SetDefaultRenderer(lipgloss.NewRenderer(tty))
 
 	p := tea.NewProgram(model,
 		tea.WithAltScreen(),
