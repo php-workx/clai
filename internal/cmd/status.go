@@ -40,7 +40,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%sclai status%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
 
-	checks := make([]statusCheck, 0, 6)
+	checks := make([]statusCheck, 0, 7)
+
+	// Check on/off state
+	checks = append(checks, checkOnOff())
 
 	// Check Claude CLI
 	checks = append(checks, checkClaudeCLI())
@@ -69,6 +72,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		switch c.status {
 		case "ok":
 			statusIcon = colorGreen + "[OK]" + colorReset
+		case "on":
+			statusIcon = colorGreen + "[ON]" + colorReset
+		case "off":
+			statusIcon = colorYellow + "[OFF]" + colorReset
 		case "warn":
 			statusIcon = colorYellow + "[WARN]" + colorReset
 			hasWarnings = true
@@ -94,6 +101,21 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func checkOnOff() statusCheck {
+	if suggestionsDisabled() {
+		return statusCheck{
+			name:    "Status",
+			status:  "off",
+			message: "integrations disabled",
+		}
+	}
+	return statusCheck{
+		name:    "Status",
+		status:  "on",
+		message: "integrations active",
+	}
 }
 
 func checkClaudeCLI() statusCheck {

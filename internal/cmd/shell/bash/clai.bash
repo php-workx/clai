@@ -301,8 +301,11 @@ _clai_history_up() {
         _CLAI_PICKER_MODE="history"
         _CLAI_PICKER_INDEX=0
         _CLAI_PICKER_ACTIVE=true
+        # Install Enter macro so picker can intercept it
+        bind '"\C-m": "\C-x\C-a\C-x\C-b"'
         if ! _clai_picker_load_history; then
             _CLAI_PICKER_ACTIVE=false
+            bind '"\C-m": accept-line'
             return 0
         fi
         _clai_picker_apply
@@ -344,6 +347,8 @@ _clai_picker_close() {
     _CLAI_PICKER_MODE=""
     _CLAI_PICKER_ITEMS=()
     _CLAI_PICKER_INDEX=0
+    # Restore normal Enter (remove macro that routes through bind -x)
+    bind '"\C-m": accept-line'
 }
 
 _clai_picker_cancel() {
@@ -354,10 +359,9 @@ _clai_picker_cancel() {
     fi
 }
 
-# Enter key handler: accept picker selection when active, otherwise execute.
-# Enter is bound to a macro "\C-x\C-a\C-x\C-b" where:
-#   \C-x\C-a  →  _clai_pre_accept (this function, via bind -x)
-#   \C-x\C-b  →  accept-line (dynamically rebound to no-op when picker absorbs Enter)
+# Enter key handler: accept picker selection when active.
+# Only reached when the picker is open (macro installed by _clai_history_up).
+# The macro "\C-x\C-a\C-x\C-b" calls this via bind -x, then \C-x\C-b fires.
 _clai_pre_accept() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         # Accept the current selection and close the picker
@@ -365,8 +369,7 @@ _clai_pre_accept() {
         # Swallow the accept-line that follows in the macro
         bind '"\C-x\C-b": ""'
     else
-        # Clear any leftover menu artifacts, then let accept-line fire
-        _clai_picker_clear_menu
+        # Shouldn't normally be reached, but handle gracefully
         bind '"\C-x\C-b": accept-line'
     fi
 }
@@ -411,10 +414,9 @@ bind -x '"\C-xs": _clai_history_scope_session'
 bind -x '"\C-xd": _clai_history_scope_cwd'
 bind -x '"\C-xg": _clai_history_scope_global'
 
-# Enter: macro calls _clai_pre_accept, then conditionally accept-line.
-# _clai_pre_accept rebinds \C-x\C-b to either "" (picker absorbed Enter)
-# or accept-line (normal execution).
-bind '"\C-m": "\C-x\C-a\C-x\C-b"'
+# Enter: normally accept-line. When picker is open, _clai_history_up installs
+# a macro "\C-x\C-a\C-x\C-b" that routes through _clai_pre_accept to intercept.
+# _clai_picker_close restores accept-line.
 bind -x '"\C-x\C-a": _clai_pre_accept'
 bind '"\C-x\C-b": accept-line'
 
@@ -677,9 +679,12 @@ _clai_disable() {
 
 _clai_enable() {
     unset CLAI_OFF
+    local _saved_session="$CLAI_SESSION_ID"
     _CLAI_REINIT=1
     eval "$(command clai init bash)"
     unset _CLAI_REINIT
+    # Preserve original session ID so history stays continuous
+    export CLAI_SESSION_ID="$_saved_session"
     echo "clai enabled"
 }
 

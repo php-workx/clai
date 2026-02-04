@@ -50,7 +50,8 @@ func TestRunSuggest_EmptyPrefix_UsesCache(t *testing.T) {
 
 func TestRunSuggest_HistoryFallback_JSONRisk(t *testing.T) {
 	withSuggestGlobals(t, suggestGlobals{limit: 2, json: true})
-	t.Setenv("CLAI_HOME", t.TempDir()) // Isolate from user config
+	t.Setenv("CLAI_HOME", t.TempDir())  // Isolate from user config
+	t.Setenv("CLAI_CACHE", t.TempDir()) // Isolate from user session-off state
 	histFile := filepath.Join(t.TempDir(), "zsh_history")
 	content := strings.Join([]string{
 		": 1700000000:0;echo hello",

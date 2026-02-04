@@ -588,9 +588,12 @@ end
 
 function _clai_enable
     set -ge CLAI_OFF
+    set -l _saved_session $CLAI_SESSION_ID
     set -g _CLAI_REINIT 1
     command clai init fish | source
     set -ge _CLAI_REINIT
+    # Preserve original session ID so history stays continuous
+    set -gx CLAI_SESSION_ID $_saved_session
     echo "clai enabled"
 end
 

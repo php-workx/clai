@@ -790,9 +790,12 @@ _clai_disable() {
 
 _clai_enable() {
     unset CLAI_OFF
+    local _saved_session="$CLAI_SESSION_ID"
     _CLAI_REINIT=1
     eval "$(command clai init zsh)"
     unset _CLAI_REINIT
+    # Preserve original session ID so history stays continuous
+    export CLAI_SESSION_ID="$_saved_session"
     echo "clai enabled"
 }
 
