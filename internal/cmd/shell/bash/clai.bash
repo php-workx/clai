@@ -96,11 +96,12 @@ _clai_completion() {
 
 # Register completion for common commands
 # Note: complete -D (default completion) requires bash 4.0+
+_CLAI_COMMANDS=(git npm yarn docker kubectl make go cargo python pip)
 if ((BASH_VERSINFO[0] >= 4)); then
     complete -o bashdefault -o default -F _clai_completion -D
 else
     # For compatibility with bash 3.2 (macOS default), register specific commands
-    complete -F _clai_completion git npm yarn docker kubectl make go cargo python pip
+    complete -F _clai_completion "${_CLAI_COMMANDS[@]}"
 fi
 
 # Enable menu-complete cycling on Tab
@@ -658,8 +659,11 @@ _clai_disable() {
     bind -r '\C-xd'
     bind -r '\C-xg'
 
-    # Remove default completion handler
+    # Remove completion handlers (default + per-command for bash <4)
     complete -r -D 2>/dev/null
+    for _cmd in "${_CLAI_COMMANDS[@]}"; do
+        complete -r "$_cmd" 2>/dev/null
+    done
 
     # Strip _ai_prompt_command from PROMPT_COMMAND
     PROMPT_COMMAND="${PROMPT_COMMAND//_ai_prompt_command;/}"
