@@ -62,28 +62,39 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 	fmt.Printf("Wrote hook file: %s\n", hookFile)
 
-	rcFile := getRCFile(shell)
-	if rcFile == "" {
+	rcFiles := getRCFiles(shell)
+	if len(rcFiles) == 0 {
 		return fmt.Errorf("could not determine rc file for %s", shell)
 	}
 
 	sourceLine := fmt.Sprintf(`source "%s"`, hookFile)
-	installed, installedLine, err := isInstalled(rcFile, hookFile, shell)
-	if err != nil {
-		return fmt.Errorf("failed to check rc file: %w", err)
+	allInstalled := true
+	var addedFiles []string
+	for _, rcFile := range rcFiles {
+		installed, installedLine, err := isInstalled(rcFile, hookFile, shell)
+		if err != nil {
+			return fmt.Errorf("failed to check rc file: %w", err)
+		}
+		if installed {
+			fmt.Printf("clai is already installed in %s\n", rcFile)
+			fmt.Printf("  Line: %s\n", installedLine)
+			continue
+		}
+		allInstalled = false
+
+		if err := appendToRCFile(rcFile, sourceLine); err != nil {
+			return err
+		}
+		addedFiles = append(addedFiles, rcFile)
 	}
-	if installed {
-		fmt.Printf("clai is already installed in %s\n", rcFile)
-		fmt.Printf("  Line: %s\n", installedLine)
+	if allInstalled {
 		return nil
 	}
 
-	if err := appendToRCFile(rcFile, sourceLine); err != nil {
-		return err
-	}
-
 	fmt.Printf("%sInstalled successfully!%s\n", colorGreen, colorReset)
-	fmt.Printf("  Added to: %s\n", rcFile)
+	for _, f := range addedFiles {
+		fmt.Printf("  Added to: %s\n", f)
+	}
 	fmt.Printf("\nTo activate, either:\n")
 	fmt.Printf("  1. Start a new terminal session, or\n")
 	fmt.Printf("  2. Run: %s%s%s\n", colorCyan, evalCommand(shell), colorReset)
@@ -191,49 +202,36 @@ func ensureTrailingNewline(f *os.File, rcFile string) error {
 	return nil
 }
 
-func getRCFile(shell string) string {
+func getRCFiles(shell string) []string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return ""
+		return nil
 	}
 
 	switch shell {
 	case "zsh":
-		// Check for .zshrc first, then .zprofile
-		zshrc := filepath.Join(home, ".zshrc")
-		if _, err := os.Stat(zshrc); err == nil {
-			return zshrc
-		}
-		// Create .zshrc if it doesn't exist
-		return zshrc
+		return []string{filepath.Join(home, ".zshrc")}
 	case "bash":
 		bashrc := filepath.Join(home, ".bashrc")
 		bashProfile := filepath.Join(home, ".bash_profile")
 		if runtime.GOOS == "darwin" {
-			// macOS Terminal.app opens login shells, which read
-			// .bash_profile but NOT .bashrc. Prefer .bash_profile
-			// so the hook actually runs.
-			if _, err := os.Stat(bashProfile); err == nil {
-				return bashProfile
-			}
-			return bashProfile // create it if missing
+			// macOS Terminal.app opens login shells which read
+			// .bash_profile, but typing `bash` from zsh starts a
+			// non-login interactive shell which only reads .bashrc.
+			// Install to both so clai loads in either case.
+			return []string{bashProfile, bashrc}
 		}
 		// Linux: .bashrc is sourced by interactive non-login shells
-		if _, err := os.Stat(bashrc); err == nil {
-			return bashrc
-		}
-		return bashrc
+		return []string{bashrc}
 	case "fish":
 		// Fish config is in ~/.config/fish/config.fish
 		configDir := filepath.Join(home, ".config", "fish")
-		configFile := filepath.Join(configDir, "config.fish")
-		// Create directory if it doesn't exist
 		if err := os.MkdirAll(configDir, 0755); err != nil {
-			return ""
+			return nil
 		}
-		return configFile
+		return []string{filepath.Join(configDir, "config.fish")}
 	default:
-		return ""
+		return nil
 	}
 }
 

@@ -65,7 +65,7 @@ func restoreEnvInstall(key, value string) {
 	}
 }
 
-func TestGetRCFile(t *testing.T) {
+func TestGetRCFiles(t *testing.T) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skip("Cannot get home directory")
@@ -82,31 +82,43 @@ func TestGetRCFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.shell, func(t *testing.T) {
-			got := getRCFile(tt.shell)
+			got := getRCFiles(tt.shell)
 			if tt.contains == "" {
-				if got != "" {
-					t.Errorf("getRCFile(%q) = %q, want empty", tt.shell, got)
+				if len(got) != 0 {
+					t.Errorf("getRCFiles(%q) = %v, want empty", tt.shell, got)
 				}
 			} else {
-				if !strings.Contains(got, tt.contains) {
-					t.Errorf("getRCFile(%q) = %q, should contain %q", tt.shell, got, tt.contains)
+				found := false
+				for _, f := range got {
+					if strings.Contains(f, tt.contains) {
+						found = true
+					}
+					if !strings.HasPrefix(f, home) {
+						t.Errorf("getRCFiles(%q) returned %q, should be in home dir", tt.shell, f)
+					}
 				}
-				if !strings.HasPrefix(got, home) {
-					t.Errorf("getRCFile(%q) = %q, should be in home dir", tt.shell, got)
+				if !found {
+					t.Errorf("getRCFiles(%q) = %v, should contain entry with %q", tt.shell, got, tt.contains)
 				}
 			}
 		})
 	}
 }
 
-func TestGetRCFile_DarwinBashProfile(t *testing.T) {
+func TestGetRCFiles_DarwinBash(t *testing.T) {
 	if runtime.GOOS != "darwin" {
 		t.Skip("macOS-specific test")
 	}
 
-	got := getRCFile("bash")
-	if !strings.Contains(got, ".bash_profile") {
-		t.Errorf("getRCFile(bash) on macOS = %q, want .bash_profile (login shells don't read .bashrc)", got)
+	got := getRCFiles("bash")
+	if len(got) != 2 {
+		t.Fatalf("getRCFiles(bash) on macOS returned %d files, want 2 (.bash_profile and .bashrc)", len(got))
+	}
+	if !strings.Contains(got[0], ".bash_profile") {
+		t.Errorf("getRCFiles(bash)[0] = %q, want .bash_profile", got[0])
+	}
+	if !strings.Contains(got[1], ".bashrc") {
+		t.Errorf("getRCFiles(bash)[1] = %q, want .bashrc", got[1])
 	}
 }
 
