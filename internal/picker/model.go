@@ -141,7 +141,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		m.textInput.Width = msg.Width - 4 // account for prompt prefix
+		m.textInput.Width = m.contentWidth() - 4 // account for prompt prefix and padding
 		return m, nil
 
 	case fetchDoneMsg:
@@ -342,8 +342,9 @@ func (m Model) currentTab() config.TabDef {
 // listHeight returns the number of visible list rows (terminal height minus
 // header and footer).
 func (m Model) listHeight() int {
-	// 1 row for tab bar, 1 row for query line, 1 row for newlines between sections.
-	chrome := 3
+	// 1 row for tab bar, 1 row for query line, 1 row for newlines between sections,
+	// 2 rows for top+bottom padding.
+	chrome := 5
 	if m.layout == LayoutBottomUp {
 		chrome++ // +1 for separator line between items and query
 	}
@@ -354,9 +355,9 @@ func (m Model) listHeight() int {
 	return h
 }
 
-// separatorWidth returns the width of the horizontal separator line.
-func (m Model) separatorWidth() int {
-	w := m.width
+// contentWidth returns the usable width inside the padded container.
+func (m Model) contentWidth() int {
+	w := m.width - viewPadX*2
 	if w < 1 {
 		w = 40
 	}
@@ -377,6 +378,9 @@ var (
 	dimStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
+// Horizontal padding applied to the entire view for breathing room.
+const viewPadX = 2
+
 // View implements tea.Model.
 func (m Model) View() string {
 	var b strings.Builder
@@ -391,14 +395,20 @@ func (m Model) View() string {
 
 	// Separator between items and query (BottomUp only)
 	if m.layout == LayoutBottomUp {
-		b.WriteString(dimStyle.Render(strings.Repeat("─", m.separatorWidth())))
+		b.WriteString(dimStyle.Render(strings.Repeat("─", m.contentWidth())))
 		b.WriteRune('\n')
 	}
 
 	// Query line
 	b.WriteString(m.viewQuery())
 
-	return b.String()
+	// Wrap in a padded container for breathing room around window borders.
+	return lipgloss.NewStyle().
+		PaddingLeft(viewPadX).
+		PaddingRight(viewPadX).
+		PaddingTop(1).
+		PaddingBottom(1).
+		Render(b.String())
 }
 
 // viewTabBar renders the tab bar.
@@ -462,8 +472,9 @@ func (m Model) viewList() string {
 	lines := make([]string, 0, n)
 	for i := 0; i < n; i++ {
 		display := m.items[i]
-		if m.width > 4 {
-			display = MiddleTruncate(StripANSI(display), m.width-4)
+		cw := m.contentWidth()
+		if cw > 4 {
+			display = MiddleTruncate(StripANSI(display), cw-4)
 		}
 		if i == m.selection {
 			lines = append(lines, selectedStyle.Render("> ")+highlightQuery(display, query, selectedStyle, matchSelectedStyle))
