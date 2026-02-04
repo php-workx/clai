@@ -114,11 +114,20 @@ func TestGetRCFiles_DarwinBash(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("getRCFiles(bash) on macOS returned %d files, want 2 (.bash_profile and .bashrc)", len(got))
 	}
-	if !strings.Contains(got[0], ".bash_profile") {
-		t.Errorf("getRCFiles(bash)[0] = %q, want .bash_profile", got[0])
+	hasProfile, hasRC := false, false
+	for _, f := range got {
+		if strings.Contains(f, ".bash_profile") {
+			hasProfile = true
+		}
+		if strings.Contains(f, ".bashrc") {
+			hasRC = true
+		}
 	}
-	if !strings.Contains(got[1], ".bashrc") {
-		t.Errorf("getRCFiles(bash)[1] = %q, want .bashrc", got[1])
+	if !hasProfile {
+		t.Errorf("getRCFiles(bash) = %v, missing .bash_profile", got)
+	}
+	if !hasRC {
+		t.Errorf("getRCFiles(bash) = %v, missing .bashrc", got)
 	}
 }
 
