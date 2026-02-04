@@ -109,7 +109,35 @@ bind "set show-all-if-ambiguous on"
 bind '"\t": menu-complete'
 
 # ============================================
-# Feature 1b: History Picker (Up Arrow)
+# Feature 1b-a: TUI Picker (clai-picker)
+# ============================================
+# If clai-picker is on PATH and bash supports bind -x, Up arrow and Alt+H
+# open the full TUI picker.
+# Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
+
+_clai_has_tui_picker() {
+    type -P clai-picker >/dev/null 2>&1
+}
+
+_clai_tui_picker_open() {
+    if ! _clai_has_tui_picker; then
+        return 2
+    fi
+    local result exit_code saved_line="$READLINE_LINE"
+    result=$(clai-picker history --query="$READLINE_LINE" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    exit_code=$?
+    if [ $exit_code -eq 0 ]; then
+        READLINE_LINE="$result"
+        READLINE_POINT=${#READLINE_LINE}
+    elif [ $exit_code -eq 2 ]; then
+        # Fall back to native history search
+        return 2
+    fi
+    # exit_code 1 = cancel, keep original line
+}
+
+# ============================================
+# Feature 1b-b: History Picker (Up Arrow)
 # ============================================
 
 _CLAI_PICKER_ACTIVE=false
@@ -294,6 +322,11 @@ _clai_history_up() {
         _clai_fallback_history_up
         return 0
     fi
+    # Try TUI picker first (when inline picker is not already active)
+    if [[ "$_CLAI_PICKER_ACTIVE" != "true" ]] && _clai_has_tui_picker; then
+        _clai_tui_picker_open
+        return 0
+    fi
     if [[ "$_CLAI_FALLBACK_ACTIVE" == "true" ]]; then
         _clai_fallback_reset
     fi
@@ -414,6 +447,7 @@ bind -x '"\C-g": _clai_picker_cancel'
 bind -x '"\C-xs": _clai_history_scope_session'
 bind -x '"\C-xd": _clai_history_scope_cwd'
 bind -x '"\C-xg": _clai_history_scope_global'
+bind -x '"\eh": _clai_tui_picker_open'    # Alt+H: always open TUI picker
 
 # Enter: normally accept-line. When picker is open, _clai_history_up installs
 # a macro "\C-x\C-a\C-x\C-b" that routes through _clai_pre_accept to intercept.
@@ -658,6 +692,7 @@ _clai_disable() {
     bind -r '\C-xs'
     bind -r '\C-xd'
     bind -r '\C-xg'
+    bind -r '\eh'
 
     # Remove completion handlers (default + per-command for bash <4)
     complete -r -D 2>/dev/null

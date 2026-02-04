@@ -459,10 +459,40 @@ voice() {
 
 
 # ============================================
-# Feature 4: Suggestion + History Pickers
+# Feature 4a: TUI Picker (clai-picker)
+# ============================================
+# If clai-picker is on PATH, Up arrow and Alt+H open the full TUI picker.
+# Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
+
+_clai_has_tui_picker() {
+    command -v clai-picker >/dev/null 2>&1
+}
+
+_clai_tui_picker_open() {
+    if ! _clai_has_tui_picker; then
+        zle .up-line-or-history
+        return
+    fi
+    local result exit_code saved_buffer="$BUFFER"
+    result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    exit_code=$?
+    if [[ $exit_code -eq 0 ]]; then
+        BUFFER="$result"
+        CURSOR=${#BUFFER}
+    elif [[ $exit_code -eq 2 ]]; then
+        zle .up-line-or-history
+        return
+    fi
+    # exit_code 1 = cancel, keep original buffer
+    zle redisplay
+}
+zle -N _clai_tui_picker_open
+
+# ============================================
+# Feature 4b: Suggestion + History Pickers
 # ============================================
 # - Tab opens suggestion picker
-# - Up arrow opens history picker
+# - Up arrow opens TUI picker (or inline history picker as fallback)
 # - Up/Down navigate while picker is open
 # - Enter accepts selection (insert only)
 # - Esc cancels and restores original buffer
@@ -649,8 +679,16 @@ _clai_picker_up() {
         # At end and at top: do nothing (no more items)
         return
     fi
-    # Not in picker - check config before opening (expensive, runs once)
-    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || ! _clai_config_enabled; then
+    # Not in picker — try TUI picker first, then inline picker
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        zle .up-line-or-history
+        return
+    fi
+    if _clai_has_tui_picker; then
+        _clai_tui_picker_open
+        return
+    fi
+    if ! _clai_config_enabled; then
         zle .up-line-or-history
         return
     fi
@@ -737,6 +775,7 @@ bindkey '^M' _clai_picker_accept       # Enter
 bindkey '^Xs' _clai_history_scope_session
 bindkey '^Xd' _clai_history_scope_cwd
 bindkey '^Xg' _clai_history_scope_global
+bindkey '\eh' _clai_tui_picker_open     # Alt+H: always open TUI picker
 # Note: bare '\e' binding removed — it intercepts arrow key sequences when
 # KEYTIMEOUT is low (common in oh-my-zsh, vi-mode configs). Picker cancel
 # is handled via send-break (Ctrl+C / Ctrl+G) instead.
@@ -770,6 +809,7 @@ _clai_disable() {
     bindkey -r '^Xs'
     bindkey -r '^Xd'
     bindkey -r '^Xg'
+    bindkey -r '\eh'
 
     # Restore zsh-autosuggestions
     _clai_zsh_autosuggest_restore

@@ -90,7 +90,36 @@ end
 bind \e _clai_escape
 
 # ============================================
-# Feature 2: Suggestion & History Pickers
+# Feature 2a: TUI Picker (clai-picker)
+# ============================================
+# If clai-picker is on PATH, Up arrow and Alt+H open the full TUI picker.
+# Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
+
+function _clai_has_tui_picker
+    type -q clai-picker
+end
+
+function _clai_tui_picker_open
+    if not _clai_has_tui_picker
+        commandline -f up-line
+        return
+    end
+    set -l saved_buffer (commandline)
+    set -l result (clai-picker history --query=(commandline) --session=$CLAI_SESSION_ID --cwd=$PWD 2>/dev/null)
+    set -l exit_code $status
+    if test $exit_code -eq 0
+        commandline -r -- $result
+        commandline -f end-of-line
+    else if test $exit_code -eq 2
+        commandline -f up-line
+        return
+    end
+    # exit_code 1 = cancel, keep original buffer
+    commandline -f repaint
+end
+
+# ============================================
+# Feature 2b: Suggestion & History Pickers
 # ============================================
 
 set -g _CLAI_PICKER_ACTIVE false
@@ -261,6 +290,11 @@ function _clai_history_up
         commandline -f history-search-backward
         return
     end
+    # Try TUI picker first (when inline picker is not already active)
+    if test "$_CLAI_PICKER_ACTIVE" != "true"; and _clai_has_tui_picker
+        _clai_tui_picker_open
+        return
+    end
     if not _clai_config_enabled
         commandline -f history-search-backward
         return
@@ -355,6 +389,7 @@ end
 bind \t _clai_suggest_tab
 bind \e\[A _clai_history_up
 bind \e\[B _clai_picker_down
+bind \eh _clai_tui_picker_open            # Alt+H: always open TUI picker
 # Escape is bound above via _clai_escape (unified handler)
 bind \cx\cs _clai_history_scope_session
 bind \cx\cd _clai_history_scope_cwd
@@ -575,6 +610,7 @@ function _clai_disable
     # Remove custom keybindings
     bind \e ''
     bind \e\r ''
+    bind \eh ''
     bind \cx\cv ''
     bind \cx\cs ''
     bind \cx\cd ''
