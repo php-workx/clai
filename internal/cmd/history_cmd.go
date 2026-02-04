@@ -126,6 +126,13 @@ func resolveSessionID(ctx context.Context, store *storage.SQLiteStore, rawID str
 }
 
 func buildHistoryQuery(args []string) (storage.CommandQuery, error) {
+	if historyLimit < 0 {
+		return storage.CommandQuery{}, fmt.Errorf("invalid limit: must be >= 0")
+	}
+	if historyOffset < 0 {
+		return storage.CommandQuery{}, fmt.Errorf("invalid offset: must be >= 0")
+	}
+
 	query := storage.CommandQuery{
 		Limit:  historyLimit,
 		Offset: historyOffset,

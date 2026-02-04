@@ -207,6 +207,9 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	if q.Offset > 0 {
 		query += " OFFSET ?"
 		args = append(args, q.Offset)
+	} else if q.Offset < 0 {
+		// Defense-in-depth: clamp negative offsets to 0
+		q.Offset = 0
 	}
 
 	return query, args
