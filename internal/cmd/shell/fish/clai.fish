@@ -38,6 +38,10 @@ set -g _AI_LAST_OUTPUT "$CLAI_CACHE/last_output"
 # Disable native autosuggestions only when clai is enabled
 # (leave native suggestions working when CLAI_OFF=1 or session-off)
 if test "$CLAI_OFF" != "1"; and not test -f "$CLAI_CACHE/off"
+    # Save the user's original autosuggestion setting before overriding
+    if not set -q _clai_prev_autosuggestion
+        set -g _clai_prev_autosuggestion (set -q fish_autosuggestion_enabled; and echo $fish_autosuggestion_enabled; or echo 1)
+    end
     set -g fish_autosuggestion_enabled 0
 end
 
@@ -576,8 +580,13 @@ function _clai_disable
     bind \cx\cd ''
     bind \cx\cg ''
 
-    # Restore native autosuggestions
-    set -g fish_autosuggestion_enabled 1
+    # Restore native autosuggestions to their prior state
+    if set -q _clai_prev_autosuggestion
+        set -g fish_autosuggestion_enabled $_clai_prev_autosuggestion
+        set -ge _clai_prev_autosuggestion
+    else
+        set -g fish_autosuggestion_enabled 1
+    end
 
     # Remove custom fish_right_prompt and history wrapper
     functions -e fish_right_prompt
