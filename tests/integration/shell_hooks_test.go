@@ -105,6 +105,9 @@ func TestShellHooks_ZshRequiredFunctions(t *testing.T) {
 		"_ai_precmd",
 		"run()",
 		"function history", // Uses function keyword to avoid alias expansion
+		"_clai_disable",
+		"_clai_enable",
+		"clai()",
 	}
 
 	for _, fn := range requiredFunctions {
@@ -132,6 +135,9 @@ func TestShellHooks_BashRequiredFunctions(t *testing.T) {
 		"run()",
 		"ai-fix()",
 		"history()",
+		"_clai_disable()",
+		"_clai_enable()",
+		"clai()",
 	}
 
 	for _, fn := range requiredFunctions {
@@ -395,50 +401,93 @@ echo "All functions defined"
 	}
 }
 
-// findHookFile searches for a hook file in common locations.
-func findHookFile(name string) string {
-	paths := config.DefaultPaths()
-
-	// Try installed location first
-	hookPath := filepath.Join(paths.HooksDir(), name)
-	if _, err := os.Stat(hookPath); err == nil {
-		return hookPath
+// TestShellHooks_ClaiOffOnWrapper verifies disable/enable functions and clai wrapper exist.
+func TestShellHooks_ClaiOffOnWrapper(t *testing.T) {
+	tests := []struct {
+		shell   string
+		file    string
+		disable string
+		enable  string
+		wrapper string
+		reinit  string
+	}{
+		{"zsh", "clai.zsh", "_clai_disable", "_clai_enable", "clai()", "_CLAI_REINIT"},
+		{"bash", "clai.bash", "_clai_disable", "_clai_enable", "clai()", "_CLAI_REINIT"},
+		{"fish", "clai.fish", "_clai_disable", "_clai_enable", "function clai", "_CLAI_REINIT"},
 	}
 
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			hookPath := findHookFile(tt.file)
+			if hookPath == "" {
+				t.Skipf("%s hook file not found", tt.shell)
+			}
+
+			content, err := os.ReadFile(hookPath)
+			if err != nil {
+				t.Fatalf("failed to read hook file: %v", err)
+			}
+
+			contentStr := string(content)
+
+			if !strings.Contains(contentStr, tt.disable) {
+				t.Errorf("%s: _clai_disable function not found", tt.shell)
+			}
+			if !strings.Contains(contentStr, tt.enable) {
+				t.Errorf("%s: _clai_enable function not found", tt.shell)
+			}
+			if !strings.Contains(contentStr, tt.wrapper) {
+				t.Errorf("%s: clai wrapper function not found (looking for %q)", tt.shell, tt.wrapper)
+			}
+			if !strings.Contains(contentStr, tt.reinit) {
+				t.Errorf("%s: _CLAI_REINIT guard not found", tt.shell)
+			}
+
+			// Verify CLAI_OFF is set in disable
+			if !strings.Contains(contentStr, "CLAI_OFF") {
+				t.Errorf("%s: CLAI_OFF not found in disable function", tt.shell)
+			}
+
+			// Verify command clai is used (not recursive call)
+			if !strings.Contains(contentStr, "command clai") {
+				t.Errorf("%s: 'command clai' not used in wrapper (would cause recursion)", tt.shell)
+			}
+		})
+	}
+}
+
+// findHookFile searches for a hook file in common locations.
+func findHookFile(name string) string {
 	// Get shell name from filename (e.g., "clai.zsh" -> "zsh")
 	ext := filepath.Ext(name)
 	shellName := strings.TrimPrefix(ext, ".")
 
-	// Try relative to working directory
+	// Try source files first — installed hooks may be thin loaders
+	// that delegate to `clai init` and lack the full script content.
 	cwd, _ := os.Getwd()
 
-	// Try project internal shell directory (new location)
-	hookPath = filepath.Join(cwd, "internal", "cmd", "shell", shellName, name)
-	if _, err := os.Stat(hookPath); err == nil {
-		return hookPath
-	}
-
-	// Try project hooks directory (legacy location)
-	hookPath = filepath.Join(cwd, "hooks", name)
+	// Try project internal shell directory (source of truth)
+	hookPath := filepath.Join(cwd, "internal", "cmd", "shell", shellName, name)
 	if _, err := os.Stat(hookPath); err == nil {
 		return hookPath
 	}
 
 	// Try parent directories (for running from tests/integration)
+	search := cwd
 	for i := 0; i < 3; i++ {
-		cwd = filepath.Dir(cwd)
+		search = filepath.Dir(search)
 
-		// Try internal shell directory
-		hookPath = filepath.Join(cwd, "internal", "cmd", "shell", shellName, name)
+		hookPath = filepath.Join(search, "internal", "cmd", "shell", shellName, name)
 		if _, err := os.Stat(hookPath); err == nil {
 			return hookPath
 		}
+	}
 
-		// Try hooks directory
-		hookPath = filepath.Join(cwd, "hooks", name)
-		if _, err := os.Stat(hookPath); err == nil {
-			return hookPath
-		}
+	// Fall back to installed location
+	paths := config.DefaultPaths()
+	hookPath = filepath.Join(paths.HooksDir(), name)
+	if _, err := os.Stat(hookPath); err == nil {
+		return hookPath
 	}
 
 	return ""

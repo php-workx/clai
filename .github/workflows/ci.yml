@@ -23,8 +23,11 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
+      - name: Install gotestfmt
+        run: go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@v2.5.0
+
       - name: Run tests with race detector
-        run: go test -short -race -coverprofile=coverage.out -covermode=atomic ./...
+        run: set -o pipefail && go test -short -race -json -coverprofile=coverage.out -covermode=atomic ./... 2>&1 | tee /tmp/gotest.log | gotestfmt
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
@@ -102,8 +105,11 @@ jobs:
       - name: Build clai
         run: make build
 
+      - name: Install gotestfmt
+        run: go install github.com/gotesttools/gotestfmt/v2/cmd/gotestfmt@v2.5.0
+
       - name: Run interactive shell tests
-        run: go test -v ./tests/expect/...
+        run: set -o pipefail && go test -json -v ./tests/expect/... 2>&1 | tee /tmp/gotest.log | gotestfmt
 
   build:
     name: Build

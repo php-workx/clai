@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -64,7 +65,7 @@ func restoreEnvInstall(key, value string) {
 	}
 }
 
-func TestGetRCFile(t *testing.T) {
+func TestGetRCFiles(t *testing.T) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		t.Skip("Cannot get home directory")
@@ -81,37 +82,87 @@ func TestGetRCFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.shell, func(t *testing.T) {
-			got := getRCFile(tt.shell)
+			got := getRCFiles(tt.shell)
 			if tt.contains == "" {
-				if got != "" {
-					t.Errorf("getRCFile(%q) = %q, want empty", tt.shell, got)
+				if len(got) != 0 {
+					t.Errorf("getRCFiles(%q) = %v, want empty", tt.shell, got)
 				}
 			} else {
-				if !strings.Contains(got, tt.contains) {
-					t.Errorf("getRCFile(%q) = %q, should contain %q", tt.shell, got, tt.contains)
+				found := false
+				for _, f := range got {
+					if strings.Contains(f, tt.contains) {
+						found = true
+					}
+					if !strings.HasPrefix(f, home) {
+						t.Errorf("getRCFiles(%q) returned %q, should be in home dir", tt.shell, f)
+					}
 				}
-				if !strings.HasPrefix(got, home) {
-					t.Errorf("getRCFile(%q) = %q, should be in home dir", tt.shell, got)
+				if !found {
+					t.Errorf("getRCFiles(%q) = %v, should contain entry with %q", tt.shell, got, tt.contains)
 				}
 			}
 		})
 	}
 }
 
-func TestGetHookContent(t *testing.T) {
-	tests := []string{"zsh", "bash", "fish"}
+func TestGetRCFiles_DarwinBash(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("macOS-specific test")
+	}
 
-	for _, shell := range tests {
+	got := getRCFiles("bash")
+	if len(got) != 2 {
+		t.Fatalf("getRCFiles(bash) on macOS returned %d files, want 2 (.bash_profile and .bashrc)", len(got))
+	}
+	hasProfile, hasRC := false, false
+	for _, f := range got {
+		if strings.Contains(f, ".bash_profile") {
+			hasProfile = true
+		}
+		if strings.Contains(f, ".bashrc") {
+			hasRC = true
+		}
+	}
+	if !hasProfile {
+		t.Errorf("getRCFiles(bash) = %v, missing .bash_profile", got)
+	}
+	if !hasRC {
+		t.Errorf("getRCFiles(bash) = %v, missing .bashrc", got)
+	}
+}
+
+func TestGetHookContent(t *testing.T) {
+	tests := []struct {
+		shell    string
+		contains string
+	}{
+		{"zsh", `eval "$(clai init zsh)"`},
+		{"bash", `eval "$(clai init bash)"`},
+		{"fish", "clai init fish | source"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			content, err := getHookContent(tt.shell)
+			if err != nil {
+				t.Fatalf("getHookContent(%q) error: %v", tt.shell, err)
+			}
+			if !strings.Contains(content, tt.contains) {
+				t.Errorf("getHookContent(%q) = %q, want it to contain %q", tt.shell, content, tt.contains)
+			}
+		})
+	}
+}
+
+func TestGetHookContent_NoRawPlaceholders(t *testing.T) {
+	for _, shell := range []string{"zsh", "bash", "fish"} {
 		t.Run(shell, func(t *testing.T) {
 			content, err := getHookContent(shell)
 			if err != nil {
 				t.Fatalf("getHookContent(%q) error: %v", shell, err)
 			}
-			if content == "" {
-				t.Errorf("getHookContent(%q) returned empty content", shell)
-			}
-			if len(content) < 100 {
-				t.Errorf("getHookContent(%q) content too short: %d bytes", shell, len(content))
+			if strings.Contains(content, "{{CLAI_SESSION_ID}}") {
+				t.Errorf("getHookContent(%q) contains raw {{CLAI_SESSION_ID}} placeholder", shell)
 			}
 		})
 	}

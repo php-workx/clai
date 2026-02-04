@@ -47,6 +47,7 @@ type AIConfig struct {
 
 // SuggestionsConfig holds suggestion-related settings.
 type SuggestionsConfig struct {
+	Enabled         bool `yaml:"enabled"`           // Enable suggestion UX
 	MaxHistory      int  `yaml:"max_history"`       // Max history-based suggestions
 	MaxAI           int  `yaml:"max_ai"`            // Max AI-generated suggestions
 	ShowRiskWarning bool `yaml:"show_risk_warning"` // Highlight destructive commands
@@ -80,6 +81,7 @@ func DefaultConfig() *Config {
 			CacheTTLHours: 24,
 		},
 		Suggestions: SuggestionsConfig{
+			Enabled:         true,
 			MaxHistory:      5,
 			MaxAI:           3,
 			ShowRiskWarning: true,
@@ -346,6 +348,8 @@ func (c *Config) setAIField(field, value string) error {
 
 func (c *Config) getSuggestionsField(field string) (string, error) {
 	switch field {
+	case "enabled":
+		return strconv.FormatBool(c.Suggestions.Enabled), nil
 	case "max_history":
 		return strconv.Itoa(c.Suggestions.MaxHistory), nil
 	case "max_ai":
@@ -359,6 +363,12 @@ func (c *Config) getSuggestionsField(field string) (string, error) {
 
 func (c *Config) setSuggestionsField(field, value string) error {
 	switch field {
+	case "enabled":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for enabled: %w", err)
+		}
+		c.Suggestions.Enabled = v
 	case "max_history":
 		v, err := strconv.Atoi(value)
 		if err != nil {
@@ -471,6 +481,7 @@ func isValidProvider(provider string) bool {
 // Internal settings (daemon, client, ai, privacy) are not exposed.
 func ListKeys() []string {
 	return []string{
+		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
 	}

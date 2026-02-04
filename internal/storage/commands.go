@@ -136,7 +136,31 @@ func (s *SQLiteStore) UpdateCommandEnd(ctx context.Context, commandID string, ex
 
 // QueryCommands queries commands based on the given criteria.
 func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Command, error) {
-	// Build query dynamically based on provided filters
+	query, args := buildCommandQuerySQL(q)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query commands: %w", err)
+	}
+	defer rows.Close()
+
+	var commands []Command
+	for rows.Next() {
+		cmd, err := scanCommandRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		commands = append(commands, cmd)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating commands: %w", err)
+	}
+
+	return commands, nil
+}
+
+func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	query := `
 		SELECT id, command_id, session_id, ts_start_unix_ms, ts_end_unix_ms,
 		       duration_ms, cwd, command, command_norm, command_hash,
@@ -152,26 +176,21 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 		query += " AND session_id = ?"
 		args = append(args, *q.SessionID)
 	}
-
 	if q.ExcludeSessionID != "" {
 		query += " AND session_id != ?"
 		args = append(args, q.ExcludeSessionID)
 	}
-
 	if q.CWD != nil {
 		query += " AND cwd = ?"
 		args = append(args, *q.CWD)
 	}
-
 	if q.Prefix != "" {
 		query += " AND command_norm LIKE ?"
 		args = append(args, q.Prefix+"%")
 	}
-
 	if q.SuccessOnly {
 		query += " AND is_success = 1"
 	}
-
 	if q.FailureOnly {
 		query += " AND is_success = 0"
 	}
@@ -182,94 +201,75 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 		query += " LIMIT ?"
 		args = append(args, q.Limit)
 	} else {
-		// Default limit to prevent unbounded queries
 		query += " LIMIT 1000"
 	}
 
-	rows, err := s.db.QueryContext(ctx, query, args...)
+	if q.Offset > 0 {
+		query += " OFFSET ?"
+		args = append(args, q.Offset)
+	} else if q.Offset < 0 {
+		// Defense-in-depth: clamp negative offsets to 0
+		q.Offset = 0
+	}
+
+	return query, args
+}
+
+func scanCommandRow(rows *sql.Rows) (Command, error) {
+	var cmd Command
+	var endTime, duration sql.NullInt64
+	var exitCode, isSuccess sql.NullInt32
+	var gitBranch, gitRepoName, gitRepoRoot, prevCommandID sql.NullString
+	var isSudo, pipeCount, wordCount sql.NullInt32
+
+	err := rows.Scan(
+		&cmd.ID, &cmd.CommandID, &cmd.SessionID, &cmd.TsStartUnixMs,
+		&endTime, &duration, &cmd.CWD, &cmd.Command, &cmd.CommandNorm,
+		&cmd.CommandHash, &exitCode, &isSuccess,
+		&gitBranch, &gitRepoName, &gitRepoRoot, &prevCommandID,
+		&isSudo, &pipeCount, &wordCount,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query commands: %w", err)
-	}
-	defer rows.Close()
-
-	var commands []Command
-	for rows.Next() {
-		var cmd Command
-		var endTime, duration sql.NullInt64
-		var exitCode sql.NullInt32
-		var isSuccess sql.NullInt32
-		var gitBranch, gitRepoName, gitRepoRoot, prevCommandID sql.NullString
-		var isSudo, pipeCount, wordCount sql.NullInt32
-
-		err := rows.Scan(
-			&cmd.ID,
-			&cmd.CommandID,
-			&cmd.SessionID,
-			&cmd.TsStartUnixMs,
-			&endTime,
-			&duration,
-			&cmd.CWD,
-			&cmd.Command,
-			&cmd.CommandNorm,
-			&cmd.CommandHash,
-			&exitCode,
-			&isSuccess,
-			&gitBranch,
-			&gitRepoName,
-			&gitRepoRoot,
-			&prevCommandID,
-			&isSudo,
-			&pipeCount,
-			&wordCount,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan command: %w", err)
-		}
-
-		if endTime.Valid {
-			cmd.TsEndUnixMs = &endTime.Int64
-		}
-		if duration.Valid {
-			cmd.DurationMs = &duration.Int64
-		}
-		if exitCode.Valid {
-			ec := int(exitCode.Int32)
-			cmd.ExitCode = &ec
-		}
-		if isSuccess.Valid {
-			v := isSuccess.Int32 == 1
-			cmd.IsSuccess = &v
-		}
-		if gitBranch.Valid {
-			cmd.GitBranch = &gitBranch.String
-		}
-		if gitRepoName.Valid {
-			cmd.GitRepoName = &gitRepoName.String
-		}
-		if gitRepoRoot.Valid {
-			cmd.GitRepoRoot = &gitRepoRoot.String
-		}
-		if prevCommandID.Valid {
-			cmd.PrevCommandID = &prevCommandID.String
-		}
-		if isSudo.Valid {
-			cmd.IsSudo = isSudo.Int32 == 1
-		}
-		if pipeCount.Valid {
-			cmd.PipeCount = int(pipeCount.Int32)
-		}
-		if wordCount.Valid {
-			cmd.WordCount = int(wordCount.Int32)
-		}
-
-		commands = append(commands, cmd)
+		return cmd, fmt.Errorf("failed to scan command: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error iterating commands: %w", err)
+	if endTime.Valid {
+		cmd.TsEndUnixMs = &endTime.Int64
+	}
+	if duration.Valid {
+		cmd.DurationMs = &duration.Int64
+	}
+	if exitCode.Valid {
+		ec := int(exitCode.Int32)
+		cmd.ExitCode = &ec
+	}
+	if isSuccess.Valid {
+		v := isSuccess.Int32 == 1
+		cmd.IsSuccess = &v
+	}
+	if gitBranch.Valid {
+		cmd.GitBranch = &gitBranch.String
+	}
+	if gitRepoName.Valid {
+		cmd.GitRepoName = &gitRepoName.String
+	}
+	if gitRepoRoot.Valid {
+		cmd.GitRepoRoot = &gitRepoRoot.String
+	}
+	if prevCommandID.Valid {
+		cmd.PrevCommandID = &prevCommandID.String
+	}
+	if isSudo.Valid {
+		cmd.IsSudo = isSudo.Int32 == 1
+	}
+	if pipeCount.Valid {
+		cmd.PipeCount = int(pipeCount.Int32)
+	}
+	if wordCount.Valid {
+		cmd.WordCount = int(wordCount.Int32)
 	}
 
-	return commands, nil
+	return cmd, nil
 }
 
 // NormalizeCommand normalizes a command for comparison and deduplication.

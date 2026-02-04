@@ -82,6 +82,7 @@ func measureShellStartup(t *testing.T, shell string, withClai bool) time.Duratio
 
 // TestPerformance_ZshIntegrationOverhead measures zsh startup overhead from clai.
 func TestPerformance_ZshIntegrationOverhead(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -106,6 +107,7 @@ func TestPerformance_ZshIntegrationOverhead(t *testing.T) {
 
 // TestPerformance_BashIntegrationOverhead measures bash startup overhead from clai.
 func TestPerformance_BashIntegrationOverhead(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -132,6 +134,7 @@ func TestPerformance_BashIntegrationOverhead(t *testing.T) {
 // Note: Fish has different PTY behavior, so we measure source time directly instead
 // of comparing baseline vs with-clai, which requires reliable prompt detection.
 func TestPerformance_FishIntegrationOverhead(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -174,6 +177,7 @@ func TestPerformance_FishIntegrationOverhead(t *testing.T) {
 // TestPerformance_InitCommandFast verifies clai init command completes quickly.
 // This is critical because `eval "$(clai init zsh)"` runs synchronously in shell startup.
 func TestPerformance_InitCommandFast(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -240,6 +244,7 @@ func isRunningInContainer() bool {
 // TestPerformance_SourceScriptFast measures time to source the shell script directly.
 // This isolates the shell parsing overhead from the clai binary execution.
 func TestPerformance_SourceScriptFast(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -327,6 +332,7 @@ func TestPerformance_SourceScriptFast(t *testing.T) {
 // TestPerformance_NoBlockingIPCOnStartup verifies startup doesn't block on IPC.
 // The shell script should background all clai-shim calls.
 func TestPerformance_NoBlockingIPCOnStartup(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}

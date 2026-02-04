@@ -2,10 +2,12 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"testing"
 
+	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/storage"
 )
 
@@ -45,6 +47,7 @@ func TestHistoryCmd_Flags(t *testing.T) {
 		{"session", ""},
 		{"global", "g"},
 		{"status", "s"},
+		{"format", ""},
 	}
 
 	for _, f := range expectedFlags {
@@ -89,6 +92,16 @@ func TestHistoryCmd_StatusDefault(t *testing.T) {
 	}
 	if flag.Shorthand != "s" {
 		t.Errorf("Expected status shorthand -s, got -%s", flag.Shorthand)
+	}
+}
+
+func TestHistoryCmd_FormatDefault(t *testing.T) {
+	flag := historyCmd.Flags().Lookup("format")
+	if flag == nil {
+		t.Fatal("format flag not found")
+	}
+	if flag.DefValue != "raw" {
+		t.Errorf("Expected default format=raw, got %s", flag.DefValue)
 	}
 }
 
@@ -249,25 +262,7 @@ func TestHistoryCmd_FullSessionID_NotFound(t *testing.T) {
 	}
 }
 
-// resolveSessionID mimics the history command's session resolution logic
-func resolveSessionID(ctx context.Context, store *storage.SQLiteStore, sessionID string) (string, error) {
-	session, err := store.GetSession(ctx, sessionID)
-	if err != nil {
-		if errors.Is(err, storage.ErrSessionNotFound) {
-			// Try prefix match for short IDs (< 36 chars, full UUID length)
-			if len(sessionID) < 36 {
-				session, err = store.GetSessionByPrefix(ctx, sessionID)
-				if err != nil {
-					return "", err
-				}
-				return session.SessionID, nil
-			}
-			return "", storage.ErrSessionNotFound
-		}
-		return "", err
-	}
-	return session.SessionID, nil
-}
+// Tests below use the production resolveSessionID from history_cmd.go.
 
 func TestHistoryCmd_SessionResolution_ShortToFull(t *testing.T) {
 	t.Parallel()
@@ -342,4 +337,224 @@ func TestHistoryCmd_SessionResolution_FullUUID_NoFallback(t *testing.T) {
 	if !errors.Is(err, storage.ErrSessionNotFound) {
 		t.Errorf("resolveSessionID() error = %v, want ErrSessionNotFound", err)
 	}
+}
+
+func setupHistoryStore(t *testing.T) *storage.SQLiteStore {
+	t.Helper()
+	root := t.TempDir()
+	t.Setenv("CLAI_HOME", root)
+	paths := config.DefaultPaths()
+	store, err := storage.NewSQLiteStore(paths.DatabaseFile())
+	if err != nil {
+		t.Fatalf("NewSQLiteStore() error = %v", err)
+	}
+	return store
+}
+
+func createSession(t *testing.T, store *storage.SQLiteStore, id string) {
+	t.Helper()
+	ctx := context.Background()
+	session := &storage.Session{
+		SessionID:       id,
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/home/user",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+}
+
+func createCommand(t *testing.T, store *storage.SQLiteStore, cmd storage.Command) {
+	t.Helper()
+	ctx := context.Background()
+	if err := store.CreateCommand(ctx, &cmd); err != nil {
+		t.Fatalf("CreateCommand() error = %v", err)
+	}
+}
+
+func TestRunHistory_JSON_Global(t *testing.T) {
+	store := setupHistoryStore(t)
+	defer store.Close()
+
+	createSession(t, store, "sess-1")
+	createSession(t, store, "sess-2")
+
+	createCommand(t, store, storage.Command{
+		CommandID:     "cmd-1",
+		SessionID:     "sess-1",
+		TsStartUnixMs: 1000,
+		CWD:           "/tmp",
+		Command:       "git status",
+	})
+	createCommand(t, store, storage.Command{
+		CommandID:     "cmd-2",
+		SessionID:     "sess-2",
+		TsStartUnixMs: 2000,
+		CWD:           "/work",
+		Command:       "ls -la",
+	})
+
+	withHistoryGlobals(t, historyGlobals{limit: 20, global: true, format: "json"})
+
+	output := captureStdout(t, func() {
+		if err := runHistory(historyCmd, nil); err != nil {
+			t.Fatalf("runHistory error: %v", err)
+		}
+	})
+
+	var out []historyOutput
+	if err := json.Unmarshal([]byte(output), &out); err != nil {
+		t.Fatalf("json unmarshal error: %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(out))
+	}
+	if out[0].Text != "ls -la" {
+		t.Fatalf("expected most recent command first, got %q", out[0].Text)
+	}
+	if out[0].Source != "global" {
+		t.Fatalf("expected source global, got %q", out[0].Source)
+	}
+}
+
+func TestRunHistory_JSON_SessionDefault(t *testing.T) {
+	store := setupHistoryStore(t)
+	defer store.Close()
+
+	createSession(t, store, "sess-a")
+	createSession(t, store, "sess-b")
+
+	createCommand(t, store, storage.Command{
+		CommandID:     "cmd-a",
+		SessionID:     "sess-a",
+		TsStartUnixMs: 1000,
+		CWD:           "/tmp",
+		Command:       "git status",
+	})
+	createCommand(t, store, storage.Command{
+		CommandID:     "cmd-b",
+		SessionID:     "sess-b",
+		TsStartUnixMs: 2000,
+		CWD:           "/tmp",
+		Command:       "ls",
+	})
+
+	t.Setenv("CLAI_SESSION_ID", "sess-a")
+	withHistoryGlobals(t, historyGlobals{limit: 20, global: false, format: "json"})
+
+	output := captureStdout(t, func() {
+		if err := runHistory(historyCmd, nil); err != nil {
+			t.Fatalf("runHistory error: %v", err)
+		}
+	})
+
+	var out []historyOutput
+	if err := json.Unmarshal([]byte(output), &out); err != nil {
+		t.Fatalf("json unmarshal error: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(out))
+	}
+	if out[0].Text != "git status" {
+		t.Fatalf("expected session command, got %q", out[0].Text)
+	}
+	if out[0].Source != "session" {
+		t.Fatalf("expected source session, got %q", out[0].Source)
+	}
+}
+
+func TestRunHistory_StatusFilterFailure(t *testing.T) {
+	store := setupHistoryStore(t)
+	defer store.Close()
+
+	createSession(t, store, "sess-1")
+
+	ok := true
+	bad := false
+	createCommand(t, store, storage.Command{
+		CommandID:     "cmd-ok",
+		SessionID:     "sess-1",
+		TsStartUnixMs: 1000,
+		CWD:           "/tmp",
+		Command:       "echo ok",
+		IsSuccess:     &ok,
+		ExitCode:      intPtr(0),
+	})
+	createCommand(t, store, storage.Command{
+		CommandID:     "cmd-bad",
+		SessionID:     "sess-1",
+		TsStartUnixMs: 2000,
+		CWD:           "/tmp",
+		Command:       "false",
+		IsSuccess:     &bad,
+		ExitCode:      intPtr(1),
+	})
+
+	t.Setenv("CLAI_SESSION_ID", "sess-1")
+	withHistoryGlobals(t, historyGlobals{limit: 20, status: "failure", format: "json"})
+
+	output := captureStdout(t, func() {
+		if err := runHistory(historyCmd, nil); err != nil {
+			t.Fatalf("runHistory error: %v", err)
+		}
+	})
+
+	var out []historyOutput
+	if err := json.Unmarshal([]byte(output), &out); err != nil {
+		t.Fatalf("json unmarshal error: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(out))
+	}
+	if out[0].Text != "false" {
+		t.Fatalf("expected failure command, got %q", out[0].Text)
+	}
+}
+
+func TestRunHistory_JSON_CWDSource(t *testing.T) {
+	store := setupHistoryStore(t)
+	defer store.Close()
+
+	createSession(t, store, "sess-1")
+
+	createCommand(t, store, storage.Command{
+		CommandID:     "cmd-1",
+		SessionID:     "sess-1",
+		TsStartUnixMs: 1000,
+		CWD:           "/tmp",
+		Command:       "ls",
+	})
+	createCommand(t, store, storage.Command{
+		CommandID:     "cmd-2",
+		SessionID:     "sess-1",
+		TsStartUnixMs: 2000,
+		CWD:           "/work",
+		Command:       "pwd",
+	})
+
+	t.Setenv("CLAI_SESSION_ID", "")
+	withHistoryGlobals(t, historyGlobals{limit: 20, cwd: "/tmp", format: "json"})
+
+	output := captureStdout(t, func() {
+		if err := runHistory(historyCmd, nil); err != nil {
+			t.Fatalf("runHistory error: %v", err)
+		}
+	})
+
+	var out []historyOutput
+	if err := json.Unmarshal([]byte(output), &out); err != nil {
+		t.Fatalf("json unmarshal error: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(out))
+	}
+	if out[0].Source != "cwd" {
+		t.Fatalf("expected source cwd, got %q", out[0].Source)
+	}
+}
+
+func intPtr(v int) *int {
+	return &v
 }

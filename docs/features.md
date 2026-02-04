@@ -1,38 +1,69 @@
 # Features & Usage
 
-## History-Aware Completions
+## History‑Aware Suggestions
 
-clai learns from your command history and suggests commands as you type. Suggestions are ranked by:
+As you type, clai suggests commands based on your history.
 
-1. **Recency** — Recently used commands appear first
-2. **Context** — Commands used in the current directory are prioritized
-3. **Frequency** — Commonly used commands rank higher
+- **Session‑aware** when the history daemon (`claid`) is running.
+- **Fallback** to your shell’s history file when the daemon is unavailable.
 
-### How It Works
-
-```text
+```
 git c█
-  git commit -m "fix: address review feedback"  ← most recent
+  git commit -m "fix: address review feedback"
   git checkout main
   git cherry-pick abc123
 ```
 
-Just start typing and suggestions appear. Press **Tab** to accept.
+## Inline Suggestions (Zsh)
 
-## Inline Suggestions
+Zsh shows a ghost‑text suggestion while typing.
 
-Like fish shell's autosuggestions, but for Zsh and Bash too. You see a dimmed preview of the suggested command as you type.
+- **Right Arrow** accepts the full suggestion
+- **Alt+Right** accepts the next token
 
-### Accepting Suggestions
+## Suggestion & History Pickers
 
-| Shell | Accept Full | Accept Word |
-|-------|-------------|-------------|
-| Zsh   | Tab or →    | Ctrl+→      |
-| Bash  | Tab         | —           |
-| Fish  | Tab or →    | Alt+→       |
+- **Tab**: open the suggestion picker
+- **Up Arrow**: open the history picker
 
-## Session-Based History
+These are available across zsh/bash/fish (with shell‑specific behavior).
 
-Each terminal tab/window maintains its own session. Commands from your current session are prioritized over global history.
+## Natural Language → Command
 
-This means if you're working on a git repo in one tab and npm in another, each tab gets relevant suggestions.
+Use `clai cmd` to turn plain English into a shell command:
+
+```bash
+clai cmd "list files larger than 100MB"
+```
+
+## Ask Claude
+
+Use `clai ask` for short, contextual terminal questions:
+
+```bash
+clai ask "What’s the difference between grep and ripgrep?"
+```
+
+## Toggle Suggestions
+
+```bash
+clai off
+clai on
+clai off --session
+```
+
+## Not Yet Available
+
+The shell hooks include placeholders for:
+
+- Voice mode
+- Error diagnosis
+- Output extraction
+
+These commands are not shipped in the current CLI.
+
+## Next Steps
+
+- [Quick Start](quickstart.md)
+- [Shell Integration](shell-integration.md)
+- [CLI Reference](cli-reference.md)

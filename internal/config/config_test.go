@@ -34,6 +34,9 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.AI.CacheTTLHours != 24 {
 		t.Errorf("Expected cache_ttl_hours=24, got %d", cfg.AI.CacheTTLHours)
 	}
+	if !cfg.Suggestions.Enabled {
+		t.Error("Expected suggestions.enabled=true")
+	}
 	if !cfg.Privacy.SanitizeAICalls {
 		t.Error("Expected sanitize_ai_calls=true")
 	}
@@ -52,6 +55,7 @@ func TestConfigGet(t *testing.T) {
 		{"client.fire_and_forget", "true"},
 		{"ai.enabled", "false"},
 		{"ai.provider", "auto"},
+		{"suggestions.enabled", "true"},
 		{"suggestions.max_history", "5"},
 		{"privacy.sanitize_ai_calls", "true"},
 	}
@@ -104,6 +108,7 @@ func TestConfigSet(t *testing.T) {
 		{"client.fire_and_forget", "false", "false"},
 		{"ai.enabled", "true", "true"},
 		{"ai.provider", "anthropic", "anthropic"},
+		{"suggestions.enabled", "false", "false"},
 		{"suggestions.max_history", "10", "10"},
 		{"privacy.sanitize_ai_calls", "false", "false"},
 	}
@@ -141,6 +146,7 @@ func TestConfigSetInvalidValue(t *testing.T) {
 		{"client.fire_and_forget", "not_bool"},
 		{"ai.enabled", "yes"}, // Must be true/false
 		{"ai.provider", "invalid_provider"},
+		{"suggestions.enabled", "maybe"},
 	}
 
 	for _, tt := range tests {
@@ -275,6 +281,7 @@ func TestListKeys(t *testing.T) {
 	// Check that only user-facing keys are present
 	// Internal settings (daemon, client, ai, privacy) are not exposed
 	expectedKeys := []string{
+		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
 	}
@@ -1287,6 +1294,7 @@ func TestListKeysComplete(t *testing.T) {
 	// Only user-facing keys are exposed via ListKeys()
 	// Internal settings (daemon, client, ai, privacy) are not exposed
 	expectedKeys := []string{
+		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
 	}
@@ -1327,6 +1335,7 @@ func TestListKeysAllSettable(t *testing.T) {
 	// Map of user-facing keys to valid test values
 	// Only the keys exposed by ListKeys() need to be here
 	testValues := map[string]string{
+		"suggestions.enabled":           "false",
 		"suggestions.max_history":       "10",
 		"suggestions.show_risk_warning": "false",
 	}
@@ -1377,6 +1386,7 @@ func TestDefaultConfigValues(t *testing.T) {
 		{"AI.AutoDiagnose", cfg.AI.AutoDiagnose, false},
 		{"AI.CacheTTLHours", cfg.AI.CacheTTLHours, 24},
 		// Suggestions defaults
+		{"Suggestions.Enabled", cfg.Suggestions.Enabled, true},
 		{"Suggestions.MaxHistory", cfg.Suggestions.MaxHistory, 5},
 		{"Suggestions.MaxAI", cfg.Suggestions.MaxAI, 3},
 		{"Suggestions.ShowRiskWarning", cfg.Suggestions.ShowRiskWarning, true},

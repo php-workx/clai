@@ -40,7 +40,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%sclai status%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
 
-	checks := make([]statusCheck, 0, 6)
+	checks := make([]statusCheck, 0, 7)
+
+	// Check on/off state
+	checks = append(checks, checkOnOff())
 
 	// Check Claude CLI
 	checks = append(checks, checkClaudeCLI())
@@ -69,6 +72,10 @@ func runStatus(cmd *cobra.Command, args []string) error {
 		switch c.status {
 		case "ok":
 			statusIcon = colorGreen + "[OK]" + colorReset
+		case "on":
+			statusIcon = colorGreen + "[ON]" + colorReset
+		case "off":
+			statusIcon = colorYellow + "[OFF]" + colorReset
 		case "warn":
 			statusIcon = colorYellow + "[WARN]" + colorReset
 			hasWarnings = true
@@ -94,6 +101,21 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func checkOnOff() statusCheck {
+	if suggestionsDisabled() {
+		return statusCheck{
+			name:    "Status",
+			status:  "off",
+			message: "integrations disabled",
+		}
+	}
+	return statusCheck{
+		name:    "Status",
+		status:  "on",
+		message: "integrations active",
+	}
 }
 
 func checkClaudeCLI() statusCheck {
@@ -234,47 +256,36 @@ func checkShellIntegrationWithPaths(paths *config.Paths) []string {
 		return nil
 	}
 
-	// Use consolidated shell detection
 	detection := DetectShell()
-	var installed []string
-
-	// Check if clai integration is active in THIS shell
 	if detection.Active {
-		installed = append(installed, fmt.Sprintf("%s (active)", detection.Shell))
-		return installed
+		return []string{fmt.Sprintf("%s (active)", detection.Shell)}
 	}
 
-	// Not an active session - check RC files for the current shell only
-	shellToCheck := detection.Shell
-
-	// Check zsh
-	if shellToCheck == "" || shellToCheck == "zsh" {
-		zshrc := filepath.Join(home, ".zshrc")
-		if ok, _, _ := isInstalled(zshrc, filepath.Join(paths.HooksDir(), "clai.zsh"), "zsh"); ok {
-			installed = append(installed, "zsh")
-		}
+	type shellConfig struct {
+		name    string
+		rcFiles []string
 	}
 
-	// Check bash
-	if shellToCheck == "" || shellToCheck == "bash" {
-		bashrc := filepath.Join(home, ".bashrc")
-		if ok, _, _ := isInstalled(bashrc, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
-			installed = append(installed, "bash")
-		}
+	shells := []shellConfig{
+		{"zsh", []string{filepath.Join(home, ".zshrc")}},
+		{"bash", []string{
+			filepath.Join(home, ".bashrc"),
+			filepath.Join(home, ".bash_profile"),
+		}},
+		{"fish", []string{filepath.Join(home, ".config", "fish", "config.fish")}},
+	}
 
-		bashProfile := filepath.Join(home, ".bash_profile")
-		if ok, _, _ := isInstalled(bashProfile, filepath.Join(paths.HooksDir(), "clai.bash"), "bash"); ok {
-			if len(installed) == 0 || installed[len(installed)-1] != "bash" {
-				installed = append(installed, "bash")
+	var installed []string
+	for _, sh := range shells {
+		if detection.Shell != "" && detection.Shell != sh.name {
+			continue
+		}
+		hookFile := filepath.Join(paths.HooksDir(), "clai."+sh.name)
+		for _, rc := range sh.rcFiles {
+			if ok, _, _ := isInstalled(rc, hookFile, sh.name); ok {
+				installed = append(installed, sh.name)
+				break
 			}
-		}
-	}
-
-	// Check fish
-	if shellToCheck == "" || shellToCheck == "fish" {
-		fishConfig := filepath.Join(home, ".config", "fish", "config.fish")
-		if ok, _, _ := isInstalled(fishConfig, filepath.Join(paths.HooksDir(), "clai.fish"), "fish"); ok {
-			installed = append(installed, "fish")
 		}
 	}
 

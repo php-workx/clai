@@ -5,8 +5,8 @@ This guide covers installing clai on macOS, Linux, and Windows.
 ## Requirements
 
 - **Go 1.21+** (for building from source)
-- **Shell**: zsh 5.8+, bash 4.4+ (or 3.2 on macOS), or PowerShell 7.x
-- **Optional**: Claude CLI for AI features
+- **Shell**: zsh 5.8+, bash 4.4+ (or 3.2 on macOS), or fish 3.0+
+- **Optional**: Claude CLI for `clai cmd` / `clai ask`
 
 ## Quick Install
 
@@ -33,11 +33,8 @@ sudo mv clai clai-shim /usr/local/bin/
 ### Windows (PowerShell)
 
 ```powershell
-# Download and extract to a directory in your PATH
 Invoke-WebRequest -Uri "https://github.com/runger/clai/releases/latest/download/clai-windows-amd64.zip" -OutFile clai.zip
 Expand-Archive clai.zip -DestinationPath "$env:LOCALAPPDATA\clai"
-
-# Add to PATH (run as Administrator or add to user PATH)
 $env:PATH += ";$env:LOCALAPPDATA\clai"
 ```
 
@@ -48,28 +45,31 @@ git clone https://github.com/runger/clai.git
 cd clai
 make build
 
-# Install binaries
-sudo make install
-# Or manually:
-# sudo cp bin/clai bin/clai-shim /usr/local/bin/
+go build -o bin/clai-shim ./cmd/clai-shim
+sudo cp bin/clai bin/clai-shim /usr/local/bin/
 ```
+
+### History Daemon (`claid`)
+
+Session‑aware history and suggestions use a separate daemon binary named `claid`.
+`clai-shim` will try to spawn it automatically if it is on your `PATH` or pointed
+at via `CLAI_DAEMON_PATH`. If `claid` is not available, suggestions fall back to
+your shell history file.
 
 ## Shell Integration
 
 After installing the binaries, set up shell integration:
 
 ```bash
-# Automatic installation (detects your shell)
 clai install
-
-# Or specify shell
 clai install --shell=zsh
 clai install --shell=bash
+clai install --shell=fish
 ```
 
-This adds a source line to your shell's RC file (`.zshrc`, `.bashrc`, or `.bash_profile`).
+This writes hooks to `~/.clai/hooks/` and adds a source line to your rc file.
 
-**Restart your shell** or source the RC file:
+**Restart your shell** or source the rc file:
 
 ```bash
 source ~/.zshrc  # or ~/.bashrc
@@ -78,41 +78,42 @@ source ~/.zshrc  # or ~/.bashrc
 ## Verify Installation
 
 ```bash
-# Check installation
-clai doctor
-
-# View status
 clai status
+clai suggest "git st"
 ```
 
 ## Directory Structure
 
-All clai data is stored in `~/.clai/`:
+**Base directory** (default `~/.clai`):
 
 | Location | Purpose |
 | -------- | ------- |
 | `~/.clai/config.yaml` | Configuration file |
 | `~/.clai/state.db` | SQLite database |
 | `~/.clai/hooks/` | Shell hook scripts |
-| `~/.clai/cache/` | AI response cache |
-| `~/.clai/logs/` | Daemon log files |
+| `~/.clai/logs/` | History daemon log files |
+| `~/.clai/clai.sock` | History daemon socket |
+| `~/.clai/clai.pid` | History daemon PID |
 
-Set `CLAI_HOME` environment variable to use a custom directory.
+**Cache directory** (default `~/.cache/clai`):
+
+| Location | Purpose |
+| -------- | ------- |
+| `~/.cache/clai/suggestion` | Cached suggestion |
+| `~/.cache/clai/last_output` | Last output (reserved) |
+| `~/.cache/clai/daemon.*` | Claude CLI daemon files |
+
+Set `CLAI_HOME` or `CLAI_CACHE` to override these locations.
 
 ## Uninstalling
 
 ```bash
-# Remove shell integration
 clai uninstall
-
-# Remove binaries (if installed via make)
 sudo rm /usr/local/bin/clai /usr/local/bin/clai-shim
-
-# Remove data (optional)
-rm -rf ~/.clai
+rm -rf ~/.clai ~/.cache/clai
 ```
 
 ## Next Steps
 
-- [Quick Start](quickstart.md) - Get started with clai
-- [Shell Integration](shell-integration.md) - Advanced shell configuration
+- [Quick Start](quickstart.md)
+- [Shell Integration](shell-integration.md)

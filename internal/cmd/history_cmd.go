@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -16,10 +17,12 @@ import (
 
 var (
 	historyLimit   int
+	historyOffset  int
 	historyCWD     string
 	historySession string
 	historyGlobal  bool
 	historyStatus  string
+	historyFormat  string
 )
 
 var historyCmd = &cobra.Command{
@@ -42,22 +45,24 @@ Examples:
   clai history -c /tmp            # Show commands from /tmp directory
   clai history --session=abc123   # Show specific session (8+ char prefix)
   clai history -s success         # Show only successful commands
-  clai history -s failure         # Show only failed commands`,
+  clai history -s failure         # Show only failed commands
+  clai history --format json      # Emit JSON entries for picker use`,
 	RunE: runHistory,
 }
 
 func init() {
 	historyCmd.Flags().IntVarP(&historyLimit, "limit", "n", 20, "Maximum number of commands to show")
+	historyCmd.Flags().IntVar(&historyOffset, "offset", 0, "Skip this many results (for pagination)")
 	historyCmd.Flags().StringVarP(&historyCWD, "cwd", "c", "", "Filter by working directory")
 	historyCmd.Flags().StringVar(&historySession, "session", "", "Filter by specific session ID")
 	historyCmd.Flags().BoolVarP(&historyGlobal, "global", "g", false, "Show history across all sessions")
 	historyCmd.Flags().StringVarP(&historyStatus, "status", "s", "", "Filter by status: 'success' or 'failure'")
+	historyCmd.Flags().StringVar(&historyFormat, "format", "raw", "Output format: raw or json")
 }
 
 func runHistory(cmd *cobra.Command, args []string) error {
 	paths := config.DefaultPaths()
 
-	// Open database
 	store, err := storage.NewSQLiteStore(paths.DatabaseFile())
 	if err != nil {
 		fmt.Printf("No history available. Database not found at: %s\n", paths.DatabaseFile())
@@ -68,162 +73,142 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Determine session ID to use
 	sessionID := historySession
 	if sessionID == "" && !historyGlobal {
-		// Default to current session from environment
 		sessionID = os.Getenv("CLAI_SESSION_ID")
 	}
 
-	// Validate and resolve session if specified
 	if sessionID != "" {
-		session, err := store.GetSession(ctx, sessionID)
+		sessionID, err = resolveSessionID(ctx, store, sessionID)
 		if err != nil {
-			if errors.Is(err, storage.ErrSessionNotFound) {
-				// Try prefix match for short IDs (< 36 chars, full UUID length)
-				if len(sessionID) < 36 {
-					session, err = store.GetSessionByPrefix(ctx, sessionID)
-					if err != nil {
-						if errors.Is(err, storage.ErrSessionNotFound) {
-							return fmt.Errorf("session not found (%s)", sessionID)
-						}
-						if errors.Is(err, storage.ErrAmbiguousSession) {
-							return fmt.Errorf("ambiguous session prefix (%s)", sessionID)
-						}
-						return err
-					}
-					// Use the full session ID for the query
-					sessionID = session.SessionID
-				} else {
-					return fmt.Errorf("session not found (%s)", sessionID)
-				}
-			} else {
-				return err
-			}
-		} else {
-			sessionID = session.SessionID
+			return err
 		}
 	}
 
-	// Build query
-	query := storage.CommandQuery{
-		Limit: historyLimit,
+	query, err := buildHistoryQuery(args)
+	if err != nil {
+		return err
+	}
+	if sessionID != "" {
+		query.SessionID = &sessionID
 	}
 
-	// Add status filter if provided
+	commands, err := store.QueryCommands(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to query history: %w", err)
+	}
+
+	return outputHistory(commands)
+}
+
+func resolveSessionID(ctx context.Context, store *storage.SQLiteStore, rawID string) (string, error) {
+	session, err := store.GetSession(ctx, rawID)
+	if err == nil {
+		return session.SessionID, nil
+	}
+	if !errors.Is(err, storage.ErrSessionNotFound) {
+		return "", err
+	}
+	if len(rawID) >= 36 {
+		return "", fmt.Errorf("session not found (%s): %w", rawID, storage.ErrSessionNotFound)
+	}
+	session, err = store.GetSessionByPrefix(ctx, rawID)
+	if err == nil {
+		return session.SessionID, nil
+	}
+	if errors.Is(err, storage.ErrSessionNotFound) {
+		return "", fmt.Errorf("session not found (%s): %w", rawID, storage.ErrSessionNotFound)
+	}
+	if errors.Is(err, storage.ErrAmbiguousSession) {
+		return "", fmt.Errorf("ambiguous session prefix (%s): %w", rawID, storage.ErrAmbiguousSession)
+	}
+	return "", err
+}
+
+func buildHistoryQuery(args []string) (storage.CommandQuery, error) {
+	if historyLimit < 0 {
+		return storage.CommandQuery{}, fmt.Errorf("invalid limit: must be >= 0")
+	}
+	if historyOffset < 0 {
+		return storage.CommandQuery{}, fmt.Errorf("invalid offset: must be >= 0")
+	}
+
+	query := storage.CommandQuery{
+		Limit:  historyLimit,
+		Offset: historyOffset,
+	}
+
 	switch historyStatus {
 	case "success":
 		query.SuccessOnly = true
 	case "failure":
 		query.FailureOnly = true
 	case "":
-		// No filter - show all
+		// No filter
 	default:
-		return fmt.Errorf("invalid status: %s (use 'success' or 'failure')", historyStatus)
+		return query, fmt.Errorf("invalid status: %s (use 'success' or 'failure')", historyStatus)
 	}
 
-	// Add prefix filter if provided
 	if len(args) > 0 {
 		query.Prefix = strings.ToLower(args[0])
 	}
-
-	// Add CWD filter if provided
 	if historyCWD != "" {
 		query.CWD = &historyCWD
 	}
 
-	// Add session filter if provided
-	if sessionID != "" {
-		query.SessionID = &sessionID
-	}
-
-	// Execute query
-	commands, err := store.QueryCommands(ctx, query)
-	if err != nil {
-		return fmt.Errorf("failed to query history: %w", err)
-	}
-
-	if len(commands) == 0 {
-		// Show appropriate message based on filters used
-		if historyCWD != "" {
-			fmt.Printf("%sWarning: No commands found in directory: %s%s\n", colorYellow, historyCWD, colorReset)
-		}
-		if len(args) > 0 {
-			fmt.Printf("%sWarning: No commands found matching '%s'%s\n", colorYellow, args[0], colorReset)
-		}
-
-		if sessionID != "" && historyCWD == "" && len(args) == 0 {
-			fmt.Println("No commands logged in this session yet.")
-			fmt.Println("Tip: Use 'clai history -g' to show history across all sessions.")
-		} else if historyCWD == "" && len(args) == 0 {
-			fmt.Println("No command history available.")
-		}
-		return nil
-	}
-
-	// Print commands (most recent last for typical terminal usage)
-	// Reverse the order since we want oldest at top
-	for i := len(commands) - 1; i >= 0; i-- {
-		c := commands[i]
-		printCommand(c)
-	}
-
-	fmt.Println()
-	scope := ""
-	if sessionID != "" {
-		scope = " (current session)"
-	} else {
-		scope = " (all sessions)"
-	}
-	fmt.Printf("%sShowing %d command(s)%s%s\n", colorDim, len(commands), scope, colorReset)
-
-	return nil
+	return query, nil
 }
 
-func printCommand(c storage.Command) {
-	// Format timestamp
-	t := time.UnixMilli(c.TsStartUnixMs)
-	timestamp := t.Format("2006-01-02 15:04:05")
-
-	// Format exit code
-	exitCode := ""
-	if c.ExitCode != nil {
-		if *c.ExitCode == 0 {
-			exitCode = colorGreen + "0" + colorReset
-		} else {
-			exitCode = colorRed + fmt.Sprintf("%d", *c.ExitCode) + colorReset
+func outputHistory(commands []storage.Command) error {
+	format := strings.ToLower(strings.TrimSpace(historyFormat))
+	if format == "" {
+		format = "raw"
+	}
+	switch format {
+	case "raw":
+		for _, c := range commands {
+			fmt.Println(c.Command)
 		}
-	} else {
-		exitCode = colorDim + "-" + colorReset
-	}
-
-	// Format duration
-	duration := ""
-	if c.DurationMs != nil {
-		duration = formatDurationMs(*c.DurationMs)
-	}
-
-	// Format git context (branch @ repo)
-	gitContext := ""
-	if c.GitBranch != nil && *c.GitBranch != "" {
-		gitContext = *c.GitBranch
-		if c.GitRepoName != nil && *c.GitRepoName != "" {
-			gitContext += " @ " + *c.GitRepoName
+		return nil
+	case "json":
+		entries := make([]historyOutput, 0, len(commands))
+		source := historySource(historyGlobal, historyCWD, historySession)
+		for _, c := range commands {
+			entries = append(entries, historyOutput{
+				Text:     c.Command,
+				Cwd:      c.CWD,
+				TsUnixMs: c.TsStartUnixMs,
+				ExitCode: c.ExitCode,
+				Source:   source,
+			})
 		}
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetEscapeHTML(false)
+		return enc.Encode(entries)
+	default:
+		return fmt.Errorf("invalid format: %s (use raw or json)", historyFormat)
 	}
+}
 
-	// Print formatted line
-	fmt.Printf("%s%s%s  [%s]  %s", colorDim, timestamp, colorReset, exitCode, c.Command)
+type historyOutput struct {
+	Text     string `json:"text"`
+	Cwd      string `json:"cwd"`
+	TsUnixMs int64  `json:"ts_unix_ms"`
+	ExitCode *int   `json:"exit_code"`
+	Source   string `json:"source"`
+}
 
-	if duration != "" {
-		fmt.Printf("  %s(%s)%s", colorDim, duration, colorReset)
+func historySource(global bool, cwd, session string) string {
+	if session != "" {
+		return "session"
 	}
-
-	if gitContext != "" {
-		fmt.Printf("  %s%s%s", colorCyan, gitContext, colorReset)
+	if cwd != "" {
+		return "cwd"
 	}
-
-	fmt.Println()
+	if global {
+		return "global"
+	}
+	return "session"
 }
 
 func formatDurationMs(ms int64) string {

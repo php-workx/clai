@@ -1,149 +1,88 @@
 # Quick Start
 
-Get up and running with clai in under 5 minutes.
+Get up and running with clai in a few minutes.
 
-## 1. Install and Set Up
+## 1. Install
 
 ```bash
-# Install (see installation.md for platform-specific options)
-make build && sudo make install
+# Build from source
+make build
 
-# Set up shell integration
+go build -o bin/clai-shim ./cmd/clai-shim
+sudo cp bin/clai bin/clai-shim /usr/local/bin/
+```
+
+Or use Homebrew:
+
+```bash
+brew install runger/tap/clai
+```
+
+## 2. Enable Shell Integration
+
+```bash
 clai install
-
-# Restart your shell
 exec $SHELL
 ```
 
-## 2. Verify It's Working
+If you prefer `eval` instead of a hook file:
 
 ```bash
-# Check everything is configured correctly
-clai doctor
-
-# You should see:
-#   [OK] clai binary
-#   [OK] Config directory
-#   [OK] Shell integration
-#   ...
+eval "$(clai init zsh)"
 ```
 
-## 3. Basic Usage
+## 3. Verify
 
-### Command Suggestions
+```bash
+clai status
+clai suggest "git st"
+```
 
-As you type, clai suggests commands from your history:
+## 4. Basic Usage
+
+### Suggestions
 
 ```text
-git c[TAB]           # Shows: git commit, git checkout, git clone
-docker r[TAB]        # Shows: docker run, docker rm, docker restart
+git c[TAB]     # suggestion picker
 ```
 
-Press **Tab** to cycle through suggestions, **Right Arrow** to accept.
-
-### View Command History
+### History
 
 ```bash
-# Recent commands
 clai history
-
-# Search history
-clai history --search="docker"
-
-# Limit results
-clai history --limit=20
+clai history git
+clai history --global
 ```
 
-### Check Status
+### Toggle
 
 ```bash
-# View clai status
-clai status
-
-# Shows:
-#   - Daemon status (running/stopped)
-#   - Configuration file location
-#   - Database size
-#   - Shell integration status
+clai off --session
+clai on --session
 ```
 
-## 4. Enable AI Features (Optional)
-
-AI features require the [Claude CLI](https://claude.ai/cli) to be installed and authenticated.
+## 5. AI Commands (Optional)
 
 ```bash
-# Install Claude CLI from: https://claude.ai/cli
-# Then authenticate:
-claude login
-
-# Enable AI in config
-clai config ai.enabled true
-
-# Verify Claude CLI is detected
-clai doctor  # Should show [OK] Claude CLI
+clai cmd "list files larger than 100MB"
+clai ask "How do I find large files?"
 ```
 
-### Voice-to-Command
-
-With AI enabled, use the backtick prefix for natural language:
-
-```text
-`find all large log files
-# Suggests: find /var/log -type f -size +100M
-```
-
-### Error Diagnosis
-
-When a command fails, clai can explain why:
+For faster `clai cmd` calls:
 
 ```bash
-# Use the 'run' wrapper for auto-diagnosis
-run npm install
-
-# If it fails, clai explains the error and suggests fixes
+clai daemon start
 ```
 
-## 5. Configuration
-
-View and modify settings:
+## 6. Configuration
 
 ```bash
-# List all settings
-clai config list
-
-# Get a specific value
-clai config ai.enabled
-
-# Set a value
-clai config suggestions.max_history 10
-```
-
-Common settings:
-
-| Key | Description | Default |
-| --- | ----------- | ------- |
-| `ai.enabled` | Enable AI features | `false` |
-| `ai.provider` | AI provider (anthropic, auto) | `auto` |
-| `suggestions.max_history` | Max history-based suggestions | `5` |
-| `suggestions.show_risk_warning` | Warn about destructive commands | `true` |
-
-## 6. Daemon Management
-
-The daemon runs automatically but can be managed manually:
-
-```bash
-# Check if running
-clai status
-
-# View logs
-clai logs
-
-# Stop daemon (it auto-restarts when needed)
-clai daemon stop
+clai config
+clai config suggestions.enabled false
 ```
 
 ## Next Steps
 
-- [Configuration](configuration.md) - All configuration options
-- [Shell Integration](shell-integration.md) - Advanced shell setup
-- [Troubleshooting](troubleshooting.md) - Common issues and solutions
+- [Configuration](configuration.md)
+- [Shell Integration](shell-integration.md)
+- [Troubleshooting](troubleshooting.md)

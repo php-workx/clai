@@ -10,6 +10,7 @@ import (
 
 // TestFish_SourceWithoutError verifies the fish script sources without errors.
 func TestFish_SourceWithoutError(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -46,6 +47,7 @@ func TestFish_SourceWithoutError(t *testing.T) {
 
 // TestFish_RightPromptFunction verifies fish_right_prompt is defined.
 func TestFish_RightPromptFunction(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -77,6 +79,7 @@ func TestFish_RightPromptFunction(t *testing.T) {
 
 // TestFish_AltEnterBinding verifies Alt+Enter is bound for accepting suggestions.
 func TestFish_AltEnterBinding(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -106,6 +109,7 @@ func TestFish_AltEnterBinding(t *testing.T) {
 
 // TestFish_VoiceModeFunction verifies voice mode functions are defined.
 func TestFish_VoiceModeFunction(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -137,6 +141,7 @@ func TestFish_VoiceModeFunction(t *testing.T) {
 
 // TestFish_RunWrapperExists verifies the run wrapper function exists.
 func TestFish_RunWrapperExists(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -168,6 +173,7 @@ func TestFish_RunWrapperExists(t *testing.T) {
 
 // TestFish_AIFixFunctionExists verifies the ai-fix function exists.
 func TestFish_AIFixFunctionExists(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -199,6 +205,7 @@ func TestFish_AIFixFunctionExists(t *testing.T) {
 
 // TestFish_AIFunctionExists verifies the ai function exists.
 func TestFish_AIFunctionExists(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -230,6 +237,7 @@ func TestFish_AIFunctionExists(t *testing.T) {
 
 // TestFish_VoiceFunctionExists verifies the voice function exists.
 func TestFish_VoiceFunctionExists(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -261,6 +269,7 @@ func TestFish_VoiceFunctionExists(t *testing.T) {
 
 // TestFish_CacheDirCreated verifies the cache directory is created.
 func TestFish_CacheDirCreated(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -292,6 +301,7 @@ func TestFish_CacheDirCreated(t *testing.T) {
 
 // TestFish_EnterBindingForVoice verifies Enter is bound for voice-aware execute.
 func TestFish_EnterBindingForVoice(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -323,6 +333,7 @@ func TestFish_EnterBindingForVoice(t *testing.T) {
 
 // TestFish_EscapeBindingClears verifies Escape clears suggestions.
 func TestFish_EscapeBindingClears(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -354,6 +365,7 @@ func TestFish_EscapeBindingClears(t *testing.T) {
 
 // TestFish_HistoryFunctionExists verifies the history function is defined.
 func TestFish_HistoryFunctionExists(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -385,6 +397,7 @@ func TestFish_HistoryFunctionExists(t *testing.T) {
 
 // TestFish_SessionIDExists verifies CLAI_SESSION_ID is set.
 func TestFish_SessionIDExists(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -416,6 +429,7 @@ func TestFish_SessionIDExists(t *testing.T) {
 
 // TestFish_DoctorShowsCorrectShell verifies clai doctor detects fish correctly.
 func TestFish_DoctorShowsCorrectShell(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -452,6 +466,7 @@ func TestFish_DoctorShowsCorrectShell(t *testing.T) {
 // even without CLAI_CURRENT_SHELL set. Fish is special because it doesn't
 // export FISH_VERSION, so detection relies on parent process checking.
 func TestFish_InstallDetectsShell(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -485,6 +500,7 @@ func TestFish_InstallDetectsShell(t *testing.T) {
 
 // TestFish_StatusShowsCorrectShell verifies clai status detects fish correctly.
 func TestFish_StatusShowsCorrectShell(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}

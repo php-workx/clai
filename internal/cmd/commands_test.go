@@ -18,6 +18,8 @@ func TestRootCmd_HasCommands(t *testing.T) {
 		"init",
 		"install",
 		"logs",
+		"off",
+		"on",
 		"status",
 		"suggest",
 		"uninstall",
@@ -122,7 +124,7 @@ func TestRootCmd_HiddenCommands(t *testing.T) {
 
 func TestRootCmd_CoreCommandsGrouped(t *testing.T) {
 	// Core commands should be in the core group
-	coreCommands := []string{"ask", "cmd", "suggest", "history"}
+	coreCommands := []string{"ask", "cmd", "suggest", "history", "on", "off"}
 
 	for _, name := range coreCommands {
 		var found *cobra.Command

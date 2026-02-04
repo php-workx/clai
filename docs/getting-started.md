@@ -3,7 +3,8 @@
 ## Requirements
 
 - macOS or Linux
-- Zsh, Bash, or Fish shell
+- Zsh, Bash, or Fish
+- Optional: Claude CLI for `clai cmd` / `clai ask`
 
 ## Installation
 
@@ -18,44 +19,46 @@ brew install runger/tap/clai
 ```bash
 git clone https://github.com/runger/clai.git
 cd clai
-make install
-```
+make build
 
-### Go Install
-
-```bash
-go install github.com/runger/clai/cmd/clai@latest
+go build -o bin/clai-shim ./cmd/clai-shim
+sudo cp bin/clai bin/clai-shim /usr/local/bin/
 ```
 
 ## Shell Setup
 
-Add clai to your shell configuration:
-
-### Zsh
+### Automatic (writes hook file)
 
 ```bash
-echo 'eval "$(clai init zsh)"' >> ~/.zshrc
-source ~/.zshrc
+clai install
 ```
 
-### Bash
+### Manual (eval in rc file)
 
 ```bash
-echo 'eval "$(clai init bash)"' >> ~/.bashrc
-source ~/.bashrc
+eval "$(clai init zsh)"
+# or
+clai init fish | source
 ```
 
-### Fish
-
-```bash
-echo 'clai init fish | source' >> ~/.config/fish/config.fish
-source ~/.config/fish/config.fish
-```
+`clai init` generates a session ID each time it’s evaluated.
 
 ## Verify Installation
 
 ```bash
-clai version
+clai status
+clai suggest "git st"
 ```
 
-You should see version information. Now start typing commands and watch the suggestions appear!
+## Optional: AI Commands
+
+```bash
+clai cmd "list large files"
+clai ask "How do I find large files?"
+```
+
+If you want faster `clai cmd` calls:
+
+```bash
+clai daemon start
+```
