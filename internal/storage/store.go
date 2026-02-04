@@ -17,6 +17,7 @@ type Store interface {
 	CreateCommand(ctx context.Context, c *Command) error
 	UpdateCommandEnd(ctx context.Context, commandID string, exitCode int, endTime, duration int64) error
 	QueryCommands(ctx context.Context, q CommandQuery) ([]Command, error)
+	QueryHistoryCommands(ctx context.Context, q CommandQuery) ([]HistoryRow, error)
 
 	// AI Cache
 	GetCached(ctx context.Context, key string) (*CacheEntry, error)
@@ -74,10 +75,18 @@ type CommandQuery struct {
 	ExcludeSessionID string  // Exclude this session (for global queries)
 	CWD              *string
 	Prefix           string
+	Substring        string // Substring match (case-insensitive via command_norm)
 	Limit            int
 	Offset           int  // Skip this many results (for pagination)
 	SuccessOnly      bool // Only return successful commands (exit code 0)
 	FailureOnly      bool // Only return failed commands (exit code != 0)
+	Deduplicate      bool // Group by command_norm, return most recent per unique command
+}
+
+// HistoryRow represents a deduplicated command history entry.
+type HistoryRow struct {
+	Command     string
+	TimestampMs int64
 }
 
 // CacheEntry represents a cached AI response.

@@ -2,7 +2,9 @@ package daemon
 
 import (
 	"context"
+	"regexp"
 	"runtime"
+	"strings"
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
@@ -449,6 +451,72 @@ func (s *Server) GetStatus(ctx context.Context, req *pb.Ack) (*pb.StatusResponse
 		ActiveSessions: int32(s.sessionManager.ActiveCount()),
 		UptimeSeconds:  int64(uptime),
 		CommandsLogged: s.getCommandsLogged(),
+	}, nil
+}
+
+// ansiRegexp matches ANSI escape sequences for stripping from command text.
+var ansiRegexp = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+
+// stripANSI removes ANSI escape sequences from a string.
+func stripANSI(s string) string {
+	return ansiRegexp.ReplaceAllString(s, "")
+}
+
+// FetchHistory handles the FetchHistory RPC.
+// It returns paginated, deduplicated command history with optional substring filtering.
+func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) (*pb.HistoryFetchResponse, error) {
+	s.touchActivity()
+
+	limit := int(req.Limit)
+	if limit <= 0 {
+		limit = 50
+	}
+
+	offset := int(req.Offset)
+	if offset < 0 {
+		offset = 0
+	}
+
+	q := storage.CommandQuery{
+		Limit:       limit + 1, // Fetch one extra to determine at_end
+		Offset:      offset,
+		Deduplicate: true,
+	}
+
+	// Apply substring filter (normalize to lowercase for command_norm matching)
+	if req.Query != "" {
+		q.Substring = strings.ToLower(req.Query)
+	}
+
+	// Apply session scoping
+	if !req.Global && req.SessionId != "" {
+		q.SessionID = &req.SessionId
+	}
+
+	rows, err := s.store.QueryHistoryCommands(ctx, q)
+	if err != nil {
+		s.logger.Warn("failed to query history",
+			"error", err,
+		)
+		return &pb.HistoryFetchResponse{}, nil
+	}
+
+	atEnd := len(rows) <= limit
+	if !atEnd {
+		rows = rows[:limit]
+	}
+
+	items := make([]*pb.HistoryItem, len(rows))
+	for i, row := range rows {
+		items[i] = &pb.HistoryItem{
+			Command:     stripANSI(row.Command),
+			TimestampMs: row.TimestampMs,
+		}
+	}
+
+	return &pb.HistoryFetchResponse{
+		Items: items,
+		AtEnd: atEnd,
 	}, nil
 }
 

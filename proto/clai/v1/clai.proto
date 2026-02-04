@@ -140,6 +140,28 @@ message DiagnoseResponse {
 }
 
 // ---------------------------------------------------------
+// History
+// ---------------------------------------------------------
+
+message HistoryFetchRequest {
+  string session_id = 1;   // Optional: filter by session (UUID v4)
+  string query = 2;        // Substring filter (provider-side)
+  int32  limit = 3;        // Page size
+  int32  offset = 4;       // Pagination offset
+  bool   global = 5;       // True = all sessions
+}
+
+message HistoryFetchResponse {
+  repeated HistoryItem items = 1;
+  bool at_end = 2;
+}
+
+message HistoryItem {
+  string command = 1;
+  int64  timestamp_ms = 2;
+}
+
+// ---------------------------------------------------------
 // Status
 // ---------------------------------------------------------
 
@@ -166,6 +188,9 @@ service ClaiService {
   rpc TextToCommand(TextToCommandRequest) returns (TextToCommandResponse);
   rpc NextStep(NextStepRequest) returns (NextStepResponse);
   rpc Diagnose(DiagnoseRequest) returns (DiagnoseResponse);
+
+  // History
+  rpc FetchHistory(HistoryFetchRequest) returns (HistoryFetchResponse);
 
   // Ops
   rpc Ping(Ack) returns (Ack);

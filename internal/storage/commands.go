@@ -160,6 +160,87 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 	return commands, nil
 }
 
+// QueryHistoryCommands queries deduplicated command history.
+// It groups by command_norm and returns the most recent timestamp for each unique command.
+func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) ([]HistoryRow, error) {
+	query, args := buildHistoryQuerySQL(q)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query history commands: %w", err)
+	}
+	defer rows.Close()
+
+	var results []HistoryRow
+	for rows.Next() {
+		var row HistoryRow
+		if err := rows.Scan(&row.Command, &row.TimestampMs); err != nil {
+			return nil, fmt.Errorf("failed to scan history row: %w", err)
+		}
+		results = append(results, row)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating history rows: %w", err)
+	}
+
+	return results, nil
+}
+
+func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
+	query := `
+		SELECT command, MAX(ts_start_unix_ms) as latest_ts
+		FROM commands
+		WHERE 1=1
+	`
+	args := make([]interface{}, 0)
+
+	if q.SessionID != nil {
+		query += " AND session_id = ?"
+		args = append(args, *q.SessionID)
+	}
+	if q.ExcludeSessionID != "" {
+		query += " AND session_id != ?"
+		args = append(args, q.ExcludeSessionID)
+	}
+	if q.CWD != nil {
+		query += " AND cwd = ?"
+		args = append(args, *q.CWD)
+	}
+	if q.Prefix != "" {
+		query += " AND command_norm LIKE ?"
+		args = append(args, q.Prefix+"%")
+	}
+	if q.Substring != "" {
+		query += " AND command_norm LIKE ?"
+		args = append(args, "%"+q.Substring+"%")
+	}
+	if q.SuccessOnly {
+		query += " AND is_success = 1"
+	}
+	if q.FailureOnly {
+		query += " AND is_success = 0"
+	}
+
+	query += " GROUP BY command_norm ORDER BY latest_ts DESC"
+
+	if q.Limit > 0 {
+		query += " LIMIT ?"
+		args = append(args, q.Limit)
+	} else {
+		query += " LIMIT 1000"
+	}
+
+	if q.Offset > 0 {
+		query += " OFFSET ?"
+		args = append(args, q.Offset)
+	} else if q.Offset < 0 {
+		q.Offset = 0
+	}
+
+	return query, args
+}
+
 func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	query := `
 		SELECT id, command_id, session_id, ts_start_unix_ms, ts_end_unix_ms,
@@ -187,6 +268,10 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	if q.Prefix != "" {
 		query += " AND command_norm LIKE ?"
 		args = append(args, q.Prefix+"%")
+	}
+	if q.Substring != "" {
+		query += " AND command_norm LIKE ?"
+		args = append(args, "%"+q.Substring+"%")
 	}
 	if q.SuccessOnly {
 		query += " AND is_success = 1"

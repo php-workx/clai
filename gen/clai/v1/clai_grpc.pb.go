@@ -28,6 +28,7 @@ const (
 	ClaiService_TextToCommand_FullMethodName  = "/clai.v1.ClaiService/TextToCommand"
 	ClaiService_NextStep_FullMethodName       = "/clai.v1.ClaiService/NextStep"
 	ClaiService_Diagnose_FullMethodName       = "/clai.v1.ClaiService/Diagnose"
+	ClaiService_FetchHistory_FullMethodName   = "/clai.v1.ClaiService/FetchHistory"
 	ClaiService_Ping_FullMethodName           = "/clai.v1.ClaiService/Ping"
 	ClaiService_GetStatus_FullMethodName      = "/clai.v1.ClaiService/GetStatus"
 )
@@ -46,6 +47,8 @@ type ClaiServiceClient interface {
 	TextToCommand(ctx context.Context, in *TextToCommandRequest, opts ...grpc.CallOption) (*TextToCommandResponse, error)
 	NextStep(ctx context.Context, in *NextStepRequest, opts ...grpc.CallOption) (*NextStepResponse, error)
 	Diagnose(ctx context.Context, in *DiagnoseRequest, opts ...grpc.CallOption) (*DiagnoseResponse, error)
+	// History
+	FetchHistory(ctx context.Context, in *HistoryFetchRequest, opts ...grpc.CallOption) (*HistoryFetchResponse, error)
 	// Ops
 	Ping(ctx context.Context, in *Ack, opts ...grpc.CallOption) (*Ack, error)
 	GetStatus(ctx context.Context, in *Ack, opts ...grpc.CallOption) (*StatusResponse, error)
@@ -139,6 +142,16 @@ func (c *claiServiceClient) Diagnose(ctx context.Context, in *DiagnoseRequest, o
 	return out, nil
 }
 
+func (c *claiServiceClient) FetchHistory(ctx context.Context, in *HistoryFetchRequest, opts ...grpc.CallOption) (*HistoryFetchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HistoryFetchResponse)
+	err := c.cc.Invoke(ctx, ClaiService_FetchHistory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *claiServiceClient) Ping(ctx context.Context, in *Ack, opts ...grpc.CallOption) (*Ack, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Ack)
@@ -173,6 +186,8 @@ type ClaiServiceServer interface {
 	TextToCommand(context.Context, *TextToCommandRequest) (*TextToCommandResponse, error)
 	NextStep(context.Context, *NextStepRequest) (*NextStepResponse, error)
 	Diagnose(context.Context, *DiagnoseRequest) (*DiagnoseResponse, error)
+	// History
+	FetchHistory(context.Context, *HistoryFetchRequest) (*HistoryFetchResponse, error)
 	// Ops
 	Ping(context.Context, *Ack) (*Ack, error)
 	GetStatus(context.Context, *Ack) (*StatusResponse, error)
@@ -209,6 +224,9 @@ func (UnimplementedClaiServiceServer) NextStep(context.Context, *NextStepRequest
 }
 func (UnimplementedClaiServiceServer) Diagnose(context.Context, *DiagnoseRequest) (*DiagnoseResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Diagnose not implemented")
+}
+func (UnimplementedClaiServiceServer) FetchHistory(context.Context, *HistoryFetchRequest) (*HistoryFetchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FetchHistory not implemented")
 }
 func (UnimplementedClaiServiceServer) Ping(context.Context, *Ack) (*Ack, error) {
 	return nil, status.Error(codes.Unimplemented, "method Ping not implemented")
@@ -381,6 +399,24 @@ func _ClaiService_Diagnose_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClaiService_FetchHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HistoryFetchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).FetchHistory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_FetchHistory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).FetchHistory(ctx, req.(*HistoryFetchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ClaiService_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(Ack)
 	if err := dec(in); err != nil {
@@ -455,6 +491,10 @@ var ClaiService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Diagnose",
 			Handler:    _ClaiService_Diagnose_Handler,
+		},
+		{
+			MethodName: "FetchHistory",
+			Handler:    _ClaiService_FetchHistory_Handler,
 		},
 		{
 			MethodName: "Ping",

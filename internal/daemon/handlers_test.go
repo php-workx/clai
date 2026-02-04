@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -83,6 +84,53 @@ func (m *mockStore) QueryCommands(ctx context.Context, q storage.CommandQuery) (
 	result := make([]storage.Command, 0, len(m.commands))
 	for _, c := range m.commands {
 		result = append(result, *c)
+	}
+	return result, nil
+}
+
+func (m *mockStore) QueryHistoryCommands(ctx context.Context, q storage.CommandQuery) ([]storage.HistoryRow, error) {
+	// Collect commands, dedup by command_norm
+	seen := make(map[string]storage.HistoryRow)
+	for _, c := range m.commands {
+		norm := strings.ToLower(c.Command)
+		// Substring filter
+		if q.Substring != "" && !strings.Contains(norm, q.Substring) {
+			continue
+		}
+		// Session filter
+		if q.SessionID != nil && c.SessionID != *q.SessionID {
+			continue
+		}
+		existing, ok := seen[norm]
+		if !ok || c.TsStartUnixMs > existing.TimestampMs {
+			seen[norm] = storage.HistoryRow{
+				Command:     c.Command,
+				TimestampMs: c.TsStartUnixMs,
+			}
+		}
+	}
+	// Sort by timestamp descending
+	result := make([]storage.HistoryRow, 0, len(seen))
+	for _, row := range seen {
+		result = append(result, row)
+	}
+	// Simple sort (stable enough for tests)
+	for i := 0; i < len(result); i++ {
+		for j := i + 1; j < len(result); j++ {
+			if result[j].TimestampMs > result[i].TimestampMs {
+				result[i], result[j] = result[j], result[i]
+			}
+		}
+	}
+	// Apply offset
+	if q.Offset > 0 && q.Offset < len(result) {
+		result = result[q.Offset:]
+	} else if q.Offset >= len(result) {
+		result = nil
+	}
+	// Apply limit
+	if q.Limit > 0 && len(result) > q.Limit {
+		result = result[:q.Limit]
 	}
 	return result, nil
 }
@@ -1959,5 +2007,366 @@ func TestHandler_GetStatus_ReturnsVersion(t *testing.T) {
 	// Version should be set (defaults to "dev")
 	if resp.Version == "" {
 		t.Error("expected version to be set")
+	}
+}
+
+// ============================================================================
+// FetchHistory handler tests
+// ============================================================================
+
+func createTestServerWithCommands(t *testing.T) *Server {
+	t.Helper()
+
+	store := newMockStore()
+
+	// Add a session
+	store.sessions["session-1"] = &storage.Session{
+		SessionID: "session-1",
+	}
+	store.sessions["session-2"] = &storage.Session{
+		SessionID: "session-2",
+	}
+
+	// Add commands with timestamps
+	store.commands["cmd-1"] = &storage.Command{
+		CommandID:     "cmd-1",
+		SessionID:     "session-1",
+		Command:       "git status",
+		CommandNorm:   "git status",
+		TsStartUnixMs: 1000,
+		CWD:           "/tmp",
+	}
+	store.commands["cmd-2"] = &storage.Command{
+		CommandID:     "cmd-2",
+		SessionID:     "session-1",
+		Command:       "git log",
+		CommandNorm:   "git log",
+		TsStartUnixMs: 2000,
+		CWD:           "/tmp",
+	}
+	store.commands["cmd-3"] = &storage.Command{
+		CommandID:     "cmd-3",
+		SessionID:     "session-1",
+		Command:       "git status",
+		CommandNorm:   "git status",
+		TsStartUnixMs: 3000,
+		CWD:           "/tmp",
+	}
+	store.commands["cmd-4"] = &storage.Command{
+		CommandID:     "cmd-4",
+		SessionID:     "session-2",
+		Command:       "ls -la",
+		CommandNorm:   "ls -la",
+		TsStartUnixMs: 4000,
+		CWD:           "/tmp",
+	}
+	store.commands["cmd-5"] = &storage.Command{
+		CommandID:     "cmd-5",
+		SessionID:     "session-2",
+		Command:       "echo hello",
+		CommandNorm:   "echo hello",
+		TsStartUnixMs: 5000,
+		CWD:           "/tmp",
+	}
+
+	ranker := &mockRanker{}
+	server, err := NewServer(&ServerConfig{
+		Store:       store,
+		Ranker:      ranker,
+		IdleTimeout: 5 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	return server
+}
+
+func TestHandler_FetchHistory_GlobalQuery(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServerWithCommands(t)
+	ctx := context.Background()
+
+	req := &pb.HistoryFetchRequest{
+		Global: true,
+		Limit:  50,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	// Should have 4 deduplicated commands (git status, git log, ls -la, echo hello)
+	if len(resp.Items) != 4 {
+		t.Errorf("expected 4 items, got %d", len(resp.Items))
+	}
+
+	if !resp.AtEnd {
+		t.Error("expected at_end=true when all results fit")
+	}
+}
+
+func TestHandler_FetchHistory_SessionScoped(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServerWithCommands(t)
+	ctx := context.Background()
+
+	req := &pb.HistoryFetchRequest{
+		SessionId: "session-1",
+		Limit:     50,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	// session-1 has git status (x2 deduped) and git log = 2 unique commands
+	if len(resp.Items) != 2 {
+		t.Errorf("expected 2 items for session-1, got %d", len(resp.Items))
+	}
+}
+
+func TestHandler_FetchHistory_SubstringFilter(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServerWithCommands(t)
+	ctx := context.Background()
+
+	req := &pb.HistoryFetchRequest{
+		Global: true,
+		Query:  "git",
+		Limit:  50,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	// Only "git status" and "git log" match "git"
+	if len(resp.Items) != 2 {
+		t.Errorf("expected 2 items matching 'git', got %d", len(resp.Items))
+	}
+}
+
+func TestHandler_FetchHistory_Deduplication(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServerWithCommands(t)
+	ctx := context.Background()
+
+	req := &pb.HistoryFetchRequest{
+		SessionId: "session-1",
+		Query:     "status",
+		Limit:     50,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	// "git status" appears twice (ts=1000, ts=3000), should dedup to 1
+	if len(resp.Items) != 1 {
+		t.Fatalf("expected 1 deduplicated item, got %d", len(resp.Items))
+	}
+
+	// Should keep the most recent timestamp
+	if resp.Items[0].TimestampMs != 3000 {
+		t.Errorf("expected most recent timestamp 3000, got %d", resp.Items[0].TimestampMs)
+	}
+}
+
+func TestHandler_FetchHistory_Pagination(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServerWithCommands(t)
+	ctx := context.Background()
+
+	// First page: limit=2
+	req := &pb.HistoryFetchRequest{
+		Global: true,
+		Limit:  2,
+		Offset: 0,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	if len(resp.Items) != 2 {
+		t.Errorf("expected 2 items on first page, got %d", len(resp.Items))
+	}
+
+	if resp.AtEnd {
+		t.Error("expected at_end=false on first page when more items exist")
+	}
+
+	// Second page: offset=2, limit=2
+	req2 := &pb.HistoryFetchRequest{
+		Global: true,
+		Limit:  2,
+		Offset: 2,
+	}
+
+	resp2, err := server.FetchHistory(ctx, req2)
+	if err != nil {
+		t.Fatalf("FetchHistory page 2 failed: %v", err)
+	}
+
+	if len(resp2.Items) != 2 {
+		t.Errorf("expected 2 items on second page, got %d", len(resp2.Items))
+	}
+
+	if !resp2.AtEnd {
+		t.Error("expected at_end=true on last page")
+	}
+}
+
+func TestHandler_FetchHistory_ANSIStripping(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.commands["cmd-ansi"] = &storage.Command{
+		CommandID:     "cmd-ansi",
+		SessionID:     "session-1",
+		Command:       "\x1b[32mgit\x1b[0m status",
+		CommandNorm:   "git status",
+		TsStartUnixMs: 1000,
+		CWD:           "/tmp",
+	}
+
+	ranker := &mockRanker{}
+	server, err := NewServer(&ServerConfig{
+		Store:       store,
+		Ranker:      ranker,
+		IdleTimeout: 5 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.HistoryFetchRequest{
+		Global: true,
+		Limit:  50,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	if len(resp.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(resp.Items))
+	}
+
+	expected := "git status"
+	if resp.Items[0].Command != expected {
+		t.Errorf("expected ANSI-stripped command %q, got %q", expected, resp.Items[0].Command)
+	}
+}
+
+func TestHandler_FetchHistory_DefaultLimit(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServerWithCommands(t)
+	ctx := context.Background()
+
+	// Limit=0 should use default of 50
+	req := &pb.HistoryFetchRequest{
+		Global: true,
+		Limit:  0,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	// Should still return results (4 unique commands)
+	if len(resp.Items) != 4 {
+		t.Errorf("expected 4 items with default limit, got %d", len(resp.Items))
+	}
+}
+
+func TestHandler_FetchHistory_EmptyResult(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServerWithCommands(t)
+	ctx := context.Background()
+
+	req := &pb.HistoryFetchRequest{
+		Global: true,
+		Query:  "nonexistent-command-xyz",
+		Limit:  50,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	if len(resp.Items) != 0 {
+		t.Errorf("expected 0 items for non-matching query, got %d", len(resp.Items))
+	}
+
+	if !resp.AtEnd {
+		t.Error("expected at_end=true for empty result")
+	}
+}
+
+func TestStripANSI(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "no ANSI codes",
+			input:    "git status",
+			expected: "git status",
+		},
+		{
+			name:     "color codes",
+			input:    "\x1b[32mgit\x1b[0m status",
+			expected: "git status",
+		},
+		{
+			name:     "bold and reset",
+			input:    "\x1b[1mhello\x1b[0m world",
+			expected: "hello world",
+		},
+		{
+			name:     "multiple codes",
+			input:    "\x1b[31;1merror\x1b[0m: \x1b[33mwarning\x1b[0m",
+			expected: "error: warning",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "cursor movement",
+			input:    "text\x1b[2Amore",
+			expected: "textmore",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := stripANSI(tt.input)
+			if result != tt.expected {
+				t.Errorf("stripANSI(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
 	}
 }
