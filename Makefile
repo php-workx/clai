@@ -102,10 +102,10 @@ bin/linux:
 test-docker: bin/linux
 	@if command -v docker-compose >/dev/null 2>&1; then \
 		docker-compose -f tests/docker/docker-compose.yml build && \
-		docker-compose -f tests/docker/docker-compose.yml up; \
+		docker-compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
 	elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
 		docker compose -f tests/docker/docker-compose.yml build && \
-		docker compose -f tests/docker/docker-compose.yml up; \
+		docker compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
 	else \
 		echo "Error: docker-compose or docker compose not found"; \
 		exit 1; \
