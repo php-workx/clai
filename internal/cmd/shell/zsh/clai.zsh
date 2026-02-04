@@ -575,18 +575,17 @@ _clai_picker_render() {
 
     menu_text+=$'\n'"────────────────────────────────"
 
-    # Render items in reversed order: last array item at top, first at bottom.
-    # Index 0 is the closest/newest match and appears at the bottom of the menu.
+    # Render items in array order: index 0 (newest) at top, closest to input.
     local count=${#_CLAI_PICKER_ITEMS[@]}
-    local i=$((count - 1))
-    while [[ $i -ge 0 ]]; do
+    local i=0
+    while [[ $i -lt $count ]]; do
         local item="${_CLAI_PICKER_ITEMS[$i + 1]}"  # zsh 1-based
         if [[ $i -eq $_CLAI_PICKER_INDEX ]]; then
             menu_text+=$'\n'" → $item"
         else
             menu_text+=$'\n'"   $item"
         fi
-        ((i--))
+        ((i++))
     done
     POSTDISPLAY=""
     region_highlight=()
@@ -631,6 +630,9 @@ _clai_picker_cancel() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         BUFFER="$_CLAI_PICKER_ORIG_BUFFER"
         CURSOR=$_CLAI_PICKER_ORIG_CURSOR
+        _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
+        region_highlight=()
         _clai_picker_close
         _ai_update_suggestion
         zle redisplay
@@ -642,6 +644,10 @@ _clai_picker_accept() {
         local selected="${_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX + 1]}"
         BUFFER="$selected"
         CURSOR=${#BUFFER}
+        # Clear ghost text before closing picker and recalculating.
+        _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
+        region_highlight=()
         _clai_picker_close
         _ai_update_suggestion
         zle redisplay

@@ -3,6 +3,7 @@ package picker
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -62,19 +63,42 @@ func runCmd(cmd tea.Cmd) tea.Msg {
 	return cmd()
 }
 
-// initAndLoad runs the full Init -> initMsg -> fetchCmd -> fetchDoneMsg cycle,
+// drainBatch runs a batch cmd and feeds all resulting messages into the model,
+// returning the final model state and any remaining cmd from the last message.
+func drainBatch(t *testing.T, m Model, batchCmd tea.Cmd) (Model, tea.Cmd) {
+	t.Helper()
+	msg := runCmd(batchCmd)
+	if msg == nil {
+		return m, nil
+	}
+	// tea.Batch produces a tea.BatchMsg ([]tea.Cmd) when run.
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var lastCmd tea.Cmd
+		for _, cmd := range batch {
+			sub := runCmd(cmd)
+			if sub == nil {
+				continue
+			}
+			var result tea.Model
+			result, lastCmd = m.Update(sub)
+			m = result.(Model)
+		}
+		return m, lastCmd
+	}
+	// Single message.
+	result, cmd := m.Update(msg)
+	return result.(Model), cmd
+}
+
+// initAndLoad runs the full Init -> fetch cycle,
 // returning the model in its post-fetch state (loaded, empty, or error).
 func initAndLoad(t *testing.T, m Model) Model {
 	t.Helper()
 
-	// Init() returns a cmd that produces initMsg
+	// Init() returns a batch (textinput.Blink + initMsg).
+	// Drain the batch to process all messages including initMsg.
 	initCmd := m.Init()
-	initMsgVal := runCmd(initCmd)
-	require.IsType(t, initMsg{}, initMsgVal)
-
-	// Process initMsg -> triggers startFetch, returns fetchCmd
-	result, fetchCmd := m.Update(initMsgVal)
-	m = result.(Model)
+	m, fetchCmd := drainBatch(t, m, initCmd)
 	require.Equal(t, stateLoading, m.state)
 
 	// Run fetchCmd -> produces fetchDoneMsg
@@ -82,7 +106,7 @@ func initAndLoad(t *testing.T, m Model) Model {
 	require.NotNil(t, fetchDoneMsgVal)
 
 	// Process fetchDoneMsg -> transitions to loaded/empty/error
-	result, _ = m.Update(fetchDoneMsgVal)
+	result, _ := m.Update(fetchDoneMsgVal)
 	m = result.(Model)
 	return m
 }
@@ -92,9 +116,7 @@ func initAndLoad(t *testing.T, m Model) Model {
 func initToLoading(t *testing.T, m Model) (Model, tea.Cmd) {
 	t.Helper()
 	initCmd := m.Init()
-	initMsgVal := runCmd(initCmd)
-	result, fetchCmd := m.Update(initMsgVal)
-	m = result.(Model)
+	m, fetchCmd := drainBatch(t, m, initCmd)
 	require.Equal(t, stateLoading, m.state)
 	return m, fetchCmd
 }
@@ -408,32 +430,33 @@ func TestTyping_AppendsToQuery(t *testing.T) {
 
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
 	m = result.(Model)
-	assert.Equal(t, "l", m.query)
+	assert.Equal(t, "l", m.textInput.Value())
 
 	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	m = result.(Model)
-	assert.Equal(t, "ls", m.query)
+	assert.Equal(t, "ls", m.textInput.Value())
 }
 
 func TestBackspace_RemovesFromQuery(t *testing.T) {
 	p := &mockProvider{items: []string{"a"}, atEnd: true}
 	m := newTestModel(p)
-	m.query = "ls"
+	m.textInput.SetValue("ls")
 
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
 	m = result.(Model)
-	assert.Equal(t, "l", m.query)
+	assert.Equal(t, "l", m.textInput.Value())
 }
 
 func TestBackspace_EmptyQuery_NoOp(t *testing.T) {
 	p := &mockProvider{items: []string{"a"}, atEnd: true}
 	m := newTestModel(p)
-	m.query = ""
+	m.textInput.SetValue("")
 
 	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyBackspace})
 	m = result.(Model)
-	assert.Equal(t, "", m.query)
-	assert.Nil(t, cmd)
+	assert.Equal(t, "", m.textInput.Value())
+	// textinput may return a blink cmd even on empty backspace
+	_ = cmd
 }
 
 func TestDebounce_NewKeystrokeCancelsPrevious(t *testing.T) {
@@ -514,7 +537,7 @@ func TestView_ShowsTabBar(t *testing.T) {
 func TestView_ShowsQueryLine(t *testing.T) {
 	p := &mockProvider{items: []string{"a"}, atEnd: true}
 	m := newTestModel(p)
-	m.query = "test"
+	m.textInput.SetValue("test")
 
 	view := m.View()
 	assert.Contains(t, view, "test")
@@ -634,7 +657,7 @@ func TestZeroResults_QueryEditable(t *testing.T) {
 	// Should still be able to type.
 	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	m = result.(Model)
-	assert.Equal(t, "x", m.query)
+	assert.Equal(t, "x", m.textInput.Value())
 	assert.NotNil(t, cmd) // Debounce timer started
 }
 
@@ -708,7 +731,7 @@ func TestError_QueryEditableAndRetryViaDebounce(t *testing.T) {
 	// Type to start a new search.
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	m = result.(Model)
-	assert.Equal(t, "r", m.query)
+	assert.Equal(t, "r", m.textInput.Value())
 	debounceID := m.debounceID
 
 	// Fire the debounce -> starts fetch.
@@ -741,7 +764,7 @@ func TestWithQuery(t *testing.T) {
 	p := &mockProvider{items: []string{"a"}, atEnd: true}
 	m := newTestModel(p)
 	m = m.WithQuery("initial")
-	assert.Equal(t, "initial", m.query)
+	assert.Equal(t, "initial", m.textInput.Value())
 }
 
 // --- Init returns a cmd ---
@@ -767,4 +790,180 @@ func TestEnter_NoOp_DuringLoading(t *testing.T) {
 	m = result.(Model)
 	assert.Empty(t, m.Result())
 	assert.NotNil(t, cmd) // tea.Quit
+}
+
+// --- Layout tests ---
+
+func newBottomUpModel(p Provider) Model {
+	m := newTestModel(p)
+	m.layout = LayoutBottomUp
+	return m
+}
+
+func TestBottomUp_ViewList_ReversesItems(t *testing.T) {
+	p := &mockProvider{items: []string{"newest", "middle", "oldest"}, atEnd: true}
+	m := newBottomUpModel(p)
+	m = initAndLoad(t, m)
+
+	view := m.viewList()
+	lines := strings.Split(view, "\n")
+
+	// Find non-empty lines (skip padding).
+	var items []string
+	for _, l := range lines {
+		trimmed := strings.TrimSpace(l)
+		if trimmed != "" {
+			items = append(items, trimmed)
+		}
+	}
+
+	require.Len(t, items, 3)
+	// Reversed: oldest at top, newest at bottom (closest to input).
+	assert.Contains(t, items[0], "oldest")
+	assert.Contains(t, items[1], "middle")
+	assert.Contains(t, items[2], "newest")
+}
+
+func TestBottomUp_ViewList_BottomAligned(t *testing.T) {
+	p := &mockProvider{items: []string{"a", "b"}, atEnd: true}
+	m := newBottomUpModel(p)
+	m = initAndLoad(t, m)
+
+	view := m.viewList()
+	lines := strings.Split(view, "\n")
+	maxItems := m.listHeight()
+
+	// Total lines should equal listHeight (items + padding).
+	assert.Equal(t, maxItems, len(lines))
+
+	// First lines should be empty (padding).
+	padCount := maxItems - 2
+	for i := 0; i < padCount; i++ {
+		assert.Empty(t, lines[i], "line %d should be padding", i)
+	}
+}
+
+func TestBottomUp_View_HasSeparator(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	m := newBottomUpModel(p)
+	m = initAndLoad(t, m)
+
+	view := m.View()
+	assert.Contains(t, view, "──")
+}
+
+func TestBottomUp_UpDown_InvertedNavigation(t *testing.T) {
+	p := &mockProvider{items: []string{"newest", "middle", "oldest"}, atEnd: true}
+	m := newBottomUpModel(p)
+	m = initAndLoad(t, m)
+	assert.Equal(t, 0, m.selection) // Starts at newest
+
+	// Up should move to older (higher index = visually higher).
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = result.(Model)
+	assert.Equal(t, 1, m.selection)
+
+	// Up again.
+	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = result.(Model)
+	assert.Equal(t, 2, m.selection)
+
+	// Up at top - stays.
+	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = result.(Model)
+	assert.Equal(t, 2, m.selection)
+
+	// Down moves toward newer (lower index = visually lower).
+	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = result.(Model)
+	assert.Equal(t, 1, m.selection)
+
+	// Down again.
+	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = result.(Model)
+	assert.Equal(t, 0, m.selection)
+
+	// Down at bottom - stays.
+	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = result.(Model)
+	assert.Equal(t, 0, m.selection)
+}
+
+func TestBottomUp_SelectionMarkerOnCorrectItem(t *testing.T) {
+	p := &mockProvider{items: []string{"newest", "oldest"}, atEnd: true}
+	m := newBottomUpModel(p)
+	m = initAndLoad(t, m)
+	// Selection 0 = "newest", which should be at the bottom visually.
+
+	view := m.viewList()
+	lines := strings.Split(view, "\n")
+
+	// Find the line with the selection marker.
+	var selectedLine string
+	for _, l := range lines {
+		if strings.Contains(l, ">") {
+			selectedLine = l
+			break
+		}
+	}
+	assert.Contains(t, selectedLine, "newest")
+}
+
+func TestTopDown_ViewList_PreservesOrder(t *testing.T) {
+	p := &mockProvider{items: []string{"a", "b", "c"}, atEnd: true}
+	m := newTestModel(p) // Default LayoutTopDown
+	m = initAndLoad(t, m)
+
+	view := m.viewList()
+	lines := strings.Split(view, "\n")
+
+	// Items should appear in original order, no padding.
+	require.Len(t, lines, 3)
+	assert.Contains(t, lines[0], "a")
+	assert.Contains(t, lines[1], "b")
+	assert.Contains(t, lines[2], "c")
+}
+
+func TestTopDown_View_NoSeparator(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	m := newTestModel(p) // Default LayoutTopDown
+	m = initAndLoad(t, m)
+
+	view := m.View()
+	assert.NotContains(t, view, "──")
+}
+
+func TestWithLayout(t *testing.T) {
+	p := &mockProvider{}
+	m := NewModel(defaultTabs(), p)
+	assert.Equal(t, LayoutTopDown, m.layout)
+
+	m = m.WithLayout(LayoutBottomUp)
+	assert.Equal(t, LayoutBottomUp, m.layout)
+}
+
+func TestBottomUp_StatusMessages_BottomAligned(t *testing.T) {
+	p := &mockProvider{items: []string{}, atEnd: true}
+	m := newBottomUpModel(p)
+	m = initAndLoad(t, m)
+	assert.Equal(t, stateEmpty, m.state)
+
+	content := m.viewContent()
+	lines := strings.Split(content, "\n")
+	// Should have padding lines before the status message.
+	assert.Greater(t, len(lines), 1)
+	// Last line should contain the status.
+	assert.Contains(t, lines[len(lines)-1], "No matches")
+}
+
+func TestBottomUp_ListHeight_AccountsForSeparator(t *testing.T) {
+	p := &mockProvider{}
+	m := newTestModel(p)
+	topDownHeight := m.listHeight()
+
+	m.layout = LayoutBottomUp
+	bottomUpHeight := m.listHeight()
+
+	// BottomUp has 1 extra chrome row for separator.
+	assert.Equal(t, topDownHeight-1, bottomUpHeight)
 }

@@ -277,7 +277,7 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	tabs := resolveTabs(cfg, opts)
 	provider := picker.NewHistoryProvider(socketPath(cfg))
 
-	model := picker.NewModel(tabs, provider)
+	model := picker.NewModel(tabs, provider).WithLayout(picker.LayoutBottomUp)
 	if opts.query != "" {
 		model = model.WithQuery(opts.query)
 	}

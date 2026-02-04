@@ -376,12 +376,12 @@ func TestZshScript_AcceptLineClearsGhostText(t *testing.T) {
 	}
 }
 
-// TestZshScript_PickerReversedRenderAndPaging verifies that the picker:
-// 1. Renders items in reversed order (last array element at top, first at bottom)
+// TestZshScript_PickerRenderAndPaging verifies that the picker:
+// 1. Renders items in forward order (newest at top, closest to input)
 // 2. Tracks paging state (_CLAI_PICKER_PAGE, _CLAI_PICKER_AT_END)
 // 3. Passes --offset to clai history for pagination
 // 4. Down at bottom (index 0) does nothing (no wrapping)
-func TestZshScript_PickerReversedRenderAndPaging(t *testing.T) {
+func TestZshScript_PickerRenderAndPaging(t *testing.T) {
 	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
 	if err != nil {
 		t.Fatalf("Failed to read zsh script: %v", err)
@@ -400,9 +400,9 @@ func TestZshScript_PickerReversedRenderAndPaging(t *testing.T) {
 		t.Error("_clai_picker_load should pass --offset to clai history")
 	}
 
-	// 3. Reversed render: loop counts down from count-1 to 0
-	if !strings.Contains(script, "local i=$((count - 1))") {
-		t.Error("_clai_picker_render should loop in reverse (i = count-1 down to 0)")
+	// 3. Forward render: loop counts up from 0
+	if !strings.Contains(script, "local i=0") || !strings.Contains(script, "((i++))") {
+		t.Error("_clai_picker_render should loop forward (i = 0 up to count)")
 	}
 
 	// 4. Down handler: at index 0, do nothing (no wrapping to end)
