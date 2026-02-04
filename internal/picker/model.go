@@ -3,6 +3,8 @@ package picker
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -36,7 +38,7 @@ const (
 	stateLoaded                       // Items loaded successfully (len > 0)
 	stateEmpty                        // Fetch succeeded but returned 0 items
 	stateError                        // Fetch failed
-	stateCancelled                    // User cancelled (Esc / Ctrl+C)
+	stateCancelled                    // User cancelled (Esc)
 )
 
 // fetchDoneMsg is sent when an async Provider.Fetch completes.
@@ -55,6 +57,15 @@ type debounceMsg struct {
 // initMsg is sent by Init() to trigger the first fetch via Update(),
 // ensuring state mutations are visible to the Bubble Tea runtime.
 type initMsg struct{}
+
+// clipboardMsg is sent after a clipboard copy attempt completes.
+type clipboardMsg struct{ err error }
+
+// copiedClearMsg clears the "Copied!" indicator after a delay.
+type copiedClearMsg struct{}
+
+// copiedFeedbackDuration is how long the "Copied!" indicator stays visible.
+const copiedFeedbackDuration = 1500 * time.Millisecond
 
 // Model is the Bubble Tea model for the history picker TUI.
 // It must be exported so that cmd/clai-picker can use it.
@@ -87,6 +98,9 @@ type Model struct {
 
 	// layout controls the visual arrangement of list items.
 	layout Layout
+
+	// copied is true while the "Copied!" indicator is visible.
+	copied bool
 }
 
 // NewModel creates a new picker Model.
@@ -152,6 +166,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case initMsg:
 		return m, m.startFetch()
+
+	case clipboardMsg:
+		if msg.err == nil {
+			m.copied = true
+			return m, tea.Tick(copiedFeedbackDuration, func(time.Time) tea.Msg {
+				return copiedClearMsg{}
+			})
+		}
+		return m, nil
+
+	case copiedClearMsg:
+		m.copied = false
+		return m, nil
 	}
 
 	// Forward to textinput for cursor blink and other internal messages.
@@ -163,10 +190,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // handleKey processes keyboard input.
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
-	case tea.KeyEsc, tea.KeyCtrlC:
+	case tea.KeyEsc:
 		m.state = stateCancelled
 		m.cancelInflight()
 		return m, tea.Quit
+
+	case tea.KeyCtrlC:
+		if m.selection >= 0 && m.selection < len(m.items) {
+			return m, copyToClipboard(m.items[m.selection])
+		}
+		return m, nil
 
 	case tea.KeyEnter:
 		if m.selection >= 0 && m.selection < len(m.items) {
@@ -317,6 +350,29 @@ func (m *Model) cancelInflight() {
 	}
 }
 
+// copyToClipboard returns a tea.Cmd that writes text to the system clipboard.
+func copyToClipboard(text string) tea.Cmd {
+	return func() tea.Msg {
+		var cmd *exec.Cmd
+		switch runtime.GOOS {
+		case "darwin":
+			cmd = exec.Command("pbcopy")
+		case "linux":
+			if path, err := exec.LookPath("xclip"); err == nil {
+				cmd = exec.Command(path, "-selection", "clipboard")
+			} else if path, err := exec.LookPath("xsel"); err == nil {
+				cmd = exec.Command(path, "--clipboard", "--input")
+			} else {
+				return clipboardMsg{err: fmt.Errorf("no clipboard tool found")}
+			}
+		default:
+			return clipboardMsg{err: fmt.Errorf("unsupported OS: %s", runtime.GOOS)}
+		}
+		cmd.Stdin = strings.NewReader(text)
+		return clipboardMsg{err: cmd.Run()}
+	}
+}
+
 // clampSelection ensures the selection index is within bounds.
 func (m *Model) clampSelection() {
 	if len(m.items) == 0 {
@@ -374,6 +430,7 @@ var (
 	matchStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
 	matchSelectedStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("214"))
 	queryStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
+	truncStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
 	errorStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	dimStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
@@ -476,11 +533,16 @@ func (m Model) viewList() string {
 		if cw > 4 {
 			display = MiddleTruncate(StripANSI(display), cw-4)
 		}
+
+		var base, hl lipgloss.Style
+		var prefix string
 		if i == m.selection {
-			lines = append(lines, selectedStyle.Render("> ")+highlightQuery(display, query, selectedStyle, matchSelectedStyle))
+			base, hl, prefix = selectedStyle, matchSelectedStyle, "> "
 		} else {
-			lines = append(lines, normalStyle.Render("  ")+highlightQuery(display, query, normalStyle, matchStyle))
+			base, hl, prefix = normalStyle, matchStyle, "  "
 		}
+
+		lines = append(lines, base.Render(prefix)+renderItem(display, query, base, hl))
 	}
 
 	if m.layout == LayoutBottomUp {
@@ -500,6 +562,23 @@ func (m Model) viewList() string {
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// ellipsis is the truncation marker used by MiddleTruncate.
+const ellipsis = "\u2026"
+
+// renderItem renders a display string with styled truncation ellipsis and
+// query highlighting. If the display contains an ellipsis from MiddleTruncate,
+// the ellipsis is rendered with truncStyle while the surrounding text gets
+// query highlighting.
+func renderItem(display, query string, base, hl lipgloss.Style) string {
+	parts := strings.SplitN(display, ellipsis, 2)
+	if len(parts) == 2 {
+		return highlightQuery(parts[0], query, base, hl) +
+			truncStyle.Render(" "+ellipsis+" ") +
+			highlightQuery(parts[1], query, base, hl)
+	}
+	return highlightQuery(display, query, base, hl)
 }
 
 // highlightQuery renders display text with occurrences of query highlighted.
@@ -532,5 +611,9 @@ func highlightQuery(display, query string, base, highlight lipgloss.Style) strin
 
 // viewQuery renders the query input line.
 func (m Model) viewQuery() string {
-	return m.textInput.View()
+	q := m.textInput.View()
+	if m.copied {
+		q += "  " + dimStyle.Render("Copied!")
+	}
+	return q
 }

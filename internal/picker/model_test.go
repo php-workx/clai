@@ -3,6 +3,7 @@ package picker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -193,14 +194,29 @@ func TestAnyCancelledOnEsc(t *testing.T) {
 	assert.NotNil(t, quitMsg)
 }
 
-func TestAnyCancelledOnCtrlC(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+func TestCtrlC_CopiesSelectedItem(t *testing.T) {
+	p := &mockProvider{items: []string{"ls -la", "pwd"}, atEnd: true}
 	m := newTestModel(p)
+	m = initAndLoad(t, m)
+	assert.Equal(t, 0, m.selection)
+
+	// Ctrl+C should return a command (clipboard copy), not quit.
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	m = result.(Model)
+	assert.NotEqual(t, stateCancelled, m.state)
+	assert.NotNil(t, cmd, "Ctrl+C with selection should return a clipboard command")
+}
+
+func TestCtrlC_NoSelection_NoOp(t *testing.T) {
+	p := &mockProvider{items: nil, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+	assert.Equal(t, -1, m.selection)
 
 	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	m = result.(Model)
-	assert.Equal(t, stateCancelled, m.state)
-	assert.NotNil(t, cmd)
+	assert.Nil(t, cmd)
+	assert.NotEqual(t, stateCancelled, m.state)
 }
 
 func TestError_ToLoading_OnTabChange(t *testing.T) {
@@ -1057,4 +1073,99 @@ func TestViewList_HighlightsQuery(t *testing.T) {
 			assert.NotContains(t, line, yellowSelectedRendered)
 		}
 	}
+}
+
+// --- Truncation styling tests ---
+
+func TestViewList_TruncationStyled(t *testing.T) {
+	// Use a very long item that will be truncated.
+	longItem := strings.Repeat("abcdef", 20) // 120 chars
+	p := &mockProvider{items: []string{longItem}, atEnd: true}
+	m := newTestModel(p)
+	m.width = 40 // Force truncation
+	m = initAndLoad(t, m)
+
+	view := m.viewList()
+	// The truncation ellipsis should be styled with truncStyle (orange 208).
+	styledEllipsis := truncStyle.Render(" \u2026 ")
+	assert.Contains(t, view, styledEllipsis)
+}
+
+func TestRenderItem_NoTruncation(t *testing.T) {
+	result := renderItem("short", "sh", normalStyle, matchStyle)
+	// Should contain highlighted "sh" but no truncation styling.
+	assert.Contains(t, result, matchStyle.Render("sh"))
+	assert.NotContains(t, result, truncStyle.Render(" \u2026 "))
+}
+
+func TestRenderItem_WithTruncation(t *testing.T) {
+	// Simulate a truncated string: "abcdef…xyz"
+	display := "abcdef\u2026xyz"
+	result := renderItem(display, "", normalStyle, matchStyle)
+	assert.Contains(t, result, truncStyle.Render(" \u2026 "))
+	assert.Contains(t, result, normalStyle.Render("abcdef"))
+	assert.Contains(t, result, normalStyle.Render("xyz"))
+}
+
+// --- Clipboard + copied indicator tests ---
+
+func TestClipboardMsg_SetsCopied(t *testing.T) {
+	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	result, cmd := m.Update(clipboardMsg{err: nil})
+	m = result.(Model)
+	assert.True(t, m.copied)
+	assert.NotNil(t, cmd, "should return a tick command to clear the indicator")
+}
+
+func TestClipboardMsg_Error_NoCopied(t *testing.T) {
+	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	result, cmd := m.Update(clipboardMsg{err: fmt.Errorf("no clipboard")})
+	m = result.(Model)
+	assert.False(t, m.copied)
+	assert.Nil(t, cmd)
+}
+
+func TestCopiedClearMsg_ClearsCopied(t *testing.T) {
+	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	m := newTestModel(p)
+	m.copied = true
+
+	result, _ := m.Update(copiedClearMsg{})
+	m = result.(Model)
+	assert.False(t, m.copied)
+}
+
+func TestViewQuery_ShowsCopiedIndicator(t *testing.T) {
+	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	m := newTestModel(p)
+	m.copied = true
+
+	view := m.viewQuery()
+	assert.Contains(t, view, "Copied!")
+}
+
+func TestViewQuery_NoCopiedIndicator(t *testing.T) {
+	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	m := newTestModel(p)
+	m.copied = false
+
+	view := m.viewQuery()
+	assert.NotContains(t, view, "Copied!")
+}
+
+func TestEsc_StillCancels(t *testing.T) {
+	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = result.(Model)
+	assert.Equal(t, stateCancelled, m.state)
+	assert.NotNil(t, cmd, "Esc should return tea.Quit")
 }
