@@ -573,3 +573,198 @@ func TestSingleTab_TabIsNoOp(t *testing.T) {
 	assert.Equal(t, 0, m.activeTab)
 	assert.Nil(t, cmd) // No fetch triggered
 }
+
+// --- Empty list: Up/Down are no-ops ---
+
+func TestUpDown_NoOp_WhenEmpty(t *testing.T) {
+	p := &mockProvider{items: []string{}, atEnd: true}
+	m := newTestModel(p)
+
+	m = initAndLoad(t, m)
+	assert.Equal(t, stateEmpty, m.state)
+	assert.Equal(t, -1, m.selection)
+
+	// Down should be a no-op.
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = result.(Model)
+	assert.Equal(t, -1, m.selection)
+
+	// Up should be a no-op.
+	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyUp})
+	m = result.(Model)
+	assert.Equal(t, -1, m.selection)
+}
+
+func TestEsc_WorksWhenEmpty(t *testing.T) {
+	p := &mockProvider{items: []string{}, atEnd: true}
+	m := newTestModel(p)
+
+	m = initAndLoad(t, m)
+	assert.Equal(t, stateEmpty, m.state)
+
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = result.(Model)
+	assert.Equal(t, stateCancelled, m.state)
+	assert.Empty(t, m.Result())
+	assert.NotNil(t, cmd)
+}
+
+// --- Zero search results: Enter is no-op, query still editable ---
+
+func TestZeroResults_EnterIsNoOp(t *testing.T) {
+	p := &mockProvider{items: []string{}, atEnd: true}
+	m := newTestModel(p)
+
+	m = initAndLoad(t, m)
+	assert.Equal(t, stateEmpty, m.state)
+
+	// Enter should produce no result.
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = result.(Model)
+	assert.Empty(t, m.Result())
+}
+
+func TestZeroResults_QueryEditable(t *testing.T) {
+	p := &mockProvider{items: []string{}, atEnd: true}
+	m := newTestModel(p)
+
+	m = initAndLoad(t, m)
+	assert.Equal(t, stateEmpty, m.state)
+
+	// Should still be able to type.
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m = result.(Model)
+	assert.Equal(t, "x", m.query)
+	assert.NotNil(t, cmd) // Debounce timer started
+}
+
+// --- Selection bounds: items grow ---
+
+func TestSelectionClamped_ItemsGrow(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	m := newTestModel(p)
+
+	m = initAndLoad(t, m)
+	assert.Equal(t, 0, m.selection)
+
+	// Tab to switch to a result with more items.
+	p.items = []string{"a", "b", "c", "d", "e"}
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
+	m = result.(Model)
+	msg := runCmd(cmd)
+	result, _ = m.Update(msg)
+	m = result.(Model)
+
+	assert.Equal(t, stateLoaded, m.state)
+	// Selection should remain at 0 (still valid).
+	assert.Equal(t, 0, m.selection)
+}
+
+// --- Query change triggers loading (via debounce -> fetch) ---
+
+func TestQueryChange_TriggersLoadingViaDebounce(t *testing.T) {
+	p := &mockProvider{items: []string{"abc"}, atEnd: true}
+	m := newTestModel(p)
+
+	m = initAndLoad(t, m)
+	assert.Equal(t, stateLoaded, m.state)
+
+	// Type a character - starts debounce.
+	result, debounceCmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
+	m = result.(Model)
+	debounceID := m.debounceID
+
+	// Fire the debounce.
+	result, fetchCmd := m.Update(debounceMsg{id: debounceID})
+	m = result.(Model)
+	require.NotNil(t, fetchCmd)
+	assert.Equal(t, stateLoading, m.state)
+
+	// Complete the fetch.
+	p.items = []string{"abc"}
+	fetchResult := runCmd(fetchCmd)
+	result, _ = m.Update(fetchResult)
+	m = result.(Model)
+	assert.Equal(t, stateLoaded, m.state)
+
+	// Suppress unused warning.
+	_ = debounceCmd
+}
+
+// --- Error state: query still editable, retry via query change ---
+
+func TestError_QueryEditableAndRetryViaDebounce(t *testing.T) {
+	p := &mockProvider{err: errors.New("fail")}
+	m := newTestModel(p)
+
+	m = initAndLoad(t, m)
+	assert.Equal(t, stateError, m.state)
+
+	// Fix the provider.
+	p.err = nil
+	p.items = []string{"recovered"}
+	p.atEnd = true
+
+	// Type to start a new search.
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
+	m = result.(Model)
+	assert.Equal(t, "r", m.query)
+	debounceID := m.debounceID
+
+	// Fire the debounce -> starts fetch.
+	result, fetchCmd := m.Update(debounceMsg{id: debounceID})
+	m = result.(Model)
+	assert.Equal(t, stateLoading, m.state)
+
+	// Complete the fetch.
+	fetchResult := runCmd(fetchCmd)
+	result, _ = m.Update(fetchResult)
+	m = result.(Model)
+	assert.Equal(t, stateLoaded, m.state)
+	assert.Equal(t, []string{"recovered"}, m.items)
+}
+
+// --- Cancelled state: View shows "Cancelled" ---
+
+func TestView_ShowsCancelledState(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	m := newTestModel(p)
+	m.state = stateCancelled
+
+	view := m.View()
+	assert.Contains(t, view, "Cancelled")
+}
+
+// --- WithQuery sets initial query ---
+
+func TestWithQuery(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	m := newTestModel(p)
+	m = m.WithQuery("initial")
+	assert.Equal(t, "initial", m.query)
+}
+
+// --- Init returns a cmd ---
+
+func TestInit_ReturnsCmd(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	m := newTestModel(p)
+	cmd := m.Init()
+	assert.NotNil(t, cmd)
+}
+
+// --- Loading state: Enter is no-op ---
+
+func TestEnter_NoOp_DuringLoading(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true, delay: 1 * time.Second}
+	m := newTestModel(p)
+
+	m, _ = initToLoading(t, m)
+	assert.Equal(t, stateLoading, m.state)
+
+	// Enter during loading should quit but produce no result.
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = result.(Model)
+	assert.Empty(t, m.Result())
+	assert.NotNil(t, cmd) // tea.Quit
+}

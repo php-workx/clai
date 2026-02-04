@@ -181,6 +181,51 @@ func TestParseHistoryFlags_UnexpectedPositionalArg(t *testing.T) {
 	}
 }
 
+func TestSanitizeQuery_StripANSI(t *testing.T) {
+	// ANSI escape codes contain 0x1B (ESC) which is a control char < 0x20,
+	// so sanitizeQuery strips it byte-by-byte. The '[31m' chars are printable
+	// and preserved. This verifies the function handles ANSI-like input.
+	input := "\x1b[31mhello\x1b[0m"
+	result, err := sanitizeQuery(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// ESC (0x1B) is stripped as a control char. The rest are printable.
+	if strings.Contains(result, "\x1b") {
+		t.Fatalf("expected ESC bytes stripped, got %q", result)
+	}
+}
+
+func TestParseHistoryFlags_LimitZeroIsValid(t *testing.T) {
+	opts, err := parseHistoryFlags([]string{"--limit", "0"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts.limit != 0 {
+		t.Errorf("expected limit 0, got %d", opts.limit)
+	}
+}
+
+func TestParseHistoryFlags_OutputPlainIsValid(t *testing.T) {
+	opts, err := parseHistoryFlags([]string{"--output", "plain"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts.output != "plain" {
+		t.Errorf("expected output %q, got %q", "plain", opts.output)
+	}
+}
+
+func TestParseHistoryFlags_OutputEmptyIsValid(t *testing.T) {
+	opts, err := parseHistoryFlags([]string{})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if opts.output != "" {
+		t.Errorf("expected empty output, got %q", opts.output)
+	}
+}
+
 // --- Backend dispatch tests ---
 
 func TestDispatch_EmptyBackendDefaultsToBuiltin(t *testing.T) {
