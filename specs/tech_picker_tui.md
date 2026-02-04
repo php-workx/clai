@@ -51,7 +51,7 @@ Add a first-party TUI picker (Bubble Tea) that provides a consistent **history**
 - Matching is **substring** by default.
 - Matched substrings are highlighted in the results list (bold or inverse). In NO_COLOR/monochrome mode, matched text uses bold if supported; if bold is unavailable, use reverse video or underline.
 - Case sensitivity is configurable (default: case-insensitive).
-- Commands longer than the terminal width are **middle-truncated** with `...` in the list view. Show at least 20 characters from the start and the remainder from the end; if terminal width < 45, use start-only truncation with trailing `...`.
+- Commands longer than the terminal width are **middle-truncated** with `...` in the list view. Show at least 20 characters from the start and the remainder from the end; if terminal width < 45, use start-only truncation with trailing `...`. **Truncation must use display-width-aware measurement** (e.g., `go-runewidth`) since CJK characters occupy 2 terminal columns. Truncate based on display column count, not byte length or rune count.
 
 ### Keybindings by Shell
 **Policy:** Up is intercepted only when `history.picker_open_on_empty=true` **or** the buffer is non-empty. Otherwise Up falls back to native history. Down is intercepted only while the picker is open.
@@ -132,7 +132,7 @@ These keys must be added to `internal/config/config.go` as a new `HistoryConfig`
 
 ## Input Sanitization
 - **--query:** max 4096 bytes. Strip control characters (0x00-0x1F except 0x09 tab). Reject embedded newlines. If exceeded, truncate to 4096 bytes and proceed.
-- **History items from providers:** strip ANSI escape sequences (regex `\x1b\[[0-9;]*[a-zA-Z]`) before display AND before stdout output. Multi-line commands: display with a visual `\n` indicator in the list; output the full multi-line command as-is on stdout (shell handles multi-line insertion).
+- **History items from providers:** strip ANSI escape sequences before display AND before stdout output. Use a comprehensive regex that covers SGR (`\x1b\[[0-9;]*[a-zA-Z]`), OSC sequences (`\x1b\][^\a]*\a`), and character set selection (`\x1b\([B0UK]`), or use an existing ANSI stripping library. Multi-line commands: display with a visual `\n` indicator in the list; output the full multi-line command as-is on stdout (shell handles multi-line insertion).
 - **Selected output:** raw UTF-8 text only, no terminal escape codes. Followed by a single newline.
 
 ## Encoding
@@ -147,7 +147,8 @@ These keys must be added to `internal/config/config.go` as a new `HistoryConfig`
 	- Tabs map to **clai-defined providers + args** (no arbitrary shell commands in v1).
 - Providers use contexts with 200ms timeouts and support cancellation on tab/page/query changes.
 - Deduplicate history results by command text (case-insensitive per config), keeping the most recent occurrence by `ts_unix_ms`. Deduplication is scoped to the active tab.
-- **Concurrency:** Use a file lock (`$CLAI_CACHE/picker.lock`) to prevent concurrent picker instances. If lock acquisition fails, exit 1.
+- **Deduplication must happen at the provider level** (e.g., SQL `GROUP BY command_norm ORDER BY MAX(ts_start_unix_ms) DESC`). Offset/limit apply to the **deduplicated** result set so paging is consistent. The TUI must not perform client-side deduplication on paged results.
+- **Concurrency:** Use a file lock (`$CLAI_CACHE/picker.lock`) with `syscall.Flock` (advisory lock) to prevent concurrent picker instances. If lock acquisition fails, exit 1. Advisory locks auto-release on process exit including crashes.
 
 ## Tab-to-Provider Mapping
 Tab definitions must be configurable to allow future tabs to call different providers.
@@ -193,10 +194,11 @@ CLI remains `--tabs=session,global` for v1; tab ids map to config entries.
 	1. Check `/dev/tty` is openable; exit 2 if not (before any I/O).
 	2. Check `TERM != dumb`; exit 2 if dumb.
 	3. Check terminal width >= 20; exit 2 if too narrow.
-	4. Acquire file lock (`$CLAI_CACHE/picker.lock`); exit 1 if another instance is running.
-	5. Parse flags; exit 1 with usage on error.
-	6. Read config and choose backend (`builtin|fzf|clai`).
-	7. Dispatch to backend implementation.
+	4. Ensure `$CLAI_CACHE` directory exists (`os.MkdirAll`); if creation fails, exit 1 with "Error: cannot create cache directory" to stderr.
+	5. Acquire file lock (`$CLAI_CACHE/picker.lock`) using `syscall.Flock` (exclusive advisory lock); exit 1 if another instance is running. Advisory locks auto-release on process exit, including crashes.
+	6. Parse flags; exit 1 with usage on error.
+	7. Read config and choose backend (`builtin|fzf|clai`).
+	8. Dispatch to backend implementation.
 
 ### 3) Picker Core (Bubble Tea)
 - Create `internal/picker` package with:
@@ -215,6 +217,7 @@ CLI remains `--tabs=session,global` for v1; tab ids map to config entries.
 	  ```
 	- Model fields: state, items, selection index, page, at_end, tab list, active tab, query string, currentRequestID (uint64), viewport width/height.
 	- **Selection bounds:** after any items list mutation, clamp `selection = min(selection, len(items)-1)`. If items is empty, selection = -1 (Enter is no-op).
+	- **Key behavior during loading state:** Up/Down are no-ops while loading (do not queue additional fetches). Tab and Esc still function (Tab cancels current fetch and switches tab; Esc cancels picker).
 	- `Provider` interface: `Fetch(ctx, req) (items, atEnd, err)`.
 	- `Request` includes scope, query, limit, offset/page, `RequestID uint64`, and a generic `Options map[string]string` for future providers. Provider echoes `RequestID` in response.
 - Implement Bubble Tea `Init`, `Update`, `View`:
@@ -262,7 +265,7 @@ HistoryItem {
 }
 ```
 
-The daemon handler queries SQLite (`internal/storage`) with the existing pagination and query capabilities. Socket location: `config.DefaultPaths().SocketFile()` (same as daemon server).
+The daemon handler queries SQLite (`internal/storage`) with substring filtering, pagination, and deduplication. The existing `CommandQuery.Prefix` field only supports prefix matching (`LIKE prefix%`); a new `Substring` field (or renaming to `Query` with a `SubstringMatch` flag) is required to support `LIKE %query%` matching. Socket location: `config.DefaultPaths().SocketFile()` (same as daemon server).
 
 #### Provider Fallback
 - If daemon IPC fails (socket not found, connection refused, timeout), exit 1. Shell glue treats non-zero as cancel and falls back to native history.
@@ -283,46 +286,68 @@ Shell glue must capture stdout for selection while allowing the picker to read a
 **Zsh:**
 ```zsh
 _clai_picker_open() {
-  local result
-  result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID") || return
-  BUFFER="$result"
-  CURSOR=${#BUFFER}
+  local result exit_code
+  result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID")
+  exit_code=$?
+  if [[ $exit_code -eq 0 ]]; then
+    BUFFER="$result"
+    CURSOR=${#BUFFER}
+  elif [[ $exit_code -eq 2 ]]; then
+    # Picker unavailable (no TTY, TERM=dumb, too narrow) → native history
+    zle .up-line-or-history
+    return
+  fi
+  # exit 1 (cancel): leave buffer unchanged
   zle redisplay
 }
 zle -N _clai_picker_open
 bindkey '^[[A' _clai_picker_open  # Up arrow (emacs/viins)
 ```
 - Respect `history.picker_open_on_empty`.
-- On cancel (exit 1/2): restore buffer and cursor; fall back to native history if picker exited 2.
+- On cancel (exit 1): restore buffer and cursor. On exit 2: fall back to native history.
+- **Note:** This binding replaces any existing Up arrow binding (e.g., `_ai_menu_up`). Existing suggestion menu bindings must be migrated or removed.
 
 **Bash:**
 ```bash
 _clai_picker_open() {
-  local result
+  local result exit_code
   result=$(clai-picker history --query="$READLINE_LINE" --session="$CLAI_SESSION_ID")
-  if [ $? -eq 0 ]; then
+  exit_code=$?
+  if [ $exit_code -eq 0 ]; then
     READLINE_LINE="$result"
     READLINE_POINT=${#READLINE_LINE}
+  elif [ $exit_code -eq 2 ]; then
+    # Picker unavailable → no action (native history handles Up natively)
+    :
   fi
-  # Non-zero exit: leave buffer unchanged
+  # exit 1 (cancel): leave buffer unchanged
 }
-bind -x '"\e[A": _clai_picker_open'  # Requires Bash 4.0+
+# Only bind if Bash 4.0+ and bind -x is available
+if [[ ${BASH_VERSINFO[0]} -ge 4 ]]; then
+  bind -x '"\e[A": _clai_picker_open'
+fi
 ```
 - If picker exits non-zero, do nothing (leave buffer unchanged).
+- Bash 3.2 (macOS default): binding is skipped entirely; native history works as-is.
 
 **Fish:**
 ```fish
 function _clai_picker_open
   set -l result (clai-picker history --query=(commandline) --session=$CLAI_SESSION_ID)
-  if test $status -eq 0
+  set -l exit_code $status
+  if test $exit_code -eq 0
     commandline -r -- $result
+  else if test $exit_code -eq 2
+    # Picker unavailable → fall back to native history
+    commandline -f up-or-search
+    return
   end
-  # Non-zero: buffer unchanged
+  # exit 1 (cancel): buffer unchanged
   commandline -f repaint
 end
 bind \e\[A _clai_picker_open  # Up arrow
 ```
-- On cancel: restore buffer without side effects.
+- On cancel (exit 1): restore buffer without side effects. On exit 2: fall back to native history.
 
 ### 7) Backend Fallback
 - If backend is `fzf` and fzf is not in PATH: silently fall back to `builtin`. Log to stderr only if `CLAI_DEBUG=1`.
