@@ -21,6 +21,7 @@ export CLAI_CURRENT_SHELL=zsh
 : ${CLAI_AUTO_EXTRACT:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
+: ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
 
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
@@ -789,9 +790,27 @@ zle -N _clai_history_scope_cwd
 zle -N _clai_history_scope_global
 zle -N send-break _clai_picker_break
 
-# Inline picker disabled — use shell defaults for Tab/arrows/Enter.
-# The TUI picker (Alt+H) remains available.
-bindkey '\eh' _clai_tui_picker_open     # Alt+H: always open TUI picker
+# Alt+H always opens TUI picker.
+bindkey '\eh' _clai_tui_picker_open
+
+# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
+# (with fallback to shell default). Otherwise shell defaults are used.
+if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
+    _clai_up_arrow() {
+        if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+            zle .up-line-or-history
+            return
+        fi
+        if _clai_has_tui_picker; then
+            _clai_tui_picker_open
+        else
+            zle .up-line-or-history
+        fi
+    }
+    zle -N _clai_up_arrow
+    bindkey '^[[A' _clai_up_arrow    # Up arrow (CSI mode)
+    bindkey '^[OA' _clai_up_arrow    # Up arrow (application mode)
+fi
 
 # ============================================
 # Full Disable / Enable (clai off / clai on)

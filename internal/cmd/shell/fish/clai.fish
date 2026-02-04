@@ -27,6 +27,9 @@ end
 if not set -q CLAI_MENU_LIMIT
     set -gx CLAI_MENU_LIMIT 5
 end
+if not set -q CLAI_UP_ARROW_HISTORY
+    set -gx CLAI_UP_ARROW_HISTORY {{CLAI_UP_ARROW_HISTORY}}
+end
 
 # Ensure cache directory exists
 mkdir -p $CLAI_CACHE
@@ -399,9 +402,25 @@ function _clai_history_scope_global
     end
 end
 
-# Inline picker disabled — use shell defaults for Tab/arrows.
-# The TUI picker (Alt+H) remains available.
-bind \eh _clai_tui_picker_open            # Alt+H: always open TUI picker
+# Alt+H always opens TUI picker.
+bind \eh _clai_tui_picker_open
+
+# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
+# (with fallback to shell default). Otherwise shell defaults are used.
+if test "$CLAI_UP_ARROW_HISTORY" = "true"
+    function _clai_up_arrow
+        if test "$CLAI_OFF" = "1"; or _clai_session_off
+            commandline -f history-search-backward
+            return
+        end
+        if _clai_has_tui_picker
+            _clai_tui_picker_open
+        else
+            commandline -f history-search-backward
+        end
+    end
+    bind \e\[A _clai_up_arrow
+end
 
 # ============================================
 # Feature 3: Voice Mode

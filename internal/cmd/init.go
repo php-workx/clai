@@ -4,10 +4,13 @@ import (
 	"embed"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+
+	"github.com/runger/clai/internal/config"
 )
 
 //go:embed shell/zsh/clai.zsh
@@ -67,8 +70,15 @@ func runInit(cmd *cobra.Command, args []string) error {
 		sessionID = uuid.New().String()
 	}
 
-	// Replace placeholder with actual session ID export
+	// Load config to inject settings into the shell script.
+	cfg, _ := config.Load() // Ignore errors; defaults are fine.
+	if cfg == nil {
+		cfg = config.DefaultConfig()
+	}
+
+	// Replace placeholders with actual values.
 	script := strings.ReplaceAll(string(content), "{{CLAI_SESSION_ID}}", sessionID)
+	script = strings.ReplaceAll(script, "{{CLAI_UP_ARROW_HISTORY}}", strconv.FormatBool(cfg.History.UpArrowOpensHistory))
 
 	fmt.Print(script)
 	return nil

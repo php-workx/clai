@@ -19,6 +19,7 @@ export CLAI_CURRENT_SHELL=bash
 : ${CLAI_AUTO_EXTRACT:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
+: ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
 
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
@@ -459,9 +460,21 @@ _clai_history_scope_global() {
 # sequences — it fails with "cannot find keymap for command". Work around by
 # using a readline macro to translate arrow escapes to Ctrl-X prefixed
 # sequences, then bind those with -x.
-# Inline picker disabled — use shell defaults for arrows/Enter.
-# The TUI picker (Alt+H) remains available.
-bind -x '"\eh": _clai_tui_picker_open'    # Alt+H: always open TUI picker
+# Alt+H always opens TUI picker.
+bind -x '"\eh": _clai_tui_picker_open'
+
+# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
+# (with fallback to shell default). Otherwise shell defaults are used.
+if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
+    _clai_up_arrow() {
+        if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+            return 0
+        fi
+        _clai_tui_picker_open
+    }
+    bind '"\e[A": "\C-x\C-p"'
+    bind -x '"\C-x\C-p": _clai_up_arrow'
+fi
 
 # Show AI suggestion in prompt when available (for AI-generated suggestions)
 _ai_show_suggestion() {

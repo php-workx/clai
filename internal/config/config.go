@@ -69,11 +69,12 @@ type TabDef struct {
 
 // HistoryConfig holds history picker settings.
 type HistoryConfig struct {
-	PickerBackend       string   `yaml:"picker_backend"`        // builtin, fzf, or clai
-	PickerOpenOnEmpty   bool     `yaml:"picker_open_on_empty"`  // Open picker when search is empty
-	PickerPageSize      int      `yaml:"picker_page_size"`      // Number of items per page
-	PickerCaseSensitive bool     `yaml:"picker_case_sensitive"` // Case-sensitive search
-	PickerTabs          []TabDef `yaml:"picker_tabs"`           // Tab definitions
+	PickerBackend       string   `yaml:"picker_backend"`         // builtin, fzf, or clai
+	PickerOpenOnEmpty   bool     `yaml:"picker_open_on_empty"`   // Open picker when search is empty
+	PickerPageSize      int      `yaml:"picker_page_size"`       // Number of items per page
+	PickerCaseSensitive bool     `yaml:"picker_case_sensitive"`  // Case-sensitive search
+	PickerTabs          []TabDef `yaml:"picker_tabs"`            // Tab definitions
+	UpArrowOpensHistory bool     `yaml:"up_arrow_opens_history"` // Up arrow opens TUI picker (default: false)
 }
 
 // DefaultConfig returns the default configuration.
@@ -464,6 +465,8 @@ func (c *Config) getHistoryField(field string) (string, error) {
 		return strconv.Itoa(c.History.PickerPageSize), nil
 	case "picker_case_sensitive":
 		return strconv.FormatBool(c.History.PickerCaseSensitive), nil
+	case "up_arrow_opens_history":
+		return strconv.FormatBool(c.History.UpArrowOpensHistory), nil
 	default:
 		return "", fmt.Errorf("unknown field: history.%s", field)
 	}
@@ -500,6 +503,12 @@ func (c *Config) setHistoryField(field, value string) error {
 			return fmt.Errorf("invalid value for picker_case_sensitive: %w", err)
 		}
 		c.History.PickerCaseSensitive = v
+	case "up_arrow_opens_history":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for up_arrow_opens_history: %w", err)
+		}
+		c.History.UpArrowOpensHistory = v
 	default:
 		return fmt.Errorf("unknown field: history.%s", field)
 	}
