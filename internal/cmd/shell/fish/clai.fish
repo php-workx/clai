@@ -399,15 +399,9 @@ function _clai_history_scope_global
     end
 end
 
-# Bindings
-bind \t _clai_suggest_tab
-bind \e\[A _clai_history_up
-bind \e\[B _clai_picker_down
+# Inline picker disabled — use shell defaults for Tab/arrows.
+# The TUI picker (Alt+H) remains available.
 bind \eh _clai_tui_picker_open            # Alt+H: always open TUI picker
-# Escape is bound above via _clai_escape (unified handler)
-bind \cx\cs _clai_history_scope_session
-bind \cx\cd _clai_history_scope_cwd
-bind \cx\cg _clai_history_scope_global
 
 # ============================================
 # Feature 3: Voice Mode

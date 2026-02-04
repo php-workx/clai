@@ -459,21 +459,9 @@ _clai_history_scope_global() {
 # sequences — it fails with "cannot find keymap for command". Work around by
 # using a readline macro to translate arrow escapes to Ctrl-X prefixed
 # sequences, then bind those with -x.
-bind '"\e[A": "\C-x\C-p"'
-bind '"\e[B": "\C-x\C-n"'
-bind -x '"\C-x\C-p": _clai_history_up'
-bind -x '"\C-x\C-n": _clai_history_down'
-bind -x '"\C-g": _clai_picker_cancel'
-bind -x '"\C-xs": _clai_history_scope_session'
-bind -x '"\C-xd": _clai_history_scope_cwd'
-bind -x '"\C-xg": _clai_history_scope_global'
+# Inline picker disabled — use shell defaults for arrows/Enter.
+# The TUI picker (Alt+H) remains available.
 bind -x '"\eh": _clai_tui_picker_open'    # Alt+H: always open TUI picker
-
-# Enter: normally accept-line. When picker is open, _clai_history_up installs
-# a macro "\C-x\C-a\C-x\C-b" that routes through _clai_pre_accept to intercept.
-# _clai_picker_close restores accept-line.
-bind -x '"\C-x\C-a": _clai_pre_accept'
-bind '"\C-x\C-b": accept-line'
 
 # Show AI suggestion in prompt when available (for AI-generated suggestions)
 _ai_show_suggestion() {

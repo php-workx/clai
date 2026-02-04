@@ -789,19 +789,9 @@ zle -N _clai_history_scope_cwd
 zle -N _clai_history_scope_global
 zle -N send-break _clai_picker_break
 
-bindkey '^I' _clai_picker_suggest      # Tab
-bindkey '^[[A' _clai_picker_up         # Up arrow (CSI mode)
-bindkey '^[OA' _clai_picker_up         # Up arrow (application mode)
-bindkey '^[[B' _clai_picker_down       # Down arrow (CSI mode)
-bindkey '^[OB' _clai_picker_down       # Down arrow (application mode)
-bindkey '^M' _clai_picker_accept       # Enter
-bindkey '^Xs' _clai_history_scope_session
-bindkey '^Xd' _clai_history_scope_cwd
-bindkey '^Xg' _clai_history_scope_global
+# Inline picker disabled — use shell defaults for Tab/arrows/Enter.
+# The TUI picker (Alt+H) remains available.
 bindkey '\eh' _clai_tui_picker_open     # Alt+H: always open TUI picker
-# Note: bare '\e' binding removed — it intercepts arrow key sequences when
-# KEYTIMEOUT is low (common in oh-my-zsh, vi-mode configs). Picker cancel
-# is handled via send-break (Ctrl+C / Ctrl+G) instead.
 
 # ============================================
 # Full Disable / Enable (clai off / clai on)
