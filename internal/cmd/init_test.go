@@ -270,14 +270,15 @@ func TestZshScript_EditingWidgetsDismissPicker(t *testing.T) {
 	}
 
 	for _, widget := range widgets {
-		// Find the function body and check it calls _clai_dismiss_picker
-		funcPattern := regexp.MustCompile(`(?s)` + regexp.QuoteMeta(widget) + `\(\)\s*\{([^}]+)\}`)
-		match := funcPattern.FindStringSubmatch(output)
-		if match == nil {
+		// Check that the widget function exists and calls _clai_dismiss_picker.
+		// We extract from function start to the next function definition rather
+		// than matching braces, since widget bodies may contain nested braces.
+		body := extractFunctionBody(output, widget)
+		if body == "" {
 			t.Errorf("widget function %s() not found in zsh script", widget)
 			continue
 		}
-		if !strings.Contains(match[1], "_clai_dismiss_picker") {
+		if !strings.Contains(body, "_clai_dismiss_picker") {
 			t.Errorf("widget %s() does not call _clai_dismiss_picker", widget)
 		}
 	}
@@ -407,27 +408,42 @@ func TestZshScript_PickerReversedRenderAndPaging(t *testing.T) {
 	// 4. Down handler: at index 0, do nothing (no wrapping to end)
 	// The old code had: _CLAI_PICKER_INDEX=0 as wrap-to-start in down handler.
 	// New code should NOT wrap — only decrement when index > 0.
-	downStart := strings.Index(script, "_clai_picker_down()")
-	if downStart == -1 {
+	downBody := extractFunctionBody(script, "_clai_picker_down")
+	if downBody == "" {
 		t.Fatal("_clai_picker_down() not found")
 	}
-	downBody := script[downStart : downStart+400]
 	if strings.Contains(downBody, "_CLAI_PICKER_INDEX=$((${#_CLAI_PICKER_ITEMS[@]} - 1))") {
 		t.Error("_clai_picker_down should NOT wrap to end when at bottom")
 	}
 
 	// 5. Up handler references paging (PAGE increment, offset calculation)
-	upStart := strings.Index(script, "_clai_picker_up()")
-	if upStart == -1 {
+	upBody := extractFunctionBody(script, "_clai_picker_up")
+	if upBody == "" {
 		t.Fatal("_clai_picker_up() not found")
 	}
-	upBody := script[upStart : upStart+800]
 	if !strings.Contains(upBody, "_CLAI_PICKER_PAGE++") {
 		t.Error("_clai_picker_up should increment page when at top")
 	}
 	if !strings.Contains(upBody, "_CLAI_PICKER_AT_END") {
 		t.Error("_clai_picker_up should check _CLAI_PICKER_AT_END before paging")
 	}
+}
+
+// extractFunctionBody returns the text from a shell function definition
+// (funcName followed by "()") up to the next top-level function definition.
+// Returns empty string if the function is not found.
+func extractFunctionBody(script, funcName string) string {
+	start := strings.Index(script, funcName+"()")
+	if start == -1 {
+		return ""
+	}
+	rest := script[start:]
+	// Find next function definition as boundary
+	nextFunc := regexp.MustCompile(`\n[a-zA-Z_][a-zA-Z0-9_]*\(\)\s*\{`)
+	if loc := nextFunc.FindStringIndex(rest[1:]); loc != nil {
+		return rest[:loc[0]+1]
+	}
+	return rest
 }
 
 func TestShellScripts_Embedded(t *testing.T) {
