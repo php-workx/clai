@@ -461,10 +461,12 @@ _clai_history_scope_global() {
 # using a readline macro to translate arrow escapes to Ctrl-X prefixed
 # sequences, then bind those with -x.
 # Alt/Option+H opens TUI picker.
-# '\eh' works when the terminal sends ESC for Alt. The literal '˙' covers
-# macOS Terminal.app/iTerm2 defaults where Option+H produces U+02D9.
+# '\eh' works when the terminal sends ESC for Alt (Linux, macOS with Meta key).
+# On macOS, Option+H produces ˙ (U+02D9). bash 3.2 cannot bind -x to multi-byte
+# chars, so we use a macro to translate it to a Ctrl sequence we can bind -x to.
 bind -x '"\eh": _clai_tui_picker_open'
-bind -x '"˙": _clai_tui_picker_open'
+bind -x '"\C-x\C-h": _clai_tui_picker_open'
+bind '"˙": "\C-x\C-h"'
 
 # When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
 # (with fallback to shell default). Otherwise shell defaults are used.
@@ -719,6 +721,7 @@ _clai_disable() {
     bind -r '\C-xd'
     bind -r '\C-xg'
     bind -r '\eh'
+    bind -r '\C-x\C-h'
     bind -r '˙'
 
     # Remove completion handlers (default + per-command for bash <4)

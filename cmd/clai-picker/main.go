@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/picker"
@@ -291,10 +292,12 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	}
 	defer tty.Close()
 
-	// Set the default lipgloss renderer to use the tty for color detection.
-	// Without this, lipgloss detects color profile from stdout which is a pipe
-	// when invoked via $(clai-picker ...) in shell, resulting in no colors.
-	lipgloss.SetDefaultRenderer(lipgloss.NewRenderer(tty))
+	// Detect color profile from the tty and apply it to the default renderer.
+	// When invoked via $(clai-picker ...), stdout is a pipe so lipgloss
+	// defaults to Ascii (no color). We detect from the real tty instead.
+	// SetColorProfile modifies the existing default renderer in-place so
+	// package-level styles already created in picker/model.go pick it up.
+	lipgloss.SetColorProfile(termenv.NewOutput(tty).ColorProfile())
 
 	p := tea.NewProgram(model,
 		tea.WithAltScreen(),
