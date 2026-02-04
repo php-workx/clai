@@ -69,7 +69,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 
 	sourceLine := fmt.Sprintf(`source "%s"`, hookFile)
 	allInstalled := true
-	var addedFiles []string
+	addedFiles := make([]string, 0, len(rcFiles))
 	for _, rcFile := range rcFiles {
 		installed, installedLine, err := isInstalled(rcFile, hookFile, shell)
 		if err != nil {
