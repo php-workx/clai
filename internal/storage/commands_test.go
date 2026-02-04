@@ -492,6 +492,94 @@ func TestSQLiteStore_QueryCommands_ByPrefix(t *testing.T) {
 	}
 }
 
+func TestSQLiteStore_QueryCommands_WithOffset(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create session
+	session := &Session{
+		SessionID:       "offset-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Create 10 commands (newest first after ORDER BY ts DESC)
+	for i := 0; i < 10; i++ {
+		cmd := &Command{
+			CommandID:     generateTestCommandID(100 + i),
+			SessionID:     "offset-session",
+			TsStartUnixMs: int64(1700000001000 + i),
+			CWD:           "/tmp",
+			Command:       "cmd-" + string(rune('a'+i)),
+			IsSuccess:     boolPtr(true),
+		}
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand() error = %v", err)
+		}
+	}
+
+	sid := "offset-session"
+
+	// Page 1: first 3 items (most recent)
+	page1, err := store.QueryCommands(ctx, CommandQuery{
+		SessionID: &sid,
+		Limit:     3,
+		Offset:    0,
+	})
+	if err != nil {
+		t.Fatalf("Page 1 error: %v", err)
+	}
+	if len(page1) != 3 {
+		t.Fatalf("Page 1: got %d, want 3", len(page1))
+	}
+
+	// Page 2: next 3 items
+	page2, err := store.QueryCommands(ctx, CommandQuery{
+		SessionID: &sid,
+		Limit:     3,
+		Offset:    3,
+	})
+	if err != nil {
+		t.Fatalf("Page 2 error: %v", err)
+	}
+	if len(page2) != 3 {
+		t.Fatalf("Page 2: got %d, want 3", len(page2))
+	}
+
+	// Pages should not overlap
+	if page1[0].Command == page2[0].Command {
+		t.Errorf("Page 1 and 2 overlap: both start with %q", page1[0].Command)
+	}
+
+	// Page 1 should be newer than page 2 (DESC order)
+	if page1[0].TsStartUnixMs < page2[0].TsStartUnixMs {
+		t.Errorf("Page 1 should be newer: page1[0].ts=%d, page2[0].ts=%d",
+			page1[0].TsStartUnixMs, page2[0].TsStartUnixMs)
+	}
+
+	// Offset beyond data returns empty
+	empty, err := store.QueryCommands(ctx, CommandQuery{
+		SessionID: &sid,
+		Limit:     3,
+		Offset:    100,
+	})
+	if err != nil {
+		t.Fatalf("Empty page error: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Errorf("Expected empty page, got %d", len(empty))
+	}
+}
+
 func TestSQLiteStore_QueryCommands_EmptyResult(t *testing.T) {
 	t.Parallel()
 

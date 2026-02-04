@@ -375,6 +375,61 @@ func TestZshScript_AcceptLineClearsGhostText(t *testing.T) {
 	}
 }
 
+// TestZshScript_PickerReversedRenderAndPaging verifies that the picker:
+// 1. Renders items in reversed order (last array element at top, first at bottom)
+// 2. Tracks paging state (_CLAI_PICKER_PAGE, _CLAI_PICKER_AT_END)
+// 3. Passes --offset to clai history for pagination
+// 4. Down at bottom (index 0) does nothing (no wrapping)
+func TestZshScript_PickerReversedRenderAndPaging(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	// 1. Paging state variables exist
+	for _, v := range []string{"_CLAI_PICKER_PAGE=0", "_CLAI_PICKER_AT_END=false"} {
+		if !strings.Contains(script, v) {
+			t.Errorf("Missing paging state variable: %s", v)
+		}
+	}
+
+	// 2. --offset passed in picker load
+	if !strings.Contains(script, `--offset "$offset"`) {
+		t.Error("_clai_picker_load should pass --offset to clai history")
+	}
+
+	// 3. Reversed render: loop counts down from count-1 to 0
+	if !strings.Contains(script, "local i=$((count - 1))") {
+		t.Error("_clai_picker_render should loop in reverse (i = count-1 down to 0)")
+	}
+
+	// 4. Down handler: at index 0, do nothing (no wrapping to end)
+	// The old code had: _CLAI_PICKER_INDEX=0 as wrap-to-start in down handler.
+	// New code should NOT wrap — only decrement when index > 0.
+	downStart := strings.Index(script, "_clai_picker_down()")
+	if downStart == -1 {
+		t.Fatal("_clai_picker_down() not found")
+	}
+	downBody := script[downStart : downStart+400]
+	if strings.Contains(downBody, "_CLAI_PICKER_INDEX=$((${#_CLAI_PICKER_ITEMS[@]} - 1))") {
+		t.Error("_clai_picker_down should NOT wrap to end when at bottom")
+	}
+
+	// 5. Up handler references paging (PAGE increment, offset calculation)
+	upStart := strings.Index(script, "_clai_picker_up()")
+	if upStart == -1 {
+		t.Fatal("_clai_picker_up() not found")
+	}
+	upBody := script[upStart : upStart+800]
+	if !strings.Contains(upBody, "_CLAI_PICKER_PAGE++") {
+		t.Error("_clai_picker_up should increment page when at top")
+	}
+	if !strings.Contains(upBody, "_CLAI_PICKER_AT_END") {
+		t.Error("_clai_picker_up should check _CLAI_PICKER_AT_END before paging")
+	}
+}
+
 func TestShellScripts_Embedded(t *testing.T) {
 	// Verify all shell scripts are properly embedded
 	shells := []string{

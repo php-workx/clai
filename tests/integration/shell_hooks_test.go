@@ -397,48 +397,36 @@ echo "All functions defined"
 
 // findHookFile searches for a hook file in common locations.
 func findHookFile(name string) string {
-	paths := config.DefaultPaths()
-
-	// Try installed location first
-	hookPath := filepath.Join(paths.HooksDir(), name)
-	if _, err := os.Stat(hookPath); err == nil {
-		return hookPath
-	}
-
 	// Get shell name from filename (e.g., "clai.zsh" -> "zsh")
 	ext := filepath.Ext(name)
 	shellName := strings.TrimPrefix(ext, ".")
 
-	// Try relative to working directory
+	// Try source files first — installed hooks may be thin loaders
+	// that delegate to `clai init` and lack the full script content.
 	cwd, _ := os.Getwd()
 
-	// Try project internal shell directory (new location)
-	hookPath = filepath.Join(cwd, "internal", "cmd", "shell", shellName, name)
-	if _, err := os.Stat(hookPath); err == nil {
-		return hookPath
-	}
-
-	// Try project hooks directory (legacy location)
-	hookPath = filepath.Join(cwd, "hooks", name)
+	// Try project internal shell directory (source of truth)
+	hookPath := filepath.Join(cwd, "internal", "cmd", "shell", shellName, name)
 	if _, err := os.Stat(hookPath); err == nil {
 		return hookPath
 	}
 
 	// Try parent directories (for running from tests/integration)
+	search := cwd
 	for i := 0; i < 3; i++ {
-		cwd = filepath.Dir(cwd)
+		search = filepath.Dir(search)
 
-		// Try internal shell directory
-		hookPath = filepath.Join(cwd, "internal", "cmd", "shell", shellName, name)
+		hookPath = filepath.Join(search, "internal", "cmd", "shell", shellName, name)
 		if _, err := os.Stat(hookPath); err == nil {
 			return hookPath
 		}
+	}
 
-		// Try hooks directory
-		hookPath = filepath.Join(cwd, "hooks", name)
-		if _, err := os.Stat(hookPath); err == nil {
-			return hookPath
-		}
+	// Fall back to installed location
+	paths := config.DefaultPaths()
+	hookPath = filepath.Join(paths.HooksDir(), name)
+	if _, err := os.Stat(hookPath); err == nil {
+		return hookPath
 	}
 
 	return ""

@@ -17,6 +17,7 @@ import (
 
 var (
 	historyLimit   int
+	historyOffset  int
 	historyCWD     string
 	historySession string
 	historyGlobal  bool
@@ -51,6 +52,7 @@ Examples:
 
 func init() {
 	historyCmd.Flags().IntVarP(&historyLimit, "limit", "n", 20, "Maximum number of commands to show")
+	historyCmd.Flags().IntVar(&historyOffset, "offset", 0, "Skip this many results (for pagination)")
 	historyCmd.Flags().StringVarP(&historyCWD, "cwd", "c", "", "Filter by working directory")
 	historyCmd.Flags().StringVar(&historySession, "session", "", "Filter by specific session ID")
 	historyCmd.Flags().BoolVarP(&historyGlobal, "global", "g", false, "Show history across all sessions")
@@ -125,7 +127,8 @@ func resolveSessionID(ctx context.Context, store *storage.SQLiteStore, rawID str
 
 func buildHistoryQuery(args []string) (storage.CommandQuery, error) {
 	query := storage.CommandQuery{
-		Limit: historyLimit,
+		Limit:  historyLimit,
+		Offset: historyOffset,
 	}
 
 	switch historyStatus {

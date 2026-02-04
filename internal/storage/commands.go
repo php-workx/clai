@@ -204,6 +204,11 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 		query += " LIMIT 1000"
 	}
 
+	if q.Offset > 0 {
+		query += " OFFSET ?"
+		args = append(args, q.Offset)
+	}
+
 	return query, args
 }
 

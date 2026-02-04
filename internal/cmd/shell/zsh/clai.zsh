@@ -473,6 +473,8 @@ _CLAI_PICKER_ACTIVE=false
 _CLAI_PICKER_MODE=""
 _CLAI_PICKER_ORIG_BUFFER=""
 _CLAI_PICKER_ORIG_CURSOR=0
+_CLAI_PICKER_PAGE=0
+_CLAI_PICKER_AT_END=false
 _CLAI_HISTORY_SCOPE="session"
 
 _clai_config_enabled() {
@@ -499,6 +501,7 @@ _clai_history_args() {
 }
 
 _clai_picker_load() {
+    local offset="${1:-0}"
     local -a items
     if [[ "$_CLAI_PICKER_MODE" == "suggest" ]]; then
         if [[ -n "$BUFFER" ]]; then
@@ -507,15 +510,15 @@ _clai_picker_load() {
             # Intentional: with empty BUFFER, 'clai suggest' only returns the
             # single cached AI suggestion which isn't useful for a picker list.
             # Fall back to recent session history instead.
-            items=(${(f)"$(clai history --limit "$CLAI_MENU_LIMIT" --session="$CLAI_SESSION_ID" 2>/dev/null)"})
+            items=(${(f)"$(clai history --limit "$CLAI_MENU_LIMIT" --offset "$offset" --session="$CLAI_SESSION_ID" 2>/dev/null)"})
         fi
     else
         local -a args
         args=(${(z)$(_clai_history_args)})
         if [[ -n "$BUFFER" ]]; then
-            items=(${(f)"$(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$BUFFER" 2>/dev/null)"})
+            items=(${(f)"$(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" --offset "$offset" "$BUFFER" 2>/dev/null)"})
         else
-            items=(${(f)"$(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" 2>/dev/null)"})
+            items=(${(f)"$(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" --offset "$offset" 2>/dev/null)"})
         fi
     fi
 
@@ -524,24 +527,34 @@ _clai_picker_load() {
     if [[ ${#_CLAI_PICKER_ITEMS[@]} -eq 0 ]]; then
         return 1
     fi
+    # If fewer items returned than the limit, we've reached the end
+    if [[ ${#_CLAI_PICKER_ITEMS[@]} -lt $CLAI_MENU_LIMIT ]]; then
+        _CLAI_PICKER_AT_END=true
+    else
+        _CLAI_PICKER_AT_END=false
+    fi
     return 0
 }
 
 _clai_picker_render() {
     local menu_text=""
-    local i=0
     local header="Suggestions"
     if [[ "$_CLAI_PICKER_MODE" == "history" ]]; then
         header="History (${_CLAI_HISTORY_SCOPE})"
     fi
 
-    for item in "${_CLAI_PICKER_ITEMS[@]}"; do
+    # Render items in reversed order: last array item at top, first at bottom.
+    # Index 0 is the closest/newest match and appears at the bottom of the menu.
+    local count=${#_CLAI_PICKER_ITEMS[@]}
+    local i=$((count - 1))
+    while [[ $i -ge 0 ]]; do
+        local item="${_CLAI_PICKER_ITEMS[$i + 1]}"  # zsh 1-based
         if [[ $i -eq $_CLAI_PICKER_INDEX ]]; then
             menu_text+=$'\n'" → $item"
         else
             menu_text+=$'\n'"   $item"
         fi
-        ((i++))
+        ((i--))
     done
     POSTDISPLAY=""
     region_highlight=()
@@ -562,8 +575,10 @@ _clai_picker_open() {
     _CLAI_PICKER_ORIG_CURSOR=$CURSOR
     _CLAI_PICKER_ACTIVE=true
     _CLAI_PICKER_INDEX=0
+    _CLAI_PICKER_PAGE=0
+    _CLAI_PICKER_AT_END=false
 
-    if ! _clai_picker_load; then
+    if ! _clai_picker_load 0; then
         _CLAI_PICKER_ACTIVE=false
         zle -M "No ${mode} items"
         return
@@ -575,6 +590,8 @@ _clai_picker_close() {
     _CLAI_PICKER_ACTIVE=false
     _CLAI_PICKER_ITEMS=()
     _CLAI_PICKER_INDEX=0
+    _CLAI_PICKER_PAGE=0
+    _CLAI_PICKER_AT_END=false
     _CLAI_PICKER_MODE=""
     zle -M ""
 }
@@ -605,12 +622,31 @@ _clai_picker_accept() {
 _clai_picker_up() {
     # Fast path: if picker is already open, navigate without external commands
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
-        if [[ $_CLAI_PICKER_INDEX -gt 0 ]]; then
-            ((_CLAI_PICKER_INDEX--))
-        else
-            _CLAI_PICKER_INDEX=$((${#_CLAI_PICKER_ITEMS[@]} - 1))
+        local last_index=$((${#_CLAI_PICKER_ITEMS[@]} - 1))
+        if [[ $_CLAI_PICKER_INDEX -lt $last_index ]]; then
+            # Move up in the visual list (toward older items)
+            ((_CLAI_PICKER_INDEX++))
+            _clai_picker_render
+        elif [[ "$_CLAI_PICKER_AT_END" != "true" ]]; then
+            # At top of current page and more items exist — load next page
+            ((_CLAI_PICKER_PAGE++))
+            local offset=$((_CLAI_PICKER_PAGE * CLAI_MENU_LIMIT))
+            if _clai_picker_load "$offset"; then
+                # Place cursor at bottom after paging (newest item on new page)
+                _CLAI_PICKER_INDEX=0
+                local selected="${_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX + 1]}"
+                if [[ -n "$selected" ]]; then
+                    BUFFER="$selected"
+                    CURSOR=${#BUFFER}
+                fi
+                _clai_picker_render
+            else
+                # No more items — mark end and stay put
+                _CLAI_PICKER_AT_END=true
+                ((_CLAI_PICKER_PAGE--))
+            fi
         fi
-        _clai_picker_render
+        # At end and at top: do nothing (no more items)
         return
     fi
     # Not in picker - check config before opening (expensive, runs once)
@@ -623,12 +659,12 @@ _clai_picker_up() {
 
 _clai_picker_down() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
-        if [[ $_CLAI_PICKER_INDEX -lt $((${#_CLAI_PICKER_ITEMS[@]} - 1)) ]]; then
-            ((_CLAI_PICKER_INDEX++))
-        else
-            _CLAI_PICKER_INDEX=0
+        if [[ $_CLAI_PICKER_INDEX -gt 0 ]]; then
+            # Move down in the visual list (toward newer items)
+            ((_CLAI_PICKER_INDEX--))
+            _clai_picker_render
         fi
-        _clai_picker_render
+        # At bottom (index 0): do nothing
         return
     fi
     zle .down-line-or-history
@@ -642,7 +678,9 @@ _clai_history_scope_session() {
     _CLAI_HISTORY_SCOPE="session"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load && _clai_picker_render
+        _CLAI_PICKER_PAGE=0
+        _CLAI_PICKER_AT_END=false
+        _clai_picker_load 0 && _clai_picker_render
     else
         zle -M "History scope: session"
     fi
@@ -652,7 +690,9 @@ _clai_history_scope_cwd() {
     _CLAI_HISTORY_SCOPE="cwd"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load && _clai_picker_render
+        _CLAI_PICKER_PAGE=0
+        _CLAI_PICKER_AT_END=false
+        _clai_picker_load 0 && _clai_picker_render
     else
         zle -M "History scope: cwd"
     fi
@@ -662,7 +702,9 @@ _clai_history_scope_global() {
     _CLAI_HISTORY_SCOPE="global"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load && _clai_picker_render
+        _CLAI_PICKER_PAGE=0
+        _CLAI_PICKER_AT_END=false
+        _clai_picker_load 0 && _clai_picker_render
     else
         zle -M "History scope: global"
     fi
