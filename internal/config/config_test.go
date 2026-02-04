@@ -58,6 +58,8 @@ func TestConfigGet(t *testing.T) {
 		{"suggestions.enabled", "true"},
 		{"suggestions.max_history", "5"},
 		{"privacy.sanitize_ai_calls", "true"},
+		{"history.picker_backend", "builtin"},
+		{"history.picker_page_size", "100"},
 	}
 
 	for _, tt := range tests {
@@ -284,6 +286,10 @@ func TestListKeys(t *testing.T) {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
+		"history.picker_backend",
+		"history.picker_open_on_empty",
+		"history.picker_page_size",
+		"history.picker_case_sensitive",
 	}
 
 	if len(keys) != len(expectedKeys) {
@@ -780,6 +786,7 @@ func TestGetUnknownFieldInSection(t *testing.T) {
 		{"ai_unknown", "ai.unknown_field"},
 		{"suggestions_unknown", "suggestions.unknown_field"},
 		{"privacy_unknown", "privacy.unknown_field"},
+		{"history_unknown", "history.unknown_field"},
 		{"daemon_typo", "daemon.idle_timeout"},
 		{"ai_typo", "ai.enable"},
 	}
@@ -806,6 +813,7 @@ func TestSetUnknownFieldInSection(t *testing.T) {
 		{"ai_unknown", "ai.unknown_field"},
 		{"suggestions_unknown", "suggestions.unknown_field"},
 		{"privacy_unknown", "privacy.unknown_field"},
+		{"history_unknown", "history.unknown_field"},
 	}
 
 	for _, tt := range tests {
@@ -1193,6 +1201,15 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		Privacy: PrivacyConfig{
 			SanitizeAICalls: false,
 		},
+		History: HistoryConfig{
+			PickerBackend:       "fzf",
+			PickerOpenOnEmpty:   true,
+			PickerPageSize:      50,
+			PickerCaseSensitive: true,
+			PickerTabs: []TabDef{
+				{ID: "session", Label: "Session", Provider: "history", Args: map[string]string{"session": "$CLAI_SESSION_ID"}},
+			},
+		},
 	}
 
 	// Save
@@ -1262,6 +1279,19 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if loaded.Privacy.SanitizeAICalls != false {
 		t.Errorf("Privacy.SanitizeAICalls: got %v, want false", loaded.Privacy.SanitizeAICalls)
 	}
+
+	if loaded.History.PickerBackend != "fzf" {
+		t.Errorf("History.PickerBackend: got %s, want fzf", loaded.History.PickerBackend)
+	}
+	if loaded.History.PickerOpenOnEmpty != true {
+		t.Errorf("History.PickerOpenOnEmpty: got %v, want true", loaded.History.PickerOpenOnEmpty)
+	}
+	if loaded.History.PickerPageSize != 50 {
+		t.Errorf("History.PickerPageSize: got %d, want 50", loaded.History.PickerPageSize)
+	}
+	if loaded.History.PickerCaseSensitive != true {
+		t.Errorf("History.PickerCaseSensitive: got %v, want true", loaded.History.PickerCaseSensitive)
+	}
 }
 
 func TestLoadFromFile_ReadError(t *testing.T) {
@@ -1297,6 +1327,10 @@ func TestListKeysComplete(t *testing.T) {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
+		"history.picker_backend",
+		"history.picker_open_on_empty",
+		"history.picker_page_size",
+		"history.picker_case_sensitive",
 	}
 
 	if len(keys) != len(expectedKeys) {
@@ -1338,6 +1372,10 @@ func TestListKeysAllSettable(t *testing.T) {
 		"suggestions.enabled":           "false",
 		"suggestions.max_history":       "10",
 		"suggestions.show_risk_warning": "false",
+		"history.picker_backend":        "fzf",
+		"history.picker_open_on_empty":  "true",
+		"history.picker_page_size":      "50",
+		"history.picker_case_sensitive": "true",
 	}
 
 	for _, key := range keys {
@@ -1392,6 +1430,11 @@ func TestDefaultConfigValues(t *testing.T) {
 		{"Suggestions.ShowRiskWarning", cfg.Suggestions.ShowRiskWarning, true},
 		// Privacy defaults
 		{"Privacy.SanitizeAICalls", cfg.Privacy.SanitizeAICalls, true},
+		// History defaults
+		{"History.PickerBackend", cfg.History.PickerBackend, "builtin"},
+		{"History.PickerOpenOnEmpty", cfg.History.PickerOpenOnEmpty, false},
+		{"History.PickerPageSize", cfg.History.PickerPageSize, 100},
+		{"History.PickerCaseSensitive", cfg.History.PickerCaseSensitive, false},
 	}
 
 	for _, tt := range tests {
@@ -1400,6 +1443,212 @@ func TestDefaultConfigValues(t *testing.T) {
 				t.Errorf("%s = %v, want %v", tt.name, tt.got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestDefaultHistoryConfig(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if cfg.History.PickerBackend != "builtin" {
+		t.Errorf("Expected picker_backend=builtin, got %s", cfg.History.PickerBackend)
+	}
+	if cfg.History.PickerOpenOnEmpty {
+		t.Error("Expected picker_open_on_empty=false")
+	}
+	if cfg.History.PickerPageSize != 100 {
+		t.Errorf("Expected picker_page_size=100, got %d", cfg.History.PickerPageSize)
+	}
+	if cfg.History.PickerCaseSensitive {
+		t.Error("Expected picker_case_sensitive=false")
+	}
+	if len(cfg.History.PickerTabs) != 2 {
+		t.Fatalf("Expected 2 default tabs, got %d", len(cfg.History.PickerTabs))
+	}
+	if cfg.History.PickerTabs[0].ID != "session" {
+		t.Errorf("Expected first tab id=session, got %s", cfg.History.PickerTabs[0].ID)
+	}
+	if cfg.History.PickerTabs[1].ID != "global" {
+		t.Errorf("Expected second tab id=global, got %s", cfg.History.PickerTabs[1].ID)
+	}
+}
+
+func TestGetAllHistoryFields(t *testing.T) {
+	cfg := DefaultConfig()
+
+	tests := []struct {
+		key      string
+		expected string
+	}{
+		{"history.picker_backend", "builtin"},
+		{"history.picker_open_on_empty", "false"},
+		{"history.picker_page_size", "100"},
+		{"history.picker_case_sensitive", "false"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			got, err := cfg.Get(tt.key)
+			if err != nil {
+				t.Errorf("Get(%q) error: %v", tt.key, err)
+				return
+			}
+			if got != tt.expected {
+				t.Errorf("Get(%q) = %q, want %q", tt.key, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSetAllHistoryFields(t *testing.T) {
+	tests := []struct {
+		key      string
+		value    string
+		expected string
+	}{
+		{"history.picker_backend", "fzf", "fzf"},
+		{"history.picker_backend", "clai", "clai"},
+		{"history.picker_backend", "builtin", "builtin"},
+		{"history.picker_open_on_empty", "true", "true"},
+		{"history.picker_open_on_empty", "false", "false"},
+		{"history.picker_page_size", "50", "50"},
+		{"history.picker_page_size", "200", "200"},
+		{"history.picker_case_sensitive", "true", "true"},
+		{"history.picker_case_sensitive", "false", "false"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
+			cfg := DefaultConfig()
+			err := cfg.Set(tt.key, tt.value)
+			if err != nil {
+				t.Errorf("Set(%q, %q) error: %v", tt.key, tt.value, err)
+				return
+			}
+
+			got, err := cfg.Get(tt.key)
+			if err != nil {
+				t.Errorf("Get(%q) error: %v", tt.key, err)
+				return
+			}
+			if got != tt.expected {
+				t.Errorf("After Set, Get(%q) = %q, want %q", tt.key, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSetHistoryPickerPageSizeClamping(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected string
+	}{
+		{"below_minimum", "5", "20"},
+		{"at_minimum", "20", "20"},
+		{"normal", "100", "100"},
+		{"at_maximum", "500", "500"},
+		{"above_maximum", "999", "500"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			err := cfg.Set("history.picker_page_size", tt.value)
+			if err != nil {
+				t.Errorf("Set picker_page_size=%q error: %v", tt.value, err)
+				return
+			}
+			got, _ := cfg.Get("history.picker_page_size")
+			if got != tt.expected {
+				t.Errorf("picker_page_size=%q: got %q, want %q", tt.value, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSetHistoryInvalidValues(t *testing.T) {
+	tests := []struct {
+		key   string
+		value string
+	}{
+		{"history.picker_backend", "invalid"},
+		{"history.picker_backend", ""},
+		{"history.picker_open_on_empty", "yes"},
+		{"history.picker_page_size", "not_a_number"},
+		{"history.picker_case_sensitive", "maybe"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
+			cfg := DefaultConfig()
+			err := cfg.Set(tt.key, tt.value)
+			if err == nil {
+				t.Errorf("Set(%q, %q) should have failed", tt.key, tt.value)
+			}
+		})
+	}
+}
+
+func TestValidateHistoryPickerBackend(t *testing.T) {
+	tests := []struct {
+		name    string
+		backend string
+		wantErr bool
+	}{
+		{"builtin", "builtin", false},
+		{"fzf", "fzf", false},
+		{"clai", "clai", false},
+		{"invalid", "invalid", true},
+		{"empty", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.History.PickerBackend = tt.backend
+			err := cfg.Validate()
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Validate() with backend=%q: error = %v, wantErr %v", tt.backend, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateHistoryPickerPageSizeClamping(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.History.PickerPageSize = 5
+	err := cfg.Validate()
+	if err != nil {
+		t.Fatalf("Validate() unexpected error: %v", err)
+	}
+	if cfg.History.PickerPageSize != 20 {
+		t.Errorf("Expected clamped page_size=20, got %d", cfg.History.PickerPageSize)
+	}
+
+	cfg.History.PickerPageSize = 999
+	err = cfg.Validate()
+	if err != nil {
+		t.Fatalf("Validate() unexpected error: %v", err)
+	}
+	if cfg.History.PickerPageSize != 500 {
+		t.Errorf("Expected clamped page_size=500, got %d", cfg.History.PickerPageSize)
+	}
+}
+
+func TestValidPickerBackends(t *testing.T) {
+	validBackends := []string{"builtin", "fzf", "clai"}
+
+	for _, backend := range validBackends {
+		if !isValidPickerBackend(backend) {
+			t.Errorf("isValidPickerBackend(%q) = false, want true", backend)
+		}
+	}
+
+	invalidBackends := []string{"BUILTIN", "Fzf", "custom", ""}
+	for _, backend := range invalidBackends {
+		if isValidPickerBackend(backend) {
+			t.Errorf("isValidPickerBackend(%q) = true, want false", backend)
+		}
 	}
 }
 
