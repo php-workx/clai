@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
+
 	"github.com/runger/clai/internal/config"
 )
 
@@ -224,6 +227,78 @@ func TestParseHistoryFlags_OutputEmptyIsValid(t *testing.T) {
 	}
 	if opts.output != "" {
 		t.Errorf("expected empty output, got %q", opts.output)
+	}
+}
+
+// --- Color profile tests ---
+
+// TestSetColorProfile_PipeDetectsAscii verifies that lipgloss detects Ascii
+// (no color) when output goes to a pipe, which is the root cause of the
+// no-color-in-zsh bug (stdout is a pipe in $(clai-picker ...) subshells).
+func TestSetColorProfile_PipeDetectsAscii(t *testing.T) {
+	// Create a pipe — lipgloss should detect no color capabilities.
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	defer r.Close()
+	defer w.Close()
+
+	output := termenv.NewOutput(w)
+	profile := output.ColorProfile()
+	if profile != termenv.Ascii {
+		t.Errorf("expected Ascii profile for pipe, got %v", profile)
+	}
+}
+
+// TestSetColorProfile_ModifiesDefaultRenderer verifies that
+// lipgloss.SetColorProfile modifies the existing default renderer in-place,
+// so package-level styles pick up the change. This is the fix for colors
+// not appearing when styles are created at init time.
+func TestSetColorProfile_ModifiesDefaultRenderer(t *testing.T) {
+	// Save and restore the original profile after the test.
+	origProfile := lipgloss.DefaultRenderer().ColorProfile()
+	defer lipgloss.SetColorProfile(origProfile)
+
+	// Force Ascii (no color) to simulate pipe detection.
+	lipgloss.SetColorProfile(termenv.Ascii)
+
+	// A style created now should produce plain text (no ANSI codes).
+	s := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	plainOutput := s.Render("hello")
+
+	// Now switch to ANSI256 (simulating our tty detection fix).
+	lipgloss.SetColorProfile(termenv.ANSI256)
+
+	// The same style object should now produce colored output.
+	colorOutput := s.Render("hello")
+
+	// In Ascii mode, Render should return plain "hello" (no escape codes).
+	if strings.Contains(plainOutput, "\x1b[") {
+		t.Errorf("Ascii profile should not produce ANSI codes, got %q", plainOutput)
+	}
+
+	// In ANSI256 mode, Render should include ANSI escape codes.
+	if !strings.Contains(colorOutput, "\x1b[") {
+		t.Errorf("ANSI256 profile should produce ANSI codes, got %q", colorOutput)
+	}
+}
+
+// TestSetColorProfile_TtyDetectsColor verifies that a real tty (/dev/tty)
+// is detected as having color support, which is the core of the fix.
+func TestSetColorProfile_TtyDetectsColor(t *testing.T) {
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		t.Skip("no /dev/tty available (CI environment)")
+	}
+	defer tty.Close()
+
+	output := termenv.NewOutput(tty)
+	profile := output.ColorProfile()
+
+	// A real terminal should support at least ANSI colors.
+	if profile == termenv.Ascii {
+		t.Errorf("expected color support from /dev/tty, got Ascii")
 	}
 }
 

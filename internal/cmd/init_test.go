@@ -446,6 +446,143 @@ func extractFunctionBody(script, funcName string) string {
 	return rest
 }
 
+// TestShellScripts_MacOSOptionH verifies that all shell scripts bind both
+// \eh (ESC+h, for terminals that send ESC for Alt) and the literal ˙ character
+// (U+02D9, which macOS Option+H produces with US keyboard layout).
+func TestShellScripts_MacOSOptionH(t *testing.T) {
+	shells := []struct {
+		path       string
+		escBinding string // ESC-based binding
+		macBinding string // macOS literal character binding
+	}{
+		{"shell/zsh/clai.zsh", `'\eh'`, `'˙'`},
+		{"shell/bash/clai.bash", `"\eh"`, `"˙"`},
+		{"shell/fish/clai.fish", `\eh`, `˙`},
+	}
+
+	for _, sh := range shells {
+		t.Run(sh.path, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(sh.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", sh.path, err)
+			}
+			script := string(content)
+
+			if !strings.Contains(script, sh.escBinding) {
+				t.Errorf("%s missing ESC-based Alt+H binding %s", sh.path, sh.escBinding)
+			}
+			if !strings.Contains(script, sh.macBinding) {
+				t.Errorf("%s missing macOS Option+H binding %s", sh.path, sh.macBinding)
+			}
+			if !strings.Contains(script, "_clai_tui_picker_open") {
+				t.Errorf("%s missing _clai_tui_picker_open function reference", sh.path)
+			}
+		})
+	}
+}
+
+// TestShellScripts_UpArrowHistoryPlaceholder verifies that all shell scripts
+// contain the {{CLAI_UP_ARROW_HISTORY}} placeholder that init.go replaces.
+func TestShellScripts_UpArrowHistoryPlaceholder(t *testing.T) {
+	shells := []string{
+		"shell/zsh/clai.zsh",
+		"shell/bash/clai.bash",
+		"shell/fish/clai.fish",
+	}
+
+	for _, path := range shells {
+		t.Run(path, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", path, err)
+			}
+			script := string(content)
+
+			if !strings.Contains(script, "{{CLAI_UP_ARROW_HISTORY}}") {
+				t.Errorf("%s missing {{CLAI_UP_ARROW_HISTORY}} placeholder", path)
+			}
+			if !strings.Contains(script, "CLAI_UP_ARROW_HISTORY") {
+				t.Errorf("%s missing CLAI_UP_ARROW_HISTORY variable usage", path)
+			}
+		})
+	}
+}
+
+// TestShellScripts_UpArrowConditionalBinding verifies that Up arrow is only
+// bound to the TUI picker when CLAI_UP_ARROW_HISTORY is "true".
+func TestShellScripts_UpArrowConditionalBinding(t *testing.T) {
+	shells := []struct {
+		path  string
+		guard string // the conditional check
+	}{
+		{"shell/zsh/clai.zsh", `"$CLAI_UP_ARROW_HISTORY" == "true"`},
+		{"shell/bash/clai.bash", `"$CLAI_UP_ARROW_HISTORY" == "true"`},
+		{"shell/fish/clai.fish", `"$CLAI_UP_ARROW_HISTORY" = "true"`},
+	}
+
+	for _, sh := range shells {
+		t.Run(sh.path, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(sh.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", sh.path, err)
+			}
+			script := string(content)
+
+			if !strings.Contains(script, sh.guard) {
+				t.Errorf("%s missing conditional guard %q for Up arrow binding", sh.path, sh.guard)
+			}
+		})
+	}
+}
+
+// TestBashScript_MacOSOptionHMacroTranslation verifies that bash uses a
+// readline macro to translate the macOS ˙ character to a Ctrl sequence,
+// since bash 3.2's bind -x cannot bind multi-byte UTF-8 characters.
+func TestBashScript_MacOSOptionHMacroTranslation(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
+	if err != nil {
+		t.Fatalf("Failed to read bash script: %v", err)
+	}
+	script := string(content)
+
+	// The ˙ character should be translated via a macro, not bound with -x directly.
+	if !strings.Contains(script, `bind '"˙": "\C-x\C-h"'`) {
+		t.Error("bash script missing macro translation of ˙ to \\C-x\\C-h")
+	}
+	if !strings.Contains(script, `bind -x '"\C-x\C-h": _clai_tui_picker_open'`) {
+		t.Error("bash script missing bind -x for \\C-x\\C-h")
+	}
+}
+
+// TestInitPlaceholderReplacement verifies that init.go replaces both
+// CLAI_SESSION_ID and CLAI_UP_ARROW_HISTORY placeholders.
+func TestInitPlaceholderReplacement(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	// Verify the raw template has the placeholder.
+	if !strings.Contains(script, "{{CLAI_UP_ARROW_HISTORY}}") {
+		t.Fatal("zsh script missing {{CLAI_UP_ARROW_HISTORY}} placeholder")
+	}
+
+	// Simulate the replacement that init.go performs.
+	replaced := strings.ReplaceAll(script, "{{CLAI_SESSION_ID}}", "test-session-id")
+	replaced = strings.ReplaceAll(replaced, "{{CLAI_UP_ARROW_HISTORY}}", "false")
+
+	if strings.Contains(replaced, "{{CLAI_UP_ARROW_HISTORY}}") {
+		t.Error("placeholder {{CLAI_UP_ARROW_HISTORY}} not replaced")
+	}
+	if strings.Contains(replaced, "{{CLAI_SESSION_ID}}") {
+		t.Error("placeholder {{CLAI_SESSION_ID}} not replaced")
+	}
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_HISTORY:=false") {
+		t.Error("expected CLAI_UP_ARROW_HISTORY:=false after replacement")
+	}
+}
+
 func TestShellScripts_Embedded(t *testing.T) {
 	// Verify all shell scripts are properly embedded
 	shells := []string{
