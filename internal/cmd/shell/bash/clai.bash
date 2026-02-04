@@ -237,12 +237,52 @@ _clai_picker_load_history() {
     return 0
 }
 
+_CLAI_PICKER_LINE_COUNT=0
+
+_clai_picker_render() {
+    local header="Suggestions"
+    if [[ "$_CLAI_PICKER_MODE" == "history" ]]; then
+        header="History (${_CLAI_HISTORY_SCOPE})"
+    fi
+
+    local menu_text="$header (↑↓, Enter, Ctrl+G):"
+    local i=0
+    local line_count=1
+    for item in "${_CLAI_PICKER_ITEMS[@]}"; do
+        if [[ $i -eq $_CLAI_PICKER_INDEX ]]; then
+            menu_text+=$'\n'" → $item"
+        else
+            menu_text+=$'\n'"   $item"
+        fi
+        ((i++))
+        ((line_count++))
+    done
+
+    _CLAI_PICKER_LINE_COUNT=$line_count
+
+    # Draw below command line using terminal escape sequences
+    printf '\e[s' >&2              # save cursor position
+    printf '\n\e[J' >&2            # newline + clear to end of screen
+    printf '%s\n' "$menu_text" >&2
+    printf '\e[u' >&2              # restore cursor position
+}
+
+_clai_picker_clear_menu() {
+    if [[ $_CLAI_PICKER_LINE_COUNT -gt 0 ]]; then
+        printf '\e[s' >&2          # save cursor
+        printf '\n\e[J' >&2        # newline + clear to end of screen
+        printf '\e[u' >&2          # restore cursor
+        _CLAI_PICKER_LINE_COUNT=0
+    fi
+}
+
 _clai_picker_apply() {
     local selected="${_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX]}"
     if [[ -n "$selected" ]]; then
         READLINE_LINE="$selected"
         READLINE_POINT=${#READLINE_LINE}
     fi
+    _clai_picker_render
 }
 
 _clai_history_up() {
@@ -298,14 +338,36 @@ _clai_history_down() {
     fi
 }
 
+_clai_picker_close() {
+    _clai_picker_clear_menu
+    _CLAI_PICKER_ACTIVE=false
+    _CLAI_PICKER_MODE=""
+    _CLAI_PICKER_ITEMS=()
+    _CLAI_PICKER_INDEX=0
+}
+
 _clai_picker_cancel() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         READLINE_LINE="$_CLAI_PICKER_ORIG_LINE"
         READLINE_POINT=${#READLINE_LINE}
-        _CLAI_PICKER_ACTIVE=false
-        _CLAI_PICKER_MODE=""
-        _CLAI_PICKER_ITEMS=()
-        _CLAI_PICKER_INDEX=0
+        _clai_picker_close
+    fi
+}
+
+# Enter key handler: accept picker selection when active, otherwise execute.
+# Enter is bound to a macro "\C-x\C-a\C-x\C-b" where:
+#   \C-x\C-a  →  _clai_pre_accept (this function, via bind -x)
+#   \C-x\C-b  →  accept-line (dynamically rebound to no-op when picker absorbs Enter)
+_clai_pre_accept() {
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        # Accept the current selection and close the picker
+        _clai_picker_close
+        # Swallow the accept-line that follows in the macro
+        bind '"\C-x\C-b": ""'
+    else
+        # Clear any leftover menu artifacts, then let accept-line fire
+        _clai_picker_clear_menu
+        bind '"\C-x\C-b": accept-line'
     fi
 }
 
@@ -333,7 +395,8 @@ _clai_history_scope_global() {
     fi
 }
 
-# Bindings: Up/Down for history picker, Ctrl+G cancels, Ctrl+x s/d/g switches scope
+# Bindings: Up/Down for history picker, Enter accepts, Ctrl+G cancels,
+# Ctrl+x s/d/g switches scope.
 #
 # Arrow keys: bash 3.2 (macOS default) doesn't support `bind -x` with escape
 # sequences — it fails with "cannot find keymap for command". Work around by
@@ -347,6 +410,13 @@ bind -x '"\C-g": _clai_picker_cancel'
 bind -x '"\C-xs": _clai_history_scope_session'
 bind -x '"\C-xd": _clai_history_scope_cwd'
 bind -x '"\C-xg": _clai_history_scope_global'
+
+# Enter: macro calls _clai_pre_accept, then conditionally accept-line.
+# _clai_pre_accept rebinds \C-x\C-b to either "" (picker absorbed Enter)
+# or accept-line (normal execution).
+bind '"\C-m": "\C-x\C-a\C-x\C-b"'
+bind -x '"\C-x\C-a": _clai_pre_accept'
+bind '"\C-x\C-b": accept-line'
 
 # Show AI suggestion in prompt when available (for AI-generated suggestions)
 _ai_show_suggestion() {
