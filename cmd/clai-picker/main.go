@@ -1,16 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/runger/clai/internal/config"
+	tea "github.com/charmbracelet/bubbletea"
 
-	_ "github.com/charmbracelet/bubbletea"
-	_ "github.com/charmbracelet/lipgloss"
+	"github.com/runger/clai/internal/config"
+	"github.com/runger/clai/internal/picker"
 )
 
 // Version information (set via ldflags during build).
@@ -217,41 +218,186 @@ func dispatch(cfg *config.Config, opts *pickerOpts) int {
 		backend = "builtin"
 	}
 
-	return dispatchBackend(backend, opts)
+	return dispatchBackend(backend, cfg, opts)
 }
 
 // dispatchBackend executes the selected backend or falls back.
-func dispatchBackend(backend string, opts *pickerOpts) int {
+func dispatchBackend(backend string, cfg *config.Config, opts *pickerOpts) int {
 	switch backend {
 	case "fzf":
-		return dispatchFzf(opts)
+		return dispatchFzf(cfg, opts)
 	case "clai":
-		return dispatchBuiltin(opts)
+		return dispatchBuiltin(cfg, opts)
 	case "builtin":
-		return dispatchBuiltin(opts)
+		return dispatchBuiltin(cfg, opts)
 	default:
 		// Unknown backend, fall back to builtin.
 		debugLog("unknown backend %q, falling back to builtin", backend)
-		return dispatchBuiltin(opts)
+		return dispatchBuiltin(cfg, opts)
 	}
 }
 
-// dispatchBuiltin runs the built-in Bubble Tea TUI (placeholder).
-func dispatchBuiltin(_ *pickerOpts) int {
-	fmt.Fprintln(os.Stderr, "builtin backend")
+// resolveTabs resolves the comma-separated tab IDs in opts to []config.TabDef.
+// If opts.tabs is empty, all configured tabs are returned.
+func resolveTabs(cfg *config.Config, opts *pickerOpts) []config.TabDef {
+	if opts.tabs == "" {
+		return cfg.History.PickerTabs
+	}
+
+	ids := strings.Split(opts.tabs, ",")
+	idSet := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		idSet[strings.TrimSpace(id)] = true
+	}
+
+	var tabs []config.TabDef
+	for _, t := range cfg.History.PickerTabs {
+		if idSet[t.ID] {
+			tabs = append(tabs, t)
+		}
+	}
+
+	// If no matches, return all configured tabs as fallback.
+	if len(tabs) == 0 {
+		return cfg.History.PickerTabs
+	}
+	return tabs
+}
+
+// socketPath returns the daemon socket path from config or the default.
+func socketPath(cfg *config.Config) string {
+	if cfg.Daemon.SocketPath != "" {
+		return cfg.Daemon.SocketPath
+	}
+	return config.DefaultPaths().SocketFile()
+}
+
+// dispatchBuiltin runs the built-in Bubble Tea TUI.
+func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
+	tabs := resolveTabs(cfg, opts)
+	provider := picker.NewHistoryProvider(socketPath(cfg))
+
+	model := picker.NewModel(tabs, provider)
+	if opts.query != "" {
+		model = model.WithQuery(opts.query)
+	}
+
+	// Open /dev/tty for TUI input/output since stdin/stdout are used for data.
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "clai-picker: cannot open /dev/tty: %v\n", err)
+		return exitError
+	}
+	defer tty.Close()
+
+	p := tea.NewProgram(model,
+		tea.WithAltScreen(),
+		tea.WithInput(tty),
+		tea.WithOutput(tty),
+	)
+
+	finalModel, err := p.Run()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "clai-picker: TUI error: %v\n", err)
+		return exitError
+	}
+
+	m, ok := finalModel.(picker.Model)
+	if !ok {
+		fmt.Fprintln(os.Stderr, "clai-picker: unexpected model type")
+		return exitError
+	}
+
+	if result := m.Result(); result != "" {
+		fmt.Fprintln(os.Stdout, result)
+	}
+
 	return exitSuccess
 }
 
 // dispatchFzf checks for fzf on PATH and falls back to builtin if missing.
-func dispatchFzf(opts *pickerOpts) int {
+func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 	_, err := exec.LookPath("fzf")
 	if err != nil {
 		debugLog("fzf not found on PATH, falling back to builtin")
-		return dispatchBuiltin(opts)
+		return dispatchBuiltin(cfg, opts)
 	}
-	// Placeholder: for now fzf backend acts like builtin.
-	fmt.Fprintln(os.Stderr, "fzf backend")
+
+	result, err := runFzfBackend(cfg, opts)
+	if err != nil {
+		// fzf exit code 130 = cancelled by user, exit code 1 = no match
+		debugLog("fzf backend error: %v", err)
+		return exitSuccess
+	}
+
+	if result != "" {
+		fmt.Fprintln(os.Stdout, result)
+	}
+
 	return exitSuccess
+}
+
+// runFzfBackend fetches all history and pipes it through fzf.
+func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
+	provider := picker.NewHistoryProvider(socketPath(cfg))
+	tabs := resolveTabs(cfg, opts)
+
+	// Use the first tab for fzf (fzf doesn't support tabs).
+	var tabID string
+	var tabOpts map[string]string
+	if len(tabs) > 0 {
+		tabID = tabs[0].ID
+		tabOpts = tabs[0].Args
+	}
+
+	// Fetch all items by paginating until AtEnd.
+	ctx := context.Background()
+	var allItems []string
+	offset := 0
+	limit := cfg.History.PickerPageSize
+	if limit <= 0 {
+		limit = 100
+	}
+
+	for {
+		resp, err := provider.Fetch(ctx, picker.Request{
+			Query:   opts.query,
+			TabID:   tabID,
+			Options: tabOpts,
+			Limit:   limit,
+			Offset:  offset,
+		})
+		if err != nil {
+			debugLog("fzf backend: fetch error: %v", err)
+			break
+		}
+		allItems = append(allItems, resp.Items...)
+		if resp.AtEnd || len(resp.Items) == 0 {
+			break
+		}
+		offset += len(resp.Items)
+	}
+
+	if len(allItems) == 0 {
+		return "", nil
+	}
+
+	// Build fzf command.
+	args := []string{"--no-sort", "--exact"}
+	if opts.query != "" {
+		args = append(args, "--query", opts.query)
+	}
+
+	cmd := exec.Command("fzf", args...)
+	cmd.Stdin = strings.NewReader(strings.Join(allItems, "\n"))
+	cmd.Stderr = os.Stderr // Let fzf render its TUI on stderr/tty.
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimRight(string(output), "\n"), nil
 }
 
 // debugLog logs a message to stderr when CLAI_DEBUG=1.

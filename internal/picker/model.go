@@ -85,6 +85,12 @@ func NewModel(tabs []config.TabDef, provider Provider) Model {
 	}
 }
 
+// WithQuery returns a copy of the Model with the initial query set.
+func (m Model) WithQuery(q string) Model {
+	m.query = q
+	return m
+}
+
 // Result returns the selected command string, or "" if cancelled.
 func (m Model) Result() string {
 	return m.result
