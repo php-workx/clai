@@ -20,7 +20,7 @@ It uses a thin client (`clai-shim`) for session logging and a history daemon
 - **Session logging** is done by `clai-shim`; it spawns `claid` if present.
 - If `claid` is missing, suggestions fall back to your shell history file.
 
-```
+```text
 Shell → clai suggest  (history + optional daemon)
      ↘ clai-shim → claid (session logging, optional)
 ```
