@@ -42,7 +42,7 @@ install-dev:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	go install golang.org/x/vuln/cmd/govulncheck@latest
 	go install golang.org/x/tools/cmd/goimports@latest
-	go install gotest.tools/gotestsum@latest
+	go install gotest.tools/gotestsum@v1.12.1
 	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
 	@echo "Installing pre-commit..."
