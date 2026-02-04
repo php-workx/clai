@@ -31,6 +31,7 @@ func TestRunSuggest_EmptyPrefix_UsesCache(t *testing.T) {
 	withSuggestGlobals(t, suggestGlobals{limit: 1, json: false})
 	cacheDir := t.TempDir()
 	t.Setenv("CLAI_CACHE", cacheDir)
+	t.Setenv("CLAI_HOME", t.TempDir()) // Isolate from user config
 
 	if err := cache.WriteSuggestion("git status"); err != nil {
 		t.Fatalf("WriteSuggestion error: %v", err)
@@ -49,6 +50,7 @@ func TestRunSuggest_EmptyPrefix_UsesCache(t *testing.T) {
 
 func TestRunSuggest_HistoryFallback_JSONRisk(t *testing.T) {
 	withSuggestGlobals(t, suggestGlobals{limit: 2, json: true})
+	t.Setenv("CLAI_HOME", t.TempDir()) // Isolate from user config
 	histFile := filepath.Join(t.TempDir(), "zsh_history")
 	content := strings.Join([]string{
 		": 1700000000:0;echo hello",

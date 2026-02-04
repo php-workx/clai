@@ -742,6 +742,78 @@ bindkey '^Xg' _clai_history_scope_global
 # is handled via send-break (Ctrl+C / Ctrl+G) instead.
 
 # ============================================
+# Full Disable / Enable (clai off / clai on)
+# ============================================
+
+_clai_disable() {
+    export CLAI_OFF=1
+
+    # Restore default ZLE widgets (undo custom overrides)
+    zle -A .self-insert self-insert
+    zle -A .backward-delete-char backward-delete-char
+    zle -A .backward-char backward-char
+    zle -A .beginning-of-line beginning-of-line
+    zle -A .end-of-line end-of-line
+    zle -A .forward-char forward-char
+    zle -A .bracketed-paste bracketed-paste
+    zle -A .send-break send-break
+
+    # Restore default keybindings
+    bindkey '^I' expand-or-complete
+    bindkey '^M' accept-line
+    bindkey '^[[A' up-line-or-history
+    bindkey '^[OA' up-line-or-history
+    bindkey '^[[B' down-line-or-history
+    bindkey '^[OB' down-line-or-history
+    bindkey '\e[1;3C' forward-word
+    bindkey -r '^X^V'
+    bindkey -r '^Xs'
+    bindkey -r '^Xd'
+    bindkey -r '^Xg'
+
+    # Restore zsh-autosuggestions
+    _clai_zsh_autosuggest_restore
+
+    # Remove hooks
+    add-zsh-hook -d preexec _ai_preexec
+    add-zsh-hook -d precmd _ai_precmd
+
+    # Clear ghost text
+    POSTDISPLAY=""
+    region_highlight=()
+
+    # Restore native history command
+    unfunction history 2>/dev/null
+
+    echo "clai disabled — native shell restored"
+}
+
+_clai_enable() {
+    unset CLAI_OFF
+    _CLAI_REINIT=1
+    eval "$(command clai init zsh)"
+    unset _CLAI_REINIT
+    echo "clai enabled"
+}
+
+# Wrapper function: intercepts off/on to run shell-native disable/enable
+clai() {
+    case "$1" in
+        off)
+            command clai off --session
+            _clai_disable
+            ;;
+        on)
+            command clai on --session
+            _clai_enable
+            ;;
+        *)
+            command clai "$@"
+            ;;
+    esac
+}
+
+# ============================================
 # Daemon Management
 # ============================================
 
@@ -778,7 +850,7 @@ _clai_cleanup() {
     clai-shim session-end --session-id="$CLAI_SESSION_ID" >/dev/null 2>&1 &!
 }
 
-if [[ -o interactive ]]; then
+if [[ -o interactive && -z "$_CLAI_REINIT" ]]; then
     # Notify daemon of new session (fire and forget)
     # Note: claid starts lazily via clai-shim -> ipc.NewClient() -> EnsureDaemon()
     (clai-shim session-start \

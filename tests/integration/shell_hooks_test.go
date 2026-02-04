@@ -105,6 +105,9 @@ func TestShellHooks_ZshRequiredFunctions(t *testing.T) {
 		"_ai_precmd",
 		"run()",
 		"function history", // Uses function keyword to avoid alias expansion
+		"_clai_disable",
+		"_clai_enable",
+		"clai()",
 	}
 
 	for _, fn := range requiredFunctions {
@@ -132,6 +135,9 @@ func TestShellHooks_BashRequiredFunctions(t *testing.T) {
 		"run()",
 		"ai-fix()",
 		"history()",
+		"_clai_disable()",
+		"_clai_enable()",
+		"clai()",
 	}
 
 	for _, fn := range requiredFunctions {
@@ -392,6 +398,61 @@ echo "All functions defined"
 	if err := cmd.Run(); err != nil {
 		t.Errorf("bash integration test failed: %v\nstdout: %s\nstderr: %s",
 			err, stdout.String(), stderr.String())
+	}
+}
+
+// TestShellHooks_ClaiOffOnWrapper verifies disable/enable functions and clai wrapper exist.
+func TestShellHooks_ClaiOffOnWrapper(t *testing.T) {
+	tests := []struct {
+		shell   string
+		file    string
+		disable string
+		enable  string
+		wrapper string
+		reinit  string
+	}{
+		{"zsh", "clai.zsh", "_clai_disable", "_clai_enable", "clai()", "_CLAI_REINIT"},
+		{"bash", "clai.bash", "_clai_disable", "_clai_enable", "clai()", "_CLAI_REINIT"},
+		{"fish", "clai.fish", "_clai_disable", "_clai_enable", "function clai", "_CLAI_REINIT"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.shell, func(t *testing.T) {
+			hookPath := findHookFile(tt.file)
+			if hookPath == "" {
+				t.Skipf("%s hook file not found", tt.shell)
+			}
+
+			content, err := os.ReadFile(hookPath)
+			if err != nil {
+				t.Fatalf("failed to read hook file: %v", err)
+			}
+
+			contentStr := string(content)
+
+			if !strings.Contains(contentStr, tt.disable) {
+				t.Errorf("%s: _clai_disable function not found", tt.shell)
+			}
+			if !strings.Contains(contentStr, tt.enable) {
+				t.Errorf("%s: _clai_enable function not found", tt.shell)
+			}
+			if !strings.Contains(contentStr, tt.wrapper) {
+				t.Errorf("%s: clai wrapper function not found (looking for %q)", tt.shell, tt.wrapper)
+			}
+			if !strings.Contains(contentStr, tt.reinit) {
+				t.Errorf("%s: _CLAI_REINIT guard not found", tt.shell)
+			}
+
+			// Verify CLAI_OFF is set in disable
+			if !strings.Contains(contentStr, "CLAI_OFF") {
+				t.Errorf("%s: CLAI_OFF not found in disable function", tt.shell)
+			}
+
+			// Verify command clai is used (not recursive call)
+			if !strings.Contains(contentStr, "command clai") {
+				t.Errorf("%s: 'command clai' not used in wrapper (would cause recursion)", tt.shell)
+			}
+		})
 	}
 }
 

@@ -556,10 +556,63 @@ function voice
 end
 
 # ============================================
+# Full Disable / Enable (clai off / clai on)
+# ============================================
+
+function _clai_disable
+    set -gx CLAI_OFF 1
+
+    # Restore default keybindings
+    bind \t complete
+    bind \e\[A history-search-backward
+    bind \e\[B history-search-forward
+    bind \r execute
+
+    # Remove custom keybindings
+    bind \e ''
+    bind \e\r ''
+    bind \cx\cv ''
+    bind \cx\cs ''
+    bind \cx\cd ''
+    bind \cx\cg ''
+
+    # Restore native autosuggestions
+    set -g fish_autosuggestion_enabled 1
+
+    # Remove custom fish_right_prompt and history wrapper
+    functions -e fish_right_prompt
+    functions -e history
+
+    echo "clai disabled — native shell restored"
+end
+
+function _clai_enable
+    set -ge CLAI_OFF
+    set -g _CLAI_REINIT 1
+    command clai init fish | source
+    set -ge _CLAI_REINIT
+    echo "clai enabled"
+end
+
+# Wrapper function: intercepts off/on to run shell-native disable/enable
+function clai --wraps=clai
+    switch $argv[1]
+        case off
+            command clai off --session
+            _clai_disable
+        case on
+            command clai on --session
+            _clai_enable
+        case '*'
+            command clai $argv
+    end
+end
+
+# ============================================
 # Startup Message
 # ============================================
 
-if status is-interactive
+if status is-interactive; and not set -q _CLAI_REINIT
     set -l short_id (string sub -l 8 -- $CLAI_SESSION_ID)
     set_color brblack
     echo "🤖 clai [$short_id] → suggest | Alt+↵ accept | ?\"describe task\""

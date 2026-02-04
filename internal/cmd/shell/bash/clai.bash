@@ -633,10 +633,78 @@ voice() {
 }
 
 # ============================================
+# Full Disable / Enable (clai off / clai on)
+# ============================================
+
+_clai_disable() {
+    export CLAI_OFF=1
+
+    # Restore default keybindings
+    bind '"\C-m": accept-line'
+    bind '"\e[A": previous-history'
+    bind '"\e[B": next-history'
+    bind '"\t": complete'
+    bind "set show-all-if-ambiguous off"
+
+    # Remove custom key bindings
+    bind -r '\C-x\C-a'
+    bind -r '\C-x\C-b'
+    bind -r '\C-x\C-p'
+    bind -r '\C-x\C-n'
+    bind -r '\C-g'
+    bind -r '\C-xs'
+    bind -r '\C-xd'
+    bind -r '\C-xg'
+
+    # Remove default completion handler
+    complete -r -D 2>/dev/null
+
+    # Strip _ai_prompt_command from PROMPT_COMMAND
+    PROMPT_COMMAND="${PROMPT_COMMAND//_ai_prompt_command;/}"
+    PROMPT_COMMAND="${PROMPT_COMMAND//_ai_prompt_command/}"
+
+    # Remove DEBUG trap and restore extdebug
+    trap - DEBUG
+    if [[ "$_AI_EXTDEBUG_WAS_ON" != "true" ]]; then
+        shopt -u extdebug
+    fi
+
+    # Restore native history command
+    unset -f history 2>/dev/null
+
+    echo "clai disabled — native shell restored"
+}
+
+_clai_enable() {
+    unset CLAI_OFF
+    _CLAI_REINIT=1
+    eval "$(command clai init bash)"
+    unset _CLAI_REINIT
+    echo "clai enabled"
+}
+
+# Wrapper function: intercepts off/on to run shell-native disable/enable
+clai() {
+    case "$1" in
+        off)
+            command clai off --session
+            _clai_disable
+            ;;
+        on)
+            command clai on --session
+            _clai_enable
+            ;;
+        *)
+            command clai "$@"
+            ;;
+    esac
+}
+
+# ============================================
 # Startup Message
 # ============================================
 
-if [[ $- == *i* ]]; then
+if [[ $- == *i* && -z "$_CLAI_REINIT" ]]; then
     # Use printf for better portability across bash versions
     printf '\033[2m🤖 clai [%s] Tab complete | accept cmd | ?"describe task"\033[0m\n' "${CLAI_SESSION_ID:0:8}"
 fi
