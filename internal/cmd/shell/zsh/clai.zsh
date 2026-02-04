@@ -790,8 +790,12 @@ zle -N _clai_history_scope_cwd
 zle -N _clai_history_scope_global
 zle -N send-break _clai_picker_break
 
-# Alt+H always opens TUI picker.
+# Alt/Option+H opens TUI picker.
+# '\eh' works when the terminal sends ESC for Alt (Linux, or macOS with
+# "Use Option as Meta key" enabled). The literal '˙' covers macOS
+# Terminal.app and iTerm2 defaults where Option+H produces U+02D9.
 bindkey '\eh' _clai_tui_picker_open
+bindkey '˙' _clai_tui_picker_open
 
 # When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
 # (with fallback to shell default). Otherwise shell defaults are used.
@@ -842,6 +846,7 @@ _clai_disable() {
     bindkey -r '^Xd'
     bindkey -r '^Xg'
     bindkey -r '\eh'
+    bindkey -r '˙'
 
     # Restore zsh-autosuggestions
     _clai_zsh_autosuggest_restore

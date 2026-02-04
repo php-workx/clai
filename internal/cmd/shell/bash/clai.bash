@@ -460,8 +460,11 @@ _clai_history_scope_global() {
 # sequences — it fails with "cannot find keymap for command". Work around by
 # using a readline macro to translate arrow escapes to Ctrl-X prefixed
 # sequences, then bind those with -x.
-# Alt+H always opens TUI picker.
+# Alt/Option+H opens TUI picker.
+# '\eh' works when the terminal sends ESC for Alt. The literal '˙' covers
+# macOS Terminal.app/iTerm2 defaults where Option+H produces U+02D9.
 bind -x '"\eh": _clai_tui_picker_open'
+bind -x '"˙": _clai_tui_picker_open'
 
 # When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
 # (with fallback to shell default). Otherwise shell defaults are used.
@@ -716,6 +719,7 @@ _clai_disable() {
     bind -r '\C-xd'
     bind -r '\C-xg'
     bind -r '\eh'
+    bind -r '˙'
 
     # Remove completion handlers (default + per-command for bash <4)
     complete -r -D 2>/dev/null

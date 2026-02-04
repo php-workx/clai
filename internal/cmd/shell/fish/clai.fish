@@ -402,8 +402,11 @@ function _clai_history_scope_global
     end
 end
 
-# Alt+H always opens TUI picker.
+# Alt/Option+H opens TUI picker.
+# \eh works when the terminal sends ESC for Alt. The literal ˙ covers
+# macOS Terminal.app/iTerm2 defaults where Option+H produces U+02D9.
 bind \eh _clai_tui_picker_open
+bind ˙ _clai_tui_picker_open
 
 # When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
 # (with fallback to shell default). Otherwise shell defaults are used.
@@ -638,6 +641,7 @@ function _clai_disable
     bind \e ''
     bind \e\r ''
     bind \eh ''
+    bind ˙ ''
     bind \cx\cv ''
     bind \cx\cs ''
     bind \cx\cd ''
