@@ -5,6 +5,7 @@
 //! command assistance.
 
 pub mod alt_screen;
+pub mod assistant_comment;
 pub mod bracketed_paste;
 pub mod cli;
 pub mod color_detect;
@@ -78,6 +79,10 @@ pub use standalone::{Feature, StandaloneError, StandaloneReason, StandaloneState
 pub use suggestion_receiver::{
     ParseError as SuggestionParseError, Suggestion, SuggestionReceiver, SuggestionType,
     MAX_SUGGESTIONS_PER_COMMAND, MAX_TOTAL_SUGGESTIONS,
+};
+
+pub use assistant_comment::{
+    AssistantComment, CommentManager, CommentRenderer, CommentType, Shell,
 };
 
 #[cfg(unix)]
