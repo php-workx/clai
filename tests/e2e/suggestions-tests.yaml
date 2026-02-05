@@ -11,12 +11,17 @@
 # - Debug endpoints
 # - Incognito mode suggestions behavior
 #
-# These tests should be run in all three shells: bash, zsh, fish
+# Schema:
+#   shell: <shell>           - Run test in a single shell (bash, zsh, or fish)
+#   shells: [bash, zsh, fish] - Run test in multiple shells (test runner iterates)
+#
+# When using `shells`, the test runner should execute the test once per shell.
+# The test name may be suffixed with the shell name in reports (e.g., "Test name (bash)").
 
 suite:
   name: "clai Suggestions Engine"
   description: "End-to-end tests for suggestion features"
-  version: "2.0"
+  version: "3.0"
 
 defaults:
   timeout: 30s
@@ -31,13 +36,13 @@ environment:
 
 tests:
   # ===========================================================================
-  # clai suggest CLI Tests - Bash
+  # clai suggest CLI Tests - Cross-Shell
   # ===========================================================================
 
-  - name: "clai suggest text format (bash)"
+  - name: "clai suggest text format"
     description: "Default output shows numbered list with reasons"
-    shell: bash
-    tags: [suggest, format, bash, smoke]
+    shells: [bash, zsh, fish]
+    tags: [suggest, format, cross-shell, smoke]
     setup:
       - "echo setup1"
       - "git status"
@@ -50,10 +55,10 @@ tests:
       - screen_matches: "\\d+\\."  # Numbered list
       - screen_matches: "\\("      # Reasons in parens
 
-  - name: "clai suggest JSON format (bash)"
+  - name: "clai suggest JSON format"
     description: "--format=json returns valid JSON structure"
-    shell: bash
-    tags: [suggest, format, json, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggest, format, json, cross-shell]
     setup:
       - "npm test"
     steps:
@@ -64,10 +69,10 @@ tests:
       - screen_contains: "{"
       - screen_contains: "suggestions"
 
-  - name: "clai suggest fzf format (bash)"
+  - name: "clai suggest fzf format"
     description: "--format=fzf returns plain command list for piping"
-    shell: bash
-    tags: [suggest, format, fzf, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggest, format, fzf, cross-shell]
     setup:
       - "docker ps"
     steps:
@@ -79,10 +84,10 @@ tests:
       - screen_not_contains: "1."
       - screen_not_contains: "("
 
-  - name: "clai suggest with limit (bash)"
+  - name: "clai suggest with limit"
     description: "--limit restricts suggestion count"
-    shell: bash
-    tags: [suggest, format, parameters, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggest, format, parameters, cross-shell]
     setup:
       - "cmd1"
       - "cmd2"
@@ -94,10 +99,10 @@ tests:
     expect:
       - screen_matches: "."
 
-  - name: "clai suggest with prefix filters results (bash)"
+  - name: "clai suggest with prefix filters results"
     description: "Providing a prefix argument filters suggestions"
-    shell: bash
-    tags: [suggest, prefix, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggest, prefix, cross-shell]
     setup:
       - "git status"
       - "git log --oneline"
@@ -113,171 +118,13 @@ tests:
       - screen_not_contains: "make"
 
   # ===========================================================================
-  # clai suggest CLI Tests - Zsh
-  # ===========================================================================
-
-  - name: "clai suggest text format (zsh)"
-    description: "Default output shows numbered list with reasons"
-    shell: zsh
-    tags: [suggest, format, zsh, cross-shell]
-    setup:
-      - "echo setup1"
-      - "git status"
-    steps:
-      - type: "clai suggest"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_matches: "\\d+\\."
-
-  - name: "clai suggest JSON format (zsh)"
-    description: "--format=json returns valid JSON structure"
-    shell: zsh
-    tags: [suggest, format, json, zsh, cross-shell]
-    setup:
-      - "npm test"
-    steps:
-      - type: "clai suggest --format=json"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "{"
-      - screen_contains: "suggestions"
-
-  - name: "clai suggest fzf format (zsh)"
-    description: "--format=fzf returns plain command list for piping"
-    shell: zsh
-    tags: [suggest, format, fzf, zsh, cross-shell]
-    setup:
-      - "docker ps"
-    steps:
-      - type: "clai suggest --format=fzf"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_not_contains: "1."
-      - screen_not_contains: "("
-
-  - name: "clai suggest with limit (zsh)"
-    description: "--limit restricts suggestion count"
-    shell: zsh
-    tags: [suggest, format, parameters, zsh, cross-shell]
-    setup:
-      - "cmd1"
-      - "cmd2"
-      - "cmd3"
-    steps:
-      - type: "clai suggest --limit=2"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_matches: "."
-
-  - name: "clai suggest with prefix filters results (zsh)"
-    description: "Providing a prefix argument filters suggestions"
-    shell: zsh
-    tags: [suggest, prefix, zsh, cross-shell]
-    setup:
-      - "git status"
-      - "git log --oneline"
-      - "npm test"
-      - "make build"
-    steps:
-      - type: "clai suggest git"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "git"
-      - screen_not_contains: "npm"
-      - screen_not_contains: "make"
-
-  # ===========================================================================
-  # clai suggest CLI Tests - Fish
-  # ===========================================================================
-
-  - name: "clai suggest text format (fish)"
-    description: "Default output shows numbered list with reasons"
-    shell: fish
-    tags: [suggest, format, fish, cross-shell]
-    setup:
-      - "echo setup1"
-      - "git status"
-    steps:
-      - type: "clai suggest"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_matches: "\\d+\\."
-
-  - name: "clai suggest JSON format (fish)"
-    description: "--format=json returns valid JSON structure"
-    shell: fish
-    tags: [suggest, format, json, fish, cross-shell]
-    setup:
-      - "npm test"
-    steps:
-      - type: "clai suggest --format=json"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "{"
-      - screen_contains: "suggestions"
-
-  - name: "clai suggest fzf format (fish)"
-    description: "--format=fzf returns plain command list for piping"
-    shell: fish
-    tags: [suggest, format, fzf, fish, cross-shell]
-    setup:
-      - "docker ps"
-    steps:
-      - type: "clai suggest --format=fzf"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_not_contains: "1."
-      - screen_not_contains: "("
-
-  - name: "clai suggest with limit (fish)"
-    description: "--limit restricts suggestion count"
-    shell: fish
-    tags: [suggest, format, parameters, fish, cross-shell]
-    setup:
-      - "cmd1"
-      - "cmd2"
-      - "cmd3"
-    steps:
-      - type: "clai suggest --limit=2"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_matches: "."
-
-  - name: "clai suggest with prefix filters results (fish)"
-    description: "Providing a prefix argument filters suggestions"
-    shell: fish
-    tags: [suggest, prefix, fish, cross-shell]
-    setup:
-      - "git status"
-      - "git log --oneline"
-      - "npm test"
-      - "make build"
-    steps:
-      - type: "clai suggest git"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "git"
-      - screen_not_contains: "npm"
-      - screen_not_contains: "make"
-
-  # ===========================================================================
-  # Suggestion Reasons Tests
+  # Suggestion Reasons Tests - Cross-Shell
   # ===========================================================================
 
   - name: "Suggestion shows transition reason"
     description: "Commands following patterns show transition reason"
-    shell: bash
-    tags: [suggest, reasons, transition, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggest, reasons, transition, cross-shell]
     setup:
       - "git add ."
       - "git commit -m 'test'"
@@ -293,8 +140,8 @@ tests:
 
   - name: "Suggestion shows freq_repo reason"
     description: "Frequently used repo commands show freq_repo reason"
-    shell: bash
-    tags: [suggest, reasons, frequency, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggest, reasons, frequency, cross-shell]
     setup:
       - "make build"
       - "make build"
@@ -309,8 +156,8 @@ tests:
 
   - name: "Suggestion includes confidence score"
     description: "JSON output includes confidence field"
-    shell: bash
-    tags: [suggest, confidence, json, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggest, confidence, json, cross-shell]
     setup:
       - "git status"
     steps:
@@ -322,8 +169,8 @@ tests:
 
   - name: "Suggestion context includes last_cmd_norm"
     description: "JSON context shows normalized last command"
-    shell: bash
-    tags: [suggest, context, json, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggest, context, json, cross-shell]
     setup:
       - "git status"
     steps:
@@ -334,13 +181,13 @@ tests:
       - screen_matches: "(context|last_cmd)"
 
   # ===========================================================================
-  # Ghost Text / Inline Suggestions - Bash
+  # Ghost Text / Inline Suggestions - Cross-Shell
   # ===========================================================================
 
-  - name: "Ghost text suggestion appears (bash)"
+  - name: "Ghost text suggestion appears"
     description: "Typing a known command prefix shows ghost text suggestion"
-    shell: bash
-    tags: [suggestions, ghost-text, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggestions, ghost-text, cross-shell]
     setup:
       - "git status"
       - "git log --oneline"
@@ -350,10 +197,10 @@ tests:
     expect:
       - screen_contains: "atus"  # Suggestion completing "git status"
 
-  - name: "Right arrow accepts full suggestion (bash)"
+  - name: "Right arrow accepts full suggestion"
     description: "Pressing Right at end of line accepts the ghost text"
-    shell: bash
-    tags: [suggestions, ghost-text, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggestions, ghost-text, cross-shell]
     setup:
       - "docker ps -a"
     steps:
@@ -364,10 +211,10 @@ tests:
     expect:
       - screen_contains: "docker ps"
 
-  - name: "Escape clears suggestion (bash)"
+  - name: "Escape clears suggestion"
     description: "Pressing Escape removes the ghost text"
-    shell: bash
-    tags: [suggestions, ghost-text, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggestions, ghost-text, cross-shell]
     setup:
       - "npm install"
     steps:
@@ -378,10 +225,10 @@ tests:
     expect:
       - screen_not_contains: "nstall"  # Ghost text gone
 
-  - name: "Alt+Right accepts next token (bash)"
+  - name: "Alt+Right accepts next token"
     description: "Alt+Right accepts one token of the suggestion at a time"
-    shell: bash
-    tags: [suggestions, ghost-text, token, bash]
+    shells: [bash, zsh, fish]
+    tags: [suggestions, ghost-text, token, cross-shell]
     setup:
       - "kubectl get pods -n production"
     steps:
@@ -394,133 +241,13 @@ tests:
       - screen_not_contains: "pods"  # Rest not accepted yet
 
   # ===========================================================================
-  # Ghost Text / Inline Suggestions - Zsh
+  # Typo Correction (Did You Mean?) - Cross-Shell
   # ===========================================================================
 
-  - name: "Ghost text suggestion appears (zsh)"
-    description: "Typing a known command prefix shows ghost text suggestion"
-    shell: zsh
-    tags: [suggestions, ghost-text, zsh, cross-shell]
-    setup:
-      - "git status"
-      - "git log --oneline"
-    steps:
-      - type: "git st"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "atus"
-
-  - name: "Right arrow accepts full suggestion (zsh)"
-    description: "Pressing Right at end of line accepts the ghost text"
-    shell: zsh
-    tags: [suggestions, ghost-text, zsh, cross-shell]
-    setup:
-      - "docker ps -a"
-    steps:
-      - type: "docker p"
-      - wait: "300ms"
-      - press: "Right"
-      - wait: "200ms"
-    expect:
-      - screen_contains: "docker ps"
-
-  - name: "Escape clears suggestion (zsh)"
-    description: "Pressing Escape removes the ghost text"
-    shell: zsh
-    tags: [suggestions, ghost-text, zsh, cross-shell]
-    setup:
-      - "npm install"
-    steps:
-      - type: "npm i"
-      - wait: "300ms"
-      - press: "Escape"
-      - wait: "200ms"
-    expect:
-      - screen_not_contains: "nstall"
-
-  - name: "Alt+Right accepts next token (zsh)"
-    description: "Alt+Right accepts one token of the suggestion at a time"
-    shell: zsh
-    tags: [suggestions, ghost-text, token, zsh, cross-shell]
-    setup:
-      - "kubectl get pods -n production"
-    steps:
-      - type: "kubectl"
-      - wait: "300ms"
-      - press: "Alt+Right"
-      - wait: "200ms"
-    expect:
-      - screen_contains: "kubectl get"
-      - screen_not_contains: "pods"
-
-  # ===========================================================================
-  # Ghost Text / Inline Suggestions - Fish
-  # ===========================================================================
-
-  - name: "Ghost text suggestion appears (fish)"
-    description: "Typing a known command prefix shows ghost text suggestion"
-    shell: fish
-    tags: [suggestions, ghost-text, fish, cross-shell]
-    setup:
-      - "git status"
-      - "git log --oneline"
-    steps:
-      - type: "git st"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "atus"
-
-  - name: "Right arrow accepts full suggestion (fish)"
-    description: "Pressing Right at end of line accepts the ghost text"
-    shell: fish
-    tags: [suggestions, ghost-text, fish, cross-shell]
-    setup:
-      - "docker ps -a"
-    steps:
-      - type: "docker p"
-      - wait: "300ms"
-      - press: "Right"
-      - wait: "200ms"
-    expect:
-      - screen_contains: "docker ps"
-
-  - name: "Escape clears suggestion (fish)"
-    description: "Pressing Escape removes the ghost text"
-    shell: fish
-    tags: [suggestions, ghost-text, fish, cross-shell]
-    setup:
-      - "npm install"
-    steps:
-      - type: "npm i"
-      - wait: "300ms"
-      - press: "Escape"
-      - wait: "200ms"
-    expect:
-      - screen_not_contains: "nstall"
-
-  - name: "Alt+Right accepts next token (fish)"
-    description: "Alt+Right accepts one token of the suggestion at a time"
-    shell: fish
-    tags: [suggestions, ghost-text, token, fish, cross-shell]
-    setup:
-      - "kubectl get pods -n production"
-    steps:
-      - type: "kubectl"
-      - wait: "300ms"
-      - press: "Alt+Right"
-      - wait: "200ms"
-    expect:
-      - screen_contains: "kubectl get"
-      - screen_not_contains: "pods"
-
-  # ===========================================================================
-  # Typo Correction (Did You Mean?) - All Shells
-  # ===========================================================================
-
-  - name: "Typo correction suggests on exit 127 (bash)"
+  - name: "Typo correction suggests on exit 127"
     description: "Misspelled command triggers Did You Mean suggestion"
-    shell: bash
-    tags: [typo, correction, suggestions, bash]
+    shells: [bash, zsh, fish]
+    tags: [typo, correction, suggestions, cross-shell]
     skip: true
     skip_reason: "Typo correction backend not yet implemented"
     setup:
@@ -536,46 +263,10 @@ tests:
     expect:
       - screen_contains: "git"
 
-  - name: "Typo correction suggests on exit 127 (zsh)"
-    description: "Misspelled command triggers Did You Mean suggestion"
-    shell: zsh
-    tags: [typo, correction, suggestions, zsh, cross-shell]
-    skip: true
-    skip_reason: "Typo correction backend not yet implemented"
-    setup:
-      - "git status"
-    steps:
-      - type: "gti status"
-      - press: "Enter"
-      - wait: "1s"
-      - type: "clai suggest"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "git"
-
-  - name: "Typo correction suggests on exit 127 (fish)"
-    description: "Misspelled command triggers Did You Mean suggestion"
-    shell: fish
-    tags: [typo, correction, suggestions, fish, cross-shell]
-    skip: true
-    skip_reason: "Typo correction backend not yet implemented"
-    setup:
-      - "git status"
-    steps:
-      - type: "gti status"
-      - press: "Enter"
-      - wait: "1s"
-      - type: "clai suggest"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "git"
-
   - name: "Typo correction respects similarity threshold"
     description: "Very different strings don't trigger correction"
-    shell: bash
-    tags: [typo, correction, threshold]
+    shells: [bash, zsh, fish]
+    tags: [typo, correction, threshold, cross-shell]
     skip: true
     skip_reason: "Typo correction backend not yet implemented"
     steps:
@@ -590,8 +281,8 @@ tests:
 
   - name: "Typo correction prioritizes high-frequency commands"
     description: "Common commands are suggested over rare ones"
-    shell: bash
-    tags: [typo, correction, frequency]
+    shells: [bash, zsh, fish]
+    tags: [typo, correction, frequency, cross-shell]
     skip: true
     skip_reason: "Typo correction backend not yet implemented"
     setup:
@@ -610,13 +301,13 @@ tests:
       - screen_contains: "common_cmd"
 
   # ===========================================================================
-  # Semantic Slot Filling - All Shells
+  # Semantic Slot Filling - Cross-Shell
   # ===========================================================================
 
-  - name: "Slot filling learns argument values (bash)"
+  - name: "Slot filling learns argument values"
     description: "Repeated arguments are remembered for suggestions"
-    shell: bash
-    tags: [slots, learning, suggestions, bash]
+    shells: [bash, zsh, fish]
+    tags: [slots, learning, suggestions, cross-shell]
     skip: true
     skip_reason: "Slot filling backend not yet implemented"
     setup:
@@ -632,8 +323,8 @@ tests:
 
   - name: "Slot filling respects frequency"
     description: "More frequent values are preferred"
-    shell: bash
-    tags: [slots, frequency, suggestions]
+    shells: [bash, zsh, fish]
+    tags: [slots, frequency, suggestions, cross-shell]
     skip: true
     skip_reason: "Slot filling backend not yet implemented"
     setup:
@@ -650,8 +341,8 @@ tests:
 
   - name: "Slot scope repo overrides global"
     description: "Repo-scoped slot values take precedence over global"
-    shell: bash
-    tags: [slots, scope, suggestions]
+    shells: [bash, zsh, fish]
+    tags: [slots, scope, suggestions, cross-shell]
     skip: true
     skip_reason: "Slot filling backend not yet implemented"
     setup:
@@ -668,13 +359,13 @@ tests:
       - screen_contains: "alpine"
 
   # ===========================================================================
-  # Pre-computed Cache - All Shells
+  # Pre-computed Cache - Cross-Shell
   # ===========================================================================
 
-  - name: "Suggestions served from cache (bash)"
+  - name: "Suggestions served from cache"
     description: "Cache hit after recent command"
-    shell: bash
-    tags: [cache, performance, bash]
+    shells: [bash, zsh, fish]
+    tags: [cache, performance, cross-shell]
     skip: true
     skip_reason: "Cache introspection not yet exposed in CLI"
     setup:
@@ -688,8 +379,8 @@ tests:
 
   - name: "Cache TTL expires stale entries"
     description: "Suggestions recompute after TTL expiration"
-    shell: bash
-    tags: [cache, ttl, performance]
+    shells: [bash, zsh, fish]
+    tags: [cache, ttl, performance, cross-shell]
     skip: true
     skip_reason: "Cache introspection not yet exposed in CLI"
     setup:
@@ -708,8 +399,8 @@ tests:
 
   - name: "Cache invalidated on new command"
     description: "Running a command invalidates the cache"
-    shell: bash
-    tags: [cache, invalidation, performance]
+    shells: [bash, zsh, fish]
+    tags: [cache, invalidation, performance, cross-shell]
     skip: true
     skip_reason: "Cache introspection not yet exposed in CLI"
     setup:
@@ -730,8 +421,8 @@ tests:
 
   - name: "Cache shows in debug endpoint"
     description: "/debug/cache endpoint returns cache state"
-    shell: bash
-    tags: [cache, debug]
+    shells: [bash, zsh, fish]
+    tags: [cache, debug, cross-shell]
     skip: true
     skip_reason: "Cache introspection not yet exposed in CLI"
     steps:
@@ -742,7 +433,8 @@ tests:
       - screen_matches: "(size|entries|cache)"
 
   # ===========================================================================
-  # Suggestion Widget Keybindings
+  # Suggestion Widget Keybindings - Shell-Specific
+  # These have different keybindings per shell, so we test separately
   # ===========================================================================
 
   - name: "Ctrl+Space opens suggestion picker (bash)"
@@ -761,7 +453,7 @@ tests:
   - name: "Ctrl+Space opens suggestion picker (zsh)"
     description: "Ctrl+Space keybinding triggers suggestion widget"
     shell: zsh
-    tags: [suggestions, keybind, widget, zsh, cross-shell]
+    tags: [suggestions, keybind, widget, zsh]
     setup:
       - "echo test1"
       - "git status"
@@ -772,9 +464,9 @@ tests:
       - screen_matches: "(fzf|suggest|pick)"
 
   - name: "Alt+Space opens suggestion picker (fish)"
-    description: "Alt+Space keybinding triggers suggestion widget"
+    description: "Alt+Space keybinding triggers suggestion widget (fish uses Alt)"
     shell: fish
-    tags: [suggestions, keybind, widget, fish, cross-shell]
+    tags: [suggestions, keybind, widget, fish]
     setup:
       - "echo test1"
       - "git status"
@@ -785,13 +477,13 @@ tests:
       - screen_matches: "(fzf|suggest|pick)"
 
   # ===========================================================================
-  # FTS5 Search Command Tests (moved from example-test-plan.yaml)
+  # FTS5 Search Command Tests - Cross-Shell
   # ===========================================================================
 
   - name: "clai search basic query"
     description: "Search command finds matching history entries"
-    shell: bash
-    tags: [search, fts5, smoke]
+    shells: [bash, zsh, fish]
+    tags: [search, fts5, smoke, cross-shell]
     setup:
       - "echo 'searchable_unique_term_abc123'"
       - "git status"
@@ -804,8 +496,8 @@ tests:
 
   - name: "clai search with repo filter"
     description: "Search --repo limits results to current repository"
-    shell: bash
-    tags: [search, fts5, repo]
+    shells: [bash, zsh, fish]
+    tags: [search, fts5, repo, cross-shell]
     setup:
       - "echo 'repo_specific_search_term'"
     steps:
@@ -817,8 +509,8 @@ tests:
 
   - name: "clai search with limit"
     description: "Search --limit restricts result count"
-    shell: bash
-    tags: [search, fts5, parameters]
+    shells: [bash, zsh, fish]
+    tags: [search, fts5, parameters, cross-shell]
     setup:
       - "echo search_limit_1"
       - "echo search_limit_2"
@@ -835,8 +527,8 @@ tests:
 
   - name: "clai search with JSON output"
     description: "Search --json returns valid JSON format"
-    shell: bash
-    tags: [search, fts5, json]
+    shells: [bash, zsh, fish]
+    tags: [search, fts5, json, cross-shell]
     setup:
       - "echo json_search_test"
     steps:
@@ -849,8 +541,8 @@ tests:
 
   - name: "clai search empty results"
     description: "Search with no matches returns empty gracefully"
-    shell: bash
-    tags: [search, fts5, edge-case]
+    shells: [bash, zsh, fish]
+    tags: [search, fts5, edge-case, cross-shell]
     steps:
       - type: "clai search 'xyznonexistent98765'"
       - press: "Enter"
@@ -861,8 +553,8 @@ tests:
 
   - name: "clai search with special characters"
     description: "Search handles special characters in query"
-    shell: bash
-    tags: [search, fts5, edge-case]
+    shells: [bash, zsh, fish]
+    tags: [search, fts5, edge-case, cross-shell]
     setup:
       - "echo 'test-with-dashes_and_underscores'"
     steps:
@@ -872,40 +564,14 @@ tests:
     expect:
       - screen_contains: "test-with-dashes"
 
-  - name: "clai search cross-shell (zsh)"
-    description: "Search works identically in zsh"
-    shell: zsh
-    tags: [search, fts5, zsh, cross-shell]
-    setup:
-      - "echo 'zsh_search_term_xyz'"
-    steps:
-      - type: "clai search 'zsh_search'"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "zsh_search_term_xyz"
-
-  - name: "clai search cross-shell (fish)"
-    description: "Search works identically in fish"
-    shell: fish
-    tags: [search, fts5, fish, cross-shell]
-    setup:
-      - "echo 'fish_search_term_xyz'"
-    steps:
-      - type: "clai search 'fish_search'"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "fish_search_term_xyz"
-
   # ===========================================================================
-  # Project Task Discovery Tests (moved from example-test-plan.yaml)
+  # Project Task Discovery Tests - Cross-Shell
   # ===========================================================================
 
   - name: "Discovery finds package.json scripts"
     description: "npm scripts appear in suggestions for node projects"
-    shell: bash
-    tags: [discovery, package-json, suggestions]
+    shells: [bash, zsh, fish]
+    tags: [discovery, package-json, suggestions, cross-shell]
     setup:
       # Create a minimal package.json
       - "mkdir -p /tmp/node-test-project"
@@ -920,8 +586,8 @@ tests:
 
   - name: "Discovery finds Makefile targets"
     description: "make targets appear in suggestions"
-    shell: bash
-    tags: [discovery, makefile, suggestions]
+    shells: [bash, zsh, fish]
+    tags: [discovery, makefile, suggestions, cross-shell]
     setup:
       - "mkdir -p /tmp/make-test-project"
       - "cd /tmp/make-test-project"
@@ -935,8 +601,8 @@ tests:
 
   - name: "Discovery shows project_task reason"
     description: "Discovered tasks have project_task in reasons"
-    shell: bash
-    tags: [discovery, reasons]
+    shells: [bash, zsh, fish]
+    tags: [discovery, reasons, cross-shell]
     setup:
       - "mkdir -p /tmp/reason-test"
       - "cd /tmp/reason-test"
@@ -950,8 +616,8 @@ tests:
 
   - name: "Discovery finds Cargo.toml commands"
     description: "Rust project commands appear in suggestions"
-    shell: bash
-    tags: [discovery, cargo, suggestions]
+    shells: [bash, zsh, fish]
+    tags: [discovery, cargo, suggestions, cross-shell]
     skip: true
     skip_reason: "Cargo discovery not yet implemented"
     setup:
@@ -967,8 +633,8 @@ tests:
 
   - name: "Discovery finds pyproject.toml scripts"
     description: "Python project commands appear in suggestions"
-    shell: bash
-    tags: [discovery, python, suggestions]
+    shells: [bash, zsh, fish]
+    tags: [discovery, python, suggestions, cross-shell]
     skip: true
     skip_reason: "pyproject.toml discovery not yet implemented"
     setup:
@@ -983,13 +649,13 @@ tests:
       - screen_matches: "(pytest|python)"
 
   # ===========================================================================
-  # Debug Endpoint Tests (moved from example-test-plan.yaml)
+  # Debug Endpoint Tests - Cross-Shell
   # ===========================================================================
 
   - name: "Debug scores endpoint returns data"
     description: "GET /debug/scores returns command scores"
-    shell: bash
-    tags: [debug, endpoints, api]
+    shells: [bash, zsh, fish]
+    tags: [debug, endpoints, api, cross-shell]
     steps:
       - type: "curl -s http://localhost:8765/debug/scores 2>/dev/null || clai debug scores"
       - press: "Enter"
@@ -999,8 +665,8 @@ tests:
 
   - name: "Debug scores with limit parameter"
     description: "GET /debug/scores?limit=N respects limit"
-    shell: bash
-    tags: [debug, endpoints, parameters]
+    shells: [bash, zsh, fish]
+    tags: [debug, endpoints, parameters, cross-shell]
     steps:
       - type: "curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5"
       - press: "Enter"
@@ -1010,8 +676,8 @@ tests:
 
   - name: "Debug transitions endpoint returns data"
     description: "GET /debug/transitions returns Markov bigrams"
-    shell: bash
-    tags: [debug, endpoints, transitions]
+    shells: [bash, zsh, fish]
+    tags: [debug, endpoints, transitions, cross-shell]
     setup:
       - "git status"
       - "git add ."
@@ -1025,8 +691,8 @@ tests:
 
   - name: "Debug tasks endpoint returns discovered tasks"
     description: "GET /debug/tasks returns project task cache"
-    shell: bash
-    tags: [debug, endpoints, discovery]
+    shells: [bash, zsh, fish]
+    tags: [debug, endpoints, discovery, cross-shell]
     setup:
       - "mkdir -p /tmp/debug-task-test"
       - "cd /tmp/debug-task-test"
@@ -1041,8 +707,8 @@ tests:
 
   - name: "Debug discovery-errors endpoint"
     description: "GET /debug/discovery-errors returns failures"
-    shell: bash
-    tags: [debug, endpoints, discovery]
+    shells: [bash, zsh, fish]
+    tags: [debug, endpoints, discovery, cross-shell]
     steps:
       - type: "curl -s http://localhost:8765/debug/discovery-errors 2>/dev/null || clai debug discovery-errors"
       - press: "Enter"
@@ -1052,8 +718,8 @@ tests:
 
   - name: "Debug endpoints return valid JSON"
     description: "All debug endpoints return parseable JSON"
-    shell: bash
-    tags: [debug, endpoints, json]
+    shells: [bash, zsh, fish]
+    tags: [debug, endpoints, json, cross-shell]
     steps:
       - type: "curl -s http://localhost:8765/debug/cache 2>/dev/null | jq . || echo 'curl failed'"
       - press: "Enter"
@@ -1062,13 +728,24 @@ tests:
       - screen_not_contains: "parse error"
 
   # ===========================================================================
-  # Incognito Mode Suggestions Tests
+  # Incognito Mode Suggestions Tests - Cross-Shell
   # ===========================================================================
+
+  - name: "Incognito mode toggle"
+    description: "Incognito on/off works correctly"
+    shells: [bash, zsh, fish]
+    tags: [incognito, suggestions, privacy, cross-shell]
+    steps:
+      - type: "clai incognito on"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "Incognito mode enabled"
 
   - name: "Incognito commands appear in session suggestions"
     description: "Ephemeral mode keeps session context for suggestions"
-    shell: bash
-    tags: [incognito, suggestions, privacy]
+    shells: [bash, zsh, fish]
+    tags: [incognito, suggestions, privacy, cross-shell]
     setup:
       - "clai incognito on"
       - "echo 'ephemeral_session_cmd_12345'"
@@ -1082,8 +759,8 @@ tests:
 
   - name: "Incognito commands not in global suggestions"
     description: "Ephemeral commands don't affect global suggestion scores"
-    shell: bash
-    tags: [incognito, suggestions, privacy]
+    shells: [bash, zsh, fish]
+    tags: [incognito, suggestions, privacy, cross-shell]
     setup:
       - "clai incognito on"
       - "echo 'incognito_only_cmd_xyz'"
@@ -1100,8 +777,8 @@ tests:
 
   - name: "CLAI_EPHEMERAL affects suggestions"
     description: "Setting CLAI_EPHEMERAL=1 enables ephemeral mode"
-    shell: bash
-    tags: [incognito, suggestions, env-var]
+    shells: [bash, zsh, fish]
+    tags: [incognito, suggestions, env-var, cross-shell]
     setup:
       - "export CLAI_EPHEMERAL=1"
       - "echo 'ephemeral_env_test_cmd'"
@@ -1116,36 +793,14 @@ tests:
       # Ephemeral commands should not appear in global
       - screen_not_contains: "ephemeral_env_test_cmd"
 
-  - name: "Incognito mode toggle (zsh)"
-    description: "Incognito on/off works in zsh"
-    shell: zsh
-    tags: [incognito, suggestions, privacy, zsh, cross-shell]
-    steps:
-      - type: "clai incognito on"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "Incognito mode enabled"
-
-  - name: "Incognito mode toggle (fish)"
-    description: "Incognito on/off works in fish"
-    shell: fish
-    tags: [incognito, suggestions, privacy, fish, cross-shell]
-    steps:
-      - type: "clai incognito on"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "Incognito mode enabled"
-
   # ===========================================================================
-  # Suggestion API Response Fields
+  # Suggestion API Response Fields - Cross-Shell
   # ===========================================================================
 
   - name: "Suggest API returns expected JSON structure"
     description: "JSON response has all required fields"
-    shell: bash
-    tags: [suggest, api, json, structure]
+    shells: [bash, zsh, fish]
+    tags: [suggest, api, json, structure, cross-shell]
     setup:
       - "git status"
       - "make build"
@@ -1160,8 +815,8 @@ tests:
 
   - name: "Suggest API includes cache status"
     description: "JSON context indicates cache hit/miss"
-    shell: bash
-    tags: [suggest, api, cache, json]
+    shells: [bash, zsh, fish]
+    tags: [suggest, api, cache, json, cross-shell]
     skip: true
     skip_reason: "Cache status field not yet exposed"
     setup:
@@ -1175,8 +830,8 @@ tests:
 
   - name: "Suggest API includes timing info"
     description: "JSON includes computation time"
-    shell: bash
-    tags: [suggest, api, timing, json]
+    shells: [bash, zsh, fish]
+    tags: [suggest, api, timing, json, cross-shell]
     skip: true
     skip_reason: "Timing info not yet exposed"
     setup:
@@ -1197,28 +852,36 @@ metadata:
   author: "clai team"
   purpose: "Comprehensive suggestions engine e2e tests with cross-shell coverage"
 
-  total_tests: 72
-  skipped_tests: 17
-  by_shell:
-    bash: 44
-    zsh: 14
-    fish: 14
+  # Test counts (unique test definitions, not expanded per-shell)
+  total_test_definitions: 47
+  skipped_tests: 10
+
+  # When expanded per shell:
+  #   - 44 tests with shells: [bash, zsh, fish] = 132 test runs
+  #   - 3 shell-specific tests (keybindings) = 3 test runs
+  #   Total expanded: 135 test runs
+  expanded_test_runs:
+    bash: 45
+    zsh: 45
+    fish: 45
+    total: 135
+
   by_tag:
-    suggest: 20
-    format: 14
-    json: 10
-    fzf: 3
-    parameters: 4
+    suggest: 12
+    format: 5
+    json: 7
+    fzf: 1
+    parameters: 3
     prefix: 1
-    reasons: 5
+    reasons: 3
     transition: 1
     frequency: 2
     confidence: 1
     context: 1
-    ghost-text: 15
-    token: 3
-    typo: 5
-    correction: 5
+    ghost-text: 4
+    token: 1
+    typo: 3
+    correction: 3
     threshold: 1
     slots: 3
     scope: 1
@@ -1231,21 +894,21 @@ metadata:
     endpoints: 6
     keybind: 3
     widget: 3
-    search: 8
-    fts5: 8
+    search: 6
+    fts5: 6
     repo: 1
     discovery: 6
     package-json: 1
     makefile: 1
     cargo: 1
     python: 1
-    incognito: 3
-    privacy: 3
+    incognito: 4
+    privacy: 4
     env-var: 1
     api: 4
     structure: 1
     timing: 1
-    cross-shell: 17
+    cross-shell: 44
     smoke: 2
     edge-case: 2
 
@@ -1259,3 +922,5 @@ metadata:
     - "Discovery tests create temporary project directories"
     - "Debug endpoint tests require daemon to be running on port 8765"
     - "Incognito tests verify ephemeral mode doesn't affect global suggestions"
+    - "Tests with 'shells' array should be run once per shell by the test runner"
+    - "Shell-specific tests (keybindings) use singular 'shell' field"
