@@ -188,41 +188,62 @@ func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) 
 }
 
 func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
-	query := `
-		SELECT command, MAX(ts_start_unix_ms) as latest_ts
-		FROM commands
-		WHERE 1=1
-	`
+	// Build WHERE clause conditions for inner subquery (no table prefix needed)
+	// and outer query (with 'c.' prefix for the commands table alias)
+	innerWhere := " WHERE 1=1"
+	outerWhere := " WHERE 1=1"
 	args := make([]interface{}, 0)
 
 	if q.SessionID != nil {
-		query += " AND session_id = ?"
+		innerWhere += " AND session_id = ?"
+		outerWhere += " AND c.session_id = ?"
 		args = append(args, *q.SessionID)
 	}
 	if q.ExcludeSessionID != "" {
-		query += " AND session_id != ?"
+		innerWhere += " AND session_id != ?"
+		outerWhere += " AND c.session_id != ?"
 		args = append(args, q.ExcludeSessionID)
 	}
 	if q.CWD != nil {
-		query += " AND cwd = ?"
+		innerWhere += " AND cwd = ?"
+		outerWhere += " AND c.cwd = ?"
 		args = append(args, *q.CWD)
 	}
 	if q.Prefix != "" {
-		query += " AND command_norm LIKE ?"
+		innerWhere += " AND command_norm LIKE ?"
+		outerWhere += " AND c.command_norm LIKE ?"
 		args = append(args, q.Prefix+"%")
 	}
 	if q.Substring != "" {
-		query += " AND command_norm LIKE ?"
+		innerWhere += " AND command_norm LIKE ?"
+		outerWhere += " AND c.command_norm LIKE ?"
 		args = append(args, "%"+q.Substring+"%")
 	}
 	if q.SuccessOnly {
-		query += " AND is_success = 1"
+		innerWhere += " AND is_success = 1"
+		outerWhere += " AND c.is_success = 1"
 	}
 	if q.FailureOnly {
-		query += " AND is_success = 0"
+		innerWhere += " AND is_success = 0"
+		outerWhere += " AND c.is_success = 0"
 	}
 
-	query += " GROUP BY command_norm ORDER BY latest_ts DESC"
+	// Use subquery to get deterministic results: the actual command text from
+	// the row with the latest timestamp for each command_norm.
+	// The subquery finds MAX(ts_start_unix_ms) per command_norm, then we join
+	// back to get the actual row with that timestamp.
+	query := `
+		SELECT c.command, c.ts_start_unix_ms
+		FROM commands c
+		INNER JOIN (
+			SELECT command_norm, MAX(ts_start_unix_ms) as max_ts
+			FROM commands` + innerWhere + `
+			GROUP BY command_norm
+		) latest ON c.command_norm = latest.command_norm AND c.ts_start_unix_ms = latest.max_ts` + outerWhere + `
+		ORDER BY c.ts_start_unix_ms DESC`
+
+	// Args are used twice: once for subquery, once for outer WHERE
+	args = append(args, args...)
 
 	if q.Limit > 0 {
 		query += " LIMIT ?"
