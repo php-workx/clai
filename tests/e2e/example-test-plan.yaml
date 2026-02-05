@@ -121,17 +121,49 @@ tests:
       - screen_contains: "original text"
       - screen_not_contains: "history"  # Picker closed
 
-  - name: "History scope switching"
-    description: "Ctrl+X shortcuts switch between session/cwd/global scope"
+  - name: "History scope switching with Tab"
+    description: "Tab key switches between Session and Global scope in picker"
     shell: bash
     tags: [picker, history, scope]
     steps:
       - press: "Alt+H"
       - wait: "300ms"
-      - press: "Ctrl+X s"  # Session scope
+      - press: "Tab"  # Switch to Global scope
       - wait: "200ms"
     expect:
-      - screen_matches: "(session|Session)"
+      - screen_contains: "Global"  # Global tab should be active
+
+  - name: "Session history is isolated from global"
+    description: "Session scope only shows commands from current session"
+    shell: bash
+    tags: [picker, history, scope, isolation]
+    setup:
+      # Run a unique command only in this session
+      - "echo unique_session_test_command_12345"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+    expect:
+      # Session scope (default) should show the unique command
+      - screen_contains: "Session"
+      - screen_contains: "unique_session_test_command_12345"
+
+  - name: "Global history contains cross-session commands"
+    description: "Global scope shows commands from all sessions"
+    shell: bash
+    tags: [picker, history, scope, global]
+    setup:
+      - "echo session_specific_command"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Tab"  # Switch to Global
+      - wait: "300ms"
+    expect:
+      - screen_contains: "Global"
+      # Global should have many more commands than just this session
+      # Look for commands that wouldn't be in a fresh session
+      - screen_matches: "(git|make|cd|ls)"
 
   # ===========================================================================
   # Command Suggestion Tests
@@ -252,6 +284,102 @@ tests:
       - screen_contains: "echo first"
       - screen_contains: "echo second"
       - screen_contains: "echo third"
+
+  # ===========================================================================
+  # CLI Commands (Shell Context Dependent)
+  # ===========================================================================
+  # These commands require an active shell session to work correctly
+
+  - name: "clai status shows session info"
+    description: "Status command detects active session and shell"
+    shell: bash
+    tags: [cli, status, smoke]
+    steps:
+      - type: "clai status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "[OK]"
+      - screen_contains: "Session"
+      - screen_contains: "bash"
+      - screen_not_contains: "[WARN] Session"  # Session should be detected
+
+  - name: "clai status in zsh"
+    description: "Status command correctly identifies zsh shell"
+    shell: zsh
+    tags: [cli, status, zsh]
+    steps:
+      - type: "clai status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "[OK]"
+      - screen_contains: "zsh"
+
+  - name: "clai history with session flag"
+    description: "History command respects --session flag"
+    shell: bash
+    tags: [cli, history]
+    setup:
+      - "echo test_history_cmd_1"
+      - "echo test_history_cmd_2"
+    steps:
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "test_history_cmd_1"
+      - screen_contains: "test_history_cmd_2"
+
+  - name: "clai history with global flag"
+    description: "History command shows all history with --global"
+    shell: bash
+    tags: [cli, history, global]
+    steps:
+      - type: "clai history --global --limit 10"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Global history should have content from previous sessions
+      - screen_matches: "."  # Non-empty output
+
+  - name: "clai suggest uses session context"
+    description: "Suggest command returns matches from session history"
+    shell: bash
+    tags: [cli, suggest]
+    setup:
+      - "git status"
+      - "git log --oneline"
+    steps:
+      - type: "clai suggest git"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "git"
+
+  - name: "clai off disables integration"
+    description: "Running clai off disables shell features"
+    shell: bash
+    tags: [cli, toggle]
+    steps:
+      - type: "clai off"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "disabled"
+
+  - name: "clai on re-enables integration"
+    description: "Running clai on re-enables shell features after off"
+    shell: bash
+    tags: [cli, toggle]
+    setup:
+      - "clai off"
+    steps:
+      - type: "clai on"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "enabled"
 
   # ===========================================================================
   # PTY Wrapper Tests
@@ -382,23 +510,30 @@ tests:
 # ===========================================================================
 metadata:
   created: "2026-02-05"
+  updated: "2026-02-05"
   author: "clai team"
   purpose: "Reference implementation for AI-assisted terminal testing"
 
   # Statistics
-  total_tests: 22
+  total_tests: 31
   by_tag:
-    smoke: 3
-    picker: 8
+    smoke: 4
+    picker: 10
+    history: 6
+    scope: 3
     suggestions: 4
     integration: 4
+    cli: 7
     pty: 3
     voice: 1
     edge-case: 3
     cross-shell: 2
+    toggle: 2
 
   # Execution notes
   notes:
     - "Run 'make test-server' before executing tests"
     - "Ensure clai daemon is running"
     - "Tests assume clean CLAI_HOME directory"
+    - "Session vs Global tests require prior command history in database"
+    - "CLI tests validate shell-context-dependent commands"
