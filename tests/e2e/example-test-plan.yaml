@@ -343,6 +343,51 @@ tests:
       # Global history should have content from previous sessions
       - screen_matches: "."  # Non-empty output
 
+  - name: "clai history filters by CWD"
+    description: "History --cwd flag filters commands by working directory"
+    shell: bash
+    tags: [cli, history, parameters]
+    setup:
+      - "cd /tmp && echo from_tmp_dir"
+      - "cd ~ && echo from_home_dir"
+    steps:
+      - type: "clai history --cwd=/tmp --global"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "from_tmp_dir"
+      - screen_not_contains: "from_home_dir"
+
+  - name: "clai history filters successful commands"
+    description: "History --status=success shows only exit code 0 commands"
+    shell: bash
+    tags: [cli, history, parameters]
+    setup:
+      - "echo success_command"
+      - "false"  # Exit code 1
+    steps:
+      - type: "clai history --status=success --global"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "success_command"
+      - screen_not_contains: "false"
+
+  - name: "clai history filters failed commands"
+    description: "History --status=failure shows only non-zero exit codes"
+    shell: bash
+    tags: [cli, history, parameters]
+    setup:
+      - "echo will_succeed"
+      - "false"  # Exit code 1, will be logged as failure
+    steps:
+      - type: "clai history --status=failure --global"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "false"
+      - screen_not_contains: "will_succeed"
+
   - name: "clai suggest uses session context"
     description: "Suggest command returns matches from session history"
     shell: bash
@@ -515,15 +560,16 @@ metadata:
   purpose: "Reference implementation for AI-assisted terminal testing"
 
   # Statistics
-  total_tests: 31
+  total_tests: 34
   by_tag:
     smoke: 4
     picker: 10
-    history: 6
+    history: 9
     scope: 3
     suggestions: 4
     integration: 4
-    cli: 7
+    cli: 10
+    parameters: 3
     pty: 3
     voice: 1
     edge-case: 3
@@ -537,3 +583,4 @@ metadata:
     - "Tests assume clean CLAI_HOME directory"
     - "Session vs Global tests require prior command history in database"
     - "CLI tests validate shell-context-dependent commands"
+    - "Parameter tests verify CWD and exit code logging/filtering"
