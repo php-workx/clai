@@ -199,6 +199,21 @@ tests:
     expect:
       - screen_not_contains: "nstall"  # Ghost text gone
 
+  - name: "Alt+Right accepts next token (bash)"
+    description: "Alt+Right accepts one token of the suggestion at a time"
+    shell: bash
+    tags: [suggestions, ghost-text, token, bash]
+    setup:
+      - "kubectl get pods -n production"
+    steps:
+      - type: "kubectl"
+      - wait: "300ms"
+      - press: "Alt+Right"  # Accept "get"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "kubectl get"
+      - screen_not_contains: "pods"  # Rest not accepted yet
+
   # ===========================================================================
   # Ghost Text / Inline Suggestions - Zsh
   # ===========================================================================
@@ -230,6 +245,21 @@ tests:
     expect:
       - screen_contains: "docker ps"
 
+  - name: "Alt+Right accepts next token (zsh)"
+    description: "Alt+Right accepts one token of the suggestion at a time"
+    shell: zsh
+    tags: [suggestions, ghost-text, token, zsh, cross-shell]
+    setup:
+      - "kubectl get pods -n production"
+    steps:
+      - type: "kubectl"
+      - wait: "300ms"
+      - press: "Alt+Right"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "kubectl get"
+      - screen_not_contains: "pods"
+
   # ===========================================================================
   # Ghost Text / Inline Suggestions - Fish
   # ===========================================================================
@@ -260,6 +290,21 @@ tests:
       - wait: "200ms"
     expect:
       - screen_contains: "docker ps"
+
+  - name: "Alt+Right accepts next token (fish)"
+    description: "Alt+Right accepts one token of the suggestion at a time"
+    shell: fish
+    tags: [suggestions, ghost-text, token, fish, cross-shell]
+    setup:
+      - "kubectl get pods -n production"
+    steps:
+      - type: "kubectl"
+      - wait: "300ms"
+      - press: "Alt+Right"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "kubectl get"
+      - screen_not_contains: "pods"
 
   # ===========================================================================
   # Typo Correction (Did You Mean?) - All Shells
@@ -336,6 +381,27 @@ tests:
     expect:
       - screen_not_contains: "xyzabc123"
 
+  - name: "Typo correction prioritizes high-frequency commands"
+    description: "Common commands are suggested over rare ones"
+    shell: bash
+    tags: [typo, correction, frequency]
+    skip: true
+    skip_reason: "Typo correction backend not yet implemented"
+    setup:
+      - "echo common_cmd"
+      - "echo common_cmd"
+      - "echo common_cmd"
+      - "echo rare_cmd"
+    steps:
+      - type: "commo_cmd"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "common_cmd"
+
   # ===========================================================================
   # Semantic Slot Filling - All Shells
   # ===========================================================================
@@ -394,6 +460,19 @@ tests:
     expect:
       - screen_contains: "cache"
 
+  - name: "Cache shows in debug endpoint"
+    description: "/debug/cache endpoint returns cache state"
+    shell: bash
+    tags: [cache, debug]
+    skip: true
+    skip_reason: "Cache introspection not yet exposed in CLI"
+    steps:
+      - type: "curl -s http://localhost:8765/debug/cache 2>/dev/null || clai debug cache"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(size|entries|cache)"
+
   # ===========================================================================
   # Suggestion Widget Keybindings
   # ===========================================================================
@@ -446,10 +525,10 @@ metadata:
   author: "clai team"
   purpose: "Suggestions engine e2e tests with cross-shell coverage"
 
-  total_tests: 28
-  skipped_tests: 7
+  total_tests: 30
+  skipped_tests: 9
   by_shell:
-    bash: 14
+    bash: 16
     zsh: 7
     fish: 7
   by_tag:
@@ -457,15 +536,19 @@ metadata:
     format: 8
     json: 4
     fzf: 1
-    ghost-text: 8
-    typo: 4
-    correction: 4
+    ghost-text: 11
+    token: 3
+    typo: 5
+    correction: 5
+    frequency: 1
+    threshold: 1
     slots: 2
-    cache: 1
+    cache: 2
+    debug: 1
     keybind: 3
     widget: 3
     cross-shell: 11
-    skipped: 7
+    skipped: 9
 
   notes:
     - "Run 'make test-server SHELL=<shell>' to start test server for specific shell"
