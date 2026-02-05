@@ -18,6 +18,45 @@ func Suggestion(prefix string) string {
 	return ""
 }
 
+// Search finds up to `limit` unique history entries containing query as substring
+// Returns entries in order from most recent to oldest
+func Search(query string, limit int) []string {
+	if query == "" || limit <= 0 {
+		return nil
+	}
+
+	histFile := zshHistoryPath()
+	if histFile == "" {
+		return nil
+	}
+
+	entries, err := readZshHistory(histFile)
+	if err != nil {
+		return nil
+	}
+
+	// Use a map to track seen commands (deduplication)
+	seen := make(map[string]bool)
+	var results []string
+
+	// Case-insensitive search
+	queryLower := strings.ToLower(query)
+
+	// Search from most recent (end of file)
+	for i := len(entries) - 1; i >= 0 && len(results) < limit; i-- {
+		entry := entries[i]
+		if strings.Contains(strings.ToLower(entry), queryLower) {
+			// Skip duplicates
+			if !seen[entry] {
+				seen[entry] = true
+				results = append(results, entry)
+			}
+		}
+	}
+
+	return results
+}
+
 // Suggestions finds up to `limit` unique history entries starting with prefix
 // Returns entries in order from most recent to oldest
 func Suggestions(prefix string, limit int) []string {
