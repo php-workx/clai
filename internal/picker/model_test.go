@@ -783,6 +783,15 @@ func TestWithQuery(t *testing.T) {
 	assert.Equal(t, "initial", m.textInput.Value())
 }
 
+func TestWithQuery_CursorAtEnd(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	m := newTestModel(p)
+	m = m.WithQuery("hello world")
+	// Cursor should be at the end of the initial query so the user
+	// can immediately continue typing or see the full query.
+	assert.Equal(t, len("hello world"), m.textInput.Position())
+}
+
 // --- Init returns a cmd ---
 
 func TestInit_ReturnsCmd(t *testing.T) {
