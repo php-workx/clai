@@ -288,6 +288,9 @@ func resolveTabs(cfg *config.Config, opts *pickerOpts) []config.TabDef {
 
 // socketPath returns the daemon socket path from config or the default.
 func socketPath(cfg *config.Config) string {
+	if path := os.Getenv("CLAI_SOCKET"); path != "" {
+		return path
+	}
 	if cfg.Daemon.SocketPath != "" {
 		return cfg.Daemon.SocketPath
 	}
