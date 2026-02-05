@@ -161,6 +161,19 @@ message HistoryItem {
   int64  timestamp_ms = 2;
 }
 
+message HistoryImportRequest {
+  string shell = 1;           // "bash", "zsh", "fish", or "auto"
+  string history_path = 2;    // Optional custom path (empty = default)
+  bool if_not_exists = 3;     // Skip if already imported for this shell
+  bool force = 4;             // Replace existing import
+}
+
+message HistoryImportResponse {
+  int32 imported_count = 1;   // Number of entries imported
+  bool skipped = 2;           // True if skipped due to if_not_exists
+  string error = 3;           // Error message if failed
+}
+
 // ---------------------------------------------------------
 // Status
 // ---------------------------------------------------------
@@ -191,6 +204,7 @@ service ClaiService {
 
   // History
   rpc FetchHistory(HistoryFetchRequest) returns (HistoryFetchResponse);
+  rpc ImportHistory(HistoryImportRequest) returns (HistoryImportResponse);
 
   // Ops
   rpc Ping(Ack) returns (Ack);

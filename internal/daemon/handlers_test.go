@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
+	"github.com/runger/clai/internal/history"
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
@@ -149,6 +150,14 @@ func (m *mockStore) SetCached(ctx context.Context, entry *storage.CacheEntry) er
 
 func (m *mockStore) PruneExpiredCache(ctx context.Context) (int64, error) {
 	return 0, nil
+}
+
+func (m *mockStore) HasImportedHistory(ctx context.Context, shell string) (bool, error) {
+	return false, nil
+}
+
+func (m *mockStore) ImportHistory(ctx context.Context, entries []history.ImportEntry, shell string) (int, error) {
+	return len(entries), nil
 }
 
 func (m *mockStore) Close() error {

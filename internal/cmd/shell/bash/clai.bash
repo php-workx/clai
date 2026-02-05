@@ -779,6 +779,12 @@ clai() {
 # ============================================
 
 if [[ $- == *i* && -z "$_CLAI_REINIT" ]]; then
+    # Import shell history on first init (fire and forget)
+    # This is idempotent: --if-not-exists skips if already imported
+    (clai-shim import-history \
+        --shell="$CLAI_CURRENT_SHELL" \
+        --if-not-exists >/dev/null 2>&1 &)
+
     # Use printf for better portability across bash versions
     printf '\033[2m🤖 clai [%s] Tab complete | accept cmd | ?"describe task"\033[0m\n' "${CLAI_SESSION_ID:0:8}"
 fi
