@@ -113,7 +113,7 @@ func StartDaemonProcess() error {
 		logFile = nil
 	}
 
-	cmd := exec.Command(exe, "daemon", "run")
+	cmd := exec.Command(exe, "claude-daemon", "run")
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
