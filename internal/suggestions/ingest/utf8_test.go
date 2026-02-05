@@ -29,9 +29,9 @@ func TestToLossyUTF8_ValidUTF8Passthrough(t *testing.T) {
 		{"arabic", "\u0645\u0631\u062d\u0628\u0627"},
 		{"hebrew", "\u05e9\u05dc\u05d5\u05dd"},
 		{"thai", "\u0e2a\u0e27\u0e31\u0e2a\u0e14\u0e35"},
-		{"emoji simple", "\U0001F600"}, // 😀
+		{"emoji simple", "\U0001F600"},                                                  // 😀
 		{"emoji complex", "\U0001F468\u200D\U0001F469\u200D\U0001F467\u200D\U0001F466"}, // family emoji
-		{"emoji flag", "\U0001F1FA\U0001F1F8"}, // US flag
+		{"emoji flag", "\U0001F1FA\U0001F1F8"},                                          // US flag
 		{"mixed ascii and emoji", "Hello \U0001F44B World"},
 		{"mixed scripts", "Hello \u4e16\u754c \U0001F30D"},
 		{"newlines and tabs", "line1\nline2\ttabbed"},
@@ -39,8 +39,8 @@ func TestToLossyUTF8_ValidUTF8Passthrough(t *testing.T) {
 		{"path with spaces", "/home/user/My Documents/file.txt"},
 		{"special chars", "!@#$%^&*()_+-=[]{}|;':\",./<>?"},
 		{"escape sequences", "\\n\\t\\r"},
-		{"zero-width joiner", "a\u200Db"}, // ZWJ
-		{"BOM", "\uFEFFhello"},            // Byte Order Mark
+		{"zero-width joiner", "a\u200Db"},                    // ZWJ
+		{"BOM", "\uFEFFhello"},                               // Byte Order Mark
 		{"mathematical symbols", "\u221a\u03c0\u2248\u221e"}, // √π≈∞
 		{"currency symbols", "\u20ac\u00a3\u00a5\u20bf"},     // €£¥₿
 		{"arrows", "\u2190\u2191\u2192\u2193"},               // ←↑→↓
@@ -210,7 +210,7 @@ func TestToLossyUTF8_MixedValidInvalid(t *testing.T) {
 		},
 		{
 			name:   "valid path with embedded invalid byte",
-			input:  []byte{'/','h','o','m','e','/',0x80,'u','s','e','r'},
+			input:  []byte{'/', 'h', 'o', 'm', 'e', '/', 0x80, 'u', 's', 'e', 'r'},
 			output: "/home/" + replacement + "user",
 		},
 	}
@@ -401,14 +401,14 @@ func FuzzToLossyUTF8(f *testing.F) {
 	f.Add([]byte{0x00})
 	f.Add([]byte{0x80})
 	f.Add([]byte{0xFF})
-	f.Add([]byte{0xC2, 0xA9})                   // Valid 2-byte: ©
-	f.Add([]byte{0xE4, 0xB8, 0xAD})             // Valid 3-byte: 中
-	f.Add([]byte{0xF0, 0x9F, 0x98, 0x80})       // Valid 4-byte: 😀
-	f.Add([]byte{0xC0, 0x80})                   // Invalid: overlong NUL
-	f.Add([]byte{0xED, 0xA0, 0x80})             // Invalid: surrogate
-	f.Add([]byte{0xF4, 0x90, 0x80, 0x80})       // Invalid: beyond Unicode
-	f.Add([]byte("hello\x00world"))             // Embedded NUL
-	f.Add([]byte("valid\x80invalid\x81test"))   // Mixed
+	f.Add([]byte{0xC2, 0xA9})                     // Valid 2-byte: ©
+	f.Add([]byte{0xE4, 0xB8, 0xAD})               // Valid 3-byte: 中
+	f.Add([]byte{0xF0, 0x9F, 0x98, 0x80})         // Valid 4-byte: 😀
+	f.Add([]byte{0xC0, 0x80})                     // Invalid: overlong NUL
+	f.Add([]byte{0xED, 0xA0, 0x80})               // Invalid: surrogate
+	f.Add([]byte{0xF4, 0x90, 0x80, 0x80})         // Invalid: beyond Unicode
+	f.Add([]byte("hello\x00world"))               // Embedded NUL
+	f.Add([]byte("valid\x80invalid\x81test"))     // Mixed
 	f.Add([]byte("\xE4\xB8\xAD\x00\xE6\x96\x87")) // Multi-byte with embedded NUL
 
 	f.Fuzz(func(t *testing.T, data []byte) {

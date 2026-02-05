@@ -74,7 +74,7 @@ func AcquireLock(dbDir string, opts LockOptions) (*LockFile, error) {
 
 		// Check if this is a "would block" error
 		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
-			return nil, fmt.Errorf("%w: %v", ErrLockAcquireFailed, err)
+			return nil, fmt.Errorf("%w: %w", ErrLockAcquireFailed, err)
 		}
 
 		// If no timeout, fail immediately

@@ -402,11 +402,9 @@ func TestUnixTransport_Close_Idempotent(t *testing.T) {
 
 	// Call Close multiple times - should not panic
 	for i := 0; i < 3; i++ {
-		err := transport.Close()
-		if err != nil && i > 0 {
-			// First close may succeed, subsequent may return error for missing file
-			// but should not panic
-		}
+		_ = transport.Close()
+		// First close may succeed, subsequent may return error for missing file
+		// but should not panic
 	}
 }
 

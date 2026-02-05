@@ -5,9 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/runger/clai/internal/suggestions/event"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/runger/clai/internal/suggestions/event"
 )
 
 // validEventJSON returns valid JSON for a CommandEvent with optional overrides.
@@ -179,10 +180,10 @@ func TestParseEvent_MissingRequiredFields(t *testing.T) {
 
 func TestParseEvent_EmptyRequiredFields(t *testing.T) {
 	tests := []struct {
-		name         string
-		field        string
-		value        interface{}
-		expectedErr  error
+		name        string
+		field       string
+		value       interface{}
+		expectedErr error
 	}{
 		{"empty type", "type", "", ErrMissingType},
 		{"empty session_id", "session_id", "", ErrMissingSessionID},
