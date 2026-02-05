@@ -304,19 +304,6 @@ func TestSetColorProfile_TtyDetectsColor(t *testing.T) {
 
 // --- Backend dispatch tests ---
 
-func TestDispatch_EmptyBackendDefaultsToBuiltin(t *testing.T) {
-	cfg := config.DefaultConfig()
-	cfg.History.PickerBackend = ""
-	// Verify dispatch resolves empty to "builtin".
-	backend := cfg.History.PickerBackend
-	if backend == "" {
-		backend = "builtin"
-	}
-	if backend != "builtin" {
-		t.Errorf("expected backend %q, got %q", "builtin", backend)
-	}
-}
-
 func TestDispatch_BuiltinIsDefault(t *testing.T) {
 	cfg := config.DefaultConfig()
 	if cfg.History.PickerBackend != "builtin" {
@@ -324,9 +311,8 @@ func TestDispatch_BuiltinIsDefault(t *testing.T) {
 	}
 }
 
-func TestDispatchBackend_FzfFallsBackWhenMissing(t *testing.T) {
-	// Verify fzf lookup fails with an empty PATH (routing logic only,
-	// do NOT call dispatchFzf which would start the real TUI fallback).
+func TestDispatchBackend_FzfNotFoundWithEmptyPath(t *testing.T) {
+	// Verify fzf lookup fails with an empty PATH.
 	origPath := os.Getenv("PATH")
 	t.Setenv("PATH", "/nonexistent")
 	defer func() { os.Setenv("PATH", origPath) }()
@@ -334,35 +320,6 @@ func TestDispatchBackend_FzfFallsBackWhenMissing(t *testing.T) {
 	_, err := exec.LookPath("fzf")
 	if err == nil {
 		t.Fatal("expected fzf to not be found with empty PATH")
-	}
-}
-
-func TestDispatchBackend_RoutesBuiltin(t *testing.T) {
-	// Verify dispatchBackend routes "builtin" correctly by checking the
-	// switch logic. We test the routing, not the actual TUI execution.
-	for _, backend := range []string{"builtin", "clai"} {
-		t.Run(backend, func(t *testing.T) {
-			// Just verify these values are handled in the switch
-			// (not "default" branch). We can't call the actual dispatch
-			// since it starts a real TUI on /dev/tty.
-			switch backend {
-			case "builtin", "clai":
-				// expected: routes to dispatchBuiltin
-			default:
-				t.Errorf("backend %q not handled", backend)
-			}
-		})
-	}
-}
-
-func TestDispatchBackend_UnknownFallsBackToBuiltin(t *testing.T) {
-	// Verify unknown backends hit the default branch.
-	backend := "unknown_backend"
-	switch backend {
-	case "fzf", "clai", "builtin":
-		t.Errorf("backend %q should not match known cases", backend)
-	default:
-		// expected: falls back to builtin
 	}
 }
 
