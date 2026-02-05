@@ -433,3 +433,109 @@ func TestSocketPath_CustomOverride(t *testing.T) {
 		t.Errorf("expected %q, got %q", "/tmp/test.sock", path)
 	}
 }
+
+// --- Variable substitution tests ---
+
+func TestResolveTabs_SubstitutesSessionID(t *testing.T) {
+	cfg := config.DefaultConfig()
+	// Default config has "session" tab with Args: {"session": "$CLAI_SESSION_ID"}
+	opts := &pickerOpts{
+		tabs:    "session",
+		session: "my-actual-session-123",
+	}
+
+	tabs := resolveTabs(cfg, opts)
+	if len(tabs) != 1 {
+		t.Fatalf("expected 1 tab, got %d", len(tabs))
+	}
+
+	// Verify the $CLAI_SESSION_ID was substituted with the actual session ID.
+	if sid, ok := tabs[0].Args["session"]; !ok {
+		t.Error("expected 'session' key in Args")
+	} else if sid != "my-actual-session-123" {
+		t.Errorf("expected session substituted to 'my-actual-session-123', got %q", sid)
+	}
+}
+
+func TestResolveTabs_NoSubstitutionWithEmptySession(t *testing.T) {
+	cfg := config.DefaultConfig()
+	opts := &pickerOpts{
+		tabs:    "session",
+		session: "", // Empty session ID
+	}
+
+	tabs := resolveTabs(cfg, opts)
+	if len(tabs) != 1 {
+		t.Fatalf("expected 1 tab, got %d", len(tabs))
+	}
+
+	// When session is empty, $CLAI_SESSION_ID should remain as-is.
+	if sid, ok := tabs[0].Args["session"]; !ok {
+		t.Error("expected 'session' key in Args")
+	} else if sid != "$CLAI_SESSION_ID" {
+		t.Errorf("expected literal '$CLAI_SESSION_ID' when session is empty, got %q", sid)
+	}
+}
+
+func TestResolveTabs_PreservesOtherArgs(t *testing.T) {
+	cfg := config.DefaultConfig()
+	// Add a custom tab with mixed Args.
+	cfg.History.PickerTabs = append(cfg.History.PickerTabs, config.TabDef{
+		ID:    "custom",
+		Label: "Custom",
+		Args: map[string]string{
+			"session":   "$CLAI_SESSION_ID",
+			"other_key": "static_value",
+		},
+	})
+
+	opts := &pickerOpts{
+		tabs:    "custom",
+		session: "sess-456",
+	}
+
+	tabs := resolveTabs(cfg, opts)
+	if len(tabs) != 1 {
+		t.Fatalf("expected 1 tab, got %d", len(tabs))
+	}
+
+	// Verify session was substituted.
+	if tabs[0].Args["session"] != "sess-456" {
+		t.Errorf("expected session 'sess-456', got %q", tabs[0].Args["session"])
+	}
+
+	// Verify other_key was preserved.
+	if tabs[0].Args["other_key"] != "static_value" {
+		t.Errorf("expected other_key 'static_value', got %q", tabs[0].Args["other_key"])
+	}
+}
+
+func TestResolveTabs_DoesNotModifyOriginalConfig(t *testing.T) {
+	cfg := config.DefaultConfig()
+	opts := &pickerOpts{
+		tabs:    "session",
+		session: "modified-session",
+	}
+
+	// Get the original value before calling resolveTabs.
+	var originalSessionArg string
+	for _, tab := range cfg.History.PickerTabs {
+		if tab.ID == "session" {
+			originalSessionArg = tab.Args["session"]
+			break
+		}
+	}
+
+	_ = resolveTabs(cfg, opts)
+
+	// Verify the original config was not modified.
+	for _, tab := range cfg.History.PickerTabs {
+		if tab.ID == "session" {
+			if tab.Args["session"] != originalSessionArg {
+				t.Errorf("original config was modified: expected %q, got %q",
+					originalSessionArg, tab.Args["session"])
+			}
+			break
+		}
+	}
+}

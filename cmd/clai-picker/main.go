@@ -241,27 +241,42 @@ func dispatchBackend(backend string, cfg *config.Config, opts *pickerOpts) int {
 
 // resolveTabs resolves the comma-separated tab IDs in opts to []config.TabDef.
 // If opts.tabs is empty, all configured tabs are returned.
+// Variable substitution is performed on tab Args values.
 func resolveTabs(cfg *config.Config, opts *pickerOpts) []config.TabDef {
+	var srcTabs []config.TabDef
 	if opts.tabs == "" {
-		return cfg.History.PickerTabs
-	}
-
-	ids := strings.Split(opts.tabs, ",")
-	idSet := make(map[string]bool, len(ids))
-	for _, id := range ids {
-		idSet[strings.TrimSpace(id)] = true
-	}
-
-	var tabs []config.TabDef
-	for _, t := range cfg.History.PickerTabs {
-		if idSet[t.ID] {
-			tabs = append(tabs, t)
+		srcTabs = cfg.History.PickerTabs
+	} else {
+		ids := strings.Split(opts.tabs, ",")
+		idSet := make(map[string]bool, len(ids))
+		for _, id := range ids {
+			idSet[strings.TrimSpace(id)] = true
+		}
+		for _, t := range cfg.History.PickerTabs {
+			if idSet[t.ID] {
+				srcTabs = append(srcTabs, t)
+			}
+		}
+		// If no matches, return all configured tabs as fallback.
+		if len(srcTabs) == 0 {
+			srcTabs = cfg.History.PickerTabs
 		}
 	}
 
-	// If no matches, return all configured tabs as fallback.
-	if len(tabs) == 0 {
-		return cfg.History.PickerTabs
+	// Substitute variables in tab Args.
+	tabs := make([]config.TabDef, len(srcTabs))
+	for i, t := range srcTabs {
+		tabs[i] = t
+		if len(t.Args) > 0 {
+			tabs[i].Args = make(map[string]string, len(t.Args))
+			for k, v := range t.Args {
+				// Replace $CLAI_SESSION_ID with the actual session ID.
+				if v == "$CLAI_SESSION_ID" && opts.session != "" {
+					v = opts.session
+				}
+				tabs[i].Args[k] = v
+			}
+		}
 	}
 	return tabs
 }

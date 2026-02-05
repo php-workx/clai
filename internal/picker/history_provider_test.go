@@ -244,6 +244,66 @@ func TestHistoryProvider_SessionScoping(t *testing.T) {
 	}
 }
 
+func TestHistoryProvider_SessionKeyFallback(t *testing.T) {
+	t.Parallel()
+
+	// Test that "session" key is accepted as a fallback for "session_id".
+	// This allows config to use the shorter "session" key in tab Args.
+	svc := &mockClaiService{
+		items: []*pb.HistoryItem{
+			{Command: "session cmd", TimestampMs: 1000},
+		},
+		atEnd: true,
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	_, err := provider.Fetch(context.Background(), Request{
+		RequestID: 21,
+		Limit:     50,
+		Options: map[string]string{
+			"session": "short-key-session",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if svc.lastReq.SessionId != "short-key-session" {
+		t.Errorf("expected session_id 'short-key-session' from 'session' key, got %q", svc.lastReq.SessionId)
+	}
+}
+
+func TestHistoryProvider_SessionIDTakesPrecedence(t *testing.T) {
+	t.Parallel()
+
+	// When both "session_id" and "session" are present, "session_id" wins.
+	svc := &mockClaiService{
+		items: []*pb.HistoryItem{
+			{Command: "cmd", TimestampMs: 1000},
+		},
+		atEnd: true,
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	_, err := provider.Fetch(context.Background(), Request{
+		RequestID: 22,
+		Limit:     50,
+		Options: map[string]string{
+			"session_id": "primary-id",
+			"session":    "fallback-id",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if svc.lastReq.SessionId != "primary-id" {
+		t.Errorf("expected session_id 'primary-id' to take precedence, got %q", svc.lastReq.SessionId)
+	}
+}
+
 func TestHistoryProvider_GlobalFlag(t *testing.T) {
 	t.Parallel()
 

@@ -52,7 +52,10 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 
 	// Map optional fields from Options map.
 	if req.Options != nil {
+		// Accept both "session_id" and "session" for the session filter.
 		if sid, ok := req.Options["session_id"]; ok {
+			grpcReq.SessionId = sid
+		} else if sid, ok := req.Options["session"]; ok {
 			grpcReq.SessionId = sid
 		}
 		if g, ok := req.Options["global"]; ok && g == "true" {
