@@ -506,3 +506,77 @@ func TestHistoryProvider_UTF8WithMultibyteChars(t *testing.T) {
 		t.Errorf("expected \"echo 'éèê'\", got %q", resp.Items[1])
 	}
 }
+
+func TestHistoryProvider_ConnectionReuse(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockClaiService{
+		items: []*pb.HistoryItem{
+			{Command: "cmd1", TimestampMs: 1000},
+		},
+		atEnd: true,
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+	defer provider.Close()
+
+	// Make multiple Fetch calls and verify they succeed (connection is reused)
+	for i := 0; i < 5; i++ {
+		resp, err := provider.Fetch(context.Background(), Request{
+			RequestID: uint64(i),
+			Limit:     10,
+		})
+		if err != nil {
+			t.Fatalf("Fetch %d failed: %v", i, err)
+		}
+		if resp.RequestID != uint64(i) {
+			t.Errorf("Fetch %d: expected RequestID %d, got %d", i, i, resp.RequestID)
+		}
+		if len(resp.Items) != 1 {
+			t.Errorf("Fetch %d: expected 1 item, got %d", i, len(resp.Items))
+		}
+	}
+}
+
+func TestHistoryProvider_Close(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockClaiService{
+		items: []*pb.HistoryItem{
+			{Command: "cmd", TimestampMs: 1000},
+		},
+		atEnd: true,
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	// Make a fetch to establish connection
+	_, err := provider.Fetch(context.Background(), Request{
+		RequestID: 1,
+		Limit:     10,
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	// Close the provider
+	if err := provider.Close(); err != nil {
+		t.Fatalf("Close failed: %v", err)
+	}
+
+	// Close should be idempotent
+	if err := provider.Close(); err != nil {
+		t.Fatalf("Second Close failed: %v", err)
+	}
+}
+
+func TestHistoryProvider_CloseBeforeUse(t *testing.T) {
+	t.Parallel()
+
+	provider := NewHistoryProvider("/tmp/nonexistent.sock")
+
+	// Close before any use should not error
+	if err := provider.Close(); err != nil {
+		t.Fatalf("Close on unused provider failed: %v", err)
+	}
+}

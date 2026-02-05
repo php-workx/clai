@@ -308,6 +308,7 @@ func socketPath(cfg *config.Config) string {
 func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	tabs := resolveTabs(cfg, opts)
 	provider := picker.NewHistoryProvider(socketPath(cfg))
+	defer provider.Close()
 
 	model := picker.NewModel(tabs, provider).WithLayout(picker.LayoutBottomUp)
 	if opts.query != "" {
@@ -387,6 +388,7 @@ func dispatchFzf(ctx context.Context, cfg *config.Config, opts *pickerOpts) int 
 // Returns the selected item, whether the user cancelled, and any error.
 func runFzfBackend(ctx context.Context, cfg *config.Config, opts *pickerOpts) (string, bool, error) {
 	provider := picker.NewHistoryProvider(socketPath(cfg))
+	defer provider.Close()
 	tabs := resolveTabs(cfg, opts)
 
 	// Use the first tab for fzf (fzf doesn't support tabs).
