@@ -322,6 +322,145 @@ func TestDecodeFishEscapes(t *testing.T) {
 	}
 }
 
+// --- ImportForShell tests ---
+
+func TestImportForShell_Bash(t *testing.T) {
+	// Create a temp bash history file
+	dir := t.TempDir()
+	histFile := filepath.Join(dir, ".bash_history")
+	err := os.WriteFile(histFile, []byte("ls -la\ngit status\n"), 0644)
+	require.NoError(t, err)
+
+	t.Setenv("HISTFILE", histFile)
+
+	entries, err := ImportForShell("bash")
+	require.NoError(t, err)
+	assert.Len(t, entries, 2)
+	assert.Equal(t, "ls -la", entries[0].Command)
+}
+
+func TestImportForShell_Zsh(t *testing.T) {
+	// Zsh uses HISTFILE, but we're using empty path which triggers zshHistoryPath()
+	// Since that file likely doesn't exist in test env, expect nil/empty result
+	entries, err := ImportForShell("zsh")
+	require.NoError(t, err)
+	// Result depends on whether zsh history exists - just ensure no error
+	_ = entries
+}
+
+func TestImportForShell_Fish(t *testing.T) {
+	// Fish uses XDG_DATA_HOME path
+	// Since that file likely doesn't exist in test env, expect nil/empty result
+	entries, err := ImportForShell("fish")
+	require.NoError(t, err)
+	_ = entries
+}
+
+func TestImportForShell_AutoDetect(t *testing.T) {
+	t.Setenv("SHELL", "/bin/bash")
+
+	// Create temp history file
+	dir := t.TempDir()
+	histFile := filepath.Join(dir, ".bash_history")
+	err := os.WriteFile(histFile, []byte("echo test\n"), 0644)
+	require.NoError(t, err)
+	t.Setenv("HISTFILE", histFile)
+
+	entries, err := ImportForShell("auto")
+	require.NoError(t, err)
+	assert.Len(t, entries, 1)
+}
+
+func TestImportForShell_EmptyShell(t *testing.T) {
+	t.Setenv("SHELL", "/bin/bash")
+
+	dir := t.TempDir()
+	histFile := filepath.Join(dir, ".bash_history")
+	err := os.WriteFile(histFile, []byte("echo test\n"), 0644)
+	require.NoError(t, err)
+	t.Setenv("HISTFILE", histFile)
+
+	// Empty shell should auto-detect
+	entries, err := ImportForShell("")
+	require.NoError(t, err)
+	assert.Len(t, entries, 1)
+}
+
+func TestImportForShell_Unknown(t *testing.T) {
+	entries, err := ImportForShell("unknown-shell")
+	require.NoError(t, err)
+	assert.Nil(t, entries)
+}
+
+// --- DetectShell edge cases ---
+
+func TestDetectShell_EmptyEnv(t *testing.T) {
+	t.Setenv("SHELL", "")
+	shell := DetectShell()
+	assert.Equal(t, "", shell)
+}
+
+func TestDetectShell_UnknownShell(t *testing.T) {
+	t.Setenv("SHELL", "/usr/bin/ksh")
+	shell := DetectShell()
+	assert.Equal(t, "", shell)
+}
+
+func TestDetectShell_FullPaths(t *testing.T) {
+	tests := []struct {
+		shellPath string
+		expected  string
+	}{
+		{"/bin/bash", "bash"},
+		{"/usr/bin/bash", "bash"},
+		{"/usr/local/bin/bash", "bash"},
+		{"/bin/zsh", "zsh"},
+		{"/usr/bin/zsh", "zsh"},
+		{"/usr/bin/fish", "fish"},
+		{"/opt/homebrew/bin/fish", "fish"},
+		{"/bin/sh", ""},       // sh is not supported
+		{"/usr/bin/dash", ""}, // dash is not supported
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.shellPath, func(t *testing.T) {
+			t.Setenv("SHELL", tc.shellPath)
+			shell := DetectShell()
+			assert.Equal(t, tc.expected, shell)
+		})
+	}
+}
+
+// --- Path resolution tests ---
+
+func TestBashHistoryPath_WithHISTFILE(t *testing.T) {
+	t.Setenv("HISTFILE", "/custom/path/.bash_history")
+	path := bashHistoryPath()
+	assert.Equal(t, "/custom/path/.bash_history", path)
+}
+
+func TestBashHistoryPath_WithoutHISTFILE(t *testing.T) {
+	t.Setenv("HISTFILE", "")
+	path := bashHistoryPath()
+	// Should return ~/.bash_history
+	home, _ := os.UserHomeDir()
+	assert.Equal(t, filepath.Join(home, ".bash_history"), path)
+}
+
+func TestFishHistoryPath_WithXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "/custom/data")
+	path := fishHistoryPath()
+	assert.Equal(t, "/custom/data/fish/fish_history", path)
+}
+
+func TestFishHistoryPath_WithoutXDG(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", "")
+	path := fishHistoryPath()
+	// Should return ~/.local/share/fish/fish_history
+	home, _ := os.UserHomeDir()
+	assert.Equal(t, filepath.Join(home, ".local", "share", "fish", "fish_history"), path)
+}
+
 // --- Helper functions ---
 
 func writeTempFile(t *testing.T, content string) string {

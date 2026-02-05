@@ -2379,3 +2379,28 @@ func TestStripANSI(t *testing.T) {
 		})
 	}
 }
+
+func TestBoolPtr(t *testing.T) {
+	t.Parallel()
+
+	truePtr := boolPtr(true)
+	if truePtr == nil {
+		t.Fatal("boolPtr(true) returned nil")
+	}
+	if !*truePtr {
+		t.Error("boolPtr(true) should dereference to true")
+	}
+
+	falsePtr := boolPtr(false)
+	if falsePtr == nil {
+		t.Fatal("boolPtr(false) returned nil")
+	}
+	if *falsePtr {
+		t.Error("boolPtr(false) should dereference to false")
+	}
+
+	// Verify they are independent pointers
+	if truePtr == falsePtr {
+		t.Error("boolPtr should return distinct pointers")
+	}
+}

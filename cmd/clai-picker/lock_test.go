@@ -57,3 +57,27 @@ func TestReleaseLock_InvalidFd(t *testing.T) {
 	// Releasing with -1 should not panic.
 	releaseLock(-1)
 }
+
+func TestCheckTERM_Normal(t *testing.T) {
+	t.Setenv("TERM", "xterm-256color")
+	err := checkTERM()
+	if err != nil {
+		t.Errorf("expected no error for TERM=xterm-256color, got: %v", err)
+	}
+}
+
+func TestCheckTERM_Dumb(t *testing.T) {
+	t.Setenv("TERM", "dumb")
+	err := checkTERM()
+	if err == nil {
+		t.Error("expected error for TERM=dumb, got nil")
+	}
+}
+
+func TestCheckTERM_Empty(t *testing.T) {
+	t.Setenv("TERM", "")
+	err := checkTERM()
+	if err != nil {
+		t.Errorf("expected no error for empty TERM, got: %v", err)
+	}
+}
