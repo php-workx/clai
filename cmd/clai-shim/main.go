@@ -15,8 +15,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/runger/clai/internal/ipc"
 )
@@ -422,7 +424,11 @@ func runImportHistory() {
 	}
 	defer client.Close()
 
-	resp, err := client.ImportHistory(context.Background(), shell, historyPath, ifNotExists, force)
+	// Create signal-aware context for graceful cancellation
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	resp, err := client.ImportHistory(ctx, shell, historyPath, ifNotExists, force)
 	if err != nil {
 		output := map[string]interface{}{
 			"error": err.Error(),
