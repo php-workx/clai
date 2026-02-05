@@ -173,6 +173,24 @@ tests:
     expect:
       - screen_matches: "."
 
+  - name: "clai suggest with prefix filters results (zsh)"
+    description: "Providing a prefix argument filters suggestions"
+    shell: zsh
+    tags: [suggest, prefix, zsh, cross-shell]
+    setup:
+      - "git status"
+      - "git log --oneline"
+      - "npm test"
+      - "make build"
+    steps:
+      - type: "clai suggest git"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "git"
+      - screen_not_contains: "npm"
+      - screen_not_contains: "make"
+
   # ===========================================================================
   # clai suggest CLI Tests - Fish
   # ===========================================================================
@@ -233,6 +251,24 @@ tests:
       - wait: "500ms"
     expect:
       - screen_matches: "."
+
+  - name: "clai suggest with prefix filters results (fish)"
+    description: "Providing a prefix argument filters suggestions"
+    shell: fish
+    tags: [suggest, prefix, fish, cross-shell]
+    setup:
+      - "git status"
+      - "git log --oneline"
+      - "npm test"
+      - "make build"
+    steps:
+      - type: "clai suggest git"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "git"
+      - screen_not_contains: "npm"
+      - screen_not_contains: "make"
 
   # ===========================================================================
   # Suggestion Reasons Tests
@@ -1079,6 +1115,28 @@ tests:
     expect:
       # Ephemeral commands should not appear in global
       - screen_not_contains: "ephemeral_env_test_cmd"
+
+  - name: "Incognito mode toggle (zsh)"
+    description: "Incognito on/off works in zsh"
+    shell: zsh
+    tags: [incognito, suggestions, privacy, zsh, cross-shell]
+    steps:
+      - type: "clai incognito on"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "Incognito mode enabled"
+
+  - name: "Incognito mode toggle (fish)"
+    description: "Incognito on/off works in fish"
+    shell: fish
+    tags: [incognito, suggestions, privacy, fish, cross-shell]
+    steps:
+      - type: "clai incognito on"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "Incognito mode enabled"
 
   # ===========================================================================
   # Suggestion API Response Fields
