@@ -5,6 +5,7 @@ package hook
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"os"
@@ -13,10 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/runger/clai/internal/suggestions/event"
-	"github.com/runger/clai/internal/suggestions/transport"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/runger/clai/internal/suggestions/event"
+	"github.com/runger/clai/internal/suggestions/transport"
 )
 
 // shortTempDir creates a temp directory with a short path suitable for Unix sockets.
@@ -70,7 +72,7 @@ func (s *testServer) acceptOne() {
 		// Read the event (NDJSON format)
 		reader := bufio.NewReader(conn)
 		line, err := reader.ReadBytes('\n')
-		if err != nil && err != io.EOF {
+		if err != nil && !errors.Is(err, io.EOF) {
 			return
 		}
 
@@ -513,4 +515,228 @@ func TestSender_SpecialCharactersInCommand(t *testing.T) {
 	events := server.getEvents()
 	require.Len(t, events, 1)
 	assert.Equal(t, ev.CmdRaw, events[0].CmdRaw)
+}
+
+func TestSender_IncognitoNoRecord(t *testing.T) {
+	// Save and restore environment
+	origValue := os.Getenv(EnvNoRecord)
+	defer func() {
+		if origValue != "" {
+			os.Setenv(EnvNoRecord, origValue)
+		} else {
+			os.Unsetenv(EnvNoRecord)
+		}
+	}()
+
+	tmpDir := shortTempDir(t)
+	socketPath := filepath.Join(tmpDir, "norecord.sock")
+
+	// Start test server
+	server := newTestServer(t, socketPath)
+	defer server.close()
+	server.acceptOne()
+
+	// Create sender
+	tr := transport.NewUnixTransport(socketPath)
+	sender := NewSender(tr)
+	sender.connectTimeout = 100 * time.Millisecond
+	sender.writeTimeout = 100 * time.Millisecond
+
+	ev := &event.CommandEvent{
+		Version:   1,
+		Type:      event.EventTypeCommandEnd,
+		Ts:        1730000000123,
+		SessionID: "norecord-test",
+		Shell:     event.ShellZsh,
+		Cwd:       "/home/user",
+		CmdRaw:    "secret command",
+		ExitCode:  0,
+		Ephemeral: false,
+	}
+
+	// Enable no-record mode
+	os.Setenv(EnvNoRecord, "1")
+
+	// Send should succeed without actually sending
+	result := sender.Send(ev)
+	assert.True(t, result, "Send should return true even though event was dropped")
+
+	// Give server a moment to receive (it shouldn't)
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify NO event was received
+	events := server.getEvents()
+	assert.Len(t, events, 0, "No events should be received in no-record mode")
+}
+
+func TestSender_IncognitoEphemeral(t *testing.T) {
+	// Save and restore environment
+	origValue := os.Getenv(EnvEphemeral)
+	defer func() {
+		if origValue != "" {
+			os.Setenv(EnvEphemeral, origValue)
+		} else {
+			os.Unsetenv(EnvEphemeral)
+		}
+	}()
+	// Also ensure CLAI_NO_RECORD is not set
+	origNoRecord := os.Getenv(EnvNoRecord)
+	os.Unsetenv(EnvNoRecord)
+	defer func() {
+		if origNoRecord != "" {
+			os.Setenv(EnvNoRecord, origNoRecord)
+		}
+	}()
+
+	tmpDir := shortTempDir(t)
+	socketPath := filepath.Join(tmpDir, "ephemeral.sock")
+
+	// Start test server
+	server := newTestServer(t, socketPath)
+	defer server.close()
+	server.acceptOne()
+
+	// Create sender
+	tr := transport.NewUnixTransport(socketPath)
+	sender := NewSender(tr)
+	sender.connectTimeout = 100 * time.Millisecond
+	sender.writeTimeout = 100 * time.Millisecond
+
+	ev := &event.CommandEvent{
+		Version:   1,
+		Type:      event.EventTypeCommandEnd,
+		Ts:        1730000000123,
+		SessionID: "ephemeral-test",
+		Shell:     event.ShellZsh,
+		Cwd:       "/home/user",
+		CmdRaw:    "private command",
+		ExitCode:  0,
+		Ephemeral: false, // Initially false
+	}
+
+	// Enable ephemeral mode
+	os.Setenv(EnvEphemeral, "1")
+
+	// Send should succeed
+	result := sender.Send(ev)
+	assert.True(t, result)
+
+	// Wait for server to process
+	server.wg.Wait()
+
+	// Verify event was received with Ephemeral=true
+	events := server.getEvents()
+	require.Len(t, events, 1)
+	assert.True(t, events[0].Ephemeral, "Event should have Ephemeral=true when CLAI_EPHEMERAL is set")
+	assert.Equal(t, "private command", events[0].CmdRaw)
+}
+
+func TestIsNoRecord(t *testing.T) {
+	origValue := os.Getenv(EnvNoRecord)
+	defer func() {
+		if origValue != "" {
+			os.Setenv(EnvNoRecord, origValue)
+		} else {
+			os.Unsetenv(EnvNoRecord)
+		}
+	}()
+
+	tests := []struct {
+		name     string
+		envValue string
+		want     bool
+	}{
+		{"not set", "", false},
+		{"set to 1", "1", true},
+		{"set to 0", "0", false},
+		{"set to true", "true", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envValue == "" {
+				os.Unsetenv(EnvNoRecord)
+			} else {
+				os.Setenv(EnvNoRecord, tt.envValue)
+			}
+			assert.Equal(t, tt.want, IsNoRecord())
+		})
+	}
+}
+
+func TestIsEphemeral(t *testing.T) {
+	origValue := os.Getenv(EnvEphemeral)
+	defer func() {
+		if origValue != "" {
+			os.Setenv(EnvEphemeral, origValue)
+		} else {
+			os.Unsetenv(EnvEphemeral)
+		}
+	}()
+
+	tests := []struct {
+		name     string
+		envValue string
+		want     bool
+	}{
+		{"not set", "", false},
+		{"set to 1", "1", true},
+		{"set to 0", "0", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.envValue == "" {
+				os.Unsetenv(EnvEphemeral)
+			} else {
+				os.Setenv(EnvEphemeral, tt.envValue)
+			}
+			assert.Equal(t, tt.want, IsEphemeral())
+		})
+	}
+}
+
+func TestIsIncognito(t *testing.T) {
+	origNoRecord := os.Getenv(EnvNoRecord)
+	origEphemeral := os.Getenv(EnvEphemeral)
+	defer func() {
+		if origNoRecord != "" {
+			os.Setenv(EnvNoRecord, origNoRecord)
+		} else {
+			os.Unsetenv(EnvNoRecord)
+		}
+		if origEphemeral != "" {
+			os.Setenv(EnvEphemeral, origEphemeral)
+		} else {
+			os.Unsetenv(EnvEphemeral)
+		}
+	}()
+
+	tests := []struct {
+		name      string
+		noRecord  string
+		ephemeral string
+		want      bool
+	}{
+		{"neither set", "", "", false},
+		{"no_record set", "1", "", true},
+		{"ephemeral set", "", "1", true},
+		{"both set", "1", "1", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.noRecord == "" {
+				os.Unsetenv(EnvNoRecord)
+			} else {
+				os.Setenv(EnvNoRecord, tt.noRecord)
+			}
+			if tt.ephemeral == "" {
+				os.Unsetenv(EnvEphemeral)
+			} else {
+				os.Setenv(EnvEphemeral, tt.ephemeral)
+			}
+			assert.Equal(t, tt.want, IsIncognito())
+		})
+	}
 }

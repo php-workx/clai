@@ -1,0 +1,515 @@
+// Package normalize provides command normalization for the clai suggestions engine.
+// Normalization replaces variable arguments with typed slots to enable pattern matching
+// and slot filling for suggestions.
+//
+// Per spec Section 8:
+//   - Preserves command/subcommand + flags
+//   - Replaces variable arguments with typed slots (<path>, <num>, <sha>, <url>, <msg>, <arg>)
+//   - Deterministic output
+package normalize
+
+import (
+	"regexp"
+	"strings"
+
+	"github.com/google/shlex"
+)
+
+// Slot types per spec Section 8.2
+const (
+	SlotPath = "<path>" // token looks like a path (/, ./, ../, ~, contains /)
+	SlotNum  = "<num>"  // digits
+	SlotSHA  = "<sha>"  // 7-40 hex chars (git commit SHA)
+	SlotURL  = "<url>"  // http(s):// or git@...:
+	SlotMsg  = "<msg>"  // commit messages in common patterns
+	SlotArg  = "<arg>"  // generic argument placeholder
+)
+
+// Pre-compiled regex patterns for slot detection
+var (
+	// pathPattern matches tokens that look like file paths
+	pathPattern = regexp.MustCompile(`^(?:[~/.]|[a-zA-Z]:[/\\]|.*/)`)
+
+	// numPattern matches pure numeric tokens
+	numPattern = regexp.MustCompile(`^\d+$`)
+
+	// shaPattern matches git SHA-like hex strings (7-40 chars)
+	// Case-insensitive, must be only hex chars
+	shaPattern = regexp.MustCompile(`(?i)^[0-9a-f]{7,40}$`)
+
+	// urlPattern matches URLs
+	urlPattern = regexp.MustCompile(`^(?:https?://|git@[^:]+:)`)
+
+	// envVarPattern matches environment variable references
+	envVarPattern = regexp.MustCompile(`^\$[A-Za-z_][A-Za-z0-9_]*$`)
+)
+
+// Normalizer normalizes commands by replacing variable arguments with typed slots.
+type Normalizer struct {
+	// CommandRules contains command-specific normalization rules
+	CommandRules map[string]CommandRule
+}
+
+// CommandRule defines normalization behavior for a specific command.
+type CommandRule struct {
+	// ArgSlots maps argument position to a specific slot type.
+	// Position -1 means "all remaining args".
+	ArgSlots map[int]string
+
+	// FlagSlots maps flag names to slot types for their values.
+	FlagSlots map[string]string
+
+	// SubcommandRules maps subcommands to their rules.
+	SubcommandRules map[string]CommandRule
+}
+
+// NewNormalizer creates a Normalizer with default command rules.
+func NewNormalizer() *Normalizer {
+	return &Normalizer{
+		CommandRules: defaultCommandRules(),
+	}
+}
+
+// Normalize normalizes a command string by replacing variable arguments with slots.
+// Returns the normalized command and a list of slot values extracted.
+func (n *Normalizer) Normalize(cmdRaw string) (cmdNorm string, slots []SlotValue) {
+	// Parse command using shlex
+	tokens, err := shlex.Split(cmdRaw)
+	if err != nil || len(tokens) == 0 {
+		// Fall back to simple splitting on parse error
+		tokens = strings.Fields(cmdRaw)
+		if len(tokens) == 0 {
+			return cmdRaw, nil
+		}
+	}
+
+	// First token is the command
+	cmd := tokens[0]
+	result := []string{cmd}
+	slots = make([]SlotValue, 0)
+
+	// Get command-specific rules
+	rule, hasRule := n.CommandRules[cmd]
+
+	// Process remaining tokens
+	i := 1
+	argIndex := 0 // Track positional argument index
+
+	// Check for subcommand (second token that matches a known subcommand pattern)
+	if hasRule && i < len(tokens) && rule.SubcommandRules != nil {
+		token := tokens[i]
+		// Check if this looks like a subcommand (not a flag, not a path-like token)
+		if !strings.HasPrefix(token, "-") && !strings.Contains(token, "/") && !strings.HasPrefix(token, ".") {
+			if subRule, ok := rule.SubcommandRules[token]; ok {
+				result = append(result, token)
+				rule = subRule
+				i++
+			} else {
+				// Even if there's no specific rule, preserve common subcommands
+				// for commands that have SubcommandRules defined (like git, npm, etc.)
+				result = append(result, token)
+				rule = CommandRule{} // Empty rule, use default behavior
+				hasRule = false
+				i++
+			}
+		}
+	}
+
+	for i < len(tokens) {
+		token := tokens[i]
+
+		// Check if it's a flag
+		if strings.HasPrefix(token, "-") {
+			result = append(result, token)
+
+			// Check if flag takes a value (next token)
+			flagName := strings.TrimLeft(token, "-")
+			if hasRule && rule.FlagSlots != nil {
+				if slotType, ok := rule.FlagSlots[flagName]; ok {
+					// Flag has a known slot type, consume next token
+					if i+1 < len(tokens) {
+						i++
+						value := tokens[i]
+						slots = append(slots, SlotValue{
+							Index: len(slots),
+							Type:  slotType,
+							Value: value,
+						})
+						result = append(result, slotType)
+					}
+				}
+			}
+			i++
+			continue
+		}
+
+		// It's a positional argument - determine slot type
+		slotType := n.detectSlotType(token)
+
+		// Check command-specific rules for this position
+		if hasRule && rule.ArgSlots != nil {
+			if specificSlot, ok := rule.ArgSlots[argIndex]; ok {
+				slotType = specificSlot
+			} else if specificSlot, ok := rule.ArgSlots[-1]; ok {
+				// -1 means "all remaining args"
+				slotType = specificSlot
+			}
+		}
+
+		slots = append(slots, SlotValue{
+			Index: len(slots),
+			Type:  slotType,
+			Value: token,
+		})
+		result = append(result, slotType)
+		argIndex++
+		i++
+	}
+
+	return strings.Join(result, " "), slots
+}
+
+// SlotValue represents an extracted slot value from a command.
+type SlotValue struct {
+	Index int    // Position in the list of slots
+	Type  string // Slot type (e.g., "<path>", "<sha>")
+	Value string // Original value from the command
+}
+
+// detectSlotType determines the appropriate slot type for a token.
+func (n *Normalizer) detectSlotType(token string) string {
+	// Check in order of specificity
+
+	// SHA first (most specific pattern)
+	if shaPattern.MatchString(token) {
+		return SlotSHA
+	}
+
+	// URL
+	if urlPattern.MatchString(token) {
+		return SlotURL
+	}
+
+	// Path (contains /, starts with ~, ., or drive letter)
+	if pathPattern.MatchString(token) {
+		return SlotPath
+	}
+
+	// Pure number
+	if numPattern.MatchString(token) {
+		return SlotNum
+	}
+
+	// Environment variable - keep as-is (not a slot)
+	if envVarPattern.MatchString(token) {
+		return token // Return the token itself, not a slot
+	}
+
+	// Default to generic argument
+	return SlotArg
+}
+
+// defaultCommandRules returns the starter set of command-specific rules per spec Section 8.3.
+func defaultCommandRules() map[string]CommandRule {
+	return map[string]CommandRule{
+		"git": {
+			SubcommandRules: map[string]CommandRule{
+				"commit": {
+					FlagSlots: map[string]string{
+						"m":       SlotMsg,
+						"message": SlotMsg,
+					},
+				},
+				"checkout": {
+					FlagSlots: map[string]string{
+						"b": SlotArg, // branch name
+					},
+					ArgSlots: map[int]string{
+						0: SlotArg, // branch or path
+					},
+				},
+				"push": {
+					ArgSlots: map[int]string{
+						0: SlotArg, // remote
+						1: SlotArg, // branch
+					},
+				},
+				"pull": {
+					ArgSlots: map[int]string{
+						0: SlotArg, // remote
+						1: SlotArg, // branch
+					},
+				},
+				"clone": {
+					ArgSlots: map[int]string{
+						0: SlotURL,  // repo URL
+						1: SlotPath, // destination
+					},
+				},
+				"add": {
+					ArgSlots: map[int]string{
+						-1: SlotPath, // all args are paths
+					},
+				},
+				"diff": {
+					ArgSlots: map[int]string{
+						-1: SlotPath, // paths or commits
+					},
+				},
+				"log": {
+					ArgSlots: map[int]string{
+						-1: SlotPath, // paths
+					},
+				},
+				"show": {
+					ArgSlots: map[int]string{
+						0: SlotSHA, // commit
+					},
+				},
+				"reset": {
+					ArgSlots: map[int]string{
+						0:  SlotSHA,  // commit or HEAD~n
+						-1: SlotPath, // paths
+					},
+				},
+				"revert": {
+					ArgSlots: map[int]string{
+						0: SlotSHA, // commit
+					},
+				},
+				"cherry-pick": {
+					ArgSlots: map[int]string{
+						-1: SlotSHA, // commits
+					},
+				},
+			},
+		},
+		"npm": {
+			SubcommandRules: map[string]CommandRule{
+				"install": {
+					ArgSlots: map[int]string{
+						-1: SlotArg, // package names
+					},
+				},
+				"run": {
+					ArgSlots: map[int]string{
+						0: SlotArg, // script name
+					},
+				},
+				"test": {},
+			},
+		},
+		"pnpm": {
+			SubcommandRules: map[string]CommandRule{
+				"install": {
+					ArgSlots: map[int]string{
+						-1: SlotArg,
+					},
+				},
+				"add": {
+					ArgSlots: map[int]string{
+						-1: SlotArg,
+					},
+				},
+				"run": {
+					ArgSlots: map[int]string{
+						0: SlotArg,
+					},
+				},
+			},
+		},
+		"yarn": {
+			SubcommandRules: map[string]CommandRule{
+				"add": {
+					ArgSlots: map[int]string{
+						-1: SlotArg,
+					},
+				},
+				"run": {
+					ArgSlots: map[int]string{
+						0: SlotArg,
+					},
+				},
+			},
+		},
+		"go": {
+			SubcommandRules: map[string]CommandRule{
+				"test": {
+					ArgSlots: map[int]string{
+						-1: SlotPath, // paths or ./...
+					},
+				},
+				"build": {
+					ArgSlots: map[int]string{
+						-1: SlotPath,
+					},
+				},
+				"run": {
+					ArgSlots: map[int]string{
+						0: SlotPath, // main file
+					},
+				},
+				"get": {
+					ArgSlots: map[int]string{
+						-1: SlotURL, // module paths
+					},
+				},
+			},
+		},
+		"pytest": {
+			ArgSlots: map[int]string{
+				-1: SlotPath, // test paths
+			},
+		},
+		"python": {
+			ArgSlots: map[int]string{
+				0: SlotPath, // script path
+			},
+		},
+		"python3": {
+			ArgSlots: map[int]string{
+				0: SlotPath,
+			},
+		},
+		"make": {
+			ArgSlots: map[int]string{
+				-1: SlotArg, // targets
+			},
+		},
+		"kubectl": {
+			SubcommandRules: map[string]CommandRule{
+				"get": {
+					FlagSlots: map[string]string{
+						"n":         SlotArg, // namespace
+						"namespace": SlotArg,
+					},
+				},
+				"describe": {
+					FlagSlots: map[string]string{
+						"n":         SlotArg,
+						"namespace": SlotArg,
+					},
+				},
+				"apply": {
+					FlagSlots: map[string]string{
+						"f": SlotPath, // file
+					},
+				},
+				"delete": {
+					FlagSlots: map[string]string{
+						"n":         SlotArg,
+						"namespace": SlotArg,
+					},
+				},
+			},
+		},
+		"docker": {
+			SubcommandRules: map[string]CommandRule{
+				"run": {
+					ArgSlots: map[int]string{
+						0: SlotArg, // image
+					},
+				},
+				"build": {
+					FlagSlots: map[string]string{
+						"t":   SlotArg, // tag
+						"tag": SlotArg,
+						"f":   SlotPath, // dockerfile
+					},
+					ArgSlots: map[int]string{
+						0: SlotPath, // context
+					},
+				},
+				"exec": {
+					ArgSlots: map[int]string{
+						0: SlotArg, // container
+					},
+				},
+			},
+		},
+		"cd": {
+			ArgSlots: map[int]string{
+				0: SlotPath,
+			},
+		},
+		"cat": {
+			ArgSlots: map[int]string{
+				-1: SlotPath,
+			},
+		},
+		"less": {
+			ArgSlots: map[int]string{
+				0: SlotPath,
+			},
+		},
+		"vim": {
+			ArgSlots: map[int]string{
+				-1: SlotPath,
+			},
+		},
+		"nvim": {
+			ArgSlots: map[int]string{
+				-1: SlotPath,
+			},
+		},
+		"code": {
+			ArgSlots: map[int]string{
+				-1: SlotPath,
+			},
+		},
+		"rm": {
+			ArgSlots: map[int]string{
+				-1: SlotPath,
+			},
+		},
+		"mv": {
+			ArgSlots: map[int]string{
+				-1: SlotPath,
+			},
+		},
+		"cp": {
+			ArgSlots: map[int]string{
+				-1: SlotPath,
+			},
+		},
+		"mkdir": {
+			ArgSlots: map[int]string{
+				-1: SlotPath,
+			},
+		},
+		"touch": {
+			ArgSlots: map[int]string{
+				-1: SlotPath,
+			},
+		},
+		"chmod": {
+			ArgSlots: map[int]string{
+				0:  SlotNum,  // mode
+				-1: SlotPath, // paths
+			},
+		},
+		"chown": {
+			ArgSlots: map[int]string{
+				0:  SlotArg,  // owner
+				-1: SlotPath, // paths
+			},
+		},
+		"curl": {
+			ArgSlots: map[int]string{
+				0: SlotURL,
+			},
+		},
+		"wget": {
+			ArgSlots: map[int]string{
+				0: SlotURL,
+			},
+		},
+	}
+}
+
+// NormalizeSimple is a convenience function that normalizes without tracking slots.
+func NormalizeSimple(cmdRaw string) string {
+	n := NewNormalizer()
+	norm, _ := n.Normalize(cmdRaw)
+	return norm
+}

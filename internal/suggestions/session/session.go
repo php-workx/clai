@@ -48,10 +48,8 @@ func GetSessionID(t transport.Transport) (string, error) {
 		sessionID, err = requestDaemonSessionID(t)
 		if err == nil && sessionID != "" {
 			// Successfully got session ID from daemon, write to file
-			if writeErr := writeSessionFile(pid, sessionID); writeErr != nil {
-				// Log warning but continue with the session ID
-				// The session file is optional - we still have a valid session ID
-			}
+			// Ignore write error - session file is optional, we still have a valid session ID
+			_ = writeSessionFile(pid, sessionID)
 			return sessionID, nil
 		}
 		// Fall through to Strategy B if daemon unavailable
@@ -61,9 +59,8 @@ func GetSessionID(t transport.Transport) (string, error) {
 	sessionID = generateLocalSessionID()
 
 	// Write to session file for future reads
-	if writeErr := writeSessionFile(pid, sessionID); writeErr != nil {
-		// Log warning but continue with the session ID
-	}
+	// Ignore write error - session file is optional
+	_ = writeSessionFile(pid, sessionID)
 
 	return sessionID, nil
 }
