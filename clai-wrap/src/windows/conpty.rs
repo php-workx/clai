@@ -311,7 +311,11 @@ mod tests {
         println!("Windows build number: {}", build);
 
         // Build number should be reasonable (at least Windows 10 RTM = 10240)
-        assert!(build >= 10240, "Build number should be reasonable: {}", build);
+        assert!(
+            build >= 10240,
+            "Build number should be reasonable: {}",
+            build
+        );
     }
 
     #[test]
@@ -336,10 +340,7 @@ mod tests {
         // This might fail in some test environments (e.g., no console)
         // but it should not panic
         let result = enable_virtual_terminal_processing();
-        println!(
-            "Enable VT processing result: {:?}",
-            result.is_ok()
-        );
+        println!("Enable VT processing result: {:?}", result.is_ok());
     }
 
     #[test]

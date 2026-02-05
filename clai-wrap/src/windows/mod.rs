@@ -12,15 +12,15 @@
 
 #![cfg(windows)]
 
-pub mod console_events;
 pub mod conpty;
+pub mod console_events;
 pub mod process_detect;
 
-pub use console_events::{has_console, ConsoleEvent, ConsoleEventError, ConsoleEventHandler};
 pub use conpty::{
     enable_virtual_terminal_processing, get_availability_diagnostic, get_windows_build_number,
     is_build_supported, is_conpty_available, ConptyError, CONPTY_MIN_BUILD,
 };
+pub use console_events::{has_console, ConsoleEvent, ConsoleEventError, ConsoleEventHandler};
 pub use process_detect::{
     extract_exe_name, get_foreground_process, get_foreground_process_or, get_process_image_name,
     get_process_name, process_exists, ProcessDetectError,

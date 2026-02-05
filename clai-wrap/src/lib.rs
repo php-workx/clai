@@ -8,6 +8,7 @@ pub mod alt_screen;
 pub mod bracketed_paste;
 pub mod cli;
 pub mod color_detect;
+pub mod config;
 pub mod denylist;
 pub mod echo_gap;
 pub mod history_parser;
@@ -27,6 +28,7 @@ pub mod ring_buffer;
 pub mod selection_inject;
 pub mod shell_inject;
 pub mod standalone;
+pub mod suggestion_receiver;
 pub mod temp_dir;
 
 #[cfg(unix)]
@@ -42,6 +44,10 @@ pub mod signals;
 pub mod windows;
 
 pub use color_detect::{detect_color_support, ColorSupport};
+pub use config::{
+    find_config_file, get_legacy_config_path, get_xdg_config_path, Config, ConfigError, ConfigFile,
+    DEFAULT_HOTKEY,
+};
 pub use denylist::{DenyPattern, Denylist, MatchType};
 pub use echo_gap::{EchoGapConfig, EchoGapDetector, EchoGapState};
 pub use history_parser::{
@@ -69,6 +75,10 @@ pub use raw_mode::{detect_tty, enter_raw_mode, RawModeError, RawModeGuard, TtySt
 pub use ring_buffer::SpscRingBuffer;
 pub use selection_inject::SelectionInjector;
 pub use standalone::{Feature, StandaloneError, StandaloneReason, StandaloneState};
+pub use suggestion_receiver::{
+    ParseError as SuggestionParseError, Suggestion, SuggestionReceiver, SuggestionType,
+    MAX_SUGGESTIONS_PER_COMMAND, MAX_TOTAL_SUGGESTIONS,
+};
 
 #[cfg(unix)]
 pub use daemon_client::{DaemonClient, DaemonClientError, DEFAULT_CONNECT_TIMEOUT_MS};
@@ -87,6 +97,6 @@ pub use windows::{
     enable_virtual_terminal_processing, extract_exe_name, get_availability_diagnostic,
     get_foreground_process, get_foreground_process_or, get_process_image_name, get_process_name,
     get_windows_build_number, has_console, is_build_supported, is_conpty_available, process_exists,
-    ConsoleEvent, ConsoleEventError, ConsoleEventHandler, ConptyError, ProcessDetectError,
+    ConptyError, ConsoleEvent, ConsoleEventError, ConsoleEventHandler, ProcessDetectError,
     CONPTY_MIN_BUILD,
 };
