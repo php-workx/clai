@@ -286,6 +286,66 @@ tests:
       - screen_contains: "echo third"
 
   # ===========================================================================
+  # AI Commands (Not Yet Implemented)
+  # ===========================================================================
+  # These tests are skipped until the AI features are fully implemented
+
+  - name: "clai cmd converts natural language to command"
+    description: "Natural language input produces executable shell command"
+    shell: bash
+    tags: [ai, cmd, skipped]
+    skip: true
+    skip_reason: "clai cmd not yet fully implemented"
+    steps:
+      - type: "clai cmd 'list all files in current directory'"
+      - press: "Enter"
+      - wait: "3s"  # AI processing time
+    expect:
+      - screen_matches: "(ls|find|dir)"  # Should produce a list command
+
+  - name: "clai cmd caches suggestion for completion"
+    description: "Generated command is cached for Tab completion"
+    shell: bash
+    tags: [ai, cmd, skipped]
+    skip: true
+    skip_reason: "clai cmd not yet fully implemented"
+    steps:
+      - type: "clai cmd 'show git log with one line per commit'"
+      - press: "Enter"
+      - wait: "3s"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "git log"
+
+  - name: "clai ask answers terminal questions"
+    description: "Ask Claude a question and get contextual answer"
+    shell: bash
+    tags: [ai, ask, skipped]
+    skip: true
+    skip_reason: "clai ask not yet fully implemented"
+    steps:
+      - type: "clai ask 'How do I find large files?'"
+      - press: "Enter"
+      - wait: "5s"  # AI processing time
+    expect:
+      - screen_matches: "(find|du|ls)"  # Should mention relevant commands
+
+  - name: "clai ask with context flag"
+    description: "Ask with additional context passed via --context"
+    shell: bash
+    tags: [ai, ask, skipped]
+    skip: true
+    skip_reason: "clai ask not yet fully implemented"
+    steps:
+      - type: "clai ask --context 'error: permission denied' 'What went wrong?'"
+      - press: "Enter"
+      - wait: "5s"
+    expect:
+      - screen_matches: "(permission|sudo|chmod)"
+
+  # ===========================================================================
   # CLI Commands (Shell Context Dependent)
   # ===========================================================================
   # These commands require an active shell session to work correctly
@@ -560,7 +620,8 @@ metadata:
   purpose: "Reference implementation for AI-assisted terminal testing"
 
   # Statistics
-  total_tests: 34
+  total_tests: 38
+  skipped_tests: 4
   by_tag:
     smoke: 4
     picker: 10
@@ -575,6 +636,8 @@ metadata:
     edge-case: 3
     cross-shell: 2
     toggle: 2
+    ai: 4
+    skipped: 4
 
   # Execution notes
   notes:
@@ -584,3 +647,4 @@ metadata:
     - "Session vs Global tests require prior command history in database"
     - "CLI tests validate shell-context-dependent commands"
     - "Parameter tests verify CWD and exit code logging/filtering"
+    - "AI tests (clai cmd, clai ask) are skipped until features are implemented"

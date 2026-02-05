@@ -53,21 +53,18 @@ or set manually). If it’s missing, history is treated as global.
 ### Zsh
 
 - Inline ghost‑text suggestions
-- **Tab**: suggestion picker
-- **Up Arrow**: history picker
+- **Alt+H** (Option+H): history picker
 - **Right Arrow**: accept suggestion
 - **Alt+Right**: accept next token
 
 ### Bash
 
-- **Tab**: menu completion with clai suggestions first
-- **Up Arrow**: history picker
+- **Alt+H** (Option+H): history picker
 
 ### Fish
 
+- **Alt+H** (Option+H): history picker
 - **Alt+Enter**: accept suggestion
-- **Tab**: native completions + picker behavior
-- **Up Arrow**: history picker
 
 ## Toggles
 
@@ -91,15 +88,14 @@ export CLAI_MENU_LIMIT=5
 export CLAI_CACHE="$HOME/.cache/clai"
 ```
 
-## Notes on Experimental Hooks
+## Notes on Experimental Features
 
-The shell scripts include placeholders for:
+The shell scripts include placeholders for features that are not yet fully implemented:
 
-- `run` wrapper (output extraction + diagnosis)
-- `?` prefix for natural language
+- `clai cmd` for natural language → command conversion
+- `clai ask` for terminal-context questions
 
-These require commands that are not currently shipped in the CLI.
-Use `clai cmd` directly instead.
+See [CLI Reference](cli-reference.md) for current status.
 
 ## Uninstalling
 
