@@ -519,12 +519,15 @@ _clai_config_enabled() {
 }
 
 _clai_history_args() {
+    # Output one argument per line to handle paths with spaces
+    # Caller must use ${(f)...} to split on newlines
     case "$_CLAI_HISTORY_SCOPE" in
         session)
             echo "--session=$CLAI_SESSION_ID"
             ;;
         cwd)
-            echo "--session=$CLAI_SESSION_ID --cwd=$PWD"
+            echo "--session=$CLAI_SESSION_ID"
+            echo "--cwd=$PWD"
             ;;
         global)
             echo "--global"
@@ -549,7 +552,7 @@ _clai_picker_load() {
         fi
     else
         local -a args
-        args=(${(z)$(_clai_history_args)})
+        args=(${(f)"$(_clai_history_args)"})
         if [[ -n "$BUFFER" ]]; then
             items=(${(f)"$(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" --offset "$offset" "$BUFFER" 2>/dev/null)"})
         else
