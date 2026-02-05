@@ -10,3 +10,6 @@ bin/
 # Test coverage
 coverage.out
 coverage.html
+
+# Beads export state (machine-specific paths)
+.beads/export-state/*.json
