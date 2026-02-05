@@ -779,6 +779,13 @@ clai() {
 # ============================================
 
 if [[ $- == *i* && -z "$_CLAI_REINIT" ]]; then
+    # Register session with daemon (fire and forget)
+    # This notifies the daemon of the new shell session
+    (clai-shim session-start \
+        --session-id="$CLAI_SESSION_ID" \
+        --cwd="$PWD" \
+        --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1 &)
+
     # Import shell history on first init (fire and forget)
     # This is idempotent: --if-not-exists skips if already imported
     (clai-shim import-history \
