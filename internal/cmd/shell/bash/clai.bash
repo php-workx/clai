@@ -516,11 +516,95 @@ clear-suggestion() {
 }
 
 # ============================================
-# Feature 2: Prompt Hook
+# Feature 2: Command Logging Hooks
 # ============================================
+# Log commands for session history (enables clai history)
+# Uses DEBUG trap for preexec (command start) and PROMPT_COMMAND for precmd (command end)
+#
+# Key challenge: Bash's DEBUG trap fires for EVERY command including those inside
+# functions and PROMPT_COMMAND. We detect user commands by checking BASH_COMMAND
+# against internal patterns and using FUNCNAME to detect function context.
 
-# Check result after each command
+# Command tracking state
+_CLAI_COMMAND_ID=""
+_CLAI_COMMAND_START_TIME=""
+_CLAI_LAST_COMMAND=""
+_CLAI_PENDING_LOG=false  # True when we have a command to log on completion
+
+# Log command start (called from DEBUG trap before command execution)
+_clai_log_command_start() {
+    local cmd="$1"
+
+    # Skip empty commands
+    [[ -z "$cmd" ]] && return 1
+
+    # Skip if we're inside a function (FUNCNAME has entries beyond main)
+    # FUNCNAME[0] is this function, FUNCNAME[1] is caller
+    # For top-level commands, FUNCNAME should be small
+    if [[ ${#FUNCNAME[@]} -gt 2 ]]; then
+        return 1
+    fi
+
+    # Skip internal clai functions and common shell patterns
+    case "$cmd" in
+        _ai_*|_clai_*|_AI_*|_CLAI_*) return 1 ;;
+        '['*|'[['*|'(('*) return 1 ;;  # Test expressions
+        local\ *|export\ *|return\ *) return 1 ;;  # Shell builtins in functions
+    esac
+
+    # Skip if already tracking a command
+    [[ "$_CLAI_PENDING_LOG" == "true" ]] && return 1
+
+    # Mark that we have a pending command to log
+    _CLAI_PENDING_LOG=true
+
+    # Generate unique command ID
+    _CLAI_COMMAND_ID="${CLAI_SESSION_ID}-$(date +%s)-${RANDOM}"
+    # Store start time in milliseconds (seconds * 1000 as approximation)
+    _CLAI_COMMAND_START_TIME=$(($(date +%s) * 1000))
+    _CLAI_LAST_COMMAND="$cmd"
+
+    # Fire and forget - log command start to daemon
+    (clai-shim log-start \
+        --session-id="$CLAI_SESSION_ID" \
+        --command-id="$_CLAI_COMMAND_ID" \
+        --cwd="$PWD" \
+        --command="$cmd" >/dev/null 2>&1 &)
+
+    return 0
+}
+
+# Log command end (called from PROMPT_COMMAND after command execution)
+_clai_log_command_end() {
+    local exit_code="$1"
+
+    # Only log if we have a pending command
+    [[ "$_CLAI_PENDING_LOG" != "true" ]] && return
+    [[ -z "$_CLAI_COMMAND_ID" ]] && return
+
+    local end_time=$(($(date +%s) * 1000))
+    local duration=$((end_time - _CLAI_COMMAND_START_TIME))
+
+    # Fire and forget - log command end to daemon
+    (clai-shim log-end \
+        --session-id="$CLAI_SESSION_ID" \
+        --command-id="$_CLAI_COMMAND_ID" \
+        --exit-code="$exit_code" \
+        --duration="$duration" >/dev/null 2>&1 &)
+
+    # Clear command tracking state
+    _CLAI_COMMAND_ID=""
+    _CLAI_COMMAND_START_TIME=""
+    _CLAI_PENDING_LOG=false
+}
+
+# Prompt command hook (runs after each command, before showing prompt)
 _ai_prompt_command() {
+    local last_exit=$?
+
+    # Log command completion (only if we ran a user command)
+    _clai_log_command_end "$last_exit"
+
     # Show any suggestions
     _ai_show_suggestion
 }
@@ -559,7 +643,7 @@ _ai_check_nl_prefix() {
     return 1  # Not a natural language command
 }
 
-# Hook into DEBUG trap to catch ? prefix before execution
+# Hook into DEBUG trap to catch ? prefix before execution and log commands
 # Note: extdebug must be enabled for the trap to block command execution
 _ai_debug_trap() {
     # Check for natural language prefix first
@@ -567,6 +651,10 @@ _ai_debug_trap() {
         # Prevent the original command from running (requires extdebug)
         return 1
     fi
+
+    # Log command start (for session history)
+    _clai_log_command_start "$BASH_COMMAND"
+
     return 0
 }
 
