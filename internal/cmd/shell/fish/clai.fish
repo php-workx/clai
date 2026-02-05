@@ -553,6 +553,64 @@ end
 set -gx CLAI_SESSION_ID "{{CLAI_SESSION_ID}}"
 
 # ============================================
+# Command Logging (for history daemon)
+# ============================================
+# Track command execution for session-aware history
+
+set -g _CLAI_COMMAND_ID ""
+set -g _CLAI_COMMAND_START_TIME ""
+
+# Log command start (runs before each command)
+function _clai_preexec --on-event fish_preexec
+    # Skip if clai is disabled
+    if test "$CLAI_OFF" = "1"; or _clai_session_off
+        return
+    end
+
+    # Skip if no session ID
+    if test -z "$CLAI_SESSION_ID"
+        return
+    end
+
+    set -l cmd $argv[1]
+
+    # Skip empty commands
+    if test -z "$cmd"
+        return
+    end
+
+    # Generate unique command ID
+    set -g _CLAI_COMMAND_ID "$CLAI_SESSION_ID-"(date +%s)"-"(random)
+    # Store start time in milliseconds (seconds * 1000 as approximation)
+    set -g _CLAI_COMMAND_START_TIME (math (date +%s) \* 1000)
+
+    # Fire and forget - log command start to daemon
+    fish -c "clai-shim log-start --session-id='$CLAI_SESSION_ID' --command-id='$_CLAI_COMMAND_ID' --cwd='$PWD' --command='$cmd' >/dev/null 2>&1" &
+    disown %1 2>/dev/null
+end
+
+# Log command end (runs after each command)
+function _clai_postexec --on-event fish_postexec
+    set -l exit_code $status
+
+    # Skip if no pending command
+    if test -z "$_CLAI_COMMAND_ID"
+        return
+    end
+
+    set -l end_time (math (date +%s) \* 1000)
+    set -l duration (math $end_time - $_CLAI_COMMAND_START_TIME)
+
+    # Fire and forget - log command end to daemon
+    fish -c "clai-shim log-end --session-id='$CLAI_SESSION_ID' --command-id='$_CLAI_COMMAND_ID' --exit-code='$exit_code' --duration='$duration' >/dev/null 2>&1" &
+    disown %1 2>/dev/null
+
+    # Clear command tracking state
+    set -g _CLAI_COMMAND_ID ""
+    set -g _CLAI_COMMAND_START_TIME ""
+end
+
+# ============================================
 # Manual Commands
 # ============================================
 
