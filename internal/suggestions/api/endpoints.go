@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/runger/clai/internal/suggestions/discovery"
@@ -308,10 +309,41 @@ func (h *Handler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 // HandleDebugScores handles the /debug/scores endpoint.
 // Per spec Section 15.4.
 func (h *Handler) HandleDebugScores(w http.ResponseWriter, r *http.Request) {
-	// This would need a direct DB query - for now return empty
-	// In production, this would query the command_score table
+	ctx := r.Context()
+
+	// Return empty if scorer not available
+	if h.scorer == nil {
+		h.writeJSON(w, http.StatusOK, DebugScoresResponse{Scores: []DebugScoreEntry{}})
+		return
+	}
+
+	// Get limit from query params (default 100)
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if parsed, err := strconv.Atoi(limitStr); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+
+	scores, err := h.scorer.DebugScores(ctx, limit)
+	if err != nil {
+		h.logger.Error("failed to get debug scores", "error", err)
+		h.writeError(w, http.StatusInternalServerError, "db_error", "Failed to query scores")
+		return
+	}
+
+	entries := make([]DebugScoreEntry, len(scores))
+	for i, s := range scores {
+		entries[i] = DebugScoreEntry{
+			Scope:   s.Scope,
+			CmdNorm: s.CmdNorm,
+			Score:   s.Score,
+			LastTs:  s.LastTs,
+		}
+	}
+
 	resp := DebugScoresResponse{
-		Scores: []DebugScoreEntry{},
+		Scores: entries,
 	}
 	h.writeJSON(w, http.StatusOK, resp)
 }

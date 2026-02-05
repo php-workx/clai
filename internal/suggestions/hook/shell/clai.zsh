@@ -1,6 +1,10 @@
 # clai.zsh - clai suggestions engine v3 hook for Zsh
 # This hook sends command events to the daemon for ingestion.
 # See spec Section 17.1 for details.
+#
+# NOTE: Suggestion widgets (Ctrl+Space, Tab, etc.) are provided by the main
+# shell integration at internal/cmd/shell/zsh/clai.zsh. This hook focuses
+# solely on event ingestion for the daemon.
 
 # Guard: only in interactive shells
 [[ -o interactive ]] || return 0

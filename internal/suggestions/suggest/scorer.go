@@ -356,3 +356,42 @@ func (s *Scorer) TopK() int {
 func (s *Scorer) Weights() Weights {
 	return s.cfg.Weights
 }
+
+// DebugScore represents a score entry for debug output.
+type DebugScore struct {
+	Scope   string
+	CmdNorm string
+	Score   float64
+	LastTs  int64
+}
+
+// DebugScores returns the top scores from the command_score table for debugging.
+func (s *Scorer) DebugScores(ctx context.Context, limit int) ([]DebugScore, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+
+	query := `
+		SELECT scope, cmd_norm, score, last_ts
+		FROM command_score
+		ORDER BY score DESC
+		LIMIT ?
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var scores []DebugScore
+	for rows.Next() {
+		var ds DebugScore
+		if err := rows.Scan(&ds.Scope, &ds.CmdNorm, &ds.Score, &ds.LastTs); err != nil {
+			return nil, err
+		}
+		scores = append(scores, ds)
+	}
+
+	return scores, rows.Err()
+}

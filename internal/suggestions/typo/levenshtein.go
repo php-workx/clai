@@ -117,30 +117,4 @@ func Similarity(a, b string) float64 {
 	return 1.0 - float64(distance)/float64(maxLen)
 }
 
-// min returns the minimum of the given integers.
-func min(nums ...int) int {
-	if len(nums) == 0 {
-		return 0
-	}
-	m := nums[0]
-	for _, n := range nums[1:] {
-		if n < m {
-			m = n
-		}
-	}
-	return m
-}
-
-// max returns the maximum of the given integers.
-func max(nums ...int) int {
-	if len(nums) == 0 {
-		return 0
-	}
-	m := nums[0]
-	for _, n := range nums[1:] {
-		if n > m {
-			m = n
-		}
-	}
-	return m
-}
+// Note: Using Go 1.21+ builtin min/max functions
