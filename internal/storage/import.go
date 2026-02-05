@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -142,8 +143,11 @@ func (s *SQLiteStore) ImportHistory(ctx context.Context, entries []history.Impor
 			wordCount,
 		)
 		if err != nil {
-			// Skip individual failures (e.g., duplicate commands)
-			continue
+			// Only ignore duplicate key errors (UNIQUE constraint), propagate others
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				continue
+			}
+			return 0, fmt.Errorf("failed to insert command: %w", err)
 		}
 		imported++
 	}
