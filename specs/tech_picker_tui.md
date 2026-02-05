@@ -203,7 +203,7 @@ CLI remains `--tabs=session,global` for v1; tab ids map to config entries.
 ### 3) Picker Core (Bubble Tea)
 - Create `internal/picker` package with:
 	- `Model` with explicit state enum:
-	  ```
+	  ```text
 	  States: idle | loading | loaded | empty | error
 	  Transitions:
 		idle    → loading    (on open / fetch triggered)
@@ -243,7 +243,7 @@ CLI remains `--tabs=session,global` for v1; tab ids map to config entries.
 #### Provider Protocol (Daemon IPC)
 The history provider queries the daemon via gRPC. A new RPC method is required:
 
-```
+```proto
 rpc FetchHistory(HistoryFetchRequest) returns (HistoryFetchResponse)
 
 HistoryFetchRequest {

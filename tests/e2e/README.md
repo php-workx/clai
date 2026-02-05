@@ -10,7 +10,7 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
    ```
 
 2. **Ask Claude to run tests:**
-   ```
+   ```text
    Run e2e tests from tests/e2e/example-test-plan.yaml against http://localhost:8080
    ```
 
@@ -18,7 +18,7 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
 
 ## Directory Structure
 
-```
+```text
 tests/e2e/
 ├── README.md                 # This file
 ├── example-test-plan.yaml    # Reference test plan with schema docs

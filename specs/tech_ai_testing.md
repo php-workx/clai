@@ -31,7 +31,7 @@ Use Claude Code with Playwright to execute structured test plans against a web-b
 
 ### 2.1 Architecture Overview
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────┐
 │  Browser (Playwright-controlled by Claude)                      │
 │  ┌───────────────────────────────────────────────────────────┐  │
@@ -163,7 +163,7 @@ Tests are defined in YAML files. See `tests/e2e/example-test-plan.yaml` for the 
 
 ### 5.1 Manual Execution (Phase 1)
 
-```
+```text
 User                    Claude                      Browser
   │                        │                           │
   │  "Run e2e tests"       │                           │
@@ -243,7 +243,7 @@ Each test should pass in:
 For UI-heavy features (picker, suggestions), capture screenshots and compare against baselines.
 
 **Storage:**
-```
+```text
 tests/e2e/
   screenshots/
     baseline/
