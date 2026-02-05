@@ -25,8 +25,8 @@
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
-/// Default initial threshold for echo gap detection (100ms).
-pub const DEFAULT_THRESHOLD_MS: u64 = 100;
+/// Default initial threshold for echo gap detection (50ms per spec).
+pub const DEFAULT_THRESHOLD_MS: u64 = 50;
 
 /// Minimum safe threshold to avoid false positives (50ms).
 pub const MIN_THRESHOLD_MS: u64 = 50;

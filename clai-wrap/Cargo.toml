@@ -56,6 +56,10 @@ harness = false
 name = "picker"
 harness = false
 
+[features]
+# Enable tests that require a real TTY (run manually with `cargo test --features tty_tests`)
+tty_tests = []
+
 [lints.rust]
 unsafe_code = "warn"
 
