@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -189,6 +190,7 @@ func parseHistoryFlags(args []string) (*pickerOpts, error) {
 }
 
 // sanitizeQuery strips control characters and validates the query string.
+// It safely truncates to maxQueryLen bytes without splitting UTF-8 runes.
 func sanitizeQuery(q string) (string, error) {
 	if q == "" {
 		return "", nil
@@ -200,22 +202,23 @@ func sanitizeQuery(q string) (string, error) {
 	}
 
 	// Strip control characters (0x00-0x1F) except tab (0x09).
+	// Track byte length during iteration to avoid splitting multibyte runes.
 	var b strings.Builder
 	b.Grow(len(q))
+	currentLen := 0
 	for _, r := range q {
 		if r >= 0x00 && r <= 0x1F && r != 0x09 {
 			continue // strip control char
 		}
+		runeLen := utf8.RuneLen(r)
+		if currentLen+runeLen > maxQueryLen {
+			break // stop before exceeding limit
+		}
 		b.WriteRune(r)
-	}
-	result := b.String()
-
-	// Truncate to maxQueryLen bytes.
-	if len(result) > maxQueryLen {
-		result = result[:maxQueryLen]
+		currentLen += runeLen
 	}
 
-	return result, nil
+	return b.String(), nil
 }
 
 // dispatch routes to the appropriate backend.

@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
@@ -96,6 +97,44 @@ func TestSanitizeQuery_ExactMaxLen(t *testing.T) {
 	}
 	if len(result) != maxQueryLen {
 		t.Fatalf("expected length %d, got %d", maxQueryLen, len(result))
+	}
+}
+
+func TestSanitizeQuery_UTF8SafeTruncation(t *testing.T) {
+	// Create a string of multibyte characters that exceeds maxQueryLen.
+	// The emoji "🔥" is 4 bytes in UTF-8.
+	emoji := "🔥"
+	emojiLen := len(emoji) // 4 bytes
+
+	// Calculate how many emojis we need to exceed maxQueryLen.
+	count := (maxQueryLen / emojiLen) + 10
+	input := strings.Repeat(emoji, count)
+
+	result, err := sanitizeQuery(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Result should be valid UTF-8.
+	if !utf8.ValidString(result) {
+		t.Fatal("result is not valid UTF-8")
+	}
+
+	// Result should be <= maxQueryLen bytes.
+	if len(result) > maxQueryLen {
+		t.Fatalf("result exceeds maxQueryLen: got %d bytes", len(result))
+	}
+
+	// Result should be a multiple of 4 (emoji byte length).
+	// This verifies we didn't split a multibyte character.
+	if len(result)%emojiLen != 0 {
+		t.Fatalf("result length %d is not a multiple of emoji byte length %d", len(result), emojiLen)
+	}
+
+	// Verify last character is a complete emoji, not a partial rune.
+	lastRune, size := utf8.DecodeLastRuneInString(result)
+	if lastRune == utf8.RuneError && size == 1 {
+		t.Fatal("last rune is invalid (partial UTF-8 sequence)")
 	}
 }
 
