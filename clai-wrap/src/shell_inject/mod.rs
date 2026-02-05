@@ -7,7 +7,7 @@
 //!
 //! - **Bash**: Uses `--rcfile` to inject init script
 //! - **Zsh**: Uses `ZDOTDIR` wrapper
-//! - **Fish**: (future) Uses `--init-command` or native OSC 133 (Fish >= 3.6)
+//! - **Fish**: Uses `--init-command` for Fish < 3.6; Fish >= 3.6 has native OSC 133
 //!
 //! # OSC 133 Sequences
 //!
@@ -22,7 +22,9 @@
 //! | `\e]133;D;N\a` | Finished (command completed with exit code N) |
 
 mod bash;
+mod fish;
 mod zsh;
 
 pub use bash::{BashInjector, BashInjectorError};
+pub use fish::{FishInjector, FishInjectorError};
 pub use zsh::{ZshInjector, ZshInjectorError};
