@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/runger/clai/internal/config"
@@ -405,5 +406,5 @@ func TestCheckShellIntegrationWithPaths_SessionIDWithoutShell(t *testing.T) {
 
 // contains checks if s contains substr
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsString(s, substr))
+	return strings.Contains(s, substr)
 }

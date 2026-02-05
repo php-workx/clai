@@ -1,0 +1,711 @@
+# Example E2E Test Plan for clai
+#
+# This file serves as both documentation and a reference implementation
+# for the AI-assisted terminal testing framework.
+#
+# Schema Reference:
+#   - tests: Array of test cases
+#   - Each test has: name, shell, setup (optional), steps, expect
+#   - Steps: type, press, wait, wait_for
+#   - Expectations: screen_contains, screen_not_contains, screen_matches, etc.
+
+# Test suite metadata
+suite:
+  name: "clai Core Functionality"
+  description: "End-to-end tests for clai shell integration"
+  version: "1.0"
+
+# Default settings (can be overridden per test)
+defaults:
+  shell: bash
+  timeout: 30s
+  terminal_size:
+    rows: 24
+    cols: 80
+
+# Environment setup applied to all tests
+environment:
+  CLAI_HOME: "${TEST_TEMP_DIR}/clai"
+  TERM: "xterm-256color"
+  # Use a simple, predictable prompt
+  PS1: "TEST> "
+
+tests:
+  # ===========================================================================
+  # History Picker Tests
+  # ===========================================================================
+
+  - name: "History picker opens with Alt+H"
+    description: "Verify the history picker UI appears when pressing Alt+H"
+    shell: bash
+    tags: [picker, history, smoke]
+    setup:
+      # Seed some history for the picker to display
+      - "echo 'setup command 1'"
+      - "echo 'setup command 2'"
+      - "ls -la"
+    steps:
+      - press: "Alt+H"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "history"  # Picker header or indicator
+      - screen_contains: "setup command"  # Should show seeded history
+
+  - name: "History picker fuzzy search filters results"
+    description: "Typing in the picker filters visible commands"
+    shell: bash
+    tags: [picker, history, search]
+    setup:
+      - "echo apple"
+      - "echo banana"
+      - "echo apricot"
+      - "git status"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "ap"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "apple"
+      - screen_contains: "apricot"
+      - screen_not_contains: "banana"
+      - screen_not_contains: "git status"
+
+  - name: "History picker navigation with arrow keys"
+    description: "Up/Down arrows move selection in the picker"
+    shell: bash
+    tags: [picker, history, navigation]
+    setup:
+      - "command one"
+      - "command two"
+      - "command three"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Down"
+      - press: "Down"
+      - press: "Up"
+    expect:
+      # Selection should be on second item after Down, Down, Up
+      - element_visible: "picker-selection"  # Visual selection indicator
+
+  - name: "History picker Enter inserts command"
+    description: "Pressing Enter inserts selected command into buffer"
+    shell: bash
+    tags: [picker, history]
+    setup:
+      - "echo 'selected command'"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "selected"
+      - wait: "200ms"
+      - press: "Enter"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "echo 'selected command'"
+      # Picker should be closed
+      - screen_not_contains: "history"
+
+  - name: "History picker Escape cancels"
+    description: "Pressing Escape closes picker and restores original buffer"
+    shell: bash
+    tags: [picker, history]
+    steps:
+      - type: "original text"
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Escape"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "original text"
+      - screen_not_contains: "history"  # Picker closed
+
+  - name: "History scope switching with Tab"
+    description: "Tab key switches between Session and Global scope in picker"
+    shell: bash
+    tags: [picker, history, scope]
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Tab"  # Switch to Global scope
+      - wait: "200ms"
+    expect:
+      - screen_contains: "Global"  # Global tab should be active
+
+  - name: "Session history is isolated from global"
+    description: "Session scope only shows commands from current session"
+    shell: bash
+    tags: [picker, history, scope, isolation]
+    setup:
+      # Run a unique command only in this session
+      - "echo unique_session_test_command_12345"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+    expect:
+      # Session scope (default) should show the unique command
+      - screen_contains: "Session"
+      - screen_contains: "unique_session_test_command_12345"
+
+  - name: "Global history contains cross-session commands"
+    description: "Global scope shows commands from all sessions"
+    shell: bash
+    tags: [picker, history, scope, global]
+    setup:
+      - "echo session_specific_command"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Tab"  # Switch to Global
+      - wait: "300ms"
+    expect:
+      - screen_contains: "Global"
+      # Global should have many more commands than just this session
+      # Look for commands that wouldn't be in a fresh session
+      - screen_matches: "(git|make|cd|ls)"
+
+  - name: "Long command shows truncation indicator"
+    description: "Commands exceeding terminal width show middle ellipsis"
+    shell: bash
+    tags: [picker, history, truncation]
+    setup:
+      - "echo this_is_a_very_long_command_that_should_be_truncated_in_the_middle_with_an_ellipsis_indicator_to_show_both_start_and_end"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "truncated"
+      - wait: "300ms"
+    expect:
+      # Should show ellipsis indicator (middle truncation)
+      - screen_contains: "…"
+      # Should show beginning of command
+      - screen_contains: "echo this_is"
+      # Should show end of command
+      - screen_contains: "and_end"
+
+  - name: "Enter inserts full untruncated command"
+    description: "Pressing Enter on truncated command inserts full text"
+    shell: bash
+    tags: [picker, history, truncation]
+    setup:
+      - "echo UNIQUE_START_marker_this_is_a_very_long_command_with_lots_of_text_in_the_middle_UNIQUE_END_marker"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "UNIQUE_START"
+      - wait: "300ms"
+      - press: "Enter"
+      - wait: "300ms"
+    expect:
+      # Full command should be in the prompt (not truncated)
+      - screen_contains: "UNIQUE_START_marker"
+      - screen_contains: "UNIQUE_END_marker"
+      # No ellipsis in the actual command line
+      - prompt_not_contains: "…"
+
+  - name: "Ctrl+C copies full untruncated command"
+    description: "Pressing Ctrl+C copies full command to clipboard"
+    shell: bash
+    tags: [picker, history, truncation, clipboard]
+    setup:
+      - "echo CLIPBOARD_START_this_is_a_very_long_command_for_clipboard_test_CLIPBOARD_END"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "CLIPBOARD_START"
+      - wait: "300ms"
+      - press: "Ctrl+C"
+      - wait: "500ms"
+    expect:
+      # Should show "Copied!" feedback
+      - screen_contains: "Copied!"
+      # Picker should still be open (Ctrl+C doesn't close it)
+      - screen_contains: "history"
+
+  # ===========================================================================
+  # Command Suggestion Tests
+  # ===========================================================================
+
+  - name: "Ghost text suggestion appears"
+    description: "Typing a known command prefix shows ghost text suggestion"
+    shell: bash
+    tags: [suggestions, ghost-text]
+    setup:
+      - "git status"
+      - "git log --oneline"
+    steps:
+      - type: "git st"
+      - wait: "500ms"
+    expect:
+      # Ghost text should complete the suggestion
+      - screen_contains: "atus"  # Suggestion completing "git status"
+
+  - name: "Right arrow accepts full suggestion"
+    description: "Pressing Right at end of line accepts the ghost text"
+    shell: bash
+    tags: [suggestions]
+    setup:
+      - "docker ps -a"
+    steps:
+      - type: "docker p"
+      - wait: "300ms"
+      - press: "Right"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "docker ps"
+
+  - name: "Alt+Right accepts next token"
+    description: "Alt+Right accepts one token of the suggestion at a time"
+    shell: bash
+    tags: [suggestions, token]
+    setup:
+      - "kubectl get pods -n production"
+    steps:
+      - type: "kubectl"
+      - wait: "300ms"
+      - press: "Alt+Right"  # Accept "get"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "kubectl get"
+      - screen_not_contains: "pods"  # Rest not accepted yet
+
+  - name: "Escape clears suggestion"
+    description: "Pressing Escape removes the ghost text"
+    shell: bash
+    tags: [suggestions]
+    setup:
+      - "npm install"
+    steps:
+      - type: "npm i"
+      - wait: "300ms"
+      - press: "Escape"
+      - wait: "200ms"
+    expect:
+      - screen_not_contains: "nstall"  # Ghost text gone
+
+  # ===========================================================================
+  # Shell Integration Tests
+  # ===========================================================================
+
+  - name: "clai loads successfully in bash"
+    description: "Sourcing clai integration doesn't produce errors"
+    shell: bash
+    tags: [integration, bash, smoke]
+    steps:
+      - type: "source ~/.clai/shell/bash.sh"
+      - press: "Enter"
+      - wait: "1s"
+    expect:
+      - screen_not_contains: "error"
+      - screen_not_contains: "Error"
+      - screen_not_contains: "command not found"
+
+  - name: "clai loads successfully in zsh"
+    description: "Sourcing clai integration doesn't produce errors"
+    shell: zsh
+    tags: [integration, zsh, smoke]
+    steps:
+      - type: "source ~/.clai/shell/zsh.zsh"
+      - press: "Enter"
+      - wait: "1s"
+    expect:
+      - screen_not_contains: "error"
+      - screen_not_contains: "Error"
+      - screen_not_contains: "command not found"
+
+  - name: "Session ID is set"
+    description: "CLAI_SESSION_ID environment variable is populated"
+    shell: bash
+    tags: [integration, session]
+    steps:
+      - type: "echo $CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Session ID should be a non-empty UUID-like string
+      - screen_matches: "[a-f0-9-]{36}"
+
+  - name: "History command shows session history"
+    description: "The history command shows commands from current session"
+    shell: bash
+    tags: [integration, history]
+    setup:
+      - "echo first"
+      - "echo second"
+      - "echo third"
+    steps:
+      - type: "history"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "echo first"
+      - screen_contains: "echo second"
+      - screen_contains: "echo third"
+
+  # ===========================================================================
+  # AI Commands (Not Yet Implemented)
+  # ===========================================================================
+  # These tests are skipped until the AI features are fully implemented
+
+  - name: "clai cmd converts natural language to command"
+    description: "Natural language input produces executable shell command"
+    shell: bash
+    tags: [ai, cmd, skipped]
+    skip: true
+    skip_reason: "clai cmd not yet fully implemented"
+    steps:
+      - type: "clai cmd 'list all files in current directory'"
+      - press: "Enter"
+      - wait: "3s"  # AI processing time
+    expect:
+      - screen_matches: "(ls|find|dir)"  # Should produce a list command
+
+  - name: "clai cmd caches suggestion for completion"
+    description: "Generated command is cached for Tab completion"
+    shell: bash
+    tags: [ai, cmd, skipped]
+    skip: true
+    skip_reason: "clai cmd not yet fully implemented"
+    steps:
+      - type: "clai cmd 'show git log with one line per commit'"
+      - press: "Enter"
+      - wait: "3s"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "git log"
+
+  - name: "clai ask answers terminal questions"
+    description: "Ask Claude a question and get contextual answer"
+    shell: bash
+    tags: [ai, ask, skipped]
+    skip: true
+    skip_reason: "clai ask not yet fully implemented"
+    steps:
+      - type: "clai ask 'How do I find large files?'"
+      - press: "Enter"
+      - wait: "5s"  # AI processing time
+    expect:
+      - screen_matches: "(find|du|ls)"  # Should mention relevant commands
+
+  - name: "clai ask with context flag"
+    description: "Ask with additional context passed via --context"
+    shell: bash
+    tags: [ai, ask, skipped]
+    skip: true
+    skip_reason: "clai ask not yet fully implemented"
+    steps:
+      - type: "clai ask --context 'error: permission denied' 'What went wrong?'"
+      - press: "Enter"
+      - wait: "5s"
+    expect:
+      - screen_matches: "(permission|sudo|chmod)"
+
+  # ===========================================================================
+  # CLI Commands (Shell Context Dependent)
+  # ===========================================================================
+  # These commands require an active shell session to work correctly
+
+  - name: "clai status shows session info"
+    description: "Status command detects active session and shell"
+    shell: bash
+    tags: [cli, status, smoke]
+    steps:
+      - type: "clai status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "[OK]"
+      - screen_contains: "Session"
+      - screen_contains: "bash"
+      - screen_not_contains: "[WARN] Session"  # Session should be detected
+
+  - name: "clai status in zsh"
+    description: "Status command correctly identifies zsh shell"
+    shell: zsh
+    tags: [cli, status, zsh]
+    steps:
+      - type: "clai status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "[OK]"
+      - screen_contains: "zsh"
+
+  - name: "clai history with session flag"
+    description: "History command respects --session flag"
+    shell: bash
+    tags: [cli, history]
+    setup:
+      - "echo test_history_cmd_1"
+      - "echo test_history_cmd_2"
+    steps:
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "test_history_cmd_1"
+      - screen_contains: "test_history_cmd_2"
+
+  - name: "clai history with global flag"
+    description: "History command shows all history with --global"
+    shell: bash
+    tags: [cli, history, global]
+    steps:
+      - type: "clai history --global --limit 10"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Global history should have content from previous sessions
+      - screen_matches: "."  # Non-empty output
+
+  - name: "clai history filters by CWD"
+    description: "History --cwd flag filters commands by working directory"
+    shell: bash
+    tags: [cli, history, parameters]
+    setup:
+      - "cd /tmp && echo from_tmp_dir"
+      - "cd ~ && echo from_home_dir"
+    steps:
+      - type: "clai history --cwd=/tmp --global"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "from_tmp_dir"
+      - screen_not_contains: "from_home_dir"
+
+  - name: "clai history filters successful commands"
+    description: "History --status=success shows only exit code 0 commands"
+    shell: bash
+    tags: [cli, history, parameters]
+    setup:
+      - "echo success_command"
+      - "false"  # Exit code 1
+    steps:
+      - type: "clai history --status=success --global"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "success_command"
+      - screen_not_contains: "false"
+
+  - name: "clai history filters failed commands"
+    description: "History --status=failure shows only non-zero exit codes"
+    shell: bash
+    tags: [cli, history, parameters]
+    setup:
+      - "echo will_succeed"
+      - "false"  # Exit code 1, will be logged as failure
+    steps:
+      - type: "clai history --status=failure --global"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "false"
+      - screen_not_contains: "will_succeed"
+
+  - name: "clai suggest uses session context"
+    description: "Suggest command returns matches from session history"
+    shell: bash
+    tags: [cli, suggest]
+    setup:
+      - "git status"
+      - "git log --oneline"
+    steps:
+      - type: "clai suggest git"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "git"
+
+  - name: "clai off disables integration"
+    description: "Running clai off disables shell features"
+    shell: bash
+    tags: [cli, toggle]
+    steps:
+      - type: "clai off"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "disabled"
+
+  - name: "clai on re-enables integration"
+    description: "Running clai on re-enables shell features after off"
+    shell: bash
+    tags: [cli, toggle]
+    setup:
+      - "clai off"
+    steps:
+      - type: "clai on"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "enabled"
+
+  # ===========================================================================
+  # PTY Wrapper Tests
+  # ===========================================================================
+
+  - name: "PTY wrapper captures stdout"
+    description: "Commands run through clai-wrap have output captured"
+    shell: bash
+    wrapper: clai-wrap
+    tags: [pty, capture]
+    steps:
+      - type: "echo 'hello world'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "hello world"
+
+  - name: "PTY wrapper handles colors"
+    description: "ANSI color codes pass through correctly"
+    shell: bash
+    wrapper: clai-wrap
+    tags: [pty, ansi]
+    steps:
+      - type: "ls --color=always"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Just verify command completed without error
+      - screen_contains: "TEST>"  # Prompt returned
+
+  - name: "PTY wrapper Ctrl+C handling"
+    description: "Ctrl+C properly interrupts running command"
+    shell: bash
+    wrapper: clai-wrap
+    tags: [pty, signals]
+    steps:
+      - type: "sleep 60"
+      - press: "Enter"
+      - wait: "500ms"
+      - press: "Ctrl+C"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "TEST>"  # Prompt returned, not still sleeping
+
+  # ===========================================================================
+  # Voice Mode Tests
+  # ===========================================================================
+
+  - name: "Voice mode converts natural language"
+    description: "Backtick prefix triggers voice-to-command conversion"
+    shell: bash
+    tags: [voice]
+    steps:
+      - type: "`list all files in current directory"
+      - press: "Enter"
+      - wait: "2s"  # Allow time for AI processing
+    expect:
+      - screen_matches: "(ls|find|dir)"  # Should convert to a list command
+
+  # ===========================================================================
+  # Edge Cases
+  # ===========================================================================
+
+  - name: "Empty command line doesn't crash"
+    description: "Pressing Enter on empty line works normally"
+    shell: bash
+    tags: [edge-case]
+    steps:
+      - press: "Enter"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "TEST>"  # New prompt appears
+
+  - name: "Very long command doesn't overflow"
+    description: "Long commands wrap properly without breaking"
+    shell: bash
+    tags: [edge-case]
+    steps:
+      - type: "echo 'this is a very long command that should wrap properly in the terminal without causing any display issues or breaking the shell integration features'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "TEST>"  # Completed successfully
+
+  - name: "Special characters handled correctly"
+    description: "Commands with quotes and special chars work"
+    shell: bash
+    tags: [edge-case]
+    steps:
+      - type: "echo \"hello 'world' $HOME\""
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "hello 'world'"
+
+  # ===========================================================================
+  # Cross-Shell Consistency
+  # ===========================================================================
+
+  - name: "History picker works in zsh"
+    description: "Same picker behavior in zsh as bash"
+    shell: zsh
+    tags: [picker, zsh, cross-shell]
+    setup:
+      - "echo test command"
+    steps:
+      - press: "Alt+H"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "history"
+      - screen_contains: "test command"
+
+  - name: "History picker works in fish"
+    description: "Same picker behavior in fish as bash"
+    shell: fish
+    tags: [picker, fish, cross-shell]
+    setup:
+      - "echo test command"
+    steps:
+      - press: "Alt+H"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "history"
+      - screen_contains: "test command"
+
+# ===========================================================================
+# Test Plan Metadata
+# ===========================================================================
+metadata:
+  created: "2026-02-05"
+  updated: "2026-02-05"
+  author: "clai team"
+  purpose: "Reference implementation for AI-assisted terminal testing"
+
+  # Statistics
+  total_tests: 42
+  skipped_tests: 4
+  by_tag:
+    smoke: 4
+    picker: 14
+    history: 13
+    scope: 3
+    truncation: 4
+    clipboard: 1
+    suggestions: 4
+    integration: 4
+    cli: 10
+    parameters: 3
+    pty: 3
+    voice: 1
+    edge-case: 3
+    cross-shell: 2
+    toggle: 2
+    ai: 4
+    skipped: 4
+
+  # Execution notes
+  notes:
+    - "Run 'make test-server' before executing tests"
+    - "Ensure clai daemon is running"
+    - "Tests assume clean CLAI_HOME directory"
+    - "Session vs Global tests require prior command history in database"
+    - "CLI tests validate shell-context-dependent commands"
+    - "Parameter tests verify CWD and exit code logging/filtering"
+    - "AI tests (clai cmd, clai ask) are skipped until features are implemented"
+    - "Truncation tests verify long commands show ellipsis but paste/copy full text"
