@@ -79,3 +79,19 @@ function _clai_cleanup --on-event fish_exit
   set -l session_file (test -n "$XDG_RUNTIME_DIR"; and echo "$XDG_RUNTIME_DIR"; or echo "/tmp")"/clai/session."(echo %self)
   test -f "$session_file"; and rm -f "$session_file"
 end
+
+# ============================================
+# Suggestion Widget (Alt+Space)
+# ============================================
+# Requires fzf for interactive selection
+
+function _clai_suggest
+  set -l cmd (clai suggest --format=fzf --limit=10 2>/dev/null | fzf --height=10 --reverse)
+  if test -n "$cmd"
+    commandline -r $cmd
+  end
+  commandline -f repaint
+end
+
+# Bind Alt+Space (Ctrl+Space often taken by OS)
+bind \e\  _clai_suggest

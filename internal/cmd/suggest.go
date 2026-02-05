@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	suggestLimit int
-	suggestJSON  bool
+	suggestLimit  int
+	suggestJSON   bool
+	suggestFormat string
 )
 
 var suggestCmd = &cobra.Command{
@@ -43,7 +44,8 @@ Examples:
 
 func init() {
 	suggestCmd.Flags().IntVarP(&suggestLimit, "limit", "n", 1, "maximum number of suggestions to return")
-	suggestCmd.Flags().BoolVar(&suggestJSON, "json", false, "output suggestions as JSON")
+	suggestCmd.Flags().BoolVar(&suggestJSON, "json", false, "output suggestions as JSON (deprecated: use --format=json)")
+	suggestCmd.Flags().StringVar(&suggestFormat, "format", "text", "output format: text, json, or fzf")
 }
 
 func runSuggest(cmd *cobra.Command, args []string) error {
@@ -52,8 +54,14 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 		prefix = args[0]
 	}
 
+	// Determine output format (--json flag for backwards compat)
+	format := suggestFormat
+	if suggestJSON && format == "text" {
+		format = "json"
+	}
+
 	if integrationDisabled() {
-		if suggestJSON {
+		if format == "json" {
 			return writeSuggestJSON(nil)
 		}
 		return nil
@@ -62,7 +70,7 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 	// Empty prefix - return cached AI suggestion
 	if prefix == "" {
 		suggestion, _ := cache.ReadSuggestion()
-		if suggestJSON {
+		if format == "json" {
 			if suggestion == "" {
 				return writeSuggestJSON(nil)
 			}
@@ -88,14 +96,35 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 		suggestions = getSuggestionsFromHistory(prefix, suggestLimit)
 	}
 
-	// Output suggestions
-	if suggestJSON {
-		return writeSuggestJSON(suggestions)
-	}
-	for _, s := range suggestions {
-		fmt.Println(s.Text)
-	}
+	// Output based on format
+	return outputSuggestions(suggestions, format)
+}
 
+// outputSuggestions formats and outputs suggestions based on format type.
+func outputSuggestions(suggestions []suggestOutput, format string) error {
+	switch format {
+	case "json":
+		return writeSuggestJSON(suggestions)
+	case "fzf":
+		// fzf format: plain commands, one per line (for piping to fzf)
+		for _, s := range suggestions {
+			fmt.Println(s.Text)
+		}
+	case "text":
+		// text format: numbered list with metadata
+		for i, s := range suggestions {
+			reasons := s.Source
+			if s.Risk != "" {
+				reasons += ", " + s.Risk
+			}
+			fmt.Printf("%d. %s (%s)\n", i+1, s.Text, reasons)
+		}
+	default:
+		// Unknown format, treat as fzf (plain output)
+		for _, s := range suggestions {
+			fmt.Println(s.Text)
+		}
+	}
 	return nil
 }
 

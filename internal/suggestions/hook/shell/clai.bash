@@ -129,3 +129,22 @@ else
     *) PROMPT_COMMAND+=';_clai_postexec' ;;
   esac
 fi
+
+# ============================================
+# Suggestion Widget (Ctrl+Space)
+# ============================================
+# Requires fzf for interactive selection
+
+_clai_suggest() {
+  local suggestions
+  suggestions=$(clai suggest --format=fzf --limit=10 2>/dev/null | fzf --height=10 --reverse)
+  if [[ -n "$suggestions" ]]; then
+    READLINE_LINE="$suggestions"
+    READLINE_POINT=${#READLINE_LINE}
+  fi
+}
+
+# Bind Ctrl+Space (if readline supports it)
+if _clai_bash_version_ge 4 0; then
+  bind -x '"\C- ": _clai_suggest' 2>/dev/null
+fi
