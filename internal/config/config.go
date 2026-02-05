@@ -602,5 +602,6 @@ func ListKeys() []string {
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
 		"history.picker_case_sensitive",
+		"history.up_arrow_opens_history",
 	}
 }

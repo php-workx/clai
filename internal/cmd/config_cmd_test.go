@@ -19,6 +19,7 @@ func TestConfigCmd_List(t *testing.T) {
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
 		"history.picker_case_sensitive",
+		"history.up_arrow_opens_history",
 	}
 
 	if len(keys) != len(expectedKeys) {

@@ -871,6 +871,7 @@ func TestListKeys(t *testing.T) {
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
 		"history.picker_case_sensitive",
+		"history.up_arrow_opens_history",
 	}
 
 	if len(keys) != len(expectedKeys) {
@@ -907,13 +908,14 @@ func TestListKeysAllSettable(t *testing.T) {
 	keys := ListKeys()
 
 	testValues := map[string]string{
-		"suggestions.enabled":           "false",
-		"suggestions.max_history":       "10",
-		"suggestions.show_risk_warning": "false",
-		"history.picker_backend":        "fzf",
-		"history.picker_open_on_empty":  "true",
-		"history.picker_page_size":      "50",
-		"history.picker_case_sensitive": "true",
+		"suggestions.enabled":            "false",
+		"suggestions.max_history":        "10",
+		"suggestions.show_risk_warning":  "false",
+		"history.picker_backend":         "fzf",
+		"history.picker_open_on_empty":   "true",
+		"history.picker_page_size":       "50",
+		"history.picker_case_sensitive":  "true",
+		"history.up_arrow_opens_history": "true",
 	}
 
 	for _, key := range keys {
