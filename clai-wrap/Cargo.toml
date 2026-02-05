@@ -23,8 +23,10 @@ signal-hook = "0.3"
 signal-hook-registry = "1.4"
 libc = "0.2"
 
+[dependencies.tempfile]
+version = "3"
+
 [dev-dependencies]
-tempfile = "3"
 
 [lints.rust]
 unsafe_code = "warn"
