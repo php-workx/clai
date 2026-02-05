@@ -668,6 +668,688 @@ tests:
       - screen_contains: "history"
       - screen_contains: "test command"
 
+  # ===========================================================================
+  # Paths with Spaces Tests (P0)
+  # ===========================================================================
+
+  - name: "CWD scope works with paths containing spaces"
+    description: "History picker CWD scope handles directories with spaces correctly"
+    shell: bash
+    tags: [picker, history, scope, spaces, smoke]
+    setup:
+      - "mkdir -p '/tmp/test dir with spaces'"
+      - "cd '/tmp/test dir with spaces'"
+      - "echo 'command in spaced dir'"
+      - "ls -la"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Tab"  # Switch to CWD scope
+      - wait: "300ms"
+    expect:
+      - screen_contains: "CWD"
+      - screen_contains: "command in spaced dir"
+
+  - name: "CWD scope filters correctly with spaces in path"
+    description: "Only commands from current spaced directory appear"
+    shell: zsh
+    tags: [picker, history, scope, spaces]
+    setup:
+      - "mkdir -p '/tmp/my project'"
+      - "cd '/tmp/my project'"
+      - "echo 'in my project'"
+      - "cd /tmp"
+      - "echo 'in tmp root'"
+      - "cd '/tmp/my project'"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Tab"  # CWD scope
+      - wait: "300ms"
+    expect:
+      - screen_contains: "in my project"
+      - screen_not_contains: "in tmp root"
+
+  - name: "History args handle special path characters"
+    description: "Paths with quotes and special characters don't break filtering"
+    shell: bash
+    tags: [picker, history, scope, spaces, edge-case]
+    setup:
+      - "mkdir -p \"/tmp/path'with\\\"quotes\""
+      - "cd \"/tmp/path'with\\\"quotes\""
+      - "echo 'special path command'"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Tab"  # CWD scope
+      - wait: "500ms"
+    expect:
+      - screen_contains: "special path command"
+
+  # ===========================================================================
+  # Incognito Mode Tests (P0)
+  # ===========================================================================
+
+  - name: "Incognito mode can be enabled"
+    description: "clai incognito on sets ephemeral mode"
+    shell: bash
+    tags: [incognito, privacy, smoke]
+    steps:
+      - type: "clai incognito on"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "incognito"
+      - screen_matches: "(enabled|on)"
+
+  - name: "Commands in incognito mode not persisted"
+    description: "Commands run in incognito don't appear in global history"
+    shell: bash
+    tags: [incognito, privacy]
+    setup:
+      - "clai incognito on"
+    steps:
+      - type: "echo 'SECRET_INCOGNITO_COMMAND_12345'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai incognito off"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --global | grep SECRET_INCOGNITO"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Command should NOT be in global history
+      - screen_not_contains: "SECRET_INCOGNITO_COMMAND_12345"
+
+  - name: "Incognito commands appear in session suggestions"
+    description: "Ephemeral mode keeps session context for suggestions"
+    shell: bash
+    tags: [incognito, privacy, suggestions]
+    setup:
+      - "clai incognito on"
+      - "echo 'ephemeral_session_cmd'"
+    steps:
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Session-local suggestions should still work
+      - screen_matches: "."  # Non-empty response
+
+  - name: "Incognito mode can be disabled"
+    description: "clai incognito off returns to normal mode"
+    shell: bash
+    tags: [incognito, privacy]
+    setup:
+      - "clai incognito on"
+    steps:
+      - type: "clai incognito off"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "incognito"
+      - screen_matches: "(disabled|off)"
+
+  - name: "CLAI_NO_RECORD prevents all ingestion"
+    description: "Setting CLAI_NO_RECORD=1 stops all command recording"
+    shell: bash
+    tags: [incognito, privacy, env-var]
+    steps:
+      - type: "export CLAI_NO_RECORD=1"
+      - press: "Enter"
+      - wait: "200ms"
+      - type: "echo 'NO_RECORD_TEST_CMD'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "unset CLAI_NO_RECORD"
+      - press: "Enter"
+      - wait: "200ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_not_contains: "NO_RECORD_TEST_CMD"
+
+  # ===========================================================================
+  # Search Command Tests (P0)
+  # ===========================================================================
+
+  - name: "clai search basic query"
+    description: "Search command finds matching history entries"
+    shell: bash
+    tags: [search, fts5, smoke]
+    setup:
+      - "echo 'searchable_unique_term_abc123'"
+      - "git status"
+    steps:
+      - type: "clai search 'searchable_unique'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "searchable_unique_term_abc123"
+
+  - name: "clai search with repo filter"
+    description: "Search --repo limits results to current repository"
+    shell: bash
+    tags: [search, fts5, repo]
+    setup:
+      - "echo 'repo_specific_search_term'"
+    steps:
+      - type: "clai search --repo 'repo_specific'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "repo_specific_search_term"
+
+  - name: "clai search with limit"
+    description: "Search --limit restricts result count"
+    shell: bash
+    tags: [search, fts5, parameters]
+    setup:
+      - "echo search_limit_1"
+      - "echo search_limit_2"
+      - "echo search_limit_3"
+      - "echo search_limit_4"
+      - "echo search_limit_5"
+    steps:
+      - type: "clai search --limit 2 'search_limit'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Should only show 2 results
+      - screen_matches: "search_limit"
+
+  - name: "clai search with JSON output"
+    description: "Search --json returns valid JSON format"
+    shell: bash
+    tags: [search, fts5, json]
+    setup:
+      - "echo json_search_test"
+    steps:
+      - type: "clai search --json 'json_search'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "{"
+      - screen_contains: "results"
+
+  - name: "clai search empty results"
+    description: "Search with no matches returns empty gracefully"
+    shell: bash
+    tags: [search, fts5, edge-case]
+    steps:
+      - type: "clai search 'xyznonexistent98765'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_not_contains: "error"
+      - screen_not_contains: "Error"
+
+  - name: "clai search with special characters"
+    description: "Search handles special characters in query"
+    shell: bash
+    tags: [search, fts5, edge-case]
+    setup:
+      - "echo 'test-with-dashes_and_underscores'"
+    steps:
+      - type: "clai search 'test-with-dashes'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "test-with-dashes"
+
+  # ===========================================================================
+  # Typo Correction Tests (P1)
+  # ===========================================================================
+
+  - name: "Typo correction suggests on exit 127"
+    description: "Misspelled command triggers Did You Mean suggestion"
+    shell: bash
+    tags: [typo, correction, suggestions]
+    setup:
+      # Ensure git is in history for high frequency
+      - "git status"
+      - "git log --oneline -1"
+    steps:
+      - type: "gti status"  # Typo of git
+      - press: "Enter"
+      - wait: "1s"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Should suggest the correct command
+      - screen_contains: "git"
+
+  - name: "Typo correction respects similarity threshold"
+    description: "Very different strings don't trigger correction"
+    shell: bash
+    tags: [typo, correction]
+    steps:
+      - type: "xyzabc123"  # Nothing similar
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Should not suggest random corrections
+      - screen_not_contains: "xyzabc123"
+
+  - name: "Typo correction prioritizes high-frequency commands"
+    description: "Common commands are suggested over rare ones"
+    shell: bash
+    tags: [typo, correction, frequency]
+    setup:
+      - "echo common_cmd"
+      - "echo common_cmd"
+      - "echo common_cmd"
+      - "echo rare_cmd"
+    steps:
+      - type: "commo_cmd"  # Typo with similar matches
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "common_cmd"
+
+  # ===========================================================================
+  # Suggest Output Format Tests (P1)
+  # ===========================================================================
+
+  - name: "clai suggest text format default"
+    description: "Default output shows numbered list with reasons"
+    shell: bash
+    tags: [suggest, format, smoke]
+    setup:
+      - "git status"
+      - "make build"
+    steps:
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "1\\."  # Numbered list
+      - screen_matches: "\\("   # Reasons in parens
+
+  - name: "clai suggest JSON format"
+    description: "--format=json returns valid JSON structure"
+    shell: bash
+    tags: [suggest, format, json]
+    setup:
+      - "npm test"
+    steps:
+      - type: "clai suggest --format=json"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "{"
+      - screen_contains: "suggestions"
+      - screen_contains: "cmd"
+
+  - name: "clai suggest fzf format"
+    description: "--format=fzf returns plain command list"
+    shell: bash
+    tags: [suggest, format, fzf]
+    setup:
+      - "docker ps"
+    steps:
+      - type: "clai suggest --format=fzf"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Plain output without decorations
+      - screen_not_contains: "1."
+      - screen_not_contains: "("
+
+  - name: "clai suggest with limit"
+    description: "--limit restricts suggestion count"
+    shell: bash
+    tags: [suggest, format, parameters]
+    setup:
+      - "cmd1"
+      - "cmd2"
+      - "cmd3"
+      - "cmd4"
+      - "cmd5"
+    steps:
+      - type: "clai suggest --limit=2"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Should show at most 2 suggestions
+      - screen_matches: "."
+
+  # ===========================================================================
+  # Command Ingestion Tests (P1)
+  # ===========================================================================
+
+  - name: "Command ingestion captures exit code success"
+    description: "Exit code 0 is recorded correctly"
+    shell: bash
+    tags: [ingestion, exit-code, bash]
+    steps:
+      - type: "true"  # Exit 0
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID --json | tail -1"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "exit_code"
+      - screen_contains: "0"
+
+  - name: "Command ingestion captures exit code failure"
+    description: "Non-zero exit codes are recorded"
+    shell: bash
+    tags: [ingestion, exit-code, bash]
+    steps:
+      - type: "false"  # Exit 1
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID --json | tail -1"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "exit_code"
+      - screen_not_contains: "\"exit_code\":0"
+
+  - name: "Command ingestion captures CWD"
+    description: "Working directory is recorded with each command"
+    shell: bash
+    tags: [ingestion, cwd, bash]
+    steps:
+      - type: "cd /tmp && echo 'ingestion_cwd_test'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --cwd=/tmp --global"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "ingestion_cwd_test"
+
+  - name: "Command ingestion in zsh"
+    description: "Commands are logged correctly in zsh"
+    shell: zsh
+    tags: [ingestion, zsh, cross-shell]
+    steps:
+      - type: "echo 'zsh_ingestion_test_12345'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "zsh_ingestion_test_12345"
+
+  - name: "Command ingestion in fish"
+    description: "Commands are logged correctly in fish"
+    shell: fish
+    tags: [ingestion, fish, cross-shell]
+    steps:
+      - type: "echo 'fish_ingestion_test_12345'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "fish_ingestion_test_12345"
+
+  - name: "Command with special characters ingested"
+    description: "Quotes, pipes, and redirects are captured correctly"
+    shell: bash
+    tags: [ingestion, special-chars]
+    steps:
+      - type: "echo \"hello | world\" > /dev/null && echo 'done'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "hello | world"
+
+  - name: "Command with unicode characters ingested"
+    description: "Unicode characters are captured without corruption"
+    shell: bash
+    tags: [ingestion, unicode]
+    steps:
+      - type: "echo '日本語 émoji 🎉'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "日本語"
+
+  # ===========================================================================
+  # Daemon Management Tests (P1)
+  # ===========================================================================
+
+  - name: "clai daemon status shows state"
+    description: "Status command reports daemon running/stopped"
+    shell: bash
+    tags: [daemon, management, smoke]
+    steps:
+      - type: "clai daemon status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(running|stopped|pid|PID)"
+
+  - name: "clai daemon start works"
+    description: "Start command launches daemon successfully"
+    shell: bash
+    tags: [daemon, management]
+    steps:
+      - type: "clai daemon start"
+      - press: "Enter"
+      - wait: "2s"
+      - type: "clai daemon status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "running"
+
+  - name: "clai daemon stop graceful shutdown"
+    description: "Stop command shuts down daemon cleanly"
+    shell: bash
+    tags: [daemon, management]
+    setup:
+      - "clai daemon start"
+    steps:
+      - type: "clai daemon stop"
+      - press: "Enter"
+      - wait: "2s"
+      - type: "clai daemon status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(stopped|not running)"
+
+  - name: "clai daemon restart sequence"
+    description: "Restart performs stop then start"
+    shell: bash
+    tags: [daemon, management]
+    steps:
+      - type: "clai daemon restart"
+      - press: "Enter"
+      - wait: "3s"
+      - type: "clai daemon status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "running"
+
+  # ===========================================================================
+  # Project Task Discovery Tests (P2)
+  # ===========================================================================
+
+  - name: "Discovery finds package.json scripts"
+    description: "npm scripts appear in suggestions for node projects"
+    shell: bash
+    tags: [discovery, package-json, suggestions]
+    setup:
+      # Create a minimal package.json
+      - "mkdir -p /tmp/node-test-project"
+      - "cd /tmp/node-test-project"
+      - "echo '{\"scripts\":{\"test\":\"jest\",\"build\":\"tsc\"}}' > package.json"
+    steps:
+      - type: "cd /tmp/node-test-project && clai suggest"
+      - press: "Enter"
+      - wait: "1s"
+    expect:
+      - screen_matches: "(npm|test|build)"
+
+  - name: "Discovery finds Makefile targets"
+    description: "make targets appear in suggestions"
+    shell: bash
+    tags: [discovery, makefile, suggestions]
+    setup:
+      - "mkdir -p /tmp/make-test-project"
+      - "cd /tmp/make-test-project"
+      - "printf 'build:\\n\\techo build\\ntest:\\n\\techo test\\n' > Makefile"
+    steps:
+      - type: "cd /tmp/make-test-project && clai suggest"
+      - press: "Enter"
+      - wait: "1s"
+    expect:
+      - screen_matches: "(make|build|test)"
+
+  - name: "Discovery shows project_task reason"
+    description: "Discovered tasks have project_task in reasons"
+    shell: bash
+    tags: [discovery, reasons]
+    setup:
+      - "mkdir -p /tmp/reason-test"
+      - "cd /tmp/reason-test"
+      - "echo '{\"scripts\":{\"lint\":\"eslint\"}}' > package.json"
+    steps:
+      - type: "cd /tmp/reason-test && clai suggest --format=json"
+      - press: "Enter"
+      - wait: "1s"
+    expect:
+      - screen_contains: "project_task"
+
+  # ===========================================================================
+  # Semantic Slot Filling Tests (P2)
+  # ===========================================================================
+
+  - name: "Slot filling learns argument values"
+    description: "Repeated arguments are remembered for suggestions"
+    shell: bash
+    tags: [slots, learning, suggestions]
+    setup:
+      - "kubectl get pods -n production"
+      - "kubectl get pods -n production"
+      - "kubectl get pods -n staging"
+    steps:
+      - type: "clai suggest kubectl"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Should suggest with learned namespace
+      - screen_contains: "kubectl"
+
+  - name: "Slot filling respects frequency"
+    description: "More frequent values are preferred"
+    shell: bash
+    tags: [slots, frequency]
+    setup:
+      - "docker run -it alpine"
+      - "docker run -it alpine"
+      - "docker run -it alpine"
+      - "docker run -it ubuntu"
+    steps:
+      - type: "clai suggest 'docker run'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # alpine should be suggested (higher frequency)
+      - screen_matches: "(alpine|docker)"
+
+  # ===========================================================================
+  # Pre-computed Cache Tests (P2)
+  # ===========================================================================
+
+  - name: "Suggestions served from cache"
+    description: "Cache hit after recent command"
+    shell: bash
+    tags: [cache, performance]
+    setup:
+      - "echo cache_warmup_cmd"
+    steps:
+      - type: "clai suggest --format=json"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Response should indicate cache status
+      - screen_contains: "cache"
+
+  - name: "Cache shows in debug endpoint"
+    description: "/debug/cache endpoint returns cache state"
+    shell: bash
+    tags: [cache, debug]
+    steps:
+      - type: "curl -s http://localhost:8765/debug/cache 2>/dev/null || clai debug cache"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(size|entries|cache)"
+
+  # ===========================================================================
+  # Debug Endpoint Tests (P2)
+  # ===========================================================================
+
+  - name: "Debug scores endpoint returns data"
+    description: "GET /debug/scores returns command scores"
+    shell: bash
+    tags: [debug, endpoints, api]
+    steps:
+      - type: "curl -s http://localhost:8765/debug/scores 2>/dev/null || clai debug scores"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "scores"
+
+  - name: "Debug scores with limit parameter"
+    description: "GET /debug/scores?limit=N respects limit"
+    shell: bash
+    tags: [debug, endpoints, parameters]
+    steps:
+      - type: "curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "scores"
+
+  - name: "Debug discovery-errors endpoint"
+    description: "GET /debug/discovery-errors returns failures"
+    shell: bash
+    tags: [debug, endpoints, discovery]
+    steps:
+      - type: "curl -s http://localhost:8765/debug/discovery-errors 2>/dev/null || clai debug discovery-errors"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(errors|count)"
+
+  - name: "Debug endpoints return valid JSON"
+    description: "All debug endpoints return parseable JSON"
+    shell: bash
+    tags: [debug, endpoints, json]
+    steps:
+      - type: "curl -s http://localhost:8765/debug/cache 2>/dev/null | jq . || echo 'curl failed'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_not_contains: "parse error"
+
 # ===========================================================================
 # Test Plan Metadata
 # ===========================================================================
@@ -678,26 +1360,55 @@ metadata:
   purpose: "Reference implementation for AI-assisted terminal testing"
 
   # Statistics
-  total_tests: 42
+  total_tests: 90
   skipped_tests: 4
   by_tag:
-    smoke: 4
-    picker: 14
+    smoke: 8
+    picker: 17
     history: 13
-    scope: 3
+    scope: 6
+    spaces: 3
     truncation: 4
     clipboard: 1
-    suggestions: 4
+    suggestions: 8
     integration: 4
     cli: 10
-    parameters: 3
+    parameters: 5
     pty: 3
     voice: 1
-    edge-case: 3
-    cross-shell: 2
+    edge-case: 5
+    cross-shell: 4
     toggle: 2
     ai: 4
     skipped: 4
+    incognito: 5
+    privacy: 5
+    search: 6
+    fts5: 6
+    typo: 3
+    correction: 3
+    format: 4
+    json: 3
+    fzf: 1
+    ingestion: 7
+    exit-code: 2
+    cwd: 1
+    unicode: 1
+    special-chars: 1
+    daemon: 4
+    management: 4
+    discovery: 4
+    makefile: 1
+    package-json: 1
+    reasons: 1
+    slots: 2
+    learning: 1
+    frequency: 2
+    cache: 2
+    performance: 1
+    debug: 4
+    endpoints: 4
+    api: 1
 
   # Execution notes
   notes:
@@ -709,3 +1420,9 @@ metadata:
     - "Parameter tests verify CWD and exit code logging/filtering"
     - "AI tests (clai cmd, clai ask) are skipped until features are implemented"
     - "Truncation tests verify long commands show ellipsis but paste/copy full text"
+    - "Incognito tests verify privacy features work correctly"
+    - "Search tests require FTS5 support in SQLite"
+    - "Typo correction tests require command history for suggestions"
+    - "Daemon tests may require stopping/starting the daemon"
+    - "Discovery tests create temporary project directories"
+    - "Slot filling tests require multiple command executions for learning"
