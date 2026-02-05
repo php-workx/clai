@@ -30,6 +30,15 @@ The history picker is available across zsh/bash/fish and supports:
 - Session vs Global scope switching (Tab key)
 - Arrow key navigation
 
+### Long Command Handling
+
+Long commands are truncated in the middle with a visible `…` indicator (shown in
+orange). This keeps both the beginning and end of the command visible.
+
+**Important:** The truncation is display-only. When you:
+- Press **Enter**: The full, untruncated command is inserted into your prompt
+- Press **Ctrl+C**: The full, untruncated command is copied to your clipboard
+
 ## Natural Language → Command (Coming Soon)
 
 Use `clai cmd` to turn plain English into a shell command:

@@ -50,20 +50,30 @@ or set manually). If it’s missing, history is treated as global.
 
 ## Features
 
+### All Shells (History Picker)
+
+- **Alt+H** (Option+H): open history picker
+- **Tab**: switch between Session and Global scope
+- **Up/Down**: navigate items
+- **Enter**: insert full command into prompt
+- **Ctrl+C**: copy full command to clipboard
+- **Escape**: cancel and close picker
+
+Long commands are middle-truncated with a visible `…` indicator. The full
+command is preserved when you press Enter or copy with Ctrl+C.
+
 ### Zsh
 
 - Inline ghost‑text suggestions
-- **Alt+H** (Option+H): history picker
 - **Right Arrow**: accept suggestion
 - **Alt+Right**: accept next token
 
 ### Bash
 
-- **Alt+H** (Option+H): history picker
+- History-based suggestions via the picker
 
 ### Fish
 
-- **Alt+H** (Option+H): history picker
 - **Alt+Enter**: accept suggestion
 
 ## Toggles

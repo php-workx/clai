@@ -165,6 +165,64 @@ tests:
       # Look for commands that wouldn't be in a fresh session
       - screen_matches: "(git|make|cd|ls)"
 
+  - name: "Long command shows truncation indicator"
+    description: "Commands exceeding terminal width show middle ellipsis"
+    shell: bash
+    tags: [picker, history, truncation]
+    setup:
+      - "echo this_is_a_very_long_command_that_should_be_truncated_in_the_middle_with_an_ellipsis_indicator_to_show_both_start_and_end"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "truncated"
+      - wait: "300ms"
+    expect:
+      # Should show ellipsis indicator (middle truncation)
+      - screen_contains: "…"
+      # Should show beginning of command
+      - screen_contains: "echo this_is"
+      # Should show end of command
+      - screen_contains: "and_end"
+
+  - name: "Enter inserts full untruncated command"
+    description: "Pressing Enter on truncated command inserts full text"
+    shell: bash
+    tags: [picker, history, truncation]
+    setup:
+      - "echo UNIQUE_START_marker_this_is_a_very_long_command_with_lots_of_text_in_the_middle_UNIQUE_END_marker"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "UNIQUE_START"
+      - wait: "300ms"
+      - press: "Enter"
+      - wait: "300ms"
+    expect:
+      # Full command should be in the prompt (not truncated)
+      - screen_contains: "UNIQUE_START_marker"
+      - screen_contains: "UNIQUE_END_marker"
+      # No ellipsis in the actual command line
+      - prompt_not_contains: "…"
+
+  - name: "Ctrl+C copies full untruncated command"
+    description: "Pressing Ctrl+C copies full command to clipboard"
+    shell: bash
+    tags: [picker, history, truncation, clipboard]
+    setup:
+      - "echo CLIPBOARD_START_this_is_a_very_long_command_for_clipboard_test_CLIPBOARD_END"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "CLIPBOARD_START"
+      - wait: "300ms"
+      - press: "Ctrl+C"
+      - wait: "500ms"
+    expect:
+      # Should show "Copied!" feedback
+      - screen_contains: "Copied!"
+      # Picker should still be open (Ctrl+C doesn't close it)
+      - screen_contains: "history"
+
   # ===========================================================================
   # Command Suggestion Tests
   # ===========================================================================
@@ -620,13 +678,15 @@ metadata:
   purpose: "Reference implementation for AI-assisted terminal testing"
 
   # Statistics
-  total_tests: 38
+  total_tests: 42
   skipped_tests: 4
   by_tag:
     smoke: 4
-    picker: 10
-    history: 9
+    picker: 14
+    history: 13
     scope: 3
+    truncation: 4
+    clipboard: 1
     suggestions: 4
     integration: 4
     cli: 10
@@ -648,3 +708,4 @@ metadata:
     - "CLI tests validate shell-context-dependent commands"
     - "Parameter tests verify CWD and exit code logging/filtering"
     - "AI tests (clai cmd, clai ask) are skipped until features are implemented"
+    - "Truncation tests verify long commands show ellipsis but paste/copy full text"
