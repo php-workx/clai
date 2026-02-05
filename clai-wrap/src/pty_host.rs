@@ -171,9 +171,7 @@ impl PtyHost {
             pixel_height: 0,
         };
 
-        self.master
-            .resize(size)
-            .context("Failed to resize PTY")?;
+        self.master.resize(size).context("Failed to resize PTY")?;
 
         Ok(())
     }
@@ -346,10 +344,7 @@ fn get_terminal_size() -> Option<PtySize> {
 /// On Unix, this checks the `$SHELL` environment variable first.
 /// Falls back to platform-specific defaults.
 fn get_default_shell() -> PathBuf {
-    env::var("SHELL").map_or_else(
-        |_| PathBuf::from(DEFAULT_SHELL),
-        PathBuf::from,
-    )
+    env::var("SHELL").map_or_else(|_| PathBuf::from(DEFAULT_SHELL), PathBuf::from)
 }
 
 #[cfg(test)]
@@ -378,7 +373,10 @@ mod tests {
         let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn echo");
 
         // Read output
-        let mut reader = pair.master.try_clone_reader().expect("Failed to get reader");
+        let mut reader = pair
+            .master
+            .try_clone_reader()
+            .expect("Failed to get reader");
         let mut output = String::new();
 
         // Set a timeout for reading
@@ -485,7 +483,10 @@ mod tests {
         let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn");
 
         // Read output
-        let mut reader = pair.master.try_clone_reader().expect("Failed to get reader");
+        let mut reader = pair
+            .master
+            .try_clone_reader()
+            .expect("Failed to get reader");
         let mut output = String::new();
 
         let mut buf = [0u8; 1024];
@@ -551,7 +552,10 @@ mod tests {
         let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn");
 
         // Read output
-        let mut reader = pair.master.try_clone_reader().expect("Failed to get reader");
+        let mut reader = pair
+            .master
+            .try_clone_reader()
+            .expect("Failed to get reader");
         let mut output = String::new();
 
         let mut buf = [0u8; 1024];

@@ -329,10 +329,7 @@ mod tests {
         );
 
         // Should have precmd hook for A sequence (prompt start)
-        assert!(
-            content.contains("__clai_precmd"),
-            "should have precmd hook"
-        );
+        assert!(content.contains("__clai_precmd"), "should have precmd hook");
         assert!(
             content.contains(r"'\e]133;A\a'"),
             "precmd should emit OSC 133;A"
@@ -395,7 +392,10 @@ mod tests {
         };
 
         // After drop, the temp directory should be cleaned up
-        assert!(!path.exists(), "temp directory should be cleaned up on drop");
+        assert!(
+            !path.exists(),
+            "temp directory should be cleaned up on drop"
+        );
     }
 
     #[test]

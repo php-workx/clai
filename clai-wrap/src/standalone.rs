@@ -242,7 +242,10 @@ impl StandaloneState {
             .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
             .is_ok()
         {
-            warn!("Daemon unavailable, running in standalone mode ({})", self.reason);
+            warn!(
+                "Daemon unavailable, running in standalone mode ({})",
+                self.reason
+            );
             eprintln!("clai-wrap: Daemon unavailable, running in standalone mode");
         }
     }
@@ -296,23 +299,15 @@ fn find_history_file(shell: &str) -> Result<PathBuf> {
     let shell_lower = shell.to_lowercase();
 
     // Check for common shell names (strip path prefix if present)
-    let shell_name = shell_lower
-        .rsplit('/')
-        .next()
-        .unwrap_or(&shell_lower);
+    let shell_name = shell_lower.rsplit('/').next().unwrap_or(&shell_lower);
 
     let candidates: Vec<PathBuf> = match shell_name {
         "bash" | "bash.exe" => vec![home.join(".bash_history")],
-        "zsh" | "zsh.exe" => vec![
-            home.join(".zsh_history"),
-            home.join(".zhistory"),
-        ],
+        "zsh" | "zsh.exe" => vec![home.join(".zsh_history"), home.join(".zhistory")],
         "fish" | "fish.exe" => {
             // Fish history is in XDG_DATA_HOME or ~/.local/share
-            let data_home = std::env::var("XDG_DATA_HOME").map_or_else(
-                |_| home.join(".local").join("share"),
-                PathBuf::from,
-            );
+            let data_home = std::env::var("XDG_DATA_HOME")
+                .map_or_else(|_| home.join(".local").join("share"), PathBuf::from);
             vec![data_home.join("fish").join("fish_history")]
         }
         _ => {
@@ -413,9 +408,18 @@ mod tests {
 
     #[test]
     fn test_standalone_reason_equality() {
-        assert_eq!(StandaloneReason::DaemonUnavailable, StandaloneReason::DaemonUnavailable);
-        assert_eq!(StandaloneReason::ConnectionTimeout, StandaloneReason::ConnectionTimeout);
-        assert_ne!(StandaloneReason::DaemonUnavailable, StandaloneReason::ConnectionTimeout);
+        assert_eq!(
+            StandaloneReason::DaemonUnavailable,
+            StandaloneReason::DaemonUnavailable
+        );
+        assert_eq!(
+            StandaloneReason::ConnectionTimeout,
+            StandaloneReason::ConnectionTimeout
+        );
+        assert_ne!(
+            StandaloneReason::DaemonUnavailable,
+            StandaloneReason::ConnectionTimeout
+        );
 
         let err1 = StandaloneReason::SocketError("error".to_string());
         let err2 = StandaloneReason::SocketError("error".to_string());
@@ -661,7 +665,7 @@ mod tests {
         match (result1, result2) {
             (Ok(p1), Ok(p2)) => assert_eq!(p1, p2),
             (Err(_), Err(_)) => {} // Both failed (file doesn't exist) - that's ok
-            _ => {} // One succeeded, one failed - unexpected but ok for test
+            _ => {}                // One succeeded, one failed - unexpected but ok for test
         }
     }
 
@@ -711,7 +715,10 @@ mod tests {
     #[test]
     fn test_standalone_error_display() {
         let err = StandaloneError::HistoryNotFound("bash".to_string());
-        assert_eq!(err.to_string(), "could not find history file for shell: bash");
+        assert_eq!(
+            err.to_string(),
+            "could not find history file for shell: bash"
+        );
 
         let err = StandaloneError::HomeNotFound;
         assert_eq!(err.to_string(), "could not determine home directory");

@@ -486,9 +486,7 @@ mod tests {
         let (mut router, rx) = create_test_router();
 
         // Process binary data (all bytes except chord first byte)
-        let binary_data: Vec<u8> = (0..=255)
-            .filter(|&b| b != CHORD_FIRST_BYTE)
-            .collect();
+        let binary_data: Vec<u8> = (0..=255).filter(|&b| b != CHORD_FIRST_BYTE).collect();
         router.process_bytes(&binary_data).unwrap();
 
         let events = collect_events(&rx);

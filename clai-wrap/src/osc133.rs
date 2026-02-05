@@ -128,9 +128,7 @@ impl Perform for Osc133Handler<'_> {
             "D" => {
                 // D can optionally have an exit code: D;N
                 let exit_code = if params.len() >= 3 {
-                    String::from_utf8_lossy(params[2])
-                        .parse()
-                        .unwrap_or(0)
+                    String::from_utf8_lossy(params[2]).parse().unwrap_or(0)
                 } else {
                     0
                 };

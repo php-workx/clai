@@ -523,11 +523,7 @@ fn stdin_reader_thread(state: &IoState, event_tx: &Sender<IoEvent>) {
 /// PTY writer thread function.
 ///
 /// Receives data from the stdin reader (via channel) and writes to PTY.
-fn pty_writer_thread(
-    state: &IoState,
-    mut writer: Box<dyn Write + Send>,
-    rx: &Receiver<Vec<u8>>,
-) {
+fn pty_writer_thread(state: &IoState, mut writer: Box<dyn Write + Send>, rx: &Receiver<Vec<u8>>) {
     loop {
         if state.is_shutdown() {
             break;
@@ -798,7 +794,10 @@ mod tests {
     }
 
     impl MockWriter {
-        fn new() -> (Box<dyn Write + Send>, std::sync::Arc<std::sync::Mutex<Vec<u8>>>) {
+        fn new() -> (
+            Box<dyn Write + Send>,
+            std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
+        ) {
             let written = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
             let writer = Box::new(Self {
                 written: Arc::clone(&written),
@@ -865,8 +864,7 @@ mod tests {
         let reader: Box<dyn Read + Send> = Box::new(BlockingReader);
         let state_clone = Arc::clone(&state);
 
-        let handle =
-            thread::spawn(move || pty_reader_thread(&state_clone, reader, &event_tx));
+        let handle = thread::spawn(move || pty_reader_thread(&state_clone, reader, &event_tx));
 
         // Request shutdown
         state.request_shutdown();
@@ -891,8 +889,7 @@ mod tests {
         let (tx, rx) = mpsc::channel();
 
         let state_clone = Arc::clone(&state);
-        let handle =
-            thread::spawn(move || pty_writer_thread(&state_clone, writer, &rx));
+        let handle = thread::spawn(move || pty_writer_thread(&state_clone, writer, &rx));
 
         // Send some data
         tx.send(b"hello".to_vec()).unwrap();
@@ -930,8 +927,8 @@ mod tests {
         // Now test wraparound
         buffer.push(b"abcde"); // Fill completely
         buffer.push(b"fg"); // Overwrites 'a' and 'b'
-        // Buffer state: [f, g, c, d, e], write_pos=2, len=5
-        // Oldest data starts at write_pos (2), so order is: c, d, e, f, g
+                            // Buffer state: [f, g, c, d, e], write_pos=2, len=5
+                            // Oldest data starts at write_pos (2), so order is: c, d, e, f, g
         let data = buffer.drain();
         assert_eq!(data, b"cdefg");
     }

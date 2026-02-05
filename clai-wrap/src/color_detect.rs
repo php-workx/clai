@@ -380,10 +380,7 @@ mod tests {
     #[test]
     fn test_256color_term_with_non_truecolor_colorterm() {
         // If COLORTERM is set but not truecolor/24bit, and TERM is 256color
-        let env = mock_env(&[
-            ("COLORTERM", "gnome-terminal"),
-            ("TERM", "xterm-256color"),
-        ]);
+        let env = mock_env(&[("COLORTERM", "gnome-terminal"), ("TERM", "xterm-256color")]);
         assert_eq!(detect_color_support_from_env(&env), ColorSupport::Colors256);
     }
 

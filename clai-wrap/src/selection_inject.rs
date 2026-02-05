@@ -526,7 +526,9 @@ mod tests {
         let result = output.get_ref();
 
         // Find positions
-        let paste_start_pos = result.windows(PASTE_START.len()).position(|w| w == PASTE_START);
+        let paste_start_pos = result
+            .windows(PASTE_START.len())
+            .position(|w| w == PASTE_START);
         let paste_end_pos = result.windows(PASTE_END.len()).position(|w| w == PASTE_END);
         let newline_pos = result.iter().position(|&b| b == b'\n');
 

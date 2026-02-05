@@ -21,11 +21,11 @@
 //! ```
 
 use ratatui::{
-    Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
+    Frame,
 };
 
 /// A single item that can be displayed and selected in the picker.
@@ -248,15 +248,11 @@ impl Picker {
         ];
 
         let search_paragraph = Paragraph::new(Line::from(spans))
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title(format!(
-                        " Search ({}/{}) ",
-                        self.filtered_count(),
-                        self.total_count()
-                    )),
-            )
+            .block(Block::default().borders(Borders::ALL).title(format!(
+                " Search ({}/{}) ",
+                self.filtered_count(),
+                self.total_count()
+            )))
             .style(Style::default().fg(Color::White));
 
         frame.render_widget(search_paragraph, area);
@@ -274,10 +270,7 @@ impl Picker {
                     |meta| {
                         Line::from(vec![
                             Span::raw(&item.text),
-                            Span::styled(
-                                format!("  {meta}"),
-                                Style::default().fg(Color::DarkGray),
-                            ),
+                            Span::styled(format!("  {meta}"), Style::default().fg(Color::DarkGray)),
                         ])
                     },
                 );
@@ -417,7 +410,10 @@ mod tests {
         assert!(!picker.is_filtered_empty());
         assert_eq!(picker.total_count(), 3);
         assert_eq!(picker.filtered_count(), 3);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("first"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("first")
+        );
     }
 
     #[test]
@@ -445,30 +441,39 @@ mod tests {
         let mut picker = Picker::new(items);
 
         assert_eq!(picker.selected_index(), 0);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("first"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("first")
+        );
 
         picker.select_next();
         assert_eq!(picker.selected_index(), 1);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("second"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("second")
+        );
 
         picker.select_next();
         assert_eq!(picker.selected_index(), 2);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("third"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("third")
+        );
     }
 
     #[test]
     fn test_select_next_wraps() {
-        let items = vec![
-            PickerItem::new("first"),
-            PickerItem::new("second"),
-        ];
+        let items = vec![PickerItem::new("first"), PickerItem::new("second")];
         let mut picker = Picker::new(items);
 
         picker.select_next(); // -> second
         picker.select_next(); // -> first (wrap)
 
         assert_eq!(picker.selected_index(), 0);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("first"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("first")
+        );
     }
 
     #[test]
@@ -487,26 +492,32 @@ mod tests {
 
         picker.select_prev();
         assert_eq!(picker.selected_index(), 1);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("second"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("second")
+        );
 
         picker.select_prev();
         assert_eq!(picker.selected_index(), 0);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("first"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("first")
+        );
     }
 
     #[test]
     fn test_select_prev_wraps() {
-        let items = vec![
-            PickerItem::new("first"),
-            PickerItem::new("second"),
-        ];
+        let items = vec![PickerItem::new("first"), PickerItem::new("second")];
         let mut picker = Picker::new(items);
 
         // From first, go up should wrap to last
         picker.select_prev();
 
         assert_eq!(picker.selected_index(), 1);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("second"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("second")
+        );
     }
 
     #[test]
@@ -537,7 +548,10 @@ mod tests {
 
         assert_eq!(picker.filtered_count(), 2);
         // Selection should reset to first matching item
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("git status"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("git status")
+        );
     }
 
     #[test]
@@ -556,10 +570,7 @@ mod tests {
 
     #[test]
     fn test_filter_no_matches() {
-        let items = vec![
-            PickerItem::new("git status"),
-            PickerItem::new("ls -la"),
-        ];
+        let items = vec![PickerItem::new("git status"), PickerItem::new("ls -la")];
         let mut picker = Picker::new(items);
 
         picker.update_query("xyz");
@@ -650,7 +661,10 @@ mod tests {
         picker.update_query("a"); // alpha, gamma
 
         assert_eq!(picker.selected_index(), 0);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("alpha"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("alpha")
+        );
     }
 
     #[test]
@@ -667,13 +681,22 @@ mod tests {
         assert_eq!(picker.filtered_count(), 2);
 
         // Navigate within filtered items
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("git status"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("git status")
+        );
 
         picker.select_next();
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("git commit"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("git commit")
+        );
 
         picker.select_next(); // Wrap
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("git status"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("git status")
+        );
     }
 
     // ========== Scroll Offset Tests ==========
@@ -727,7 +750,7 @@ mod tests {
     fn test_unicode_items() {
         let items = vec![
             PickerItem::new("echo \u{4e2d}\u{6587}"), // Chinese
-            PickerItem::new("echo \u{1f600}"),         // Emoji
+            PickerItem::new("echo \u{1f600}"),        // Emoji
             PickerItem::new("normal text"),
         ];
         let mut picker = Picker::new(items);
@@ -783,22 +806,28 @@ mod tests {
         let items = vec![PickerItem::new("only one")];
         let mut picker = Picker::new(items);
 
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("only one"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("only one")
+        );
 
         // Navigation should stay on the same item (wrapping)
         picker.select_next();
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("only one"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("only one")
+        );
 
         picker.select_prev();
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("only one"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("only one")
+        );
     }
 
     #[test]
     fn test_filter_to_single_item_then_navigate() {
-        let items = vec![
-            PickerItem::new("unique"),
-            PickerItem::new("other"),
-        ];
+        let items = vec![PickerItem::new("unique"), PickerItem::new("other")];
         let mut picker = Picker::new(items);
 
         picker.update_query("unique");
@@ -806,7 +835,10 @@ mod tests {
 
         // Navigation should wrap to itself
         picker.select_next();
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("unique"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("unique")
+        );
     }
 
     // ========== State Consistency Tests ==========
@@ -850,6 +882,9 @@ mod tests {
 
         assert_eq!(picker.query(), "git s");
         assert_eq!(picker.filtered_count(), 1);
-        assert_eq!(picker.selected_item().map(|i| i.text.as_str()), Some("git status"));
+        assert_eq!(
+            picker.selected_item().map(|i| i.text.as_str()),
+            Some("git status")
+        );
     }
 }

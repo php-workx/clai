@@ -61,15 +61,9 @@ impl PassthroughReason {
     pub fn description(&self) -> String {
         match self {
             Self::NotNeeded => "Full functionality available".to_string(),
-            Self::DumbTerminal => {
-                "TERM is 'dumb' or unset; advanced features disabled".to_string()
-            }
-            Self::NonTtyStdin => {
-                "stdin is not a TTY; hotkey detection disabled".to_string()
-            }
-            Self::NonTtyStdout => {
-                "stdout is not a TTY; picker UI disabled".to_string()
-            }
+            Self::DumbTerminal => "TERM is 'dumb' or unset; advanced features disabled".to_string(),
+            Self::NonTtyStdin => "stdin is not a TTY; hotkey detection disabled".to_string(),
+            Self::NonTtyStdout => "stdout is not a TTY; picker UI disabled".to_string(),
             Self::UnsupportedShell(shell) => {
                 format!("Shell '{shell}' does not support OSC 133; operating in passthrough mode")
             }
@@ -354,7 +348,10 @@ impl PassthroughMode {
             .context("Failed to spawn stdout thread")?;
 
         // Wait for child to exit
-        let exit_status = self.pty.wait().context("Failed to wait for child process")?;
+        let exit_status = self
+            .pty
+            .wait()
+            .context("Failed to wait for child process")?;
 
         // Signal shutdown to threads
         shutdown.store(true, Ordering::Relaxed);
@@ -602,7 +599,7 @@ mod tests {
     #[cfg(unix)]
     mod unix_tests {
         use super::*;
-        use portable_pty::{CommandBuilder, PtySize, native_pty_system};
+        use portable_pty::{native_pty_system, CommandBuilder, PtySize};
         use std::io::Read;
         use std::time::Duration;
 
@@ -696,7 +693,10 @@ mod tests {
             let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn");
 
             // Read output
-            let mut reader = pair.master.try_clone_reader().expect("Failed to get reader");
+            let mut reader = pair
+                .master
+                .try_clone_reader()
+                .expect("Failed to get reader");
             let mut output = String::new();
             let mut buf = [0u8; 1024];
 

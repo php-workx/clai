@@ -307,8 +307,14 @@ mod unix {
     fn make_raw(termios: &mut libc::termios) {
         // Input modes: disable break signal, CR to NL, parity check, strip 8th bit,
         // and software flow control
-        termios.c_iflag &=
-            !(libc::IGNBRK | libc::BRKINT | libc::PARMRK | libc::ISTRIP | libc::INLCR | libc::IGNCR | libc::ICRNL | libc::IXON);
+        termios.c_iflag &= !(libc::IGNBRK
+            | libc::BRKINT
+            | libc::PARMRK
+            | libc::ISTRIP
+            | libc::INLCR
+            | libc::IGNCR
+            | libc::ICRNL
+            | libc::IXON);
 
         // Output modes: disable post-processing
         termios.c_oflag &= !libc::OPOST;
@@ -545,7 +551,10 @@ mod tests {
             };
 
             // Key settings should match original
-            assert_eq!(restored.c_lflag & libc::ICANON, original.c_lflag & libc::ICANON);
+            assert_eq!(
+                restored.c_lflag & libc::ICANON,
+                original.c_lflag & libc::ICANON
+            );
             assert_eq!(restored.c_lflag & libc::ECHO, original.c_lflag & libc::ECHO);
         }
     }

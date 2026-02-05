@@ -151,7 +151,10 @@ fn parse_bash_timestamped_internal(lines: &[&str]) -> Vec<HistoryEntry> {
                     }
                 }
                 // Timestamp without valid command
-                warn!("bash history: timestamp at line {} without valid command", i + 1);
+                warn!(
+                    "bash history: timestamp at line {} without valid command",
+                    i + 1
+                );
             }
             // Invalid timestamp format or standalone comment
             i += 1;
@@ -249,7 +252,10 @@ pub fn parse_zsh_history(content: &str) -> Vec<HistoryEntry> {
 /// Parses a single zsh extended format line.
 ///
 /// Returns `None` if the line doesn't match the extended format.
-fn parse_zsh_extended_line<'a, I>(line: &str, remaining: &mut std::iter::Peekable<I>) -> Option<HistoryEntry>
+fn parse_zsh_extended_line<'a, I>(
+    line: &str,
+    remaining: &mut std::iter::Peekable<I>,
+) -> Option<HistoryEntry>
 where
     I: Iterator<Item = &'a str>,
 {
@@ -269,9 +275,10 @@ where
     let mut command = rest[semicolon_pos + 1..].to_string();
 
     // Parse timestamp from metadata (format: "timestamp:duration" or just "timestamp")
-    let timestamp: Option<i64> = metadata
-        .find(':')
-        .map_or_else(|| metadata.parse().ok(), |colon_pos| metadata[..colon_pos].parse().ok());
+    let timestamp: Option<i64> = metadata.find(':').map_or_else(
+        || metadata.parse().ok(),
+        |colon_pos| metadata[..colon_pos].parse().ok(),
+    );
 
     // Handle multi-line commands (continuation lines end with backslash)
     while command.ends_with('\\') {
@@ -434,9 +441,7 @@ pub fn detect_and_parse(path: &Path) -> Result<Vec<HistoryEntry>, HistoryParseEr
     let content = String::from_utf8(content)?;
 
     // Try to detect format from filename
-    let filename = path.file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
 
     let path_str = path.to_string_lossy();
 
@@ -444,8 +449,11 @@ pub fn detect_and_parse(path: &Path) -> Result<Vec<HistoryEntry>, HistoryParseEr
         return Ok(parse_bash_history(&content));
     }
 
-    if filename.contains("zsh_history") || filename.contains("zhistory")
-       || path_str.contains(".zsh_history") || path_str.contains(".zhistory") {
+    if filename.contains("zsh_history")
+        || filename.contains("zhistory")
+        || path_str.contains(".zsh_history")
+        || path_str.contains(".zhistory")
+    {
         return Ok(parse_zsh_history(&content));
     }
 
@@ -464,7 +472,10 @@ pub fn detect_and_parse(path: &Path) -> Result<Vec<HistoryEntry>, HistoryParseEr
     }
 
     // Default to bash plain text as last resort
-    warn!("history: could not detect format for {:?}, defaulting to bash plain", path);
+    warn!(
+        "history: could not detect format for {:?}, defaulting to bash plain",
+        path
+    );
     Ok(parse_bash_history(&content))
 }
 
@@ -488,7 +499,10 @@ fn detect_format_from_content(content: &str) -> Option<DetectedFormat> {
         .take(5)
         .collect();
 
-    if first_non_empty.iter().any(|l| l.trim().starts_with("- cmd:")) {
+    if first_non_empty
+        .iter()
+        .any(|l| l.trim().starts_with("- cmd:"))
+    {
         return Some(DetectedFormat::Fish);
     }
 
@@ -842,7 +856,8 @@ mod tests {
     #[test]
     fn test_fish_malformed_yaml() {
         // Invalid YAML-like content
-        let content = "not yaml\n- cmd: ls -la\n  when: invalid\n- cmd: git status\n  when: 1234567890";
+        let content =
+            "not yaml\n- cmd: ls -la\n  when: invalid\n- cmd: git status\n  when: 1234567890";
         let entries = parse_fish_history(content);
 
         // Should parse what it can

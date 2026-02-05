@@ -94,7 +94,8 @@ impl EchoGapConfig {
     /// Creates a new configuration with a fixed threshold (no adaptive timing).
     #[must_use]
     pub fn with_fixed_threshold(threshold_ms: u64) -> Self {
-        let threshold = Duration::from_millis(threshold_ms.clamp(MIN_THRESHOLD_MS, MAX_THRESHOLD_MS));
+        let threshold =
+            Duration::from_millis(threshold_ms.clamp(MIN_THRESHOLD_MS, MAX_THRESHOLD_MS));
         Self {
             initial_threshold: threshold,
             min_threshold: threshold,
@@ -208,7 +209,8 @@ impl EchoGapDetector {
             self.pending_input.pop_front();
         }
 
-        self.pending_input.push_back(PendingInput { byte, timestamp });
+        self.pending_input
+            .push_back(PendingInput { byte, timestamp });
         self.last_input_time = Some(timestamp);
         self.unechoed_byte_count += 1;
 
@@ -399,10 +401,8 @@ impl EchoGapDetector {
 
         // Set threshold to p90 × 2, clamped to valid range
         let new_threshold = p90_latency.saturating_mul(2);
-        self.current_threshold = new_threshold.clamp(
-            self.config.min_threshold,
-            self.config.max_threshold,
-        );
+        self.current_threshold =
+            new_threshold.clamp(self.config.min_threshold, self.config.max_threshold);
     }
 }
 
@@ -430,11 +430,17 @@ mod tests {
     fn test_threshold_clamping() {
         // Test minimum clamping
         let detector = EchoGapDetector::new(10);
-        assert_eq!(detector.current_threshold(), Duration::from_millis(MIN_THRESHOLD_MS));
+        assert_eq!(
+            detector.current_threshold(),
+            Duration::from_millis(MIN_THRESHOLD_MS)
+        );
 
         // Test maximum clamping
         let detector = EchoGapDetector::new(1000);
-        assert_eq!(detector.current_threshold(), Duration::from_millis(MAX_THRESHOLD_MS));
+        assert_eq!(
+            detector.current_threshold(),
+            Duration::from_millis(MAX_THRESHOLD_MS)
+        );
 
         // Test valid value
         let detector = EchoGapDetector::new(100);

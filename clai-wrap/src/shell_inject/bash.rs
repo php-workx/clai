@@ -137,8 +137,8 @@ impl BashInjector {
     /// - Permissions cannot be set (Unix only)
     pub fn new() -> Result<Self, BashInjectorError> {
         // Create temp directory with a recognizable prefix
-        let temp_dir = TempDir::with_prefix("clai-bash-")
-            .map_err(BashInjectorError::TempDirCreation)?;
+        let temp_dir =
+            TempDir::with_prefix("clai-bash-").map_err(BashInjectorError::TempDirCreation)?;
 
         // Set directory permissions to 0700 on Unix
         #[cfg(unix)]
@@ -152,8 +152,7 @@ impl BashInjector {
         let rcfile_path = temp_dir.path().join(INIT_FILENAME);
 
         // Write the init file
-        let mut file = File::create(&rcfile_path)
-            .map_err(BashInjectorError::FileCreation)?;
+        let mut file = File::create(&rcfile_path).map_err(BashInjectorError::FileCreation)?;
 
         file.write_all(BASH_INIT_CONTENT.as_bytes())
             .map_err(BashInjectorError::FileWrite)?;
@@ -235,8 +234,7 @@ mod tests {
     #[test]
     fn test_init_content_sources_system_bashrc() {
         let injector = BashInjector::new().expect("failed to create injector");
-        let content = fs::read_to_string(injector.rcfile())
-            .expect("failed to read rcfile");
+        let content = fs::read_to_string(injector.rcfile()).expect("failed to read rcfile");
 
         // Check for Debian/Ubuntu location
         assert!(
@@ -254,8 +252,7 @@ mod tests {
     #[test]
     fn test_init_content_sources_user_bashrc() {
         let injector = BashInjector::new().expect("failed to create injector");
-        let content = fs::read_to_string(injector.rcfile())
-            .expect("failed to read rcfile");
+        let content = fs::read_to_string(injector.rcfile()).expect("failed to read rcfile");
 
         assert!(
             content.contains("[ -f ~/.bashrc ] && . ~/.bashrc"),
@@ -266,8 +263,7 @@ mod tests {
     #[test]
     fn test_init_content_has_osc133_hooks() {
         let injector = BashInjector::new().expect("failed to create injector");
-        let content = fs::read_to_string(injector.rcfile())
-            .expect("failed to read rcfile");
+        let content = fs::read_to_string(injector.rcfile()).expect("failed to read rcfile");
 
         // Check for prompt command function
         assert!(
@@ -303,8 +299,7 @@ mod tests {
     #[test]
     fn test_init_preserves_existing_prompt_command() {
         let injector = BashInjector::new().expect("failed to create injector");
-        let content = fs::read_to_string(injector.rcfile())
-            .expect("failed to read rcfile");
+        let content = fs::read_to_string(injector.rcfile()).expect("failed to read rcfile");
 
         // Should append to existing PROMPT_COMMAND, not replace it
         assert!(
@@ -363,10 +358,7 @@ mod tests {
             !temp_dir_path.exists(),
             "temp directory should be cleaned up on drop"
         );
-        assert!(
-            !rcfile_path.exists(),
-            "rcfile should be cleaned up on drop"
-        );
+        assert!(!rcfile_path.exists(), "rcfile should be cleaned up on drop");
     }
 
     #[cfg(unix)]
@@ -377,8 +369,7 @@ mod tests {
         let injector = BashInjector::new().expect("failed to create injector");
 
         // Check directory permissions (should be 0700)
-        let dir_metadata = fs::metadata(injector.temp_dir())
-            .expect("failed to get dir metadata");
+        let dir_metadata = fs::metadata(injector.temp_dir()).expect("failed to get dir metadata");
         let dir_mode = dir_metadata.permissions().mode() & 0o777;
         assert_eq!(
             dir_mode, 0o700,
@@ -387,8 +378,7 @@ mod tests {
         );
 
         // Check file permissions (should be 0600)
-        let file_metadata = fs::metadata(injector.rcfile())
-            .expect("failed to get file metadata");
+        let file_metadata = fs::metadata(injector.rcfile()).expect("failed to get file metadata");
         let file_mode = file_metadata.permissions().mode() & 0o777;
         assert_eq!(
             file_mode, 0o600,
@@ -427,8 +417,7 @@ mod tests {
         // We can't actually run bash in unit tests, but we can check syntax patterns
 
         let injector = BashInjector::new().expect("failed to create injector");
-        let content = fs::read_to_string(injector.rcfile())
-            .expect("failed to read rcfile");
+        let content = fs::read_to_string(injector.rcfile()).expect("failed to read rcfile");
 
         // Check for balanced brackets in conditionals
         let open_brackets = content.matches("[ ").count();

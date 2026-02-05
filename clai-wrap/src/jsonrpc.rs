@@ -693,7 +693,8 @@ mod tests {
 
     #[test]
     fn test_response_deserialization_error() {
-        let json = r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}"#;
+        let json =
+            r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}"#;
         let response = Response::parse(json).unwrap();
         assert!(response.is_error());
         let error = response.error.unwrap();
@@ -922,7 +923,11 @@ mod tests {
 
     #[test]
     fn test_request_with_unicode() {
-        let request = Request::new(1, "test", serde_json::json!({"emoji": "🚀", "cjk": "日本語"}));
+        let request = Request::new(
+            1,
+            "test",
+            serde_json::json!({"emoji": "🚀", "cjk": "日本語"}),
+        );
         let line = request.to_line().unwrap();
         let parsed: Request = serde_json::from_str(line.trim()).unwrap();
         assert_eq!(parsed.params["emoji"], "🚀");

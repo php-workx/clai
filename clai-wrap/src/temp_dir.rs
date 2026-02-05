@@ -453,7 +453,10 @@ fn create_dir_secure(path: &Path) -> Result<()> {
         if !path.is_dir() {
             return Err(TempDirError::CreateDir {
                 path: path.to_path_buf(),
-                source: io::Error::new(io::ErrorKind::AlreadyExists, "path exists but is not a directory"),
+                source: io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    "path exists but is not a directory",
+                ),
             });
         }
         return Ok(());
@@ -582,11 +585,20 @@ mod tests {
 
         // Base directory should exist
         assert!(manager.base_dir().exists(), "base directory should exist");
-        assert!(manager.base_dir().is_dir(), "base directory should be a directory");
+        assert!(
+            manager.base_dir().is_dir(),
+            "base directory should be a directory"
+        );
 
         // Session directory should exist
-        assert!(manager.session_dir().exists(), "session directory should exist");
-        assert!(manager.session_dir().is_dir(), "session directory should be a directory");
+        assert!(
+            manager.session_dir().exists(),
+            "session directory should exist"
+        );
+        assert!(
+            manager.session_dir().is_dir(),
+            "session directory should be a directory"
+        );
 
         // Session directory should be under base directory
         assert!(
@@ -607,7 +619,9 @@ mod tests {
     fn test_shell_dir_creates_subdirectory() {
         let manager = TempDirManager::new_for_test().expect("failed to create manager");
 
-        let bash_dir = manager.shell_dir("bash").expect("failed to create bash dir");
+        let bash_dir = manager
+            .shell_dir("bash")
+            .expect("failed to create bash dir");
 
         assert!(bash_dir.exists(), "bash directory should exist");
         assert!(bash_dir.is_dir(), "bash directory should be a directory");
@@ -626,9 +640,13 @@ mod tests {
     fn test_shell_dir_multiple_shells() {
         let manager = TempDirManager::new_for_test().expect("failed to create manager");
 
-        let bash_dir = manager.shell_dir("bash").expect("failed to create bash dir");
+        let bash_dir = manager
+            .shell_dir("bash")
+            .expect("failed to create bash dir");
         let zsh_dir = manager.shell_dir("zsh").expect("failed to create zsh dir");
-        let fish_dir = manager.shell_dir("fish").expect("failed to create fish dir");
+        let fish_dir = manager
+            .shell_dir("fish")
+            .expect("failed to create fish dir");
 
         assert!(bash_dir.exists());
         assert!(zsh_dir.exists());
@@ -677,7 +695,10 @@ mod tests {
         assert!(manager.shell_dir("foo\\bar").is_err(), "should reject \\");
 
         // Null byte
-        assert!(manager.shell_dir("bash\0evil").is_err(), "should reject null byte");
+        assert!(
+            manager.shell_dir("bash\0evil").is_err(),
+            "should reject null byte"
+        );
 
         // Dot directories
         assert!(manager.shell_dir(".").is_err(), "should reject .");
@@ -693,7 +714,9 @@ mod tests {
             session_path = manager.session_dir().to_path_buf();
 
             // Create a shell subdirectory to ensure recursive cleanup
-            let _ = manager.shell_dir("bash").expect("failed to create bash dir");
+            let _ = manager
+                .shell_dir("bash")
+                .expect("failed to create bash dir");
 
             assert!(session_path.exists(), "session should exist before drop");
         }
@@ -755,7 +778,8 @@ mod tests {
         );
 
         // Check session directory permissions
-        let session_meta = fs::metadata(manager.session_dir()).expect("failed to get session metadata");
+        let session_meta =
+            fs::metadata(manager.session_dir()).expect("failed to get session metadata");
         let session_mode = session_meta.permissions().mode() & 0o777;
         assert_eq!(
             session_mode, 0o700,
@@ -764,7 +788,9 @@ mod tests {
         );
 
         // Check shell subdirectory permissions
-        let bash_dir = manager.shell_dir("bash").expect("failed to create bash dir");
+        let bash_dir = manager
+            .shell_dir("bash")
+            .expect("failed to create bash dir");
         let bash_meta = fs::metadata(&bash_dir).expect("failed to get bash metadata");
         let bash_mode = bash_meta.permissions().mode() & 0o777;
         assert_eq!(
@@ -836,7 +862,10 @@ mod tests {
         drop(manager);
 
         // After dropping, the session should be gone (normal cleanup, not stale cleanup)
-        assert!(!session_path.exists(), "session should be cleaned up on drop");
+        assert!(
+            !session_path.exists(),
+            "session should be cleaned up on drop"
+        );
     }
 
     #[test]
@@ -861,10 +890,7 @@ mod tests {
             let cleaned = TempDirManager::cleanup_stale().expect("cleanup failed");
 
             // The stale directory should be cleaned up
-            assert!(
-                !stale_dir.exists(),
-                "stale directory should be cleaned up"
-            );
+            assert!(!stale_dir.exists(), "stale directory should be cleaned up");
             assert!(cleaned >= 1, "should have cleaned at least one directory");
         }
     }

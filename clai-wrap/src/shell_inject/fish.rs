@@ -194,11 +194,12 @@ impl FishInjector {
 
         // Find "version " and extract the version number
         let version_prefix = "version ";
-        let version_start = output.find(version_prefix).ok_or_else(|| {
-            FishInjectorError::VersionParseFailed {
-                output: output.to_string(),
-            }
-        })?;
+        let version_start =
+            output
+                .find(version_prefix)
+                .ok_or_else(|| FishInjectorError::VersionParseFailed {
+                    output: output.to_string(),
+                })?;
 
         let version_part = &output[version_start + version_prefix.len()..];
 
@@ -216,19 +217,20 @@ impl FishInjector {
             });
         }
 
-        let major = parts[0].parse::<u32>().map_err(|_| {
-            FishInjectorError::VersionParseFailed {
+        let major = parts[0]
+            .parse::<u32>()
+            .map_err(|_| FishInjectorError::VersionParseFailed {
                 output: output.to_string(),
-            }
-        })?;
+            })?;
 
         // Minor might have a suffix like "6-123-g1234567" for development versions
         let minor_str = parts[1].split('-').next().unwrap_or(parts[1]);
-        let minor = minor_str.parse::<u32>().map_err(|_| {
-            FishInjectorError::VersionParseFailed {
-                output: output.to_string(),
-            }
-        })?;
+        let minor =
+            minor_str
+                .parse::<u32>()
+                .map_err(|_| FishInjectorError::VersionParseFailed {
+                    output: output.to_string(),
+                })?;
 
         Ok((major, minor))
     }

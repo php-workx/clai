@@ -591,9 +591,8 @@ mod tests {
             let id = request["id"].as_u64().unwrap();
 
             // Send pong response
-            let response = format!(
-                "{{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":{{\"pong\":true}}}}\n"
-            );
+            let response =
+                format!("{{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":{{\"pong\":true}}}}\n");
             stream.write_all(response.as_bytes()).unwrap();
         });
 

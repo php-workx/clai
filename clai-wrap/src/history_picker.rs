@@ -176,11 +176,7 @@ impl HistoryPicker {
         // when a filter is active. We need to map through the picker's selected item.
         self.picker
             .selected_item()
-            .and_then(|item| {
-                self.history_entries
-                    .iter()
-                    .find(|e| e.command == item.text)
-            })
+            .and_then(|item| self.history_entries.iter().find(|e| e.command == item.text))
     }
 
     /// Moves the selection to the previous item (up).
@@ -273,19 +269,17 @@ fn default_history_path(shell: &str) -> Result<PathBuf, HistoryPickerError> {
 /// Gets the user's home directory.
 fn home_dir() -> Option<PathBuf> {
     // Try HOME environment variable first (works on Unix and sometimes Windows)
-    std::env::var_os("HOME")
-        .map(PathBuf::from)
-        .or_else(|| {
-            // Fallback for Windows
-            #[cfg(windows)]
-            {
-                std::env::var_os("USERPROFILE").map(PathBuf::from)
-            }
-            #[cfg(not(windows))]
-            {
-                None
-            }
-        })
+    std::env::var_os("HOME").map(PathBuf::from).or_else(|| {
+        // Fallback for Windows
+        #[cfg(windows)]
+        {
+            std::env::var_os("USERPROFILE").map(PathBuf::from)
+        }
+        #[cfg(not(windows))]
+        {
+            None
+        }
+    })
 }
 
 /// Processes history entries for display in the picker.
@@ -490,7 +484,7 @@ mod tests {
         let entries = vec![
             HistoryEntry::new("ls"),
             HistoryEntry::new("pwd"),
-            HistoryEntry::new("ls"),  // Duplicate of first
+            HistoryEntry::new("ls"), // Duplicate of first
         ];
         let picker = HistoryPicker::from_history(entries);
 
@@ -638,10 +632,7 @@ mod tests {
     #[test]
     fn test_from_file_not_found() {
         let result = HistoryPicker::from_file(Path::new("/nonexistent/path/history"));
-        assert!(matches!(
-            result,
-            Err(HistoryPickerError::FileNotFound(_))
-        ));
+        assert!(matches!(result, Err(HistoryPickerError::FileNotFound(_))));
     }
 
     #[test]
@@ -761,10 +752,7 @@ mod tests {
 
     #[test]
     fn test_history_entries_access() {
-        let entries = vec![
-            HistoryEntry::new("ls"),
-            HistoryEntry::new("pwd"),
-        ];
+        let entries = vec![HistoryEntry::new("ls"), HistoryEntry::new("pwd")];
         let picker = HistoryPicker::from_history(entries);
 
         // After processing, most recent is first

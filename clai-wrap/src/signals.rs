@@ -142,9 +142,7 @@ impl SignalHandler {
         };
 
         // Set up the signals we want to handle via the iterator pattern
-        let signals = Signals::new([
-            SIGWINCH, SIGCHLD, SIGINT, SIGTERM, SIGHUP, SIGTSTP, SIGCONT,
-        ])?;
+        let signals = Signals::new([SIGWINCH, SIGCHLD, SIGINT, SIGTERM, SIGHUP, SIGTSTP, SIGCONT])?;
 
         let shutdown_clone = Arc::clone(&shutdown);
         let thread_handle = thread::Builder::new()
@@ -451,7 +449,10 @@ mod tests {
         // If we get here, SIGQUIT was successfully ignored (didn't terminate the process)
         // That's the main thing we're testing. The fact that we reach this line proves
         // SIGQUIT is being ignored.
-        assert!(before.elapsed() < Duration::from_secs(1), "Test completed successfully");
+        assert!(
+            before.elapsed() < Duration::from_secs(1),
+            "Test completed successfully"
+        );
 
         drop(handler);
     }

@@ -340,8 +340,14 @@ mod tests {
         denylist.add("vim", MatchType::Exact);
 
         assert!(denylist.is_denied("vim"), "vim should match exactly");
-        assert!(!denylist.is_denied("vimx"), "vimx should not match exact vim");
-        assert!(!denylist.is_denied("xvim"), "xvim should not match exact vim");
+        assert!(
+            !denylist.is_denied("vimx"),
+            "vimx should not match exact vim"
+        );
+        assert!(
+            !denylist.is_denied("xvim"),
+            "xvim should not match exact vim"
+        );
         assert!(
             !denylist.is_denied("gvim"),
             "gvim should not match exact vim"
@@ -404,9 +410,18 @@ mod tests {
         denylist.add("vim", MatchType::Exact);
 
         assert!(denylist.is_denied("vim"), "vim should match");
-        assert!(denylist.is_denied("VIM"), "VIM should match (case insensitive)");
-        assert!(denylist.is_denied("Vim"), "Vim should match (case insensitive)");
-        assert!(denylist.is_denied("vIm"), "vIm should match (case insensitive)");
+        assert!(
+            denylist.is_denied("VIM"),
+            "VIM should match (case insensitive)"
+        );
+        assert!(
+            denylist.is_denied("Vim"),
+            "Vim should match (case insensitive)"
+        );
+        assert!(
+            denylist.is_denied("vIm"),
+            "vIm should match (case insensitive)"
+        );
     }
 
     #[test]
@@ -422,7 +437,10 @@ mod tests {
             denylist.is_denied("/usr/local/bin/ssh"),
             "/usr/local/bin/ssh should be denied"
         );
-        assert!(denylist.is_denied("/bin/nano"), "/bin/nano should be denied");
+        assert!(
+            denylist.is_denied("/bin/nano"),
+            "/bin/nano should be denied"
+        );
 
         // Windows paths
         assert!(
@@ -539,7 +557,10 @@ mod tests {
         let denylist = Denylist::load_from_file(temp_file.path()).unwrap();
 
         assert_eq!(denylist.len(), 4);
-        assert!(denylist.is_denied("custom-app"), "exact pattern should work");
+        assert!(
+            denylist.is_denied("custom-app"),
+            "exact pattern should work"
+        );
         assert!(
             !denylist.is_denied("custom-app-extended"),
             "exact should not match extended"
