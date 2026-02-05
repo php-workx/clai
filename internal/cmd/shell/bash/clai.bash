@@ -549,7 +549,7 @@ _clai_log_command_start() {
     case "$cmd" in
         _ai_*|_clai_*|_AI_*|_CLAI_*) return 1 ;;
         '['*|'[['*|'(('*) return 1 ;;  # Test expressions
-        local\ *|export\ *|return\ *) return 1 ;;  # Shell builtins in functions
+        local\ *|export\ *|return\ *|declare\ *|unset\ *|shift*|readonly\ *|typeset\ *|set\ *) return 1 ;;
     esac
 
     # Skip if already tracking a command
@@ -560,8 +560,12 @@ _clai_log_command_start() {
 
     # Generate unique command ID
     _CLAI_COMMAND_ID="${CLAI_SESSION_ID}-$(date +%s)-${RANDOM}"
-    # Store start time in milliseconds (seconds * 1000 as approximation)
-    _CLAI_COMMAND_START_TIME=$(($(date +%s) * 1000))
+    # Store start time in milliseconds. Use nanoseconds if available (GNU coreutils).
+    if date +%s%N >/dev/null 2>&1; then
+        _CLAI_COMMAND_START_TIME=$(($(date +%s%N) / 1000000))
+    else
+        _CLAI_COMMAND_START_TIME=$(($(date +%s) * 1000))
+    fi
     _CLAI_LAST_COMMAND="$cmd"
 
     # Fire and forget - log command start to daemon
@@ -582,7 +586,13 @@ _clai_log_command_end() {
     [[ "$_CLAI_PENDING_LOG" != "true" ]] && return
     [[ -z "$_CLAI_COMMAND_ID" ]] && return
 
-    local end_time=$(($(date +%s) * 1000))
+    # Calculate end time in milliseconds. Use nanoseconds if available (GNU coreutils).
+    local end_time
+    if date +%s%N >/dev/null 2>&1; then
+        end_time=$(($(date +%s%N) / 1000000))
+    else
+        end_time=$(($(date +%s) * 1000))
+    fi
     local duration=$((end_time - _CLAI_COMMAND_START_TIME))
 
     # Fire and forget - log command end to daemon
