@@ -103,6 +103,10 @@ function _clai_has_tui_picker
 end
 
 function _clai_tui_picker_open
+    if test "$CLAI_OFF" = "1"; or _clai_session_off
+        commandline -f up-line
+        return
+    end
     if not _clai_has_tui_picker
         commandline -f up-line
         return

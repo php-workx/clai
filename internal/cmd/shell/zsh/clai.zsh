@@ -470,6 +470,10 @@ _clai_has_tui_picker() {
 }
 
 _clai_tui_picker_open() {
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        zle .up-line-or-history
+        return
+    fi
     if ! _clai_has_tui_picker; then
         zle .up-line-or-history
         return
