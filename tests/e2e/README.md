@@ -33,8 +33,8 @@ tests/e2e/
 
 | File | Description |
 |------|-------------|
-| `example-test-plan.yaml` | Core clai tests: history picker, shell integration, CLI commands, PTY wrapper |
-| `suggestions-tests.yaml` | Suggestion engine tests: ghost text, typo correction, slot filling, cache (cross-shell) |
+| `example-test-plan.yaml` | Core clai tests: history picker, shell integration, CLI commands, PTY wrapper, incognito, ingestion |
+| `suggestions-tests.yaml` | Suggestion engine tests: ghost text, clai suggest CLI, typo correction, slot filling, cache, FTS5 search, project discovery, debug endpoints (cross-shell coverage) |
 
 ## Writing Tests
 
@@ -64,8 +64,16 @@ Use tags to run subsets of tests:
 |-----|-------------|
 | `smoke` | Quick sanity checks |
 | `picker` | History/suggestion picker tests |
-| `suggestions` | Ghost text suggestion tests |
+| `suggest` | clai suggest CLI tests |
+| `ghost-text` | Ghost text inline suggestion tests |
+| `search` | FTS5 history search tests |
+| `discovery` | Project task discovery tests |
+| `cache` | Pre-computed cache tests |
+| `typo` | Typo correction tests |
+| `slots` | Slot filling tests |
+| `debug` | Debug endpoint tests |
 | `integration` | Shell integration tests |
+| `incognito` | Incognito/privacy mode tests |
 | `pty` | PTY wrapper tests |
 | `cross-shell` | Tests that should pass in all shells |
 
