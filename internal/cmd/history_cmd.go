@@ -12,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/runger/clai/internal/config"
+	"github.com/runger/clai/internal/ipc"
 	"github.com/runger/clai/internal/storage"
 )
 
@@ -221,4 +222,70 @@ func formatDurationMs(ms int64) string {
 	minutes := ms / 60000
 	seconds := (ms % 60000) / 1000
 	return fmt.Sprintf("%dm%ds", minutes, seconds)
+}
+
+// --- History Import Subcommand ---
+
+var (
+	importShell       string
+	importHistoryPath string
+	importForce       bool
+)
+
+var historyImportCmd = &cobra.Command{
+	Use:   "import",
+	Short: "Import shell history from your shell's history file",
+	Long: `Import command history from bash, zsh, or fish into the clai database.
+
+This allows clai's command suggestions and history search to include
+commands you ran before installing clai.
+
+The import is idempotent: running it again will replace the previous
+import for that shell (not accumulate duplicates).
+
+Examples:
+  clai history import              # Auto-detect shell and import
+  clai history import --shell=zsh  # Import zsh history
+  clai history import --force      # Force re-import even if already done`,
+	RunE: runHistoryImport,
+}
+
+func init() {
+	historyImportCmd.Flags().StringVar(&importShell, "shell", "auto", "Shell to import from: auto, bash, zsh, or fish")
+	historyImportCmd.Flags().StringVar(&importHistoryPath, "path", "", "Custom history file path (default: auto-detect)")
+	historyImportCmd.Flags().BoolVar(&importForce, "force", false, "Force re-import even if already done")
+
+	// Add as subcommand of history
+	historyCmd.AddCommand(historyImportCmd)
+}
+
+func runHistoryImport(cmd *cobra.Command, args []string) error {
+	client, err := ipc.NewClient()
+	if err != nil {
+		return fmt.Errorf("failed to connect to daemon: %w", err)
+	}
+	defer client.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	fmt.Printf("Importing %s history...\n", importShell)
+
+	resp, err := client.ImportHistory(ctx, importShell, importHistoryPath, !importForce, importForce)
+	if err != nil {
+		return fmt.Errorf("import failed: %w", err)
+	}
+
+	if resp.Skipped {
+		fmt.Println("Skipped: history already imported for this shell.")
+		fmt.Println("Use --force to re-import.")
+		return nil
+	}
+
+	if resp.Error != "" {
+		return fmt.Errorf("import error: %s", resp.Error)
+	}
+
+	fmt.Printf("Successfully imported %d commands.\n", resp.ImportedCount)
+	return nil
 }

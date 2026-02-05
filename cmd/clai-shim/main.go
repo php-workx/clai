@@ -44,6 +44,9 @@ const (
 	flagGitRepoName   = "git-repo-name"
 	flagGitRepoRoot   = "git-repo-root"
 	flagPrevCommandID = "prev-command-id"
+	flagHistoryPath   = "history-path"
+	flagIfNotExists   = "if-not-exists"
+	flagForce         = "force"
 )
 
 func main() {
@@ -78,6 +81,8 @@ func main() {
 		runPing()
 	case "status":
 		runStatus()
+	case "import-history":
+		runImportHistory()
 	case "version", "--version", "-v":
 		printVersion()
 	case "help", "--help", "-h":
@@ -108,6 +113,7 @@ Commands:
   log-end --session-id=ID --command-id=ID --exit-code=N --duration=MS   Log command end
   suggest --session-id=ID --cwd=PATH --buffer="TEXT" [--cursor=N] [--limit=N]  Get suggestions
   text-to-command --session-id=ID --cwd=PATH --prompt="TEXT"            Text to command
+  import-history [--shell=SHELL] [--if-not-exists] [--force]            Import shell history
   ping                                        Check daemon connectivity
   status                                      Get daemon status
   version                                     Print version info
@@ -387,6 +393,51 @@ func runStatus() {
 		"active_sessions": status.ActiveSessions,
 		"uptime_seconds":  status.UptimeSeconds,
 		"commands_logged": status.CommandsLogged,
+	}
+
+	data, _ := json.Marshal(output)
+	fmt.Println(string(data))
+}
+
+// runImportHistory handles the import-history command
+// Flags: --shell, --history-path, --if-not-exists, --force
+// Output: JSON with import results
+func runImportHistory() {
+	flags := parseFlags(os.Args[2:])
+
+	shell := flags[flagShell]
+	historyPath := flags[flagHistoryPath]
+	ifNotExists := flags[flagIfNotExists] == "true"
+	force := flags[flagForce] == "true"
+
+	// Default shell to "auto" if not specified
+	if shell == "" {
+		shell = "auto"
+	}
+
+	client, err := ipc.NewClient()
+	if err != nil {
+		fmt.Println(`{"error": "not connected"}`)
+		return
+	}
+	defer client.Close()
+
+	resp, err := client.ImportHistory(context.Background(), shell, historyPath, ifNotExists, force)
+	if err != nil {
+		output := map[string]interface{}{
+			"error": err.Error(),
+		}
+		data, _ := json.Marshal(output)
+		fmt.Println(string(data))
+		return
+	}
+
+	output := map[string]interface{}{
+		"imported_count": resp.ImportedCount,
+		"skipped":        resp.Skipped,
+	}
+	if resp.Error != "" {
+		output["error"] = resp.Error
 	}
 
 	data, _ := json.Marshal(output)

@@ -2,25 +2,27 @@
 
 ## Core Commands
 
-### `clai cmd <natural language>`
+### `clai cmd <natural language>` (Coming Soon)
 
 Convert natural language into a shell command via Claude CLI.
-The generated command is also cached for Tab completion.
 
 ```bash
 clai cmd "list all files in the current directory"
 clai cmd "find all Python files modified today"
 ```
 
-### `clai ask <question>`
+> **Note:** This feature is not yet fully implemented.
+
+### `clai ask <question>` (Coming Soon)
 
 Ask Claude a question with terminal context (cwd + shell).
-If a command is present in the answer, it is cached for Tab completion.
 
 ```bash
 clai ask "How do I find large files?"
 clai ask --context "git status\nmake test" "What should I run next?"
 ```
+
+> **Note:** This feature is not yet fully implemented.
 
 ### `clai suggest [prefix]`
 
@@ -115,40 +117,8 @@ Print version, git commit, and build date.
 clai version
 ```
 
-## Advanced / Troubleshooting
-
-### `clai logs`
-
-Tail the history daemon log file (`~/.clai/logs/daemon.log`).
-
-```bash
-clai logs
-clai logs --follow
-```
-
-### `clai doctor`
-
-Run a diagnostic check (Claude CLI, shell integration, daemon status, config).
-
-```bash
-clai doctor
-```
-
-### `clai daemon`
-
-Manage the **Claude CLI** background process used to speed up `clai cmd`.
-This is **not** the history/suggestions daemon.
-
-```bash
-clai daemon start
-clai daemon stop
-clai daemon status
-```
-
 ## Background Processes
 
 - **History daemon (`claid`)**: gRPC daemon that stores history and serves
   session-aware suggestions. It is started by `clai-shim` when available.
   If `claid` is not installed, `clai suggest` falls back to your shell history.
-- **Claude CLI daemon (`clai daemon`)**: keeps a Claude CLI process warm for
-  faster `clai cmd` calls.

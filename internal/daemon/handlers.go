@@ -2,12 +2,14 @@ package daemon
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"runtime"
 	"strings"
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
+	"github.com/runger/clai/internal/history"
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/sanitize"
 	"github.com/runger/clai/internal/storage"
@@ -517,6 +519,93 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 	return &pb.HistoryFetchResponse{
 		Items: items,
 		AtEnd: atEnd,
+	}, nil
+}
+
+// ImportHistory handles the ImportHistory RPC.
+// It imports shell history entries from the specified shell's history file.
+// The operation runs synchronously (caller should invoke asynchronously if needed).
+func (s *Server) ImportHistory(ctx context.Context, req *pb.HistoryImportRequest) (*pb.HistoryImportResponse, error) {
+	s.touchActivity()
+
+	// Resolve shell type
+	shell := req.Shell
+	if shell == "" || shell == "auto" {
+		shell = history.DetectShell()
+	}
+	if shell == "" {
+		return &pb.HistoryImportResponse{
+			Error: "could not detect shell type",
+		}, nil
+	}
+
+	// Check if already imported (if_not_exists mode)
+	if req.IfNotExists {
+		has, err := s.store.HasImportedHistory(ctx, shell)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check import status: %w", err)
+		}
+		if has {
+			s.logger.Debug("import skipped: already imported",
+				"shell", shell,
+			)
+			return &pb.HistoryImportResponse{
+				Skipped: true,
+			}, nil
+		}
+	}
+
+	// Import shell history
+	var entries []history.ImportEntry
+	var err error
+	switch shell {
+	case "bash":
+		entries, err = history.ImportBashHistory(req.HistoryPath)
+	case "zsh":
+		entries, err = history.ImportZshHistory(req.HistoryPath)
+	case "fish":
+		entries, err = history.ImportFishHistory(req.HistoryPath)
+	default:
+		return &pb.HistoryImportResponse{
+			Error: "unsupported shell: " + shell,
+		}, nil
+	}
+
+	if err != nil {
+		s.logger.Warn("failed to read shell history",
+			"shell", shell,
+			"path", req.HistoryPath,
+			"error", err,
+		)
+		return nil, fmt.Errorf("failed to read shell history: %w", err)
+	}
+
+	if len(entries) == 0 {
+		s.logger.Debug("no history entries to import",
+			"shell", shell,
+		)
+		return &pb.HistoryImportResponse{
+			ImportedCount: 0,
+		}, nil
+	}
+
+	// Import into database
+	count, err := s.store.ImportHistory(ctx, entries, shell)
+	if err != nil {
+		s.logger.Warn("failed to import history",
+			"shell", shell,
+			"error", err,
+		)
+		return nil, fmt.Errorf("failed to import history: %w", err)
+	}
+
+	s.logger.Info("imported shell history",
+		"shell", shell,
+		"count", count,
+	)
+
+	return &pb.HistoryImportResponse{
+		ImportedCount: int32(count),
 	}, nil
 }
 

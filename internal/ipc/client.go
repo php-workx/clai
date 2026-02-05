@@ -215,6 +215,39 @@ func (c *Client) GetStatus() (*pb.StatusResponse, error) {
 	return c.client.GetStatus(ctx, &pb.Ack{Ok: true})
 }
 
+// ImportHistoryResponse contains the result of an import operation.
+type ImportHistoryResponse struct {
+	ImportedCount int
+	Skipped       bool
+	Error         string
+}
+
+// ImportHistory imports shell history into the daemon's database.
+// Shell can be "bash", "zsh", "fish", or "auto" (detect from SHELL env).
+// If ifNotExists is true, skip if history was already imported for this shell.
+func (c *Client) ImportHistory(ctx context.Context, shell, historyPath string, ifNotExists, force bool) (*ImportHistoryResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, InteractiveTimeout*2) // Longer timeout for import
+	defer cancel()
+
+	req := &pb.HistoryImportRequest{
+		Shell:       shell,
+		HistoryPath: historyPath,
+		IfNotExists: ifNotExists,
+		Force:       force,
+	}
+
+	resp, err := c.client.ImportHistory(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ImportHistoryResponse{
+		ImportedCount: int(resp.ImportedCount),
+		Skipped:       resp.Skipped,
+		Error:         resp.Error,
+	}, nil
+}
+
 // --- Helper Types ---
 
 // ClientInfo contains information about the client environment.

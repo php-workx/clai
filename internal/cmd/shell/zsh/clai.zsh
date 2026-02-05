@@ -938,6 +938,12 @@ if [[ -o interactive && -z "$_CLAI_REINIT" ]]; then
         --cwd="$PWD" \
         --shell=zsh >/dev/null 2>&1 &)
 
+    # Import shell history on first init (fire and forget)
+    # This is idempotent: --if-not-exists skips if already imported
+    (clai-shim import-history \
+        --shell="$CLAI_CURRENT_SHELL" \
+        --if-not-exists >/dev/null 2>&1 &)
+
     trap '_clai_cleanup' EXIT HUP
 
     local short_id="${CLAI_SESSION_ID:0:8}"

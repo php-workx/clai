@@ -24,10 +24,15 @@ var (
 )
 
 // Exit codes.
+// These match the expectations of shell scripts:
+//
+//	0 = selection made (use the result)
+//	1 = cancelled by user (keep original input)
+//	2 = fallback to native history (no TTY, error, etc.)
 const (
-	exitSuccess    = 0
-	exitError      = 1
-	exitNoTerminal = 2
+	exitSuccess   = 0
+	exitCancelled = 1
+	exitFallback  = 2
 )
 
 // maxQueryLen is the maximum length of a query string in bytes.
@@ -53,19 +58,19 @@ func run(args []string) int {
 	// Step 1: Check /dev/tty is openable.
 	if err := checkTTY(); err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
-		return exitNoTerminal
+		return exitFallback
 	}
 
 	// Step 2: Check TERM != "dumb".
 	if err := checkTERM(); err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
-		return exitNoTerminal
+		return exitFallback
 	}
 
 	// Step 3: Check terminal width >= 20 columns.
 	if err := checkTermWidth(); err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
-		return exitNoTerminal
+		return exitFallback
 	}
 
 	// Step 4: Ensure cache directory exists.
@@ -73,7 +78,7 @@ func run(args []string) int {
 	cacheDir := paths.CacheDir()
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: failed to create cache directory: %v\n", err)
-		return exitError
+		return exitFallback
 	}
 
 	// Step 5: Acquire advisory file lock.
@@ -81,14 +86,14 @@ func run(args []string) int {
 	lockFd, err := acquireLock(lockPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
-		return exitError
+		return exitFallback
 	}
 	defer releaseLock(lockFd)
 
 	// Step 6: Parse subcommand and flags.
 	if len(args) == 0 {
 		printUsage()
-		return exitError
+		return exitFallback
 	}
 
 	switch args[0] {
@@ -103,20 +108,20 @@ func run(args []string) int {
 	default:
 		fmt.Fprintf(os.Stderr, "clai-picker: unknown command %q\n", args[0])
 		printUsage()
-		return exitError
+		return exitFallback
 	}
 
 	opts, err := parseHistoryFlags(args[1:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
-		return exitError
+		return exitFallback
 	}
 
 	// Step 7: Load config.
 	cfg, err := config.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: failed to load config: %v\n", err)
-		return exitError
+		return exitFallback
 	}
 
 	// Apply config defaults for flags that weren't explicitly set.
@@ -303,7 +308,7 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: cannot open /dev/tty: %v\n", err)
-		return exitError
+		return exitFallback
 	}
 	defer tty.Close()
 
@@ -323,13 +328,17 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	finalModel, err := p.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: TUI error: %v\n", err)
-		return exitError
+		return exitFallback
 	}
 
 	m, ok := finalModel.(picker.Model)
 	if !ok {
 		fmt.Fprintln(os.Stderr, "clai-picker: unexpected model type")
-		return exitError
+		return exitFallback
+	}
+
+	if m.IsCancelled() {
+		return exitCancelled
 	}
 
 	if result := m.Result(); result != "" {

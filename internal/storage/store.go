@@ -2,7 +2,11 @@
 // It handles sessions, commands, and AI response caching.
 package storage
 
-import "context"
+import (
+	"context"
+
+	"github.com/runger/clai/internal/history"
+)
 
 // Store defines the interface for all storage operations.
 // The daemon is the single writer; clai-shim never opens the DB directly.
@@ -23,6 +27,10 @@ type Store interface {
 	GetCached(ctx context.Context, key string) (*CacheEntry, error)
 	SetCached(ctx context.Context, entry *CacheEntry) error
 	PruneExpiredCache(ctx context.Context) (int64, error)
+
+	// History Import
+	HasImportedHistory(ctx context.Context, shell string) (bool, error)
+	ImportHistory(ctx context.Context, entries []history.ImportEntry, shell string) (int, error)
 
 	// Lifecycle
 	Close() error
