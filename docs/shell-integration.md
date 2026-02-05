@@ -50,24 +50,31 @@ or set manually). If it’s missing, history is treated as global.
 
 ## Features
 
+### All Shells (History Picker)
+
+- **Alt+H** (Option+H): open history picker
+- **Tab**: switch between Session and Global scope
+- **Up/Down**: navigate items
+- **Enter**: insert full command into prompt
+- **Ctrl+C**: copy full command to clipboard
+- **Escape**: cancel and close picker
+
+Long commands are middle-truncated with a visible `…` indicator. The full
+command is preserved when you press Enter or copy with Ctrl+C.
+
 ### Zsh
 
 - Inline ghost‑text suggestions
-- **Tab**: suggestion picker
-- **Up Arrow**: history picker
 - **Right Arrow**: accept suggestion
 - **Alt+Right**: accept next token
 
 ### Bash
 
-- **Tab**: menu completion with clai suggestions first
-- **Up Arrow**: history picker
+- History-based suggestions via the picker
 
 ### Fish
 
 - **Alt+Enter**: accept suggestion
-- **Tab**: native completions + picker behavior
-- **Up Arrow**: history picker
 
 ## Toggles
 
@@ -91,15 +98,14 @@ export CLAI_MENU_LIMIT=5
 export CLAI_CACHE="$HOME/.cache/clai"
 ```
 
-## Notes on Experimental Hooks
+## Notes on Experimental Features
 
-The shell scripts include placeholders for:
+The shell scripts include placeholders for features that are not yet fully implemented:
 
-- `run` wrapper (output extraction + diagnosis)
-- `?` prefix for natural language
+- `clai cmd` for natural language → command conversion
+- `clai ask` for terminal-context questions
 
-These require commands that are not currently shipped in the CLI.
-Use `clai cmd` directly instead.
+See [CLI Reference](cli-reference.md) for current status.
 
 ## Uninstalling
 
