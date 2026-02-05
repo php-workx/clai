@@ -21,12 +21,20 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
 ```
 tests/e2e/
 ├── README.md                 # This file
-├── example-test-plan.yaml    # Reference test plan with schema docs
+├── example-test-plan.yaml    # Core functionality tests (picker, integration, CLI)
+├── suggestions-tests.yaml    # Suggestion engine tests (ghost text, typo, cache)
 ├── screenshots/
 │   ├── baseline/             # Expected screenshots for visual regression
 │   └── current/              # Screenshots from current test run
 └── artifacts/                # Failure logs, buffer dumps, etc.
 ```
+
+## Test Files
+
+| File | Description |
+|------|-------------|
+| `example-test-plan.yaml` | Core clai tests: history picker, shell integration, CLI commands, PTY wrapper |
+| `suggestions-tests.yaml` | Suggestion engine tests: ghost text, typo correction, slot filling, cache (cross-shell) |
 
 ## Writing Tests
 

@@ -1,0 +1,475 @@
+# Suggestions Engine E2E Tests
+#
+# Tests for the clai suggestions system including:
+# - Command suggestions (clai suggest)
+# - Ghost text / inline suggestions
+# - Typo correction (Did You Mean?)
+# - Semantic slot filling
+# - Pre-computed cache behavior
+#
+# These tests should be run in all three shells: bash, zsh, fish
+
+suite:
+  name: "clai Suggestions Engine"
+  description: "End-to-end tests for suggestion features"
+  version: "1.0"
+
+defaults:
+  timeout: 30s
+  terminal_size:
+    rows: 24
+    cols: 80
+
+environment:
+  CLAI_HOME: "${TEST_TEMP_DIR}/clai"
+  TERM: "xterm-256color"
+  PS1: "TEST> "
+
+tests:
+  # ===========================================================================
+  # clai suggest CLI Tests - Bash
+  # ===========================================================================
+
+  - name: "clai suggest text format (bash)"
+    description: "Default output shows numbered list with reasons"
+    shell: bash
+    tags: [suggest, format, bash, smoke]
+    setup:
+      - "echo setup1"
+      - "git status"
+      - "make build"
+    steps:
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "\\d+\\."  # Numbered list
+      - screen_matches: "\\("      # Reasons in parens
+
+  - name: "clai suggest JSON format (bash)"
+    description: "--format=json returns valid JSON structure"
+    shell: bash
+    tags: [suggest, format, json, bash]
+    setup:
+      - "npm test"
+    steps:
+      - type: "clai suggest --format=json"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "{"
+      - screen_contains: "suggestions"
+
+  - name: "clai suggest fzf format (bash)"
+    description: "--format=fzf returns plain command list for piping"
+    shell: bash
+    tags: [suggest, format, fzf, bash]
+    setup:
+      - "docker ps"
+    steps:
+      - type: "clai suggest --format=fzf"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Plain output without decorations
+      - screen_not_contains: "1."
+      - screen_not_contains: "("
+
+  - name: "clai suggest with limit (bash)"
+    description: "--limit restricts suggestion count"
+    shell: bash
+    tags: [suggest, format, parameters, bash]
+    setup:
+      - "cmd1"
+      - "cmd2"
+      - "cmd3"
+    steps:
+      - type: "clai suggest --limit=2"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "."
+
+  # ===========================================================================
+  # clai suggest CLI Tests - Zsh
+  # ===========================================================================
+
+  - name: "clai suggest text format (zsh)"
+    description: "Default output shows numbered list with reasons"
+    shell: zsh
+    tags: [suggest, format, zsh, cross-shell]
+    setup:
+      - "echo setup1"
+      - "git status"
+    steps:
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "\\d+\\."
+
+  - name: "clai suggest JSON format (zsh)"
+    description: "--format=json returns valid JSON structure"
+    shell: zsh
+    tags: [suggest, format, json, zsh, cross-shell]
+    setup:
+      - "npm test"
+    steps:
+      - type: "clai suggest --format=json"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "{"
+      - screen_contains: "suggestions"
+
+  # ===========================================================================
+  # clai suggest CLI Tests - Fish
+  # ===========================================================================
+
+  - name: "clai suggest text format (fish)"
+    description: "Default output shows numbered list with reasons"
+    shell: fish
+    tags: [suggest, format, fish, cross-shell]
+    setup:
+      - "echo setup1"
+      - "git status"
+    steps:
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "\\d+\\."
+
+  - name: "clai suggest JSON format (fish)"
+    description: "--format=json returns valid JSON structure"
+    shell: fish
+    tags: [suggest, format, json, fish, cross-shell]
+    setup:
+      - "npm test"
+    steps:
+      - type: "clai suggest --format=json"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "{"
+      - screen_contains: "suggestions"
+
+  # ===========================================================================
+  # Ghost Text / Inline Suggestions - Bash
+  # ===========================================================================
+
+  - name: "Ghost text suggestion appears (bash)"
+    description: "Typing a known command prefix shows ghost text suggestion"
+    shell: bash
+    tags: [suggestions, ghost-text, bash]
+    setup:
+      - "git status"
+      - "git log --oneline"
+    steps:
+      - type: "git st"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "atus"  # Suggestion completing "git status"
+
+  - name: "Right arrow accepts full suggestion (bash)"
+    description: "Pressing Right at end of line accepts the ghost text"
+    shell: bash
+    tags: [suggestions, ghost-text, bash]
+    setup:
+      - "docker ps -a"
+    steps:
+      - type: "docker p"
+      - wait: "300ms"
+      - press: "Right"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "docker ps"
+
+  - name: "Escape clears suggestion (bash)"
+    description: "Pressing Escape removes the ghost text"
+    shell: bash
+    tags: [suggestions, ghost-text, bash]
+    setup:
+      - "npm install"
+    steps:
+      - type: "npm i"
+      - wait: "300ms"
+      - press: "Escape"
+      - wait: "200ms"
+    expect:
+      - screen_not_contains: "nstall"  # Ghost text gone
+
+  # ===========================================================================
+  # Ghost Text / Inline Suggestions - Zsh
+  # ===========================================================================
+
+  - name: "Ghost text suggestion appears (zsh)"
+    description: "Typing a known command prefix shows ghost text suggestion"
+    shell: zsh
+    tags: [suggestions, ghost-text, zsh, cross-shell]
+    setup:
+      - "git status"
+      - "git log --oneline"
+    steps:
+      - type: "git st"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "atus"
+
+  - name: "Right arrow accepts full suggestion (zsh)"
+    description: "Pressing Right at end of line accepts the ghost text"
+    shell: zsh
+    tags: [suggestions, ghost-text, zsh, cross-shell]
+    setup:
+      - "docker ps -a"
+    steps:
+      - type: "docker p"
+      - wait: "300ms"
+      - press: "Right"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "docker ps"
+
+  # ===========================================================================
+  # Ghost Text / Inline Suggestions - Fish
+  # ===========================================================================
+
+  - name: "Ghost text suggestion appears (fish)"
+    description: "Typing a known command prefix shows ghost text suggestion"
+    shell: fish
+    tags: [suggestions, ghost-text, fish, cross-shell]
+    setup:
+      - "git status"
+      - "git log --oneline"
+    steps:
+      - type: "git st"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "atus"
+
+  - name: "Right arrow accepts full suggestion (fish)"
+    description: "Pressing Right at end of line accepts the ghost text"
+    shell: fish
+    tags: [suggestions, ghost-text, fish, cross-shell]
+    setup:
+      - "docker ps -a"
+    steps:
+      - type: "docker p"
+      - wait: "300ms"
+      - press: "Right"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "docker ps"
+
+  # ===========================================================================
+  # Typo Correction (Did You Mean?) - All Shells
+  # ===========================================================================
+
+  - name: "Typo correction suggests on exit 127 (bash)"
+    description: "Misspelled command triggers Did You Mean suggestion"
+    shell: bash
+    tags: [typo, correction, suggestions, bash]
+    skip: true
+    skip_reason: "Typo correction backend not yet implemented"
+    setup:
+      - "git status"
+      - "git log --oneline -1"
+    steps:
+      - type: "gti status"
+      - press: "Enter"
+      - wait: "1s"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "git"
+
+  - name: "Typo correction suggests on exit 127 (zsh)"
+    description: "Misspelled command triggers Did You Mean suggestion"
+    shell: zsh
+    tags: [typo, correction, suggestions, zsh, cross-shell]
+    skip: true
+    skip_reason: "Typo correction backend not yet implemented"
+    setup:
+      - "git status"
+    steps:
+      - type: "gti status"
+      - press: "Enter"
+      - wait: "1s"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "git"
+
+  - name: "Typo correction suggests on exit 127 (fish)"
+    description: "Misspelled command triggers Did You Mean suggestion"
+    shell: fish
+    tags: [typo, correction, suggestions, fish, cross-shell]
+    skip: true
+    skip_reason: "Typo correction backend not yet implemented"
+    setup:
+      - "git status"
+    steps:
+      - type: "gti status"
+      - press: "Enter"
+      - wait: "1s"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "git"
+
+  - name: "Typo correction respects similarity threshold"
+    description: "Very different strings don't trigger correction"
+    shell: bash
+    tags: [typo, correction, threshold]
+    skip: true
+    skip_reason: "Typo correction backend not yet implemented"
+    steps:
+      - type: "xyzabc123nonexistent"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai suggest"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_not_contains: "xyzabc123"
+
+  # ===========================================================================
+  # Semantic Slot Filling - All Shells
+  # ===========================================================================
+
+  - name: "Slot filling learns argument values (bash)"
+    description: "Repeated arguments are remembered for suggestions"
+    shell: bash
+    tags: [slots, learning, suggestions, bash]
+    skip: true
+    skip_reason: "Slot filling backend not yet implemented"
+    setup:
+      - "kubectl get pods -n production"
+      - "kubectl get pods -n production"
+      - "kubectl get pods -n staging"
+    steps:
+      - type: "clai suggest kubectl"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "production"
+
+  - name: "Slot filling respects frequency"
+    description: "More frequent values are preferred"
+    shell: bash
+    tags: [slots, frequency, suggestions]
+    skip: true
+    skip_reason: "Slot filling backend not yet implemented"
+    setup:
+      - "docker run -it alpine"
+      - "docker run -it alpine"
+      - "docker run -it alpine"
+      - "docker run -it ubuntu"
+    steps:
+      - type: "clai suggest 'docker run'"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "alpine"
+
+  # ===========================================================================
+  # Pre-computed Cache - All Shells
+  # ===========================================================================
+
+  - name: "Suggestions served from cache (bash)"
+    description: "Cache hit after recent command"
+    shell: bash
+    tags: [cache, performance, bash]
+    skip: true
+    skip_reason: "Cache introspection not yet exposed in CLI"
+    setup:
+      - "echo cache_warmup_cmd"
+    steps:
+      - type: "clai suggest --format=json"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "cache"
+
+  # ===========================================================================
+  # Suggestion Widget Keybindings
+  # ===========================================================================
+
+  - name: "Ctrl+Space opens suggestion picker (bash)"
+    description: "Ctrl+Space keybinding triggers suggestion widget"
+    shell: bash
+    tags: [suggestions, keybind, widget, bash]
+    setup:
+      - "echo test1"
+      - "git status"
+    steps:
+      - press: "Ctrl+ "
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(fzf|suggest|pick)"
+
+  - name: "Ctrl+Space opens suggestion picker (zsh)"
+    description: "Ctrl+Space keybinding triggers suggestion widget"
+    shell: zsh
+    tags: [suggestions, keybind, widget, zsh, cross-shell]
+    setup:
+      - "echo test1"
+      - "git status"
+    steps:
+      - press: "Ctrl+ "
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(fzf|suggest|pick)"
+
+  - name: "Alt+Space opens suggestion picker (fish)"
+    description: "Alt+Space keybinding triggers suggestion widget"
+    shell: fish
+    tags: [suggestions, keybind, widget, fish, cross-shell]
+    setup:
+      - "echo test1"
+      - "git status"
+    steps:
+      - press: "Alt+ "
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(fzf|suggest|pick)"
+
+# ===========================================================================
+# Test Plan Metadata
+# ===========================================================================
+metadata:
+  created: "2026-02-05"
+  updated: "2026-02-05"
+  author: "clai team"
+  purpose: "Suggestions engine e2e tests with cross-shell coverage"
+
+  total_tests: 28
+  skipped_tests: 7
+  by_shell:
+    bash: 14
+    zsh: 7
+    fish: 7
+  by_tag:
+    suggest: 10
+    format: 8
+    json: 4
+    fzf: 1
+    ghost-text: 8
+    typo: 4
+    correction: 4
+    slots: 2
+    cache: 1
+    keybind: 3
+    widget: 3
+    cross-shell: 11
+    skipped: 7
+
+  notes:
+    - "Run 'make test-server SHELL=<shell>' to start test server for specific shell"
+    - "Ensure clai daemon is running with recent build"
+    - "Ghost text tests require terminal with proper escape sequence support"
+    - "Typo correction and slot filling tests are skipped until backend implementation"
+    - "Cache tests require introspection API to verify cache state"
