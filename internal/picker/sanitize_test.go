@@ -43,6 +43,26 @@ func TestStripANSI_OSC(t *testing.T) {
 	}
 }
 
+func TestStripANSI_PrivateMode(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"hide cursor", "\x1b[?25lhello", "hello"},
+		{"show cursor", "\x1b[?25hhello", "hello"},
+		{"alternate screen", "\x1b[?1049htext\x1b[?1049l", "text"},
+		{"bracketed paste mode", "\x1b[?2004hcontent\x1b[?2004l", "content"},
+		{"mixed with SGR", "\x1b[?25l\x1b[31mred\x1b[0m\x1b[?25h", "red"},
+		{"multiple params", "\x1b[?1;25h", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, StripANSI(tt.input))
+		})
+	}
+}
+
 func TestStripANSI_Charset(t *testing.T) {
 	tests := []struct {
 		name  string

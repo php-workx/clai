@@ -10,11 +10,12 @@ import (
 
 // ansiRE matches ANSI escape sequences:
 //   - CSI sequences: ESC [ ... final_byte  (covers SGR like \x1b[31m)
+//   - CSI private-mode sequences: ESC [ ? ... final_byte (like \x1b[?25l)
 //   - OSC sequences: ESC ] ... (ST | BEL)
 //   - Charset sequences: ESC ( B, ESC ) B, etc.
 //   - Other two-byte escapes: ESC followed by a single byte in [#()*+\-./]
 var ansiRE = regexp.MustCompile(`\x1b(?:` +
-	`\[[0-9;]*[A-Za-z]` + // CSI sequences (SGR, cursor, etc.)
+	`\[[?]?[0-9;]*[A-Za-z]` + // CSI sequences (SGR, cursor, private-mode, etc.)
 	`|` +
 	`\].*?(?:\x1b\\|\x07)` + // OSC sequences (terminated by ST or BEL)
 	`|` +
