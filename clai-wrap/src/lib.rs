@@ -5,9 +5,33 @@
 //! command assistance.
 
 pub mod bracketed_paste;
+pub mod color_detect;
+pub mod echo_gap;
+pub mod history_parser;
 pub mod hotkey;
+pub mod jsonrpc;
 pub mod osc133;
+pub mod pty_host;
+pub mod raw_mode;
 pub mod ring_buffer;
 
+#[cfg(unix)]
+pub mod signals;
+
+pub use color_detect::{detect_color_support, ColorSupport};
+pub use echo_gap::{EchoGapConfig, EchoGapDetector, EchoGapState};
+pub use history_parser::{
+    detect_and_parse, parse_bash_history, parse_bash_timestamped, parse_fish_history,
+    parse_zsh_history, HistoryEntry, HistoryParseError,
+};
+pub use jsonrpc::{
+    Notification, Request, Response, RpcError, RpcErrorCode, command_end_request,
+    command_start_request, output_chunk_request, ping_request, suggestion_available_notification,
+};
 pub use osc133::{Osc133Parser, Osc133State};
+pub use pty_host::{ExitStatus, PtyHost};
+pub use raw_mode::{detect_tty, enter_raw_mode, RawModeError, RawModeGuard, TtyStatus};
 pub use ring_buffer::SpscRingBuffer;
+
+#[cfg(unix)]
+pub use signals::{SignalError, SignalEvent, SignalHandler};
