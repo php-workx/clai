@@ -16,16 +16,18 @@ import (
 
 // mockStore implements storage.Store for testing.
 type mockStore struct {
-	sessions map[string]*storage.Session
-	commands map[string]*storage.Command
-	cache    map[string]*storage.CacheEntry
+	sessions       map[string]*storage.Session
+	commands       map[string]*storage.Command
+	cache          map[string]*storage.CacheEntry
+	importedShells map[string]bool
 }
 
 func newMockStore() *mockStore {
 	return &mockStore{
-		sessions: make(map[string]*storage.Session),
-		commands: make(map[string]*storage.Command),
-		cache:    make(map[string]*storage.CacheEntry),
+		sessions:       make(map[string]*storage.Session),
+		commands:       make(map[string]*storage.Command),
+		cache:          make(map[string]*storage.CacheEntry),
+		importedShells: make(map[string]bool),
 	}
 }
 
@@ -90,11 +92,15 @@ func (m *mockStore) QueryCommands(ctx context.Context, q storage.CommandQuery) (
 }
 
 func (m *mockStore) QueryHistoryCommands(ctx context.Context, q storage.CommandQuery) ([]storage.HistoryRow, error) {
-	// Collect commands, dedup by command_norm
+	// Collect commands, dedup by CommandNorm (consistent with real storage)
 	seen := make(map[string]storage.HistoryRow)
 	for _, c := range m.commands {
-		norm := strings.ToLower(c.Command)
-		// Substring filter
+		norm := c.CommandNorm
+		// Fall back to lowercase command if CommandNorm is empty (for backwards compatibility)
+		if norm == "" {
+			norm = strings.ToLower(c.Command)
+		}
+		// Substring filter (matches against normalized command)
 		if q.Substring != "" && !strings.Contains(norm, q.Substring) {
 			continue
 		}
@@ -153,10 +159,11 @@ func (m *mockStore) PruneExpiredCache(ctx context.Context) (int64, error) {
 }
 
 func (m *mockStore) HasImportedHistory(ctx context.Context, shell string) (bool, error) {
-	return false, nil
+	return m.importedShells[shell], nil
 }
 
 func (m *mockStore) ImportHistory(ctx context.Context, entries []history.ImportEntry, shell string) (int, error) {
+	m.importedShells[shell] = true
 	return len(entries), nil
 }
 
