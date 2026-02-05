@@ -1178,3 +1178,33 @@ func TestEsc_StillCancels(t *testing.T) {
 	assert.Equal(t, stateCancelled, m.state)
 	assert.NotNil(t, cmd, "Esc should return tea.Quit")
 }
+
+func TestIsCancelled_TrueAfterEsc(t *testing.T) {
+	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	// Before ESC, should not be cancelled.
+	assert.False(t, m.IsCancelled())
+
+	// After ESC, should be cancelled.
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+	m = result.(Model)
+	assert.True(t, m.IsCancelled())
+	// Result should be empty when cancelled.
+	assert.Empty(t, m.Result())
+}
+
+func TestIsCancelled_FalseAfterEnter(t *testing.T) {
+	p := &mockProvider{items: []string{"ls -la"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	// Press Enter to select.
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	m = result.(Model)
+
+	// Should not be cancelled, and result should be the selection.
+	assert.False(t, m.IsCancelled())
+	assert.Equal(t, "ls -la", m.Result())
+}

@@ -138,6 +138,11 @@ func (m Model) Result() string {
 	return m.result
 }
 
+// IsCancelled returns true if the user cancelled the picker (e.g., with Esc).
+func (m Model) IsCancelled() bool {
+	return m.state == stateCancelled
+}
+
 // Init implements tea.Model. It sends an initMsg so that the first fetch
 // is triggered through Update, where state mutations are properly captured.
 func (m Model) Init() tea.Cmd {
