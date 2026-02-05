@@ -7,7 +7,7 @@ BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 PICKER_LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-all test-interactive test-docker cover fmt lint vuln dev help proto bin/linux
+.PHONY: all build install install-dev clean test test-all test-rust test-interactive test-docker cover fmt lint vuln dev help proto bin/linux
 
 all: build
 
@@ -76,8 +76,23 @@ test:
 		go test -race -v ./...; \
 	fi
 
-## test-all: Run all tests including Docker containers
-test-all: test test-docker
+## test-all: Run all tests including Docker containers and Rust
+test-all: test test-rust test-docker
+
+## test-rust: Run clai-wrap Rust tests
+test-rust:
+	@if [ -d "clai-wrap" ]; then \
+		echo "Running clai-wrap Rust tests..."; \
+		if command -v cargo >/dev/null 2>&1; then \
+			cargo test --manifest-path clai-wrap/Cargo.toml; \
+		elif [ -x "$$HOME/.cargo/bin/cargo" ]; then \
+			$$HOME/.cargo/bin/cargo test --manifest-path clai-wrap/Cargo.toml; \
+		else \
+			echo "Skipping Rust tests (cargo not found)"; \
+		fi \
+	else \
+		echo "Skipping Rust tests (clai-wrap directory missing)"; \
+	fi
 
 ## cover: Run all tests with coverage
 cover:
