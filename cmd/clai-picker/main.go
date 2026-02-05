@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -233,9 +234,12 @@ func dispatch(cfg *config.Config, opts *pickerOpts) int {
 
 // dispatchBackend executes the selected backend or falls back.
 func dispatchBackend(backend string, cfg *config.Config, opts *pickerOpts) int {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	switch backend {
 	case "fzf":
-		return dispatchFzf(cfg, opts)
+		return dispatchFzf(ctx, cfg, opts)
 	case "clai":
 		return dispatchBuiltin(cfg, opts)
 	case "builtin":
@@ -355,18 +359,21 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 }
 
 // dispatchFzf checks for fzf on PATH and falls back to builtin if missing.
-func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
+func dispatchFzf(ctx context.Context, cfg *config.Config, opts *pickerOpts) int {
 	_, err := exec.LookPath("fzf")
 	if err != nil {
 		debugLog("fzf not found on PATH, falling back to builtin")
 		return dispatchBuiltin(cfg, opts)
 	}
 
-	result, err := runFzfBackend(cfg, opts)
+	result, cancelled, err := runFzfBackend(ctx, cfg, opts)
 	if err != nil {
-		// fzf exit code 130 = cancelled by user, exit code 1 = no match
 		debugLog("fzf backend error: %v", err)
-		return exitSuccess
+		return exitFallback
+	}
+
+	if cancelled {
+		return exitCancelled
 	}
 
 	if result != "" {
@@ -377,7 +384,8 @@ func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 }
 
 // runFzfBackend fetches all history and pipes it through fzf.
-func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
+// Returns the selected item, whether the user cancelled, and any error.
+func runFzfBackend(ctx context.Context, cfg *config.Config, opts *pickerOpts) (string, bool, error) {
 	provider := picker.NewHistoryProvider(socketPath(cfg))
 	tabs := resolveTabs(cfg, opts)
 
@@ -390,7 +398,6 @@ func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
 	}
 
 	// Fetch all items by paginating until AtEnd.
-	ctx := context.Background()
 	var allItems []string
 	offset := 0
 	limit := cfg.History.PickerPageSize
@@ -418,25 +425,34 @@ func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
 	}
 
 	if len(allItems) == 0 {
-		return "", nil
+		return "", false, nil
 	}
 
-	// Build fzf command.
+	// Build fzf command with context for Ctrl+C handling.
 	args := []string{"--no-sort", "--exact"}
 	if opts.query != "" {
 		args = append(args, "--query", opts.query)
 	}
 
-	cmd := exec.Command("fzf", args...)
+	cmd := exec.CommandContext(ctx, "fzf", args...)
 	cmd.Stdin = strings.NewReader(strings.Join(allItems, "\n"))
 	cmd.Stderr = os.Stderr // Let fzf render its TUI on stderr/tty.
 
 	output, err := cmd.Output()
 	if err != nil {
-		return "", err
+		// Check for cancellation via exit codes.
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			code := exitErr.ExitCode()
+			// fzf exit code 130 = interrupted (Ctrl+C), exit code 1 = no match
+			if code == 130 || code == 1 {
+				return "", true, nil // User cancelled
+			}
+		}
+		return "", false, err
 	}
 
-	return strings.TrimRight(string(output), "\n"), nil
+	return strings.TrimRight(string(output), "\n"), false, nil
 }
 
 // debugLog logs a message to stderr when CLAI_DEBUG=1.
