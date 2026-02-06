@@ -11,6 +11,8 @@
 //! and should be run manually with `cargo test -- --ignored`.
 
 use std::io::{Read, Write};
+#[cfg(unix)]
+use std::path::Path;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -173,22 +175,7 @@ fn spawn_clai_wrap_shell() -> Option<(
     Box<dyn portable_pty::MasterPty + Send>,
     Box<dyn portable_pty::Child + Send + Sync>,
 )> {
-    let binary = clai_wrap_binary()?;
-    let pty_system = native_pty_system();
-    let pair = pty_system.openpty(default_pty_size()).ok()?;
-
-    let mut cmd = CommandBuilder::new(binary);
-    cmd.args([
-        "--standalone",
-        "--shell",
-        "/bin/sh",
-        "--login-shell",
-        "false",
-        "--no-ui",
-    ]);
-
-    let child = pair.slave.spawn_command(cmd).ok()?;
-    Some((pair.master, child))
+    spawn_clai_wrap_shell_path(Path::new("/bin/sh"))
 }
 
 #[cfg(unix)]
@@ -196,8 +183,16 @@ fn spawn_clai_wrap_bash_shell() -> Option<(
     Box<dyn portable_pty::MasterPty + Send>,
     Box<dyn portable_pty::Child + Send + Sync>,
 )> {
+    spawn_clai_wrap_shell_path(Path::new("/bin/bash"))
+}
+
+#[cfg(unix)]
+fn spawn_clai_wrap_shell_path(shell_path: &Path) -> Option<(
+    Box<dyn portable_pty::MasterPty + Send>,
+    Box<dyn portable_pty::Child + Send + Sync>,
+)> {
     let binary = clai_wrap_binary()?;
-    if !PathBuf::from("/bin/bash").exists() {
+    if !shell_path.exists() {
         return None;
     }
 
@@ -208,7 +203,7 @@ fn spawn_clai_wrap_bash_shell() -> Option<(
     cmd.args([
         "--standalone",
         "--shell",
-        "/bin/bash",
+        shell_path.to_str()?,
         "--login-shell",
         "false",
         "--no-ui",
@@ -216,6 +211,35 @@ fn spawn_clai_wrap_bash_shell() -> Option<(
 
     let child = pair.slave.spawn_command(cmd).ok()?;
     Some((pair.master, child))
+}
+
+#[cfg(unix)]
+fn available_cross_shells() -> Vec<(&'static str, PathBuf)> {
+    let mut shells = Vec::new();
+
+    let bash = PathBuf::from("/bin/bash");
+    if bash.exists() {
+        shells.push(("bash", bash));
+    }
+
+    let zsh = PathBuf::from("/bin/zsh");
+    if zsh.exists() {
+        shells.push(("zsh", zsh));
+    }
+
+    for fish_path in [
+        PathBuf::from("/opt/homebrew/bin/fish"),
+        PathBuf::from("/usr/local/bin/fish"),
+        PathBuf::from("/usr/bin/fish"),
+        PathBuf::from("/bin/fish"),
+    ] {
+        if fish_path.exists() {
+            shells.push(("fish", fish_path));
+            break;
+        }
+    }
+
+    shells
 }
 
 // ============================================================================
@@ -712,6 +736,82 @@ fn test_clai_wrap_fails_fast_with_invalid_history_file() {
         "Expected history file load error, got output: {output}"
     );
     assert!(!status.success(), "Expected non-zero exit for invalid history file");
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_cross_shell_matrix_echo_smoke() {
+    let shells = available_cross_shells();
+    if shells.is_empty() {
+        eprintln!("Skipping test: no bash/zsh/fish shells available");
+        return;
+    }
+
+    for (shell_name, shell_path) in shells {
+        let Some((master, mut child)) = spawn_clai_wrap_shell_path(&shell_path) else {
+            eprintln!("Skipping shell {shell_name}: failed to spawn clai-wrap");
+            continue;
+        };
+
+        let mut reader = master.try_clone_reader().expect("Failed to get reader");
+        let mut writer = master.take_writer().expect("Failed to get writer");
+
+        let marker = format!("CROSS_SHELL_ECHO_{shell_name}");
+        writer
+            .write_all(format!("echo {marker}\nexit\n").as_bytes())
+            .expect("write cross-shell echo command");
+        writer.flush().expect("flush cross-shell echo command");
+
+        let output = read_until_marker(&mut *reader, &marker, Duration::from_secs(8))
+            .expect("Expected cross-shell echo marker");
+        let _status = wait_for_exit_or_kill(&mut *child, Duration::from_secs(5));
+        assert!(
+            output.contains(&marker),
+            "Expected marker for shell {shell_name}, got: {output}"
+        );
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_cross_shell_matrix_ctrl_c_interrupts() {
+    let shells = available_cross_shells();
+    if shells.is_empty() {
+        eprintln!("Skipping test: no bash/zsh/fish shells available");
+        return;
+    }
+
+    for (shell_name, shell_path) in shells {
+        let Some((master, mut child)) = spawn_clai_wrap_shell_path(&shell_path) else {
+            eprintln!("Skipping shell {shell_name}: failed to spawn clai-wrap");
+            continue;
+        };
+
+        let mut reader = master.try_clone_reader().expect("Failed to get reader");
+        let mut writer = master.take_writer().expect("Failed to get writer");
+
+        writer.write_all(b"sleep 10\n").expect("write sleep");
+        writer.flush().expect("flush sleep");
+        std::thread::sleep(Duration::from_millis(200));
+
+        writer.write_all(&[0x03]).expect("write Ctrl-C");
+        writer.flush().expect("flush Ctrl-C");
+        std::thread::sleep(Duration::from_millis(100));
+
+        let marker = format!("CROSS_SHELL_CTRL_C_{shell_name}");
+        writer
+            .write_all(format!("echo {marker}\nexit\n").as_bytes())
+            .expect("write marker after Ctrl-C");
+        writer.flush().expect("flush marker after Ctrl-C");
+
+        let output = read_until_marker(&mut *reader, &marker, Duration::from_secs(8))
+            .expect("Expected post-interrupt marker");
+        let _status = wait_for_exit_or_kill(&mut *child, Duration::from_secs(5));
+        assert!(
+            output.contains(&marker),
+            "Expected Ctrl-C marker for shell {shell_name}, got: {output}"
+        );
+    }
 }
 
 #[test]
