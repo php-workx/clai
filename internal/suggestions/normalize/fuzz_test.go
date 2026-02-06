@@ -68,13 +68,15 @@ func FuzzNormalize(f *testing.F) {
 			t.Errorf("not convergent after 2 passes: %q -> %q -> %q -> %q", input, result, result2, result3)
 		}
 
-		// Property: slot values should all be valid UTF-8
-		for _, slot := range slots {
-			if !utf8.ValidString(slot.Value) {
-				t.Errorf("non-UTF8 slot value for input %q: slot[%d]=%q", input, slot.Index, slot.Value)
-			}
-			if !utf8.ValidString(slot.Type) {
-				t.Errorf("non-UTF8 slot type for input %q: slot[%d].Type=%q", input, slot.Index, slot.Type)
+		// Property: slot values should all be valid UTF-8 when input is valid UTF-8
+		if utf8.ValidString(input) {
+			for _, slot := range slots {
+				if !utf8.ValidString(slot.Value) {
+					t.Errorf("non-UTF8 slot value for valid-UTF8 input %q: slot[%d]=%q", input, slot.Index, slot.Value)
+				}
+				if !utf8.ValidString(slot.Type) {
+					t.Errorf("non-UTF8 slot type for valid-UTF8 input %q: slot[%d].Type=%q", input, slot.Index, slot.Type)
+				}
 			}
 		}
 
@@ -181,10 +183,12 @@ func FuzzSplitPipeline(f *testing.F) {
 	f.Fuzz(func(t *testing.T, input string) {
 		segments := SplitPipeline(input)
 
-		// Property: segments should all have valid UTF-8
-		for i, seg := range segments {
-			if !utf8.ValidString(seg.Raw) {
-				t.Errorf("non-UTF8 segment[%d].Raw for input %q: %q", i, input, seg.Raw)
+		// Property: segments should all have valid UTF-8 when input is valid UTF-8
+		if utf8.ValidString(input) {
+			for i, seg := range segments {
+				if !utf8.ValidString(seg.Raw) {
+					t.Errorf("non-UTF8 segment[%d].Raw for valid-UTF8 input %q: %q", i, input, seg.Raw)
+				}
 			}
 		}
 
