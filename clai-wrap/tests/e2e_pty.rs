@@ -242,6 +242,14 @@ fn available_cross_shells() -> Vec<(&'static str, PathBuf)> {
     shells
 }
 
+#[cfg(unix)]
+fn host_command_available(command: &str) -> bool {
+    std::process::Command::new("sh")
+        .args(["-c", &format!("command -v {command} >/dev/null 2>&1")])
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
 // ============================================================================
 // Basic PTY Spawning Tests
 // ============================================================================
@@ -812,6 +820,140 @@ fn test_clai_wrap_cross_shell_matrix_ctrl_c_interrupts() {
             "Expected Ctrl-C marker for shell {shell_name}, got: {output}"
         );
     }
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_fullscreen_vim_open_close_resume_shell() {
+    if !host_command_available("vim") {
+        eprintln!("Skipping test: vim not available");
+        return;
+    }
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer
+        .write_all(b"vim -Nu NONE -n +q >/dev/null 2>&1; echo AFTER_VIM\n")
+        .expect("write vim command");
+    writer.flush().expect("flush vim command");
+
+    let output = read_until_marker(&mut *reader, "AFTER_VIM", Duration::from_secs(12))
+        .expect("Expected shell to recover after vim exits");
+
+    let _ = child.kill();
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+
+    assert!(output.contains("AFTER_VIM"), "Output: {output}");
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_fullscreen_less_quit_resume_shell() {
+    if !host_command_available("less") {
+        eprintln!("Skipping test: less not available");
+        return;
+    }
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer
+        .write_all(b"printf 'line1\\nline2\\nline3\\n' | less\n")
+        .expect("write less command");
+    writer.flush().expect("flush less command");
+    std::thread::sleep(Duration::from_millis(200));
+    writer.write_all(b"q").expect("send q to less");
+    writer.flush().expect("flush q");
+
+    writer
+        .write_all(b"echo AFTER_LESS\n")
+        .expect("write post-less marker");
+    writer.flush().expect("flush post-less marker");
+
+    let output = read_until_marker(&mut *reader, "AFTER_LESS", Duration::from_secs(12))
+        .expect("Expected shell to recover after less quits");
+
+    let _ = child.kill();
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+
+    assert!(output.contains("AFTER_LESS"), "Output: {output}");
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_fullscreen_top_snapshot_resume_shell() {
+    if !host_command_available("top") {
+        eprintln!("Skipping test: top not available");
+        return;
+    }
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer
+        .write_all(
+            b"if top -l 1 >/dev/null 2>&1; then top -l 1 >/dev/null 2>&1; else top -b -n 1 >/dev/null 2>&1; fi; echo AFTER_TOP\n",
+        )
+        .expect("write top snapshot command");
+    writer.flush().expect("flush top snapshot command");
+
+    let output = read_until_marker(&mut *reader, "AFTER_TOP", Duration::from_secs(12))
+        .expect("Expected shell to recover after top snapshot");
+
+    let _ = child.kill();
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+
+    assert!(output.contains("AFTER_TOP"), "Output: {output}");
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_fullscreen_man_quit_resume_shell() {
+    if !host_command_available("man") || !host_command_available("less") {
+        eprintln!("Skipping test: man/less not available");
+        return;
+    }
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer
+        .write_all(b"man sh\n")
+        .expect("write man command");
+    writer.flush().expect("flush man command");
+    std::thread::sleep(Duration::from_millis(300));
+    writer.write_all(b"q").expect("send q to man pager");
+    writer.flush().expect("flush q");
+
+    writer
+        .write_all(b"echo AFTER_MAN\n")
+        .expect("write post-man marker");
+    writer.flush().expect("flush post-man marker");
+
+    let output = read_until_marker(&mut *reader, "AFTER_MAN", Duration::from_secs(12))
+        .expect("Expected shell to recover after man exits");
+
+    let _ = child.kill();
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+
+    assert!(output.contains("AFTER_MAN"), "Output: {output}");
 }
 
 #[test]
