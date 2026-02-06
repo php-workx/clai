@@ -13,7 +13,7 @@
 //! - `CLAI_HOTKEY`: override default hotkey chord
 //! - `CLAI_SOCKET`: override daemon socket path
 
-use clap::{Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 
 /// Default buffer capacity in bytes (2 MiB)
@@ -46,7 +46,7 @@ pub struct Cli {
     pub shell: Option<PathBuf>,
 
     /// Launch as a login shell
-    #[arg(long, default_value_t = true)]
+    #[arg(long, default_value_t = true, action = ArgAction::Set)]
     pub login_shell: bool,
 
     /// Hotkey chord to trigger picker (e.g., "ctrl-\\ h")
@@ -391,9 +391,15 @@ mod tests {
     }
 
     #[test]
-    fn test_login_shell_flag() {
-        let cli = Cli::parse_from_args(["clai-wrap", "--login-shell"]);
+    fn test_login_shell_flag_true() {
+        let cli = Cli::parse_from_args(["clai-wrap", "--login-shell", "true"]);
         assert!(cli.login_shell);
+    }
+
+    #[test]
+    fn test_login_shell_flag_false() {
+        let cli = Cli::parse_from_args(["clai-wrap", "--login-shell", "false"]);
+        assert!(!cli.login_shell);
     }
 
     #[test]
