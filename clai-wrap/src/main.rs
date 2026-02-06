@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::mpsc;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 #[cfg(unix)]
@@ -15,15 +15,25 @@ use clai_wrap::alt_screen::{enter_alt_screen, AltScreenGuard};
 #[cfg(unix)]
 use clai_wrap::bracketed_paste::BracketedPasteTracker;
 use clai_wrap::cli::{Cli, Commands, OperationMode};
-use clai_wrap::denylist::Denylist;
+use clai_wrap::config::Config;
+#[cfg(unix)]
+use clai_wrap::echo_gap::EchoGapDetector;
 use clai_wrap::hotkey::HotkeyConfig;
+#[cfg(unix)]
+use clai_wrap::process_detect::get_foreground_process_or;
 #[cfg(unix)]
 use clai_wrap::hotkey::CHORD_COMPLETIONS_BYTE;
 #[cfg(unix)]
 use clai_wrap::input_router::{InputEvent, InputRouter};
 #[cfg(unix)]
 use clai_wrap::io_threads::{IoEvent, IoThreads};
-use clai_wrap::osc133::Osc133Parser;
+use clai_wrap::osc133::{Osc133Parser, Osc133State};
+#[cfg(unix)]
+use clai_wrap::output_capture::OutputCapture;
+#[cfg(unix)]
+use clai_wrap::suggestion_receiver::SuggestionReceiver;
+#[cfg(unix)]
+use clai_wrap::assistant_comment::{CommentManager, CommentRenderer, Shell};
 #[cfg(unix)]
 use clai_wrap::picker::Picker;
 use clai_wrap::pty_host::PtyHost;
@@ -172,6 +182,14 @@ fn run_full_mode(cli: &Cli) -> Result<()> {
 /// Run in standalone mode without daemon connection
 #[cfg(unix)]
 fn run_standalone_mode(cli: &Cli) -> Result<()> {
+    // Load config file and merge with CLI arguments (CLI wins)
+    let config = Config::load_and_merge(cli);
+    if let Some(ref path) = config.config_path {
+        info!("Loaded configuration from {:?}", path);
+    }
+    debug!("Merged config: hotkey={:?}, buffer_capacity={}, execute_on_select={}",
+        config.hotkey, config.buffer_capacity, config.execute_on_select);
+
     // Get shell path
     let shell_path = cli.shell_path();
     debug!("Using shell: {:?}", shell_path);
@@ -185,14 +203,38 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
         );
     }
 
-    // Initialize denylist for privacy gate
-    let _denylist = Denylist::with_defaults();
+    // Initialize denylist for privacy gate (from merged config)
+    let denylist = config.denylist.clone();
 
-    // Create PTY and spawn shell
-    let mut pty_host = PtyHost::new_with_login(Some(shell_path.clone()), cli.login_shell)
-        .context("Failed to create PTY")?;
+    // Set up shell injection for OSC 133 hooks
+    let shell_inject = setup_shell_injection(&shell_path);
+
+    // Create PTY and spawn shell (with injection args/env if available)
+    let (extra_args, extra_env) = match &shell_inject {
+        Some(ShellInjection::Bash(ref injector)) => {
+            (injector.shell_args(), Vec::new())
+        }
+        Some(ShellInjection::Zsh(ref injector)) => {
+            (Vec::new(), injector.env_vars())
+        }
+        Some(ShellInjection::Fish(ref injector)) => {
+            (injector.shell_args(), Vec::new())
+        }
+        None => (Vec::new(), Vec::new()),
+    };
+
+    let mut pty_host = PtyHost::new_with_inject(
+        Some(shell_path.clone()),
+        cli.login_shell,
+        &extra_args,
+        &extra_env,
+    )
+    .context("Failed to create PTY")?;
 
     info!("Shell spawned with PID: {:?}", pty_host.child_pid());
+
+    // Get master PTY fd for process detection
+    let master_fd = pty_host.master_fd();
 
     // Get PTY reader and writer
     let pty_reader = pty_host.reader().context("Failed to get PTY reader")?;
@@ -208,21 +250,35 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
     let resize_handler = Arc::new(ResizeHandler::new());
 
     // Create event-driven I/O threads so stdin and PTY output are handled without blocking.
-    let buffer_cap = if cli.buffer_cap > 0 {
-        cli.buffer_cap
+    let buffer_cap = if config.buffer_capacity > 0 {
+        config.buffer_capacity
     } else {
         DEFAULT_BUFFER_CAP
     };
     let mut io_threads = IoThreads::new(pty_reader, pty_writer, buffer_cap)
         .context("Failed to start I/O threads")?;
 
-    let hotkey_config = build_hotkey_config(cli);
+    let hotkey_config = build_hotkey_config_from(&config, cli);
     let (input_event_tx, input_event_rx) = mpsc::channel();
     let mut input_router = InputRouter::new(hotkey_config, input_event_tx);
 
     // Create OSC 133 parser for command tracking
     let mut osc133_parser = Osc133Parser::new();
     let mut bracketed_paste = BracketedPasteTracker::new();
+
+    // Create echo-gap detector for password prompt detection (Privacy Gate 2)
+    let mut echo_gap = EchoGapDetector::new(clai_wrap::echo_gap::DEFAULT_THRESHOLD_MS);
+
+    // Create output capture buffer for AI analysis
+    let mut output_capture = OutputCapture::new(buffer_cap);
+
+    // Create suggestion receiver for daemon suggestions (no-op in standalone mode)
+    let mut suggestion_receiver = SuggestionReceiver::new();
+
+    // Create comment renderer and manager for displaying assistant comments
+    let shell_type = Shell::from_shell_path(&shell_path.to_string_lossy());
+    let comment_renderer = CommentRenderer::new(shell_type);
+    let mut comment_manager = CommentManager::with_renderer(comment_renderer);
 
     // Create selection injector
     let mut selection_injector = SelectionInjector::new();
@@ -232,6 +288,7 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
     let mut picker_session = None;
     let mut ui_picker_parser = PickerInputParser::default();
     let mut child_exit_status = None;
+    let mut command_counter: u64 = 0;
 
     loop {
         // Check for signals
@@ -275,6 +332,14 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
             }
         }
 
+        // Check echo-gap timeout for password prompt detection
+        if echo_gap.check_timeout(Instant::now()) && echo_gap.is_secure_mode() {
+            debug!(
+                "Echo-gap: entered secure mode, {} byte(s) to scrub",
+                echo_gap.bytes_to_scrub()
+            );
+        }
+
         // Check for child exit
         if let Ok(Some(status)) = pty_host.try_wait() {
             info!("Shell exited with status: {:?}", status.code());
@@ -286,9 +351,17 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
             handle_io_event(
                 event,
                 cli,
+                &config,
+                master_fd,
+                &denylist,
                 &mut io_threads,
                 &mut osc133_parser,
                 &mut bracketed_paste,
+                &mut echo_gap,
+                &mut output_capture,
+                &mut command_counter,
+                &mut suggestion_receiver,
+                &mut comment_manager,
                 &mut selection_injector,
                 &mut input_router,
                 &input_event_rx,
@@ -303,9 +376,17 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
             handle_io_event(
                 event,
                 cli,
+                &config,
+                master_fd,
+                &denylist,
                 &mut io_threads,
                 &mut osc133_parser,
                 &mut bracketed_paste,
+                &mut echo_gap,
+                &mut output_capture,
+                &mut command_counter,
+                &mut suggestion_receiver,
+                &mut comment_manager,
                 &mut selection_injector,
                 &mut input_router,
                 &input_event_rx,
@@ -320,7 +401,7 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
         if let Some(session) = picker_session.as_mut() {
             for key in ui_picker_parser.check_timeout() {
                 let should_close =
-                    handle_picker_key(key, session, &io_threads, &selection_injector, cli)?;
+                    handle_picker_key(key, session, &io_threads, &selection_injector, &config)?;
                 if should_close {
                     close_picker_session(&mut picker_session, &mut io_threads, &mut stdout)?;
                     break;
@@ -357,12 +438,21 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
 }
 
 #[cfg(unix)]
+#[allow(clippy::too_many_arguments)]
 fn handle_io_event(
     event: IoEvent,
     cli: &Cli,
+    config: &Config,
+    master_fd: Option<std::os::unix::io::RawFd>,
+    denylist: &clai_wrap::denylist::Denylist,
     io_threads: &mut IoThreads,
     osc133_parser: &mut Osc133Parser,
     bracketed_paste: &mut BracketedPasteTracker,
+    echo_gap: &mut EchoGapDetector,
+    output_capture: &mut OutputCapture,
+    command_counter: &mut u64,
+    suggestion_receiver: &mut SuggestionReceiver,
+    comment_manager: &mut CommentManager,
     selection_injector: &mut SelectionInjector,
     input_router: &mut InputRouter,
     input_event_rx: &std::sync::mpsc::Receiver<InputEvent>,
@@ -373,9 +463,92 @@ fn handle_io_event(
 ) -> Result<()> {
     match event {
         IoEvent::PtyOutput(data) => {
+            let prev_osc_state = osc133_parser.current_state().clone();
             osc133_parser.process_bytes(&data);
             bracketed_paste.update_from_output(&data);
             selection_injector.sync_with_tracker(bracketed_paste);
+
+            // Handle OSC 133 state transitions for output capture and denylist
+            let new_osc_state = osc133_parser.current_state();
+            if *new_osc_state != prev_osc_state {
+                match new_osc_state {
+                    Osc133State::Output => {
+                        // Command started executing — check denylist
+                        let denied = if let Some(fd) = master_fd {
+                            let fg_process = get_foreground_process_or(fd, "shell");
+                            let is_denied = denylist.is_denied(&fg_process);
+                            if is_denied {
+                                debug!("Privacy gate: foreground process {:?} is denylisted, capture disabled", fg_process);
+                                output_capture.disable();
+                            }
+                            is_denied
+                        } else {
+                            false
+                        };
+
+                        if !denied {
+                            *command_counter += 1;
+                            let cmd_id = format!("cmd-{command_counter}");
+                            output_capture.start_capture(&cmd_id);
+                        }
+                    }
+                    Osc133State::Finished(_) | Osc133State::Prompt => {
+                        // Command finished or new prompt — stop capture
+                        let finished_cmd_id = if let Some(captured) = output_capture.stop_capture() {
+                            debug!(
+                                "Captured {} bytes for {} (truncated: {}, duration: {:?})",
+                                captured.len(),
+                                captured.command_id,
+                                captured.truncated,
+                                captured.duration,
+                            );
+                            Some(captured.command_id.clone())
+                        } else {
+                            None
+                        };
+                        // Re-enable capture if it was disabled by denylist
+                        if !output_capture.is_enabled() {
+                            output_capture.enable();
+                        }
+
+                        // Check for suggestions for the finished command and render as comments
+                        if let Some(ref cmd_id) = finished_cmd_id {
+                            let suggestions = suggestion_receiver.suggestions_for_command(cmd_id);
+                            for suggestion in suggestions {
+                                comment_manager.add_from_suggestion(suggestion);
+                            }
+                            // Render shell comments for this command to PTY output
+                            let shell_output = comment_manager.render_shell_comments_for_command(cmd_id);
+                            if !shell_output.is_empty() && picker_session.is_none() {
+                                let comment_bytes = format!("\n{shell_output}\n");
+                                stdout.write_all(comment_bytes.as_bytes())?;
+                                stdout.flush()?;
+                                debug!("Rendered assistant comment for {}", cmd_id);
+                            }
+                            // Clean up rendered suggestions and comments
+                            suggestion_receiver.remove_suggestions_for_command(cmd_id);
+                            comment_manager.remove_for_command(cmd_id);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // Feed output bytes to capture buffer and echo-gap detector
+            output_capture.push(&data);
+            let now = Instant::now();
+            for &byte in &data {
+                echo_gap.record_output(byte, now);
+            }
+
+            // Scrub captured output if echo-gap enters secure mode
+            if echo_gap.is_secure_mode() && echo_gap.bytes_to_scrub() > 0 {
+                output_capture.disable();
+                debug!(
+                    "Echo-gap secure mode: disabled output capture, {} bytes to scrub",
+                    echo_gap.bytes_to_scrub()
+                );
+            }
 
             if picker_session.is_some() {
                 io_threads.buffer_output(&data);
@@ -385,10 +558,16 @@ fn handle_io_event(
             }
         }
         IoEvent::StdinInput(data) => {
+            // Feed input bytes to echo-gap detector
+            let now = Instant::now();
+            for &byte in &data {
+                echo_gap.record_input(byte, now);
+            }
+
             if let Some(session) = picker_session.as_mut() {
                 for key in ui_picker_parser.feed(&data) {
                     let should_close =
-                        handle_picker_key(key, session, io_threads, selection_injector, cli)?;
+                        handle_picker_key(key, session, io_threads, selection_injector, config)?;
                     if should_close {
                         close_picker_session(picker_session, io_threads, stdout)?;
                         break;
@@ -489,26 +668,26 @@ fn close_picker_session(
 }
 
 #[cfg(unix)]
-fn build_hotkey_config(cli: &Cli) -> HotkeyConfig {
+fn build_hotkey_config_from(config: &Config, cli: &Cli) -> HotkeyConfig {
     let mut hotkey_config = HotkeyConfig {
         timeout: Duration::from_millis(cli.hotkey_timeout),
         ..Default::default()
     };
 
-    if let Some(spec) = cli.hotkey.as_deref() {
-        if let Some((first_byte, second_byte)) = parse_hotkey_spec(spec) {
-            hotkey_config.first_byte = first_byte;
-            hotkey_config.history_byte = second_byte;
-            hotkey_config.completions_byte = CHORD_COMPLETIONS_BYTE;
-            debug!(
-                "Using custom hotkey chord: first=0x{first_byte:02x}, second=0x{second_byte:02x}"
-            );
-        } else {
-            warn!(
-                "Invalid --hotkey value {:?}; expected format like \"ctrl-\\\\ h\"",
-                spec
-            );
-        }
+    let spec = &config.hotkey;
+    if let Some((first_byte, second_byte)) = parse_hotkey_spec(spec) {
+        hotkey_config.first_byte = first_byte;
+        hotkey_config.history_byte = second_byte;
+        hotkey_config.completions_byte = CHORD_COMPLETIONS_BYTE;
+        debug!(
+            "Using custom hotkey chord: first=0x{first_byte:02x}, second=0x{second_byte:02x}"
+        );
+    } else if spec != clai_wrap::config::DEFAULT_HOTKEY {
+        // Only warn if the user explicitly set a non-default hotkey that's invalid
+        warn!(
+            "Invalid hotkey value {:?}; expected format like \"ctrl-\\\\ h\"",
+            spec
+        );
     }
 
     hotkey_config
@@ -736,7 +915,7 @@ fn handle_picker_key(
     session: &mut PickerSession,
     io_threads: &IoThreads,
     selection_injector: &SelectionInjector,
-    cli: &Cli,
+    config: &Config,
 ) -> Result<bool> {
     match key {
         PickerKey::Up => {
@@ -763,7 +942,7 @@ fn handle_picker_key(
         PickerKey::Enter => {
             if let Some(selection) = session.picker.selected_item().map(|item| item.text.clone()) {
                 let mut injected = Vec::new();
-                if cli.execute_on_select {
+                if config.execute_on_select {
                     selection_injector
                         .inject_with_execute(&mut injected, &selection)
                         .context("Failed to inject selected command with execute")?;
@@ -896,6 +1075,68 @@ fn init_standalone_history(cli: &Cli, shell_path: &Path) -> Result<StandaloneSta
     Ok(state)
 }
 
+/// Shell injection types for OSC 133 hook scripts.
+#[cfg(unix)]
+#[allow(dead_code)]
+enum ShellInjection {
+    Bash(clai_wrap::shell_inject::BashInjector),
+    Zsh(clai_wrap::shell_inject::ZshInjector),
+    Fish(clai_wrap::shell_inject::FishInjector),
+}
+
+/// Detect the shell type and create the appropriate injector.
+///
+/// Returns `None` if the shell is not supported or injection fails.
+#[cfg(unix)]
+fn setup_shell_injection(shell_path: &Path) -> Option<ShellInjection> {
+    let shell_name = shell_path
+        .file_name()
+        .and_then(|name| name.to_str())?;
+
+    match shell_name {
+        "bash" => {
+            match clai_wrap::shell_inject::BashInjector::new() {
+                Ok(injector) => {
+                    info!("Shell injection: bash OSC 133 hooks enabled");
+                    Some(ShellInjection::Bash(injector))
+                }
+                Err(e) => {
+                    warn!("Failed to create bash injector: {e}");
+                    None
+                }
+            }
+        }
+        "zsh" => {
+            match clai_wrap::shell_inject::ZshInjector::new() {
+                Ok(injector) => {
+                    info!("Shell injection: zsh OSC 133 hooks enabled");
+                    Some(ShellInjection::Zsh(injector))
+                }
+                Err(e) => {
+                    warn!("Failed to create zsh injector: {e}");
+                    None
+                }
+            }
+        }
+        "fish" => {
+            match clai_wrap::shell_inject::FishInjector::new() {
+                Ok(injector) => {
+                    info!("Shell injection: fish OSC 133 hooks enabled");
+                    Some(ShellInjection::Fish(injector))
+                }
+                Err(e) => {
+                    warn!("Failed to create fish injector: {e}");
+                    None
+                }
+            }
+        }
+        _ => {
+            debug!("Shell injection: no injector for shell {:?}", shell_name);
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1022,11 +1263,12 @@ mod tests {
             "77",
         ]);
 
-        let config = build_hotkey_config(&cli);
-        assert_eq!(config.first_byte, 0x1d);
-        assert_eq!(config.history_byte, b'h');
-        assert_eq!(config.completions_byte, CHORD_COMPLETIONS_BYTE);
-        assert_eq!(config.timeout, Duration::from_millis(77));
+        let config = Config::load_and_merge(&cli);
+        let hotkey = build_hotkey_config_from(&config, &cli);
+        assert_eq!(hotkey.first_byte, 0x1d);
+        assert_eq!(hotkey.history_byte, b'h');
+        assert_eq!(hotkey.completions_byte, CHORD_COMPLETIONS_BYTE);
+        assert_eq!(hotkey.timeout, Duration::from_millis(77));
     }
 
     #[test]

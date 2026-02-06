@@ -89,11 +89,42 @@ impl PtyHost {
         Self::with_size_and_login(shell_path, size, true)
     }
 
+    /// Creates a new PTY Host with extra arguments and environment variables.
+    ///
+    /// This is used for shell injection (OSC 133 hooks) where additional
+    /// args (e.g., `--rcfile`) and env vars (e.g., `ZDOTDIR`) are needed.
+    ///
+    /// # Arguments
+    ///
+    /// * `shell_path` - Optional path to the shell to spawn.
+    /// * `login_shell` - Whether to pass `-l` to the shell process.
+    /// * `extra_args` - Additional arguments to pass to the shell.
+    /// * `extra_env` - Additional environment variables to set.
+    pub fn new_with_inject(
+        shell_path: Option<PathBuf>,
+        login_shell: bool,
+        extra_args: &[String],
+        extra_env: &[(String, String)],
+    ) -> Result<Self> {
+        Self::with_size_login_and_inject(shell_path, None, login_shell, extra_args, extra_env)
+    }
+
     /// Internal constructor that controls both PTY size and login-shell behavior.
     fn with_size_and_login(
         shell_path: Option<PathBuf>,
         size: Option<PtySize>,
         login_shell: bool,
+    ) -> Result<Self> {
+        Self::with_size_login_and_inject(shell_path, size, login_shell, &[], &[])
+    }
+
+    /// Internal constructor with all options.
+    fn with_size_login_and_inject(
+        shell_path: Option<PathBuf>,
+        size: Option<PtySize>,
+        login_shell: bool,
+        extra_args: &[String],
+        extra_env: &[(String, String)],
     ) -> Result<Self> {
         // Determine terminal size
         let pty_size = size.unwrap_or_else(|| {
@@ -124,6 +155,11 @@ impl PtyHost {
             cmd.arg("-l");
         }
 
+        // Add extra arguments from shell injection
+        for arg in extra_args {
+            cmd.arg(arg);
+        }
+
         // Set CLAI_WRAP=1 environment variable
         cmd.env(CLAI_WRAP_ENV_VAR, "1");
 
@@ -133,6 +169,11 @@ impl PtyHost {
             if key != CLAI_WRAP_ENV_VAR {
                 cmd.env(key, value);
             }
+        }
+
+        // Set extra environment variables from shell injection
+        for (key, value) in extra_env {
+            cmd.env(key, value);
         }
 
         // Spawn the shell in the PTY
@@ -255,6 +296,19 @@ impl PtyHost {
     /// The child process ID, or `None` if it cannot be determined.
     pub fn child_pid(&self) -> Option<u32> {
         self.child.process_id()
+    }
+
+    /// Returns the raw file descriptor of the master PTY (Unix only).
+    ///
+    /// This is needed for process detection via `tcgetpgrp()`.
+    ///
+    /// # Returns
+    ///
+    /// The master PTY file descriptor, or `None` if not available.
+    #[cfg(unix)]
+    #[must_use]
+    pub fn master_fd(&self) -> Option<std::os::unix::io::RawFd> {
+        self.master.as_raw_fd()
     }
 }
 
