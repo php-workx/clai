@@ -21,6 +21,12 @@ export CLAI_CURRENT_SHELL=bash
 : ${CLAI_MENU_LIMIT:=5}
 : ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
 
+# Only initialize in interactive shells.
+# This avoids installing hooks in non-interactive contexts like `bash -c` or scripts.
+if [[ $- != *i* ]]; then
+    return 0 2>/dev/null || exit 0
+fi
+
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
 
