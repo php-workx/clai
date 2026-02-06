@@ -145,3 +145,42 @@ func LogSQLiteError(logger *slog.Logger, operation string, err error) {
 func LogFTS5Unavailable(logger *slog.Logger) {
 	logger.Warn("FTS5 not available; history search disabled")
 }
+
+// LogCorruptionDetected logs when database corruption is detected.
+func LogCorruptionDetected(logger *slog.Logger, dbPath string, reason string) {
+	logger.Error("database corruption detected",
+		"database_path", dbPath,
+		"reason", reason,
+	)
+}
+
+// LogCorruptionRecovered logs successful corruption recovery.
+func LogCorruptionRecovered(logger *slog.Logger, dbPath string, backupPath string) {
+	logger.Info("database corruption recovered",
+		"database_path", dbPath,
+		"backup_path", backupPath,
+	)
+}
+
+// LogCorruptionRecoveryFailed logs when corruption recovery fails.
+func LogCorruptionRecoveryFailed(logger *slog.Logger, dbPath string, err error) {
+	logger.Error("database corruption recovery failed",
+		"database_path", dbPath,
+		"error", err,
+	)
+}
+
+// LogIntegrityCheckPassed logs when an integrity check passes.
+func LogIntegrityCheckPassed(logger *slog.Logger, dbPath string) {
+	logger.Debug("database integrity check passed",
+		"database_path", dbPath,
+	)
+}
+
+// LogIntegrityCheckFailed logs when an integrity check fails.
+func LogIntegrityCheckFailed(logger *slog.Logger, dbPath string, err error) {
+	logger.Error("database integrity check failed",
+		"database_path", dbPath,
+		"error", err,
+	)
+}

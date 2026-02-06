@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -57,6 +58,21 @@ type Options struct {
 	// UseV1 opens the V1 database (suggestions.db) instead of V2.
 	// This is for backward compatibility with existing V1 data.
 	UseV1 bool
+
+	// EnableRecovery enables automatic corruption recovery for V2 databases.
+	// When enabled, if corruption is detected during Open, the database files
+	// are rotated to .corrupt.<timestamp> and a fresh database is initialized.
+	// This is only supported for V2 databases (ignored when UseV1 is true).
+	EnableRecovery bool
+
+	// RunIntegrityCheck runs PRAGMA integrity_check after opening the database.
+	// This is only used when EnableRecovery is true; if the integrity check
+	// fails, corruption recovery is triggered.
+	RunIntegrityCheck bool
+
+	// Logger is the structured logger for recovery events.
+	// If nil, slog.Default() is used for recovery logging.
+	Logger *slog.Logger
 }
 
 // DefaultDBPath returns the default V2 database path (~/.clai/suggestions_v2.db).
@@ -80,6 +96,10 @@ func DefaultV1DBPath() (string, error) {
 
 // Open opens the database, acquires the daemon lock, and runs migrations.
 // The caller must call Close() when done.
+//
+// When EnableRecovery is true (V2 only), corruption detected during open or
+// migration triggers automatic recovery: corrupt files are rotated to
+// .corrupt.<timestamp> and a fresh database is initialized.
 func Open(ctx context.Context, opts Options) (*DB, error) {
 	// Determine database path
 	dbPath := opts.Path
@@ -116,55 +136,55 @@ func Open(ctx context.Context, opts Options) (*DB, error) {
 		}
 	}
 
-	// Build connection string with pragmas
-	// modernc.org/sqlite uses _pragma=name(value) syntax
-	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)", dbPath)
-	if opts.ReadOnly {
-		dsn += "&mode=ro"
-	}
-
-	db, err := sql.Open("sqlite", dsn)
+	// Attempt to open and initialize the database
+	sqlDB, err := openAndInit(ctx, dbPath, opts)
 	if err != nil {
-		if lock != nil {
-			lock.Release()
-		}
-		return nil, fmt.Errorf("failed to open database: %w", err)
-	}
+		// Check if recovery is applicable:
+		// - Recovery must be enabled
+		// - Must be V2 database (not V1)
+		// - Error must be corruption (not permission/disk-full)
+		canRecover := opts.EnableRecovery && !opts.UseV1 && !opts.ReadOnly
+		if canRecover && isCorruptionError(err) && !isPermissionError(err) && !isDiskFullError(err) {
+			logger := opts.Logger
+			if logger == nil {
+				logger = slog.Default()
+			}
 
-	// Configure connection pool
-	// SQLite handles concurrency better with single writer
-	db.SetMaxOpenConns(1)
-	db.SetMaxIdleConns(1)
-	db.SetConnMaxLifetime(0) // Don't close connections
-
-	// Ping to establish connection and ensure pragmas are applied
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		if lock != nil {
-			lock.Release()
-		}
-		return nil, fmt.Errorf("failed to connect to database: %w", err)
-	}
-
-	// Run migrations (unless read-only)
-	if !opts.ReadOnly {
-		var migErr error
-		if opts.UseV1 {
-			migErr = RunMigrations(ctx, db)
+			sqlDB, err = recoverAndReopen(ctx, dbPath, sqlDB, err.Error(), logger)
+			if err != nil {
+				if lock != nil {
+					lock.Release()
+				}
+				return nil, fmt.Errorf("recovery failed: %w", err)
+			}
 		} else {
-			migErr = RunV2Migrations(ctx, db)
-		}
-		if migErr != nil {
-			db.Close()
 			if lock != nil {
 				lock.Release()
 			}
-			return nil, fmt.Errorf("failed to run migrations: %w", migErr)
+			return nil, err
+		}
+	}
+
+	// Run optional integrity check (only when recovery is enabled for V2)
+	if opts.EnableRecovery && opts.RunIntegrityCheck && !opts.UseV1 && !opts.ReadOnly {
+		if intErr := RunIntegrityCheck(ctx, sqlDB); intErr != nil {
+			logger := opts.Logger
+			if logger == nil {
+				logger = slog.Default()
+			}
+
+			sqlDB, err = recoverAndReopen(ctx, dbPath, sqlDB, intErr.Error(), logger)
+			if err != nil {
+				if lock != nil {
+					lock.Release()
+				}
+				return nil, fmt.Errorf("integrity check recovery failed: %w", err)
+			}
 		}
 	}
 
 	d := &DB{
-		db:        db,
+		db:        sqlDB,
 		lock:      lock,
 		dbPath:    dbPath,
 		stopCh:    make(chan struct{}),
@@ -180,6 +200,50 @@ func Open(ctx context.Context, opts Options) (*DB, error) {
 	}
 
 	return d, nil
+}
+
+// openAndInit opens the SQLite database, configures it, pings it, and
+// runs migrations. It is extracted from Open to allow recovery to call it.
+func openAndInit(ctx context.Context, dbPath string, opts Options) (*sql.DB, error) {
+	// Build connection string with pragmas
+	// modernc.org/sqlite uses _pragma=name(value) syntax
+	dsn := fmt.Sprintf("file:%s?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_pragma=foreign_keys(1)", dbPath)
+	if opts.ReadOnly {
+		dsn += "&mode=ro"
+	}
+
+	db, err := sql.Open("sqlite", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	// Configure connection pool
+	// SQLite handles concurrency better with single writer
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	db.SetConnMaxLifetime(0) // Don't close connections
+
+	// Ping to establish connection and ensure pragmas are applied
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	// Run migrations (unless read-only)
+	if !opts.ReadOnly {
+		var migErr error
+		if opts.UseV1 {
+			migErr = RunMigrations(ctx, db)
+		} else {
+			migErr = RunV2Migrations(ctx, db)
+		}
+		if migErr != nil {
+			db.Close()
+			return nil, fmt.Errorf("failed to run migrations: %w", migErr)
+		}
+	}
+
+	return db, nil
 }
 
 // Close closes the database connection and releases the daemon lock.

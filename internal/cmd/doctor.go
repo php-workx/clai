@@ -10,6 +10,7 @@ import (
 
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/daemon"
+	"github.com/runger/clai/internal/suggestions/db"
 )
 
 var doctorCmd = &cobra.Command{
@@ -61,6 +62,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 
 	// Check AI providers
 	results = append(results, checkAIProviders()...)
+
+	// Check corruption history
+	results = append(results, checkCorruptionHistory()...)
 
 	// Print results
 	hasErrors := false
@@ -235,6 +239,58 @@ func checkAIProviders() []checkResult {
 			message: claudePath,
 		})
 	}
+
+	return results
+}
+
+func checkCorruptionHistory() []checkResult {
+	var results []checkResult
+
+	historyPath, err := db.CorruptionHistoryPath()
+	if err != nil {
+		results = append(results, checkResult{
+			name:    "DB corruption history",
+			status:  "warn",
+			message: fmt.Sprintf("Could not determine history path: %v", err),
+		})
+		return results
+	}
+
+	history, err := db.LoadCorruptionHistory(historyPath)
+	if err != nil {
+		results = append(results, checkResult{
+			name:    "DB corruption history",
+			status:  "warn",
+			message: fmt.Sprintf("Could not load history: %v", err),
+		})
+		return results
+	}
+
+	if len(history.Events) == 0 {
+		results = append(results, checkResult{
+			name:    "DB corruption history",
+			status:  "ok",
+			message: "No corruption events recorded",
+		})
+		return results
+	}
+
+	// Report the most recent event
+	latest := history.Events[len(history.Events)-1]
+	statusStr := "warn"
+	if !latest.RecoverySuccess {
+		statusStr = "error"
+	}
+
+	results = append(results, checkResult{
+		name:   "DB corruption history",
+		status: statusStr,
+		message: fmt.Sprintf("%d event(s); latest: %s (%s)",
+			len(history.Events),
+			latest.Timestamp.Format("2006-01-02 15:04:05"),
+			latest.Reason,
+		),
+	})
 
 	return results
 }
