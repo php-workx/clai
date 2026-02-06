@@ -151,6 +151,74 @@ func TestTransitionStore_RecordTransitionBoth(t *testing.T) {
 	})
 }
 
+func TestTransitionStore_RecordTransitionAll(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDBWithTransitions(t)
+	ts, err := NewTransitionStore(db)
+	require.NoError(t, err)
+	defer ts.Close()
+
+	ctx := context.Background()
+
+	t.Run("updates global, repo, and dir scopes", func(t *testing.T) {
+		repoKey := "sha256:testrepo"
+		dirKey := "dir:abc123"
+		err := ts.RecordTransitionAll(ctx, "go build", "go test", repoKey, dirKey, 10000)
+		require.NoError(t, err)
+
+		// Check global scope
+		globalCount, err := ts.GetTransitionCount(ctx, ScopeGlobal, "go build", "go test")
+		require.NoError(t, err)
+		assert.Equal(t, 1, globalCount)
+
+		// Check repo scope
+		repoCount, err := ts.GetTransitionCount(ctx, repoKey, "go build", "go test")
+		require.NoError(t, err)
+		assert.Equal(t, 1, repoCount)
+
+		// Check dir scope
+		dirCount, err := ts.GetTransitionCount(ctx, dirKey, "go build", "go test")
+		require.NoError(t, err)
+		assert.Equal(t, 1, dirCount)
+	})
+
+	t.Run("empty dir scope key skips dir update", func(t *testing.T) {
+		repoKey := "sha256:testrepo2"
+		err := ts.RecordTransitionAll(ctx, "npm install", "npm test", repoKey, "", 11000)
+		require.NoError(t, err)
+
+		globalCount, err := ts.GetTransitionCount(ctx, ScopeGlobal, "npm install", "npm test")
+		require.NoError(t, err)
+		assert.Equal(t, 1, globalCount)
+
+		repoCount, err := ts.GetTransitionCount(ctx, repoKey, "npm install", "npm test")
+		require.NoError(t, err)
+		assert.Equal(t, 1, repoCount)
+	})
+
+	t.Run("empty repo and dir keys only updates global", func(t *testing.T) {
+		err := ts.RecordTransitionAll(ctx, "whoami", "pwd", "", "", 12000)
+		require.NoError(t, err)
+
+		globalCount, err := ts.GetTransitionCount(ctx, ScopeGlobal, "whoami", "pwd")
+		require.NoError(t, err)
+		assert.Equal(t, 1, globalCount)
+	})
+
+	t.Run("accumulates across multiple calls", func(t *testing.T) {
+		dirKey := "dir:accum"
+		for i := 0; i < 3; i++ {
+			err := ts.RecordTransitionAll(ctx, "make lint", "make test", "sha256:accrepo", dirKey, 20000)
+			require.NoError(t, err)
+		}
+
+		dirCount, err := ts.GetTransitionCount(ctx, dirKey, "make lint", "make test")
+		require.NoError(t, err)
+		assert.Equal(t, 3, dirCount)
+	})
+}
+
 func TestTransitionStore_GetPreviousCommand(t *testing.T) {
 	t.Parallel()
 
@@ -215,24 +283,21 @@ func TestTransitionStore_GetPreviousCommandWithFallback(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("prefers session match", func(t *testing.T) {
-		// session1 has a command, should return it
 		prev, err := ts.GetPreviousCommandWithFallback(ctx, "session1", "repo1", 5000, 60000)
 		require.NoError(t, err)
 		assert.Equal(t, "git status", prev)
 	})
 
 	t.Run("falls back to repo when no session match", func(t *testing.T) {
-		// session3 has no commands, should fallback to repo1's most recent
 		prev, err := ts.GetPreviousCommandWithFallback(ctx, "session3", "repo1", 5000, 60000)
 		require.NoError(t, err)
 		assert.Equal(t, "make build", prev)
 	})
 
 	t.Run("respects fallback window", func(t *testing.T) {
-		// With a small window, older commands won't be found
 		prev, err := ts.GetPreviousCommandWithFallback(ctx, "session3", "repo1", 5000, 1000)
 		require.NoError(t, err)
-		assert.Equal(t, "", prev) // 5000 - 1000 = 4000, command at 2000 is outside window
+		assert.Equal(t, "", prev)
 	})
 
 	t.Run("returns empty when no repo key", func(t *testing.T) {
@@ -253,10 +318,6 @@ func TestTransitionStore_GetTopNextCommands(t *testing.T) {
 	ctx := context.Background()
 	baseTs := int64(1000000)
 
-	// Record transitions with different frequencies
-	// git status -> git add (3 times)
-	// git status -> git commit (2 times)
-	// git status -> git diff (1 time)
 	for i := 0; i < 3; i++ {
 		require.NoError(t, ts.RecordTransition(ctx, ScopeGlobal, "git status", "git add", baseTs+int64(i*100)))
 	}
@@ -270,13 +331,10 @@ func TestTransitionStore_GetTopNextCommands(t *testing.T) {
 		require.NoError(t, err)
 
 		assert.Len(t, top, 3)
-		// git add has highest count (3)
 		assert.Equal(t, "git add", top[0].NextNorm)
 		assert.Equal(t, 3, top[0].Count)
-		// git commit has second highest (2)
 		assert.Equal(t, "git commit", top[1].NextNorm)
 		assert.Equal(t, 2, top[1].Count)
-		// git diff has lowest (1)
 		assert.Equal(t, "git diff", top[2].NextNorm)
 		assert.Equal(t, 1, top[2].Count)
 	})
@@ -284,14 +342,12 @@ func TestTransitionStore_GetTopNextCommands(t *testing.T) {
 	t.Run("respects limit", func(t *testing.T) {
 		top, err := ts.GetTopNextCommands(ctx, ScopeGlobal, "git status", 2)
 		require.NoError(t, err)
-
 		assert.Len(t, top, 2)
 	})
 
 	t.Run("returns empty for nonexistent prev command", func(t *testing.T) {
 		top, err := ts.GetTopNextCommands(ctx, ScopeGlobal, "nonexistent", 10)
 		require.NoError(t, err)
-
 		assert.Empty(t, top)
 	})
 }

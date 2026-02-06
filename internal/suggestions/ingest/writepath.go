@@ -33,6 +33,9 @@ type CacheInvalidator interface {
 	Invalidate(sessionID string)
 }
 
+// DefaultPipelineMaxSegments is the default maximum number of pipeline segments to process.
+const DefaultPipelineMaxSegments = 8
+
 // WritePathConfig configures the write-path transaction orchestrator.
 type WritePathConfig struct {
 	// TauMs is the decay time constant in milliseconds for frequency scoring.
@@ -47,6 +50,10 @@ type WritePathConfig struct {
 	// Each entry is a list of slot indices (e.g., [0,1] to correlate slots 0 and 1).
 	// When empty, no slot correlations are tracked.
 	SlotCorrelationKeys [][]int
+
+	// PipelineMaxSegments is the maximum number of pipeline segments to process.
+	// Pipelines exceeding this are truncated. Default: DefaultPipelineMaxSegments (8).
+	PipelineMaxSegments int
 
 	// Cache is an optional cache invalidator. If set, it is called after commit.
 	Cache CacheInvalidator
@@ -199,7 +206,11 @@ func WritePath(ctx context.Context, db *sql.DB, wctx *WritePathContext, cfg Writ
 	// Step 9: Update pipeline tables (for compound commands)
 	segments := wctx.PreNorm.Segments
 	if len(segments) > 1 {
-		n, err := updatePipelineTables(ctx, tx, wctx, eventID)
+		maxSegments := cfg.PipelineMaxSegments
+		if maxSegments <= 0 {
+			maxSegments = DefaultPipelineMaxSegments
+		}
+		n, err := updatePipelineTables(ctx, tx, wctx, eventID, maxSegments)
 		if err != nil {
 			return nil, fmt.Errorf("step 9 (pipeline): %w", err)
 		}
@@ -692,10 +703,15 @@ func updateDirectoryScopedAggregates(ctx context.Context, tx *sql.Tx, wctx *Writ
 }
 
 // Step 9: Update pipeline tables (pipeline_event, pipeline_transition, pipeline_pattern)
-func updatePipelineTables(ctx context.Context, tx *sql.Tx, wctx *WritePathContext, eventID int64) (int, error) {
+func updatePipelineTables(ctx context.Context, tx *sql.Tx, wctx *WritePathContext, eventID int64, maxSegments int) (int, error) {
 	segments := wctx.PreNorm.Segments
 	if len(segments) <= 1 {
 		return 0, nil
+	}
+
+	// Enforce max segments bound
+	if maxSegments > 0 && len(segments) > maxSegments {
+		segments = segments[:maxSegments]
 	}
 
 	normalizer := normalize.NewNormalizer()

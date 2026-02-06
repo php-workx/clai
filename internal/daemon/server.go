@@ -20,6 +20,7 @@ import (
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
 	"github.com/runger/clai/internal/suggestions/feedback"
+	"github.com/runger/clai/internal/suggestions/maintenance"
 )
 
 // Version is set at build time
@@ -51,6 +52,9 @@ type Server struct {
 
 	// Feedback
 	feedbackStore *feedback.Store
+
+	// Maintenance
+	maintenanceRunner *maintenance.Runner
 
 	// Backpressure
 	ingestionQueue *IngestionQueue
@@ -84,6 +88,11 @@ type ServerConfig struct {
 
 	// FeedbackStore is the suggestion feedback store (optional)
 	FeedbackStore *feedback.Store
+
+	// MaintenanceRunner is the background maintenance goroutine (optional).
+	// If non-nil, the runner is started with the server and notified on each
+	// ingested command event for activity tracking.
+	MaintenanceRunner *maintenance.Runner
 
 	// ReloadFn is called on SIGHUP to reload configuration.
 	// If nil, SIGHUP is ignored.
@@ -135,19 +144,20 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 
 	now := time.Now()
 	return &Server{
-		store:          cfg.Store,
-		ranker:         ranker,
-		registry:       registry,
-		paths:          paths,
-		logger:         logger,
-		sessionManager: NewSessionManager(),
-		feedbackStore:  cfg.FeedbackStore,
-		startTime:      now,
-		lastActivity:   now,
-		idleTimeout:    idleTimeout,
-		shutdownChan:   make(chan struct{}),
-		ingestionQueue: ingestQueue,
-		circuitBreaker: cb,
+		store:             cfg.Store,
+		ranker:            ranker,
+		registry:          registry,
+		paths:             paths,
+		logger:            logger,
+		sessionManager:    NewSessionManager(),
+		feedbackStore:     cfg.FeedbackStore,
+		startTime:         now,
+		lastActivity:      now,
+		idleTimeout:       idleTimeout,
+		shutdownChan:      make(chan struct{}),
+		maintenanceRunner: cfg.MaintenanceRunner,
+		ingestionQueue:    ingestQueue,
+		circuitBreaker:    cb,
 	}, nil
 }
 
@@ -200,6 +210,15 @@ func (s *Server) Start(ctx context.Context) error {
 	// Start cache pruning
 	s.wg.Add(1)
 	go s.pruneCacheLoop(ctx)
+
+	// Start maintenance runner (if configured)
+	if s.maintenanceRunner != nil {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.maintenanceRunner.Run(ctx, s.shutdownChan)
+		}()
+	}
 
 	// Serve gRPC requests in a goroutine
 	errChan := make(chan error, 1)
@@ -286,11 +305,16 @@ func (s *Server) getLastActivity() time.Time {
 	return s.lastActivity
 }
 
-// incrementCommandsLogged safely increments the commands logged counter.
+// incrementCommandsLogged safely increments the commands logged counter
+// and notifies the maintenance runner (if configured) about the new event.
 func (s *Server) incrementCommandsLogged() {
 	s.mu.Lock()
 	s.commandsLogged++
 	s.mu.Unlock()
+
+	if s.maintenanceRunner != nil {
+		s.maintenanceRunner.RecordEvent()
+	}
 }
 
 // getCommandsLogged returns the number of commands logged.

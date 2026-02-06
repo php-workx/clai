@@ -163,6 +163,37 @@ func (fs *FrequencyStore) UpdateBoth(ctx context.Context, cmdNorm string, repoKe
 	return tx.Commit()
 }
 
+// UpdateAll updates global, repo-scoped, and directory-scoped scores in a single transaction.
+// This extends UpdateBoth by also recording the directory scope aggregate when dirScopeKey is non-empty.
+func (fs *FrequencyStore) UpdateAll(ctx context.Context, cmdNorm, repoKey, dirScopeKey string, nowMs int64) error {
+	tx, err := fs.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	// Update global scope
+	if err := fs.updateInTx(ctx, tx, ScopeGlobal, cmdNorm, nowMs); err != nil {
+		return err
+	}
+
+	// Update repo scope if provided
+	if repoKey != "" {
+		if err := fs.updateInTx(ctx, tx, repoKey, cmdNorm, nowMs); err != nil {
+			return err
+		}
+	}
+
+	// Update directory scope if provided
+	if dirScopeKey != "" {
+		if err := fs.updateInTx(ctx, tx, dirScopeKey, cmdNorm, nowMs); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 // updateInTx performs the score update within a transaction.
 func (fs *FrequencyStore) updateInTx(ctx context.Context, tx *sql.Tx, scope, cmdNorm string, nowMs int64) error {
 	// Get current score and timestamp

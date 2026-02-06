@@ -21,6 +21,11 @@ const (
 	DefaultWeightRepoFrequency    = 30
 	DefaultWeightProjectTask      = 20
 	DefaultWeightDangerous        = -50
+
+	// Directory-scoped weights. Dir scope has higher affinity than repo
+	// because it captures location-specific patterns within a repository.
+	DefaultWeightDirTransition = 90
+	DefaultWeightDirFrequency  = 40
 )
 
 // Default configuration.
@@ -40,6 +45,8 @@ const (
 	ReasonGlobalFrequency  = "global_freq"
 	ReasonProjectTask      = "project_task"
 	ReasonDangerous        = "dangerous"
+	ReasonDirTransition    = "dir_trans"
+	ReasonDirFrequency     = "dir_freq"
 )
 
 // Weights configures the scoring weights.
@@ -50,6 +57,8 @@ type Weights struct {
 	GlobalFrequency  float64
 	ProjectTask      float64
 	DangerousPenalty float64
+	DirTransition    float64
+	DirFrequency     float64
 }
 
 // DefaultWeights returns the default scoring weights per spec Section 11.4.
@@ -61,6 +70,8 @@ func DefaultWeights() Weights {
 		GlobalFrequency:  DefaultWeightRepoFrequency, // Same as repo
 		ProjectTask:      DefaultWeightProjectTask,
 		DangerousPenalty: DefaultWeightDangerous,
+		DirTransition:    DefaultWeightDirTransition,
+		DirFrequency:     DefaultWeightDirFrequency,
 	}
 }
 
@@ -97,6 +108,8 @@ type scoreInfo struct {
 	globalFrequency  float64
 	projectTask      float64
 	dangerous        float64
+	dirTransition    float64
+	dirFrequency     float64
 }
 
 // Scorer implements the multi-factor suggestion scoring algorithm.
@@ -156,15 +169,16 @@ func buildDangerousCommands() map[string]bool {
 
 // SuggestContext contains context for generating suggestions.
 type SuggestContext struct {
-	SessionID string
-	RepoKey   string
-	LastCmd   string // Last command (normalized)
-	Cwd       string
-	NowMs     int64
+	SessionID   string
+	RepoKey     string
+	LastCmd     string // Last command (normalized)
+	Cwd         string
+	NowMs       int64
+	DirScopeKey string // Directory scope key (from dirscope.ComputeScopeKey)
 }
 
 // Suggest generates scored suggestions based on the current context.
-// Per spec Section 11: combines transitions, frequency, project tasks.
+// Per spec Section 11: combines transitions, frequency, project tasks, and directory scope.
 func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Suggestion, error) {
 	if suggestCtx.NowMs == 0 {
 		suggestCtx.NowMs = time.Now().UnixMilli()
@@ -197,6 +211,18 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 		}
 	}
 
+	// 2b. Directory-scoped transitions
+	if suggestCtx.DirScopeKey != "" && suggestCtx.LastCmd != "" && s.transitionStore != nil {
+		dirTrans, err := s.transitionStore.GetTopNextCommands(ctx, suggestCtx.DirScopeKey, suggestCtx.LastCmd, 10)
+		if err != nil {
+			s.cfg.Logger.Debug("dir transitions query failed", "error", err)
+		} else {
+			for _, t := range dirTrans {
+				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonDirTransition, s.cfg.Weights.DirTransition)
+			}
+		}
+	}
+
 	// 3. Repo frequency
 	if suggestCtx.RepoKey != "" && s.freqStore != nil {
 		repoFreq, err := s.freqStore.GetTopCommandsAt(ctx, suggestCtx.RepoKey, 10, suggestCtx.NowMs)
@@ -217,6 +243,18 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 		} else {
 			for _, f := range globalFreq {
 				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonGlobalFrequency, s.cfg.Weights.GlobalFrequency)
+			}
+		}
+	}
+
+	// 4b. Directory-scoped frequency
+	if suggestCtx.DirScopeKey != "" && s.freqStore != nil {
+		dirFreq, err := s.freqStore.GetTopCommandsAt(ctx, suggestCtx.DirScopeKey, 10, suggestCtx.NowMs)
+		if err != nil {
+			s.cfg.Logger.Debug("dir frequency query failed", "error", err)
+		} else {
+			for _, f := range dirFreq {
+				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonDirFrequency, s.cfg.Weights.DirFrequency)
 			}
 		}
 	}
@@ -286,6 +324,10 @@ func (s *Scorer) addCandidate(candidates map[string]*Suggestion, cmd string, raw
 			existing.scores.globalFrequency += adjustedScore
 		case ReasonProjectTask:
 			existing.scores.projectTask += adjustedScore
+		case ReasonDirTransition:
+			existing.scores.dirTransition += adjustedScore
+		case ReasonDirFrequency:
+			existing.scores.dirFrequency += adjustedScore
 		}
 	} else {
 		// New candidate
@@ -306,6 +348,10 @@ func (s *Scorer) addCandidate(candidates map[string]*Suggestion, cmd string, raw
 			sug.scores.globalFrequency = adjustedScore
 		case ReasonProjectTask:
 			sug.scores.projectTask = adjustedScore
+		case ReasonDirTransition:
+			sug.scores.dirTransition = adjustedScore
+		case ReasonDirFrequency:
+			sug.scores.dirFrequency = adjustedScore
 		}
 
 		candidates[cmd] = sug
@@ -336,9 +382,16 @@ func (s *Scorer) calculateConfidence(sug *Suggestion) float64 {
 	if sug.scores.projectTask > 0 {
 		sourceCount++
 	}
+	if sug.scores.dirTransition > 0 {
+		sourceCount++
+	}
+	if sug.scores.dirFrequency > 0 {
+		sourceCount++
+	}
 
 	// Base confidence from source diversity (up to 0.5)
-	sourceConfidence := float64(sourceCount) / 10.0 // Max 0.5 for 5 sources
+	// 7 total sources now, so divide by 14 for max 0.5
+	sourceConfidence := float64(sourceCount) / 14.0
 
 	// Score-based confidence (up to 0.5)
 	// Normalize score to 0-0.5 range using sigmoid

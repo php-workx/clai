@@ -483,6 +483,88 @@ func TestScorer_Confidence(t *testing.T) {
 	assert.LessOrEqual(t, confidence, 1.0)
 }
 
+func TestScorer_Suggest_WithDirScope(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDB(t)
+
+	// Create stores
+	freqStore, err := score.NewFrequencyStore(db, score.DefaultFrequencyOptions())
+	require.NoError(t, err)
+	defer freqStore.Close()
+
+	transStore, err := score.NewTransitionStore(db)
+	require.NoError(t, err)
+	defer transStore.Close()
+
+	ctx := context.Background()
+	nowMs := int64(1000000)
+	dirKey := "dir:testscope123"
+
+	// Add dir-scoped frequency
+	require.NoError(t, freqStore.Update(ctx, dirKey, "npm run dev", nowMs))
+
+	// Add dir-scoped transition
+	require.NoError(t, transStore.RecordTransition(ctx, dirKey, "git pull", "npm run dev", nowMs))
+
+	scorer, err := NewScorer(ScorerDependencies{
+		DB:              db,
+		FreqStore:       freqStore,
+		TransitionStore: transStore,
+	}, DefaultScorerConfig())
+	require.NoError(t, err)
+
+	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+		LastCmd:     "git pull",
+		DirScopeKey: dirKey,
+		NowMs:       nowMs,
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, suggestions)
+
+	// npm run dev should appear with dir scope reasons
+	var found *Suggestion
+	for i := range suggestions {
+		if suggestions[i].Command == "npm run dev" {
+			found = &suggestions[i]
+			break
+		}
+	}
+	assert.NotNil(t, found, "npm run dev should be suggested")
+	if found != nil {
+		assert.Contains(t, found.Reasons, ReasonDirTransition)
+		assert.Contains(t, found.Reasons, ReasonDirFrequency)
+	}
+}
+
+func TestScorer_Suggest_DirScopeEmpty(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDB(t)
+
+	freqStore, err := score.NewFrequencyStore(db, score.DefaultFrequencyOptions())
+	require.NoError(t, err)
+	defer freqStore.Close()
+
+	ctx := context.Background()
+	nowMs := int64(1000000)
+
+	// Add global frequency only
+	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "ls -la", nowMs))
+
+	scorer, err := NewScorer(ScorerDependencies{
+		DB:        db,
+		FreqStore: freqStore,
+	}, DefaultScorerConfig())
+	require.NoError(t, err)
+
+	// No DirScopeKey set - should still work
+	suggestions, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+	require.NoError(t, err)
+	assert.NotEmpty(t, suggestions)
+	assert.Equal(t, "ls -la", suggestions[0].Command)
+}
+
 func TestDefaultWeights(t *testing.T) {
 	t.Parallel()
 
@@ -492,6 +574,8 @@ func TestDefaultWeights(t *testing.T) {
 	assert.Equal(t, float64(DefaultWeightRepoFrequency), weights.RepoFrequency)
 	assert.Equal(t, float64(DefaultWeightProjectTask), weights.ProjectTask)
 	assert.Equal(t, float64(DefaultWeightDangerous), weights.DangerousPenalty)
+	assert.Equal(t, float64(DefaultWeightDirTransition), weights.DirTransition)
+	assert.Equal(t, float64(DefaultWeightDirFrequency), weights.DirFrequency)
 }
 
 func TestDefaultScorerConfig(t *testing.T) {
@@ -510,6 +594,8 @@ func TestConstants(t *testing.T) {
 	assert.Equal(t, 30, DefaultWeightRepoFrequency)
 	assert.Equal(t, 20, DefaultWeightProjectTask)
 	assert.Equal(t, -50, DefaultWeightDangerous)
+	assert.Equal(t, 90, DefaultWeightDirTransition)
+	assert.Equal(t, 40, DefaultWeightDirFrequency)
 	assert.Equal(t, 3, DefaultTopK)
 	assert.Equal(t, 10, MaxTopK)
 }

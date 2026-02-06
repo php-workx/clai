@@ -168,6 +168,75 @@ func TestFrequencyStore_UpdateBoth(t *testing.T) {
 	})
 }
 
+func TestFrequencyStore_UpdateAll(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDB(t)
+	fs, err := NewFrequencyStore(db, FrequencyOptions{TauMs: DefaultTauMs})
+	require.NoError(t, err)
+	defer fs.Close()
+
+	ctx := context.Background()
+
+	t.Run("updates global, repo, and dir scopes", func(t *testing.T) {
+		repoKey := "sha256:testrepo"
+		dirKey := "dir:abc123"
+		err := fs.UpdateAll(ctx, "go test ./...", repoKey, dirKey, 10000)
+		require.NoError(t, err)
+
+		// Check global scope
+		globalScore, err := fs.GetScoreAt(ctx, ScopeGlobal, "go test ./...", 10000)
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, globalScore)
+
+		// Check repo scope
+		repoScore, err := fs.GetScoreAt(ctx, repoKey, "go test ./...", 10000)
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, repoScore)
+
+		// Check dir scope
+		dirScore, err := fs.GetScoreAt(ctx, dirKey, "go test ./...", 10000)
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, dirScore)
+	})
+
+	t.Run("empty dir scope key skips dir update", func(t *testing.T) {
+		repoKey := "sha256:testrepo2"
+		err := fs.UpdateAll(ctx, "npm run build", repoKey, "", 11000)
+		require.NoError(t, err)
+
+		// Global and repo should be set
+		globalScore, err := fs.GetScoreAt(ctx, ScopeGlobal, "npm run build", 11000)
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, globalScore)
+
+		repoScore, err := fs.GetScoreAt(ctx, repoKey, "npm run build", 11000)
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, repoScore)
+	})
+
+	t.Run("empty repo and dir keys only updates global", func(t *testing.T) {
+		err := fs.UpdateAll(ctx, "whoami", "", "", 12000)
+		require.NoError(t, err)
+
+		globalScore, err := fs.GetScoreAt(ctx, ScopeGlobal, "whoami", 12000)
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, globalScore)
+	})
+
+	t.Run("accumulates across multiple calls", func(t *testing.T) {
+		dirKey := "dir:accum"
+		for i := 0; i < 3; i++ {
+			err := fs.UpdateAll(ctx, "make lint", "sha256:accrepo", dirKey, 20000)
+			require.NoError(t, err)
+		}
+
+		dirScore, err := fs.GetScoreAt(ctx, dirKey, "make lint", 20000)
+		require.NoError(t, err)
+		assert.Equal(t, 3.0, dirScore) // 1 + 1 + 1 (all at same timestamp, no decay)
+	})
+}
+
 func TestFrequencyStore_GetTopCommands(t *testing.T) {
 	t.Parallel()
 

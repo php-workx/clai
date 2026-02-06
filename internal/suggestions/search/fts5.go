@@ -34,15 +34,7 @@ const (
 	MaxLimit = 100
 )
 
-// SearchResult represents a single search result.
-type SearchResult struct {
-	ID        int64   // Command event ID
-	CmdRaw    string  // Raw command
-	RepoKey   string  // Repository key (may be empty)
-	Cwd       string  // Working directory
-	Timestamp int64   // Event timestamp (ms)
-	Score     float64 // BM25 score
-}
+// SearchResult and Backend types are defined in result.go.
 
 // SearchOptions configures search behavior.
 type SearchOptions struct {
@@ -282,7 +274,14 @@ func (s *Service) searchFTS5(ctx context.Context, query string, opts SearchOptio
 	}
 	defer rows.Close()
 
-	return s.scanResults(rows)
+	results, err := s.scanResults(rows)
+	if err != nil {
+		return nil, err
+	}
+	for i := range results {
+		results[i].Backend = BackendFTS
+	}
+	return results, nil
 }
 
 // searchLike performs LIKE-based fallback search.
@@ -301,7 +300,14 @@ func (s *Service) searchLike(ctx context.Context, query string, opts SearchOptio
 	}
 	defer rows.Close()
 
-	return s.scanResults(rows)
+	results, err := s.scanResults(rows)
+	if err != nil {
+		return nil, err
+	}
+	for i := range results {
+		results[i].Backend = BackendFallback
+	}
+	return results, nil
 }
 
 // scanResults scans search result rows.

@@ -1271,6 +1271,301 @@ func TestWritePath_AllStepsTogether(t *testing.T) {
 	}
 }
 
+// --- Pipeline Integration Tests ---
+
+func TestWritePath_PipelineGoTestGrepFAIL(t *testing.T) {
+	t.Parallel()
+	sqlDB := newTestDB(t)
+	ctx := context.Background()
+
+	// Integration test for compound command: go test | grep FAIL
+	ev := makeEvent(func(e *event.CommandEvent) {
+		e.CmdRaw = "go test ./... | grep FAIL"
+	})
+	wctx := makeWriteContext(ev)
+
+	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.PipelineSegments)
+
+	// Verify pipeline_event rows have correct content
+	rows, err := sqlDB.QueryContext(ctx, `
+		SELECT position, operator, cmd_raw, cmd_norm, template_id
+		FROM pipeline_event
+		WHERE command_event_id = ?
+		ORDER BY position
+	`, result.EventID)
+	require.NoError(t, err)
+	defer rows.Close()
+
+	type pipelineRow struct {
+		position   int
+		operator   sql.NullString
+		cmdRaw     string
+		cmdNorm    string
+		templateID string
+	}
+	var pRows []pipelineRow
+	for rows.Next() {
+		var r pipelineRow
+		err := rows.Scan(&r.position, &r.operator, &r.cmdRaw, &r.cmdNorm, &r.templateID)
+		require.NoError(t, err)
+		pRows = append(pRows, r)
+	}
+	require.NoError(t, rows.Err())
+	require.Len(t, pRows, 2)
+
+	// First segment: go test ./...
+	assert.Equal(t, 0, pRows[0].position)
+	assert.True(t, pRows[0].operator.Valid)
+	assert.Equal(t, "|", pRows[0].operator.String)
+	assert.NotEmpty(t, pRows[0].cmdNorm)
+	assert.NotEmpty(t, pRows[0].templateID)
+
+	// Second segment: grep FAIL
+	assert.Equal(t, 1, pRows[1].position)
+	assert.NotEmpty(t, pRows[1].cmdNorm)
+	assert.NotEmpty(t, pRows[1].templateID)
+
+	// Verify pipeline_transition was recorded
+	var transCount int
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_transition
+		WHERE scope = 'global' AND prev_template_id = ? AND next_template_id = ?
+	`, pRows[0].templateID, pRows[1].templateID).Scan(&transCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, transCount)
+
+	// Verify pipeline_pattern was recorded
+	var patternCount int
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_pattern WHERE scope = 'global'
+	`).Scan(&patternCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, patternCount)
+
+	// Verify the pipeline_pattern has the correct display
+	var cmdNormDisplay string
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT cmd_norm_display FROM pipeline_pattern WHERE scope = 'global'
+	`).Scan(&cmdNormDisplay)
+	require.NoError(t, err)
+	assert.NotEmpty(t, cmdNormDisplay)
+}
+
+func TestWritePath_PipelineMaxSegmentsEnforced(t *testing.T) {
+	t.Parallel()
+	sqlDB := newTestDB(t)
+	ctx := context.Background()
+
+	// A long pipeline with 5 segments, but max is set to 3
+	ev := makeEvent(func(e *event.CommandEvent) {
+		e.CmdRaw = "cat file | grep pattern | sort | uniq | head"
+	})
+	wctx := makeWriteContext(ev)
+
+	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{
+		PipelineMaxSegments: 3,
+	})
+	require.NoError(t, err)
+
+	// Should only process 3 segments (truncated from 5)
+	assert.Equal(t, 3, result.PipelineSegments)
+
+	// Verify only 3 pipeline_event rows
+	var count int
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_event WHERE command_event_id = ?
+	`, result.EventID).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 3, count)
+
+	// Verify only 2 pipeline_transition rows (3 segments = 2 transitions)
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_transition WHERE scope = 'global'
+	`).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+}
+
+func TestWritePath_PipelineDefaultMaxSegments(t *testing.T) {
+	t.Parallel()
+	sqlDB := newTestDB(t)
+	ctx := context.Background()
+
+	// Pipeline with 4 segments, no max configured (default = 8, should process all)
+	ev := makeEvent(func(e *event.CommandEvent) {
+		e.CmdRaw = "cat file | grep pattern | sort | uniq"
+	})
+	wctx := makeWriteContext(ev)
+
+	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	require.NoError(t, err)
+	assert.Equal(t, 4, result.PipelineSegments)
+}
+
+func TestWritePath_PipelineRepoScoped(t *testing.T) {
+	t.Parallel()
+	sqlDB := newTestDB(t)
+	ctx := context.Background()
+
+	ev := makeEvent(func(e *event.CommandEvent) {
+		e.CmdRaw = "go test ./... | grep FAIL"
+	})
+	wctx := makeWriteContext(ev, func(w *WritePathContext) {
+		w.RepoKey = "repo-pipeline-test"
+	})
+
+	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.PipelineSegments)
+
+	// Verify both global and repo-scoped pipeline_transition rows
+	var globalCount, repoCount int
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_transition WHERE scope = 'global'
+	`).Scan(&globalCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, globalCount)
+
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_transition WHERE scope = 'repo-pipeline-test'
+	`).Scan(&repoCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, repoCount)
+
+	// Verify both global and repo-scoped pipeline_pattern rows
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_pattern WHERE scope = 'global'
+	`).Scan(&globalCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, globalCount)
+
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM pipeline_pattern WHERE scope = 'repo-pipeline-test'
+	`).Scan(&repoCount)
+	require.NoError(t, err)
+	assert.Equal(t, 1, repoCount)
+}
+
+func TestWritePath_PipelineSemicolonOperator(t *testing.T) {
+	t.Parallel()
+	sqlDB := newTestDB(t)
+	ctx := context.Background()
+
+	ev := makeEvent(func(e *event.CommandEvent) {
+		e.CmdRaw = "cd /tmp; ls -la"
+	})
+	wctx := makeWriteContext(ev)
+
+	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.PipelineSegments)
+
+	// Verify the operator in pipeline_event
+	var operator sql.NullString
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT operator FROM pipeline_event
+		WHERE command_event_id = ? AND position = 0
+	`, result.EventID).Scan(&operator)
+	require.NoError(t, err)
+	assert.True(t, operator.Valid)
+	assert.Equal(t, ";", operator.String)
+}
+
+func TestWritePath_PipelineOrOperator(t *testing.T) {
+	t.Parallel()
+	sqlDB := newTestDB(t)
+	ctx := context.Background()
+
+	ev := makeEvent(func(e *event.CommandEvent) {
+		e.CmdRaw = "test -f file.txt || echo missing"
+	})
+	wctx := makeWriteContext(ev)
+
+	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	require.NoError(t, err)
+	assert.Equal(t, 2, result.PipelineSegments)
+}
+
+func TestWritePath_PipelinePatternCountIncremented(t *testing.T) {
+	t.Parallel()
+	sqlDB := newTestDB(t)
+	ctx := context.Background()
+
+	// Same pipeline command twice should increment count
+	for i := 0; i < 3; i++ {
+		ev := makeEvent(func(e *event.CommandEvent) {
+			e.CmdRaw = "go test ./... | grep FAIL"
+			e.Ts = int64(1000 + i*1000)
+		})
+		wctx := makeWriteContext(ev)
+
+		_, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+		require.NoError(t, err, "iteration %d", i)
+	}
+
+	// pipeline_pattern count should be 3 for the global scope
+	var count int
+	err := sqlDB.QueryRowContext(ctx, `
+		SELECT count FROM pipeline_pattern WHERE scope = 'global'
+	`).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 3, count)
+}
+
+func TestWritePath_PipelineTransitionWeightIncremented(t *testing.T) {
+	t.Parallel()
+	sqlDB := newTestDB(t)
+	ctx := context.Background()
+
+	// Same pipeline twice should increment transition weight
+	for i := 0; i < 2; i++ {
+		ev := makeEvent(func(e *event.CommandEvent) {
+			e.CmdRaw = "cat file.txt | grep pattern"
+			e.Ts = int64(1000 + i*1000)
+		})
+		wctx := makeWriteContext(ev)
+
+		_, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+		require.NoError(t, err)
+	}
+
+	// pipeline_transition weight should be 2.0 and count should be 2
+	var weight float64
+	var count int
+	err := sqlDB.QueryRowContext(ctx, `
+		SELECT weight, count FROM pipeline_transition WHERE scope = 'global'
+	`).Scan(&weight, &count)
+	require.NoError(t, err)
+	assert.Equal(t, 2.0, weight)
+	assert.Equal(t, 2, count)
+}
+
+func TestWritePath_PipelineMixedOperators(t *testing.T) {
+	t.Parallel()
+	sqlDB := newTestDB(t)
+	ctx := context.Background()
+
+	// Mixed operators: make build && make test | tee log.txt
+	ev := makeEvent(func(e *event.CommandEvent) {
+		e.CmdRaw = "make build && make test | tee log.txt"
+	})
+	wctx := makeWriteContext(ev)
+
+	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	require.NoError(t, err)
+	assert.Equal(t, 3, result.PipelineSegments)
+
+	// Verify the operator chain in pipeline_pattern
+	var operatorChain string
+	err = sqlDB.QueryRowContext(ctx, `
+		SELECT operator_chain FROM pipeline_pattern WHERE scope = 'global'
+	`).Scan(&operatorChain)
+	require.NoError(t, err)
+	assert.Equal(t, "&&,|", operatorChain)
+}
+
 // --- Benchmark ---
 
 func BenchmarkWritePath_SimpleCommand(b *testing.B) {

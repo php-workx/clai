@@ -1,0 +1,226 @@
+package search
+
+import (
+	"context"
+	"log/slog"
+	"sort"
+)
+
+// AutoConfig configures the auto search mode.
+type AutoConfig struct {
+	// Logger for auto search operations.
+	Logger *slog.Logger
+
+	// FTSWeight is the weight for FTS scores in the merged result.
+	// Must be between 0.0 and 1.0. Default: 0.6
+	FTSWeight float64
+
+	// DescribeWeight is the weight for describe scores in the merged result.
+	// Must be between 0.0 and 1.0. Default: 0.4
+	DescribeWeight float64
+}
+
+// DefaultAutoConfig returns the default auto search configuration.
+func DefaultAutoConfig() AutoConfig {
+	return AutoConfig{
+		FTSWeight:      0.6,
+		DescribeWeight: 0.4,
+	}
+}
+
+// AutoService merges FTS and describe search results.
+type AutoService struct {
+	fts      *Service
+	describe *DescribeService
+	logger   *slog.Logger
+
+	ftsWeight      float64
+	describeWeight float64
+}
+
+// NewAutoService creates a new auto search service.
+func NewAutoService(fts *Service, describe *DescribeService, cfg AutoConfig) *AutoService {
+	logger := cfg.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	ftsW := cfg.FTSWeight
+	descW := cfg.DescribeWeight
+
+	if ftsW <= 0 && descW <= 0 {
+		ftsW = 0.6
+		descW = 0.4
+	}
+
+	total := ftsW + descW
+	if total > 0 {
+		ftsW /= total
+		descW /= total
+	}
+
+	return &AutoService{
+		fts:            fts,
+		describe:       describe,
+		logger:         logger,
+		ftsWeight:      ftsW,
+		describeWeight: descW,
+	}
+}
+
+// mergedResult holds intermediate data for merging search results.
+type mergedResult struct {
+	result      SearchResult
+	ftsScore    float64
+	descScore   float64
+	hasFTS      bool
+	hasDescribe bool
+}
+
+// Search performs an auto search that merges FTS and describe results.
+func (s *AutoService) Search(ctx context.Context, query string, opts SearchOptions) ([]SearchResult, error) {
+	if query == "" {
+		return nil, nil
+	}
+
+	limit := opts.Limit
+	if limit <= 0 {
+		limit = DefaultLimit
+	}
+	if limit > MaxLimit {
+		limit = MaxLimit
+	}
+
+	internalOpts := opts
+	internalOpts.Limit = limit * 3
+	if internalOpts.Limit > MaxLimit {
+		internalOpts.Limit = MaxLimit
+	}
+
+	var ftsResults []SearchResult
+	if s.fts != nil && (s.fts.FTS5Available() || s.fts.FallbackEnabled()) {
+		var err error
+		ftsResults, err = s.fts.Search(ctx, query, internalOpts)
+		if err != nil {
+			s.logger.Warn("auto search: FTS search failed, continuing with describe only",
+				"error", err)
+		}
+	}
+
+	var descResults []SearchResult
+	if s.describe != nil {
+		var err error
+		descResults, err = s.describe.Search(ctx, query, internalOpts)
+		if err != nil {
+			s.logger.Warn("auto search: describe search failed, continuing with FTS only",
+				"error", err)
+		}
+	}
+
+	if len(ftsResults) == 0 && len(descResults) == 0 {
+		return nil, nil
+	}
+
+	merged := s.mergeResults(ftsResults, descResults)
+
+	if len(merged) > limit {
+		merged = merged[:limit]
+	}
+
+	return merged, nil
+}
+
+// mergeResults merges FTS and describe results, deduplicating by template.
+func (s *AutoService) mergeResults(ftsResults, descResults []SearchResult) []SearchResult {
+	mergeMap := make(map[string]*mergedResult)
+
+	ftsMax := maxScore(ftsResults)
+
+	for i := range ftsResults {
+		r := ftsResults[i]
+		key := dedupKey(r)
+
+		normalizedScore := 0.0
+		if ftsMax != 0 {
+			normalizedScore = r.Score / ftsMax
+		}
+
+		if existing, ok := mergeMap[key]; ok {
+			existing.ftsScore = normalizedScore
+			existing.hasFTS = true
+		} else {
+			mergeMap[key] = &mergedResult{
+				result:   r,
+				ftsScore: normalizedScore,
+				hasFTS:   true,
+			}
+		}
+	}
+
+	for i := range descResults {
+		r := descResults[i]
+		key := dedupKey(r)
+
+		if existing, ok := mergeMap[key]; ok {
+			existing.descScore = r.Score
+			existing.hasDescribe = true
+			if len(existing.result.Tags) == 0 {
+				existing.result.Tags = r.Tags
+			}
+			if len(existing.result.MatchedTags) == 0 {
+				existing.result.MatchedTags = r.MatchedTags
+			}
+			if existing.result.TemplateID == "" {
+				existing.result.TemplateID = r.TemplateID
+			}
+			if existing.result.CmdNorm == "" {
+				existing.result.CmdNorm = r.CmdNorm
+			}
+		} else {
+			mergeMap[key] = &mergedResult{
+				result:      r,
+				descScore:   r.Score,
+				hasDescribe: true,
+			}
+		}
+	}
+
+	results := make([]SearchResult, 0, len(mergeMap))
+	for _, m := range mergeMap {
+		m.result.Score = s.ftsWeight*m.ftsScore + s.describeWeight*m.descScore
+		m.result.Backend = BackendAuto
+		results = append(results, m.result)
+	}
+
+	sort.Slice(results, func(i, j int) bool {
+		if results[i].Score != results[j].Score {
+			return results[i].Score > results[j].Score
+		}
+		return results[i].Timestamp > results[j].Timestamp
+	})
+
+	return results
+}
+
+// dedupKey returns the key used to deduplicate results.
+func dedupKey(r SearchResult) string {
+	if r.TemplateID != "" {
+		return "t:" + r.TemplateID
+	}
+	return "r:" + r.CmdRaw
+}
+
+// maxScore returns the maximum absolute score from a result set.
+func maxScore(results []SearchResult) float64 {
+	if len(results) == 0 {
+		return 0
+	}
+
+	max := results[0].Score
+	for _, r := range results[1:] {
+		if r.Score < max {
+			max = r.Score
+		}
+	}
+	return max
+}

@@ -165,6 +165,59 @@ func (ts *TransitionStore) RecordTransitionBoth(ctx context.Context, prevNorm, n
 	return tx.Commit()
 }
 
+// RecordTransitionAll records a transition in global, repo, and directory scopes.
+// This extends RecordTransitionBoth by also recording the directory scope aggregate
+// when dirScopeKey is non-empty.
+func (ts *TransitionStore) RecordTransitionAll(ctx context.Context, prevNorm, nextNorm, repoKey, dirScopeKey string, nowMs int64) error {
+	tx, err := ts.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback() //nolint:errcheck
+
+	// Update global scope
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO transition (scope, prev_norm, next_norm, count, last_ts)
+		VALUES (?, ?, ?, 1, ?)
+		ON CONFLICT(scope, prev_norm, next_norm) DO UPDATE SET
+			count = count + 1,
+			last_ts = ?
+	`, ScopeGlobal, prevNorm, nextNorm, nowMs, nowMs)
+	if err != nil {
+		return err
+	}
+
+	// Update repo scope if provided
+	if repoKey != "" {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO transition (scope, prev_norm, next_norm, count, last_ts)
+			VALUES (?, ?, ?, 1, ?)
+			ON CONFLICT(scope, prev_norm, next_norm) DO UPDATE SET
+				count = count + 1,
+				last_ts = ?
+		`, repoKey, prevNorm, nextNorm, nowMs, nowMs)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Update directory scope if provided
+	if dirScopeKey != "" {
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO transition (scope, prev_norm, next_norm, count, last_ts)
+			VALUES (?, ?, ?, 1, ?)
+			ON CONFLICT(scope, prev_norm, next_norm) DO UPDATE SET
+				count = count + 1,
+				last_ts = ?
+		`, dirScopeKey, prevNorm, nextNorm, nowMs, nowMs)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 // GetPreviousCommand retrieves the previous command for a session.
 // Per spec Section 9.2, this looks up the previous cmd_norm in the same session_id.
 func (ts *TransitionStore) GetPreviousCommand(ctx context.Context, sessionID string, beforeTs int64) (string, error) {
