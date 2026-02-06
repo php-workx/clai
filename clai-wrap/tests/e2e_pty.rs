@@ -1053,6 +1053,57 @@ fn test_clai_wrap_signal_sighup_from_outside_exits() {
 
 #[test]
 #[cfg(unix)]
+fn test_clai_wrap_signal_sigtstp_sigcont_resume() {
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer
+        .write_all(b"echo BEFORE_STOP\n")
+        .expect("write BEFORE_STOP");
+    writer.flush().expect("flush BEFORE_STOP");
+    let _ = read_until_marker(&mut *reader, "BEFORE_STOP", Duration::from_secs(8))
+        .expect("Expected pre-stop marker");
+
+    let Some(pid) = child.process_id() else {
+        eprintln!("Skipping test: no child pid available");
+        return;
+    };
+
+    let stop_status = std::process::Command::new("kill")
+        .args(["-TSTP", &pid.to_string()])
+        .status()
+        .expect("send SIGTSTP");
+    assert!(stop_status.success(), "kill -TSTP should succeed");
+
+    std::thread::sleep(Duration::from_millis(200));
+
+    let cont_status = std::process::Command::new("kill")
+        .args(["-CONT", &pid.to_string()])
+        .status()
+        .expect("send SIGCONT");
+    assert!(cont_status.success(), "kill -CONT should succeed");
+
+    writer
+        .write_all(b"echo AFTER_CONT\n")
+        .expect("write AFTER_CONT");
+    writer.flush().expect("flush AFTER_CONT");
+
+    let output = read_until_marker(&mut *reader, "AFTER_CONT", Duration::from_secs(8))
+        .expect("Expected shell to resume after SIGCONT");
+
+    let _ = child.kill();
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+
+    assert!(output.contains("AFTER_CONT"), "Output: {output}");
+}
+
+#[test]
+#[cfg(unix)]
 fn test_clai_wrap_resize_propagates_to_child_stty_size() {
     let Some((master, mut child)) = spawn_clai_wrap_shell() else {
         eprintln!("Skipping test: clai-wrap binary or shell unavailable");

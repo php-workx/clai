@@ -11,6 +11,8 @@
 
 use std::env;
 use std::io::Write;
+#[cfg(unix)]
+use std::os::fd::{FromRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
@@ -56,6 +58,57 @@ fn run_with_timeout(mut child: std::process::Child, timeout: Duration) -> Output
     }
     let _ = child.kill();
     child.wait_with_output().expect("collect killed child output")
+}
+
+#[cfg(unix)]
+struct PtyPair {
+    master: RawFd,
+    slave: RawFd,
+}
+
+#[cfg(unix)]
+impl PtyPair {
+    fn new() -> Option<Self> {
+        let mut master: libc::c_int = -1;
+        let mut slave: libc::c_int = -1;
+        let result = unsafe {
+            libc::openpty(
+                &mut master,
+                &mut slave,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+            )
+        };
+        if result != 0 {
+            return None;
+        }
+        Some(Self { master, slave })
+    }
+}
+
+#[cfg(unix)]
+impl Drop for PtyPair {
+    fn drop(&mut self) {
+        unsafe {
+            libc::close(self.master);
+            libc::close(self.slave);
+        }
+    }
+}
+
+#[cfg(unix)]
+fn get_termios(fd: RawFd) -> libc::termios {
+    let mut termios = std::mem::MaybeUninit::<libc::termios>::uninit();
+    let result = unsafe { libc::tcgetattr(fd, termios.as_mut_ptr()) };
+    assert_eq!(result, 0, "tcgetattr failed");
+    unsafe { termios.assume_init() }
+}
+
+#[cfg(unix)]
+fn set_termios_now(fd: RawFd, termios: &libc::termios) {
+    let result = unsafe { libc::tcsetattr(fd, libc::TCSANOW, termios) };
+    assert_eq!(result, 0, "tcsetattr failed");
 }
 
 // ============================================================================
@@ -580,6 +633,44 @@ fn test_force_non_tty_allows_passthrough_with_piped_io() {
         stdout.contains("FORCE_NON_TTY_OK"),
         "Expected passthrough command output, got: {stdout}"
     );
+}
+
+#[test]
+#[cfg(unix)]
+fn test_reset_terminal_restores_termios_on_corrupted_tty() {
+    let Some(binary) = clai_wrap_binary() else {
+        eprintln!("Skipping test: clai-wrap binary unavailable");
+        return;
+    };
+    let Some(pty) = PtyPair::new() else {
+        eprintln!("Skipping test: failed to allocate pseudo TTY");
+        return;
+    };
+
+    let original = get_termios(pty.slave);
+    let mut corrupted = original;
+    corrupted.c_lflag &= !(libc::ICANON | libc::ECHO);
+    set_termios_now(pty.slave, &corrupted);
+
+    let stdin_fd = unsafe { libc::dup(pty.slave) };
+    let stdout_fd = unsafe { libc::dup(pty.slave) };
+    let stderr_fd = unsafe { libc::dup(pty.slave) };
+    assert!(stdin_fd >= 0 && stdout_fd >= 0 && stderr_fd >= 0, "dup failed");
+
+    let mut child = Command::new(binary)
+        .arg("reset-terminal")
+        .stdin(unsafe { Stdio::from(std::fs::File::from_raw_fd(stdin_fd)) })
+        .stdout(unsafe { Stdio::from(std::fs::File::from_raw_fd(stdout_fd)) })
+        .stderr(unsafe { Stdio::from(std::fs::File::from_raw_fd(stderr_fd)) })
+        .spawn()
+        .expect("spawn clai-wrap reset-terminal");
+
+    let status = child.wait().expect("wait for reset-terminal");
+    assert!(status.success(), "reset-terminal should succeed");
+
+    let restored = get_termios(pty.slave);
+    assert_eq!(restored.c_lflag & libc::ICANON, libc::ICANON);
+    assert_eq!(restored.c_lflag & libc::ECHO, libc::ECHO);
 }
 
 // ============================================================================

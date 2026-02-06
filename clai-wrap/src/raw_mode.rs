@@ -593,6 +593,33 @@ mod tests {
             );
             assert_eq!(restored.c_lflag & libc::ECHO, original.c_lflag & libc::ECHO);
         }
+
+        #[test]
+        fn test_drop_restores_settings_on_unwind_pseudo_tty() {
+            let Some(pty) = PtyPair::new() else {
+                eprintln!("Skipping test: failed to allocate pseudo TTY");
+                return;
+            };
+
+            let original = get_termios(pty.slave);
+
+            let mut modified = original;
+            modified.c_lflag &= !(libc::ICANON | libc::ECHO);
+            set_termios_now(pty.slave, &modified);
+
+            let panic_result = std::panic::catch_unwind(|| {
+                let _guard = RawModeGuard::new(original, pty.slave);
+                panic!("simulated abrupt unwind");
+            });
+            assert!(panic_result.is_err(), "panic path should trigger unwind");
+
+            let restored = get_termios(pty.slave);
+            assert_eq!(
+                restored.c_lflag & libc::ICANON,
+                original.c_lflag & libc::ICANON
+            );
+            assert_eq!(restored.c_lflag & libc::ECHO, original.c_lflag & libc::ECHO);
+        }
     }
 
     #[cfg(not(unix))]
