@@ -124,6 +124,54 @@ fn create_shell_script(content: &str) -> NamedTempFile {
     script
 }
 
+#[cfg(unix)]
+fn spawn_clai_wrap_shell() -> Option<(
+    Box<dyn portable_pty::MasterPty + Send>,
+    Box<dyn portable_pty::Child + Send + Sync>,
+)> {
+    let binary = clai_wrap_binary()?;
+    let pty_system = native_pty_system();
+    let pair = pty_system.openpty(default_pty_size()).ok()?;
+
+    let mut cmd = CommandBuilder::new(binary);
+    cmd.args([
+        "--standalone",
+        "--shell",
+        "/bin/sh",
+        "--login-shell=false",
+        "--no-ui",
+    ]);
+
+    let child = pair.slave.spawn_command(cmd).ok()?;
+    Some((pair.master, child))
+}
+
+#[cfg(unix)]
+fn spawn_clai_wrap_bash_shell() -> Option<(
+    Box<dyn portable_pty::MasterPty + Send>,
+    Box<dyn portable_pty::Child + Send + Sync>,
+)> {
+    let binary = clai_wrap_binary()?;
+    if !PathBuf::from("/bin/bash").exists() {
+        return None;
+    }
+
+    let pty_system = native_pty_system();
+    let pair = pty_system.openpty(default_pty_size()).ok()?;
+
+    let mut cmd = CommandBuilder::new(binary);
+    cmd.args([
+        "--standalone",
+        "--shell",
+        "/bin/bash",
+        "--login-shell=false",
+        "--no-ui",
+    ]);
+
+    let child = pair.slave.spawn_command(cmd).ok()?;
+    Some((pair.master, child))
+}
+
 // ============================================================================
 // Basic PTY Spawning Tests
 // ============================================================================
@@ -610,6 +658,234 @@ fn test_clai_wrap_fails_fast_with_invalid_history_file() {
         "Expected history file load error, got output: {output}"
     );
     assert!(!status.success(), "Expected non-zero exit for invalid history file");
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_io_simple_echo_passthrough() {
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer
+        .write_all(b"echo io_passthrough_ok\n")
+        .expect("Failed to write");
+    writer.flush().expect("Failed to flush");
+
+    let output =
+        read_until_marker(&mut *reader, "io_passthrough_ok", PTY_TIMEOUT).expect("read output");
+
+    writer.write_all(b"exit\n").expect("write exit");
+    writer.flush().expect("flush exit");
+    let status = child.wait().expect("wait child");
+
+    assert!(output.contains("io_passthrough_ok"), "Output: {output}");
+    assert!(status.success());
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_io_interactive_read_input() {
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer
+        .write_all(b"printf 'PROMPT:'; read value; echo VALUE:$value\n")
+        .expect("Failed to write command");
+    writer.flush().expect("Failed to flush command");
+    std::thread::sleep(Duration::from_millis(100));
+
+    writer
+        .write_all(b"typed_value\n")
+        .expect("Failed to write input");
+    writer.flush().expect("Failed to flush input");
+
+    let output = read_until_marker(&mut *reader, "VALUE:typed_value", PTY_TIMEOUT)
+        .expect("Failed to read interactive output");
+
+    writer.write_all(b"exit\n").expect("write exit");
+    writer.flush().expect("flush exit");
+    let status = child.wait().expect("wait child");
+
+    assert!(output.contains("VALUE:typed_value"), "Output: {output}");
+    assert!(status.success());
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_io_ansi_color_passthrough() {
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer
+        .write_all(b"printf '\\033[31mRED_TEXT\\033[0m\\n'\n")
+        .expect("Failed to write command");
+    writer.flush().expect("Failed to flush command");
+
+    let output =
+        read_until_marker(&mut *reader, "RED_TEXT", PTY_TIMEOUT).expect("Failed to read output");
+
+    writer.write_all(b"exit\n").expect("write exit");
+    writer.flush().expect("flush exit");
+    let status = child.wait().expect("wait child");
+
+    assert!(
+        output.contains("\u{1b}[31mRED_TEXT\u{1b}[0m"),
+        "Expected ANSI sequence passthrough, got: {output}"
+    );
+    assert!(status.success());
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_io_ctrl_c_interrupts_running_command() {
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer.write_all(b"sleep 10\n").expect("write sleep");
+    writer.flush().expect("flush sleep");
+    std::thread::sleep(Duration::from_millis(200));
+
+    writer.write_all(&[0x03]).expect("write Ctrl-C");
+    writer.flush().expect("flush Ctrl-C");
+    std::thread::sleep(Duration::from_millis(100));
+
+    writer
+        .write_all(b"echo AFTER_CTRL_C\n")
+        .expect("write echo after interrupt");
+    writer.flush().expect("flush echo after interrupt");
+
+    let output = read_until_marker(&mut *reader, "AFTER_CTRL_C", Duration::from_secs(8))
+        .expect("Expected command after interrupt");
+
+    writer.write_all(b"exit\n").expect("write exit");
+    writer.flush().expect("flush exit");
+    let status = child.wait().expect("wait child");
+
+    assert!(output.contains("AFTER_CTRL_C"), "Output: {output}");
+    assert!(status.success());
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_io_ctrl_d_sends_eof_and_exits() {
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut writer = master.take_writer().expect("Failed to get writer");
+    writer.write_all(&[0x04]).expect("write Ctrl-D");
+    writer.flush().expect("flush Ctrl-D");
+
+    let status = child.wait().expect("wait child");
+    assert!(
+        status.success(),
+        "Expected shell to exit successfully on Ctrl-D, code: {}",
+        status.exit_code()
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_io_tab_completion_completes_filename() {
+    let Some((master, mut child)) = spawn_clai_wrap_bash_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or /bin/bash unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    let tempdir = tempfile::tempdir().expect("create temp dir");
+    let dir = tempdir.path().to_str().expect("utf8 temp dir path");
+
+    writer
+        .write_all(format!("cd {dir}\n").as_bytes())
+        .expect("write cd");
+    writer.flush().expect("flush cd");
+    std::thread::sleep(Duration::from_millis(100));
+
+    writer
+        .write_all(b"printf 'TAB_COMPLETION_OK\\n' > completion_target_file\n")
+        .expect("write file creation");
+    writer.flush().expect("flush file creation");
+    std::thread::sleep(Duration::from_millis(100));
+
+    writer
+        .write_all(b"cat completion_target_f\t\n")
+        .expect("write tab completion command");
+    writer.flush().expect("flush tab completion command");
+
+    let output = read_until_marker(&mut *reader, "TAB_COMPLETION_OK", Duration::from_secs(8))
+        .expect("Expected filename tab completion to work");
+
+    writer.write_all(b"exit\n").expect("write exit");
+    writer.flush().expect("flush exit");
+    let status = child.wait().expect("wait child");
+
+    assert!(
+        output.contains("TAB_COMPLETION_OK"),
+        "Expected tab-completed file read output, got: {output}"
+    );
+    assert!(status.success());
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_io_line_editing_arrows_backspace_ctrl_a_ctrl_e() {
+    let Some((master, mut child)) = spawn_clai_wrap_bash_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or /bin/bash unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer.write_all(b"echo helo").expect("write line-edit test");
+    writer
+        .write_all(b"\x1b[D\x08ll\n")
+        .expect("write arrow/backspace edits");
+    writer.flush().expect("flush arrow/backspace edits");
+    let output_hello = read_until_marker(&mut *reader, "hello", Duration::from_secs(8))
+        .expect("Expected edited line to become 'hello'");
+
+    writer
+        .write_all(b"echo core\x01printf 'CTRL_A_OK '; \x05; echo CTRL_E_OK\n")
+        .expect("write ctrl-a/ctrl-e edits");
+    writer.flush().expect("flush ctrl-a/ctrl-e edits");
+    let output_ctrl = read_until_marker(&mut *reader, "CTRL_E_OK", Duration::from_secs(8))
+        .expect("Expected ctrl-a/ctrl-e edited command output");
+
+    writer.write_all(b"exit\n").expect("write exit");
+    writer.flush().expect("flush exit");
+    let status = child.wait().expect("wait child");
+
+    assert!(output_hello.contains("hello"), "Output: {output_hello}");
+    assert!(
+        output_ctrl.contains("CTRL_A_OK") && output_ctrl.contains("CTRL_E_OK"),
+        "Expected ctrl-a/ctrl-e markers, got: {output_ctrl}"
+    );
+    assert!(status.success());
 }
 
 // ============================================================================
