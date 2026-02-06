@@ -19,14 +19,28 @@ It assumes no backward-compatibility constraints and no requirement to preserve 
 - P50 suggestion latency under 15ms from shell request to first result.
 - P95 under 50ms on warm cache, under 120ms on cold compute.
 - Top-1 accept rate improves over baseline by at least 25%.
-- Shell adapter overhead under 8ms median and under 15ms p95 per command completion when invoking a helper process.
-- Optional optimization target (persistent helper channel): under 3ms median.
+- Shell adapter overhead with persistent helper channel under 3ms median and under 8ms p95 per command completion.
+- Fallback adapter overhead (fork/exec helper) under 8ms median and under 15ms p95 per command completion.
+
+### 0.4 Runtime Prerequisites
+- OS scope for V2:
+- first-class: macOS, Linux, and WSL (bash/zsh/fish)
+- native Windows (PowerShell/cmd + named pipe lifecycle) is explicitly out of scope for V2 and reserved for V3.
+- SQLite build must support WAL; FTS5 is strongly recommended (fallback search path exists when unavailable).
+- Runtime directory must be local filesystem with advisory locking support (`flock` semantics); network filesystems are unsupported for daemon runtime files.
+- `/dev/urandom` (or platform CSPRNG equivalent) must be available for session entropy fallback.
+- `$HOME` (and config/runtime dirs) must be writable for local state.
+- Shell minimum versions:
+- `bash >= 4.0` (`>= 4.4` preferred)
+- `zsh >= 5.0`
+- `fish >= 3.0`
 
 ## 1) High-Level Architecture
 
 ### 1.1 Core Components
-- Shell Adapters (`bash`, `zsh`, `fish`): collect execution context and invoke `clai-shim` ingest mode.
-- `clai-shim` (ingest mode): validates fields, lossily normalizes UTF-8, writes NDJSON events fire-and-forget.
+- Shell Adapters (`bash`, `zsh`, `fish`): collect execution context and send events through a persistent helper channel by default.
+- `clai-shim` (persistent helper): long-running per-shell-process helper that validates fields, lossily normalizes UTF-8, and writes NDJSON events fire-and-forget to daemon IPC.
+- `clai-shim` (fallback exec mode): short-lived per-event mode for environments where persistent helper cannot be started; functionally equivalent with higher latency budget.
 - `clai-suggestd` daemon:
 - Ingestion pipeline with validation and normalization.
 - Feature extraction and online aggregate maintenance.
@@ -42,12 +56,16 @@ It assumes no backward-compatibility constraints and no requirement to preserve 
 
 ### 1.3 Runtime Data Flow
 1. User runs command in shell.
-2. Post-command hook emits `command_end` to `clai-shim`.
+2. Post-command hook emits `command_end` to persistent `clai-shim`.
 3. `clai-shim` sends NDJSON to daemon over local IPC.
 4. Daemon updates in-memory aggregates and asynchronously flushes batched state to SQLite.
 5. On prompt update or typed prefix, shell asks `clai suggest`.
 6. Daemon returns top-k suggestions from session cache or computes on demand.
 7. On suggestion accept/dismiss, shell sends feedback event to improve future ranking.
+
+Fallback mode:
+- If persistent helper is unavailable, hook invokes `clai-shim ingest --oneshot`.
+- This mode is fail-open and retains full correctness with degraded latency targets.
 
 ### 1.4 Ingestion-Suggestion Ordering Guarantee
 - Race condition to handle: `command_end` ingestion may arrive slightly after the immediate subsequent `Suggest` call.
@@ -64,6 +82,9 @@ It assumes no backward-compatibility constraints and no requirement to preserve 
 - `bash >= 4.4` preferred, `bash >= 4.0` supported with compatibility branch.
 - `zsh >= 5.0`.
 - `fish >= 3.0`.
+- V2 adapter scope is Unix-like shells only (including WSL distributions). Native PowerShell/cmd adapters are out of scope for V2.
+- Install-time adapter probe must detect shell version and emit explicit diagnostics on unsupported versions.
+- macOS bash `3.2` must be detected and handled with clear warning + degraded compatibility mode (no preexec timing, postexec-only ingestion), unless user upgrades bash.
 
 ### 2.2 Hook Lifecycle Events
 - `session_start`: emitted once per interactive shell instance.
@@ -92,6 +113,19 @@ Bash critical rule:
 - The first operation in post-command hook must capture previous exit status: `local _clai_exit=$?`.
 - No command (including helper invocations) may run before this capture.
 
+Bash coexistence requirements:
+- If `bash-preexec` is present, register hooks through its API instead of replacing traps directly.
+- If `bash-preexec` is not present, install a chaining wrapper that preserves existing `DEBUG` trap behavior.
+- For bash `< 4.4`, define post-command hook in function `__clai_postcmd` and append `; __clai_postcmd` to `PROMPT_COMMAND` with idempotent guard.
+- Document expected behavior under `set -T`, `set -E`, and `shopt -s extdebug`: clai hooks remain best-effort and must not break existing trap semantics; diagnostics are emitted through doctor when unsafe combinations are detected.
+
+Fish-specific implementation notes:
+- Use `set -l` for local variables; never use `local`.
+- Capture exit status with `set -l _clai_exit $status` as the first line of `fish_postexec`.
+- Do not rely on process substitution (`<()`, `>()`); use pipes or `psub` only when unavoidable.
+- Prefer autoloaded hook functions in `~/.config/fish/functions/` for deterministic load order and debuggability.
+- Prefer fish `string` builtins over external `sed`/`awk` for adapter text operations.
+
 ### 2.5 Safety Rules
 - Interactive shell check required before installing hook behavior.
 - Never pass command text via CLI args.
@@ -99,21 +133,62 @@ Bash critical rule:
 - Hook must suppress non-critical stderr noise.
 - Hook must fail open (shell continues normally on hook failure).
 
+Interactivity and TTY detection contract:
+- `bash`/`zsh`: require shell interactive mode (`$-` contains `i` or equivalent), and `test -t 0`.
+- `fish`: require `status is-interactive`, and `test -t 0`.
+- Non-interactive shells must skip hook installation and produce no suggestion side effects.
+
+Hook-path stderr discipline:
+- Fatal hook-path errors may emit one line to stderr: `clai: <message>`.
+- Non-fatal hook-path errors must be suppressed from stderr and routed to daemon logs/doctor surfaces.
+
 ### 2.6 Session ID Assignment
 - `session_id` is required for all command and suggestion events.
 - Preferred strategy: daemon-assigned at shell startup:
 - Shell invokes `clai-shim session-start`; shim gets/creates session ID from daemon and exports it for the shell process.
 - Fallback strategy (daemon unavailable at startup):
-- Shell computes local ID from `hostname + pid + shell_start_time + random_seed`, hashed to stable string.
+- Shell computes local ID from `hostname + pid + shell_start_time + random_seed + container_fingerprint`, hashed to stable string.
+- `random_seed` must be at least 64 bits from CSPRNG (`/dev/urandom` or platform equivalent).
+- `container_fingerprint` should include `/proc/self/cgroup` content or container ID env value when available.
 - Session ID must be stable for shell lifetime and unique across concurrent shells on same host.
+
+### 2.7 Suggestion Presentation Contract
+- `clai suggest` is line-oriented in V2 (no built-in fullscreen TUI).
+- Default rendering mode per shell:
+- shell integrations may render inline hint text using native shell widget APIs
+- CLI output remains plain line output unless explicit `--format` is requested.
+- Completion coexistence:
+- native shell completion remains bound to `Tab` by default
+- clai acceptance bindings must be explicit and opt-in per shell integration.
+- Feedback hooks should fire on explicit accept/dismiss actions where shell supports it.
+- Default accept bindings:
+- `zsh`/`fish` integration defaults to `Right Arrow` accept when cursor is at line end.
+- `bash` defaults to non-invasive hint mode (no default accept keybinding) unless user explicitly enables binding.
+
+### 2.8 CLI Output and Terminal Capability Contract
+- `--color=auto|always|never` must be supported by suggestion-facing CLI commands.
+- Default is `--color=auto`:
+- ANSI formatting only when stdout is a TTY, `$TERM` is not `dumb`, and `$NO_COLOR` is not set.
+- JSON output must never contain ANSI escape sequences.
+- `--format` behavior:
+- `text`: safe for TTY and piped output.
+- `json`: machine-safe, no ANSI, deterministic field order.
+- `fzf`: only valid in interactive TTY; if stdin/stdout are not TTY, command must fail with structured `E_UNSUPPORTED_TTY`.
+- Capability fallback:
+- if `$TERM` is empty or `dumb`, use ASCII-only rendering and no ANSI styling.
+- Width detection for wrapped line output should use terminal ioctls (`x/term`) rather than external tools (`tput`).
+- Accessibility default:
+- textual line output is the baseline behavior; no overlay-only rendering path is allowed in V2.
+- honor `$NO_COLOR` for high-contrast and screen-reader-friendly terminal workflows.
 
 ## 3) IPC and Daemon Resilience
 
 ### 3.1 Transport
 - Unix domain socket on macOS/Linux.
-- Transport abstraction with named-pipe backend for Windows.
+- Transport abstraction keeps named-pipe backend reserved for future native Windows support.
 
 Windows named-pipe contract:
+- This is a forward-compatibility placeholder for V3 native Windows support.
 - Pipe path format: `\\\\.\\pipe\\clai-suggestd-<user-scope>`.
 - `<user-scope>` should be SID-based when available; fallback is a stable username hash.
 - Pipe ACL must restrict access to current user context.
@@ -134,10 +209,14 @@ Windows named-pipe contract:
 ### 3.4 Crash Recovery
 - Single-instance lock file (`.suggestd.lock`).
 - On daemon startup:
-- Acquire lock.
+- Acquire lock using `flock`-style non-blocking exclusive lock.
+- If lock acquisition fails, inspect PID owner:
+- if owner is alive and process is `clai-suggestd`, exit with `E_DAEMON_UNAVAILABLE`.
+- if owner is stale, clean stale lock and retry lock acquisition once.
 - Run migrations.
 - Clean stale socket.
 - Start listeners.
+- Runtime dir must be local filesystem; NFS/network FS for lock files is unsupported.
 
 ### 3.5 Backpressure and Failure Policy
 - Ingestion queue is bounded (default `8192` events).
@@ -158,6 +237,27 @@ Windows named-pipe contract:
 - flush in-flight writes
 - release and reacquire lock/socket around exec handoff
 - preserve zero-downtime best effort; if handoff fails, daemon exits cleanly and client auto-reconnect path recovers.
+
+Signal handling safety:
+- Daemon must ignore `SIGPIPE` to prevent crash on broken socket peers.
+- CLI commands and shim must treat stdout/stderr `EPIPE` as clean termination when downstream pipe closes.
+- V2 line-oriented CLI mode does not require `SIGWINCH`/`SIGTSTP` terminal-state handling.
+
+Windows parity note:
+- `SIGHUP`/`SIGUSR1` semantics are Unix-only in V2 scope.
+- Native Windows control-plane equivalents are specified as future work (control command or service manager integration).
+
+### 3.7 Daemon Lifecycle Management
+- Auto-start is required:
+- first `session_start` path attempts to start daemon opportunistically if not running.
+- explicit management surface is required:
+- `clai suggestd start|stop|status|reload`.
+- Optional platform integration:
+- launchd (macOS) and systemd user service (Linux) recommended, not required.
+- Degraded behavior when daemon unavailable:
+- shell hooks remain fail-open, events may be dropped
+- `clai suggest` returns empty (or explicit error in `--strict`)
+- shell interactivity is never blocked.
 
 ## 4) Storage Model (V2 Schema)
 
@@ -197,6 +297,7 @@ CREATE TABLE command_event (
   branch TEXT,
   cmd_raw TEXT NOT NULL,
   cmd_norm TEXT NOT NULL,
+  cmd_truncated INTEGER NOT NULL DEFAULT 0,
   template_id TEXT,
   exit_code INTEGER,
   duration_ms INTEGER,
@@ -304,6 +405,10 @@ CREATE VIRTUAL TABLE command_event_fts USING fts5(
   tokenize='trigram'
 );
 
+-- Tokenizer shown above is the default.
+-- On fresh DB initialization, tokenizer may be selected from config
+-- (`suggestions.search_fts_tokenizer`: `trigram` or `unicode61`).
+
 CREATE TRIGGER command_event_ai AFTER INSERT ON command_event
 WHEN NEW.ephemeral = 0
 BEGIN
@@ -326,7 +431,10 @@ CREATE TABLE schema_migrations (
 ### 4.3 Storage Policies
 - SQLite WAL mode, one writer goroutine, batched commits every 25-50ms or 100 events.
 - Ephemeral events are never persisted to long-lived aggregates.
-- Optional retention policy by age and max rows.
+- Retention policy is mandatory:
+- retain last `90` days of `command_event` rows.
+- retain maximum `500000` `command_event` rows.
+- when both limits apply, prune oldest rows first.
 
 WAL and checkpoint policy:
 - Set `PRAGMA wal_autocheckpoint=1000` (tunable).
@@ -334,9 +442,11 @@ WAL and checkpoint policy:
 - periodic `PRAGMA wal_checkpoint(PASSIVE)` during steady state
 - `PRAGMA wal_checkpoint(TRUNCATE)` on low-activity windows
 - optional `VACUUM` on size/fragmentation threshold and only outside hot path.
+- FTS maintenance includes periodic `INSERT INTO command_event_fts(command_event_fts) VALUES('optimize')` off hot path.
 
 ### 4.4 Write-Path Transaction Semantics
 - All writes for a single ingested event are applied in one transaction (`BEGIN IMMEDIATE ... COMMIT`) to preserve aggregate consistency.
+- Writer connection sets `PRAGMA busy_timeout=50` (configurable) to absorb short lock contention.
 - Transaction order for non-ephemeral `command_end`:
 - Insert row in `command_event`.
 - Upsert `command_template`.
@@ -348,6 +458,9 @@ WAL and checkpoint policy:
 - If online ranking updates are enabled, enqueue async `rank_weight_profile` update work item after transaction commit.
 - For `ephemeral=1`, only in-memory session-scoped structures are updated; no SQLite write occurs.
 - If transaction fails, daemon records error metric, abandons partial event effects, and keeps process alive.
+- Busy retry policy:
+- on `SQLITE_BUSY` after busy timeout, requeue event once.
+- if second attempt fails, drop event, increment `ingest_drop_count`, and continue.
 
 ### 4.5 Corruption Recovery
 - On startup, if SQLite returns corruption/malformed errors:
@@ -366,8 +479,18 @@ WAL and checkpoint policy:
 ### 5.2 Tokenization
 - Use shell-like tokenizer (`shlex` style) with robust fallback for malformed input.
 - Keep original raw command for audit/debug and rendering decisions.
+- UTF-8 normalization contract:
+- invalid UTF-8 is normalized with `strings.ToValidUTF8(..., \"\uFFFD\")`.
+- raw byte sequence is not preserved in V2.
+- locale transcoding is not attempted in V2; input is treated as UTF-8 byte stream.
 
-### 5.3 Normalization Rules
+### 5.3 Event Size Limits
+- `cmd_raw` ingestion maximum is `16384` bytes (configurable).
+- Events exceeding limit are truncated to max length and marked `cmd_truncated=1`.
+- Truncation is applied before persistence, ranking features, and FTS indexing.
+- Oversized events are never allowed to bypass queue byte budgets.
+
+### 5.4 Normalization Rules
 - Lowercase command/tool token.
 - Collapse whitespace.
 - Replace dynamic values with slots:
@@ -378,11 +501,11 @@ WAL and checkpoint policy:
 - `<msg>`
 - Optionally domain slots (`<branch>`, `<namespace>`, `<service>`).
 
-### 5.4 Template Identity
+### 5.5 Template Identity
 - `template_id = sha256(cmd_norm)`.
 - Store `cmd_norm` and slot count in `command_template`.
 
-### 5.5 Slot Dependency Registry
+### 5.6 Slot Dependency Registry
 - Normalizer maintains optional per-template dependency sets for semantically coupled slots (for example `<namespace>` + `<pod>`, `<cluster>` + `<context>`).
 - Dependency sets are keyed by `slot_key` (pipe-delimited slot indexes such as `1|3`) and used by `slot_correlation`.
 
@@ -526,6 +649,9 @@ Feedback signal sources:
 - L1: per-session hot cache in memory keyed by last event id + prefix hash.
 - L2: per-repo cache for cold session fallback.
 - L3: SQLite aggregate fallback.
+- Global in-memory budget applies to suggestion caches and session hot state (default `50MB`).
+- Eviction policy under pressure:
+- evict L2 entries first (LRU), then L1 entries (LRU).
 
 ### 10.2 Invalidation
 - Invalidate on new `command_end` for session.
@@ -588,6 +714,12 @@ Hot-path limits:
 - Optional sanitization stage for tokens resembling secrets.
 - Never log raw command text at info level.
 
+### 12.4 Privilege and Multi-User Safety
+- Daemon must run as the invoking user only; running daemon as root is forbidden.
+- Commands prefixed with `sudo` are ingested as normal command patterns.
+- Entering root shells (`sudo -i`, `su -`) starts a new logical shell session; if user daemon socket is inaccessible, engine degrades gracefully with no shell interruption.
+- Runtime socket and lock directories remain user-private (`0700`) and must not be shared across users.
+
 ## 13) API and CLI Surface
 
 ### 13.1 Daemon APIs
@@ -599,7 +731,7 @@ Hot-path limits:
 
 API payload contract (JSON over local RPC transport wrapper):
 - `IngestEventRequest`:
-- `event_type`, `session_id`, `shell`, `ts_ms`, `cwd`, `cmd_raw`, `exit_code`, `duration_ms`, `ephemeral`
+- `event_type`, `session_id`, `shell`, `ts_ms`, `cwd`, `cmd_raw`, `cmd_truncated`, `exit_code`, `duration_ms`, `ephemeral`
 - `SuggestRequest`:
 - `session_id`, `cwd`, `repo_key`, `prefix`, `cursor_pos`, `limit`, `include_low_confidence`, `last_cmd_raw`, `last_cmd_norm`, `last_cmd_ts_ms`, `last_event_seq`
 - `SuggestResponse`:
@@ -612,10 +744,11 @@ API payload contract (JSON over local RPC transport wrapper):
 - `session_id`, `action`, `suggested_text`, `executed_text`, `prefix`, `latency_ms`
 
 ### 13.2 CLI Commands
-- `clai suggest [prefix] --limit N --format text|json|fzf`
-- `clai search [query] --limit N --scope session|repo|global --mode fts|prefix`
+- `clai suggest [prefix] --limit N --format text|json|fzf --color auto|always|never`
+- `clai search [query] --limit N --scope session|repo|global --mode fts|prefix --color auto|always|never`
 - `clai suggest-feedback --action accepted|dismissed|edited`
 - `clai suggestions doctor`
+- `clai suggestd start|stop|status|reload`
 
 Note:
 - `clai suggest-feedback` is diagnostic/manual tooling.
@@ -632,6 +765,7 @@ Note:
 - `E_STORAGE_BUSY`: SQLite contention beyond retry budget.
 - `E_STORAGE_CORRUPT`: DB corruption detected; daemon auto-recovers by rotating corrupt DB and rebuilding.
 - `E_TIMEOUT`: operation exceeded hard timeout.
+- `E_UNSUPPORTED_TTY`: output mode requires TTY (for example `--format fzf` when piped).
 - `E_INTERNAL`: unexpected internal error.
 - CLI behavior:
 - `clai suggest` falls back to empty output on daemon failure (non-zero only with `--strict`).
@@ -641,6 +775,8 @@ Note:
 
 ### 14.1 Unit Tests
 - Normalization/tokenization edge cases.
+- UTF-8 invalid sequence normalization and replacement behavior.
+- Event truncation marker behavior and max-size enforcement.
 - Slot extraction and filling correctness.
 - Slot correlation join/fallback correctness and invalid-tuple rejection.
 - Ranking determinism and monotonicity.
@@ -649,6 +785,9 @@ Note:
 - Timeout and non-blocking guarantees in hook sender.
 - Burst mode detector thresholds and quiet-window recovery.
 - `.clai/tasks.yaml` parser validation and merge precedence.
+- Shell version detection and degraded compatibility branch selection.
+- Bash trap chaining behavior with and without `bash-preexec`.
+- Fish adapter lint checks (`set -l`, `$status`, no process substitution).
 
 ### 14.2 Property and Fuzz Tests
 - Fuzz malformed UTF-8 and shell-escaped sequences.
@@ -662,6 +801,8 @@ Note:
 - Migration tests from empty DB to latest schema.
 - Burst-mode ingestion under command storms with bounded durable writes.
 - FTS5 index synchronization (`command_event` <-> `command_event_fts`) and fallback path correctness.
+- Retention pruning correctness (`90d` and `500k` thresholds).
+- Busy lock retry path under synthetic `SQLITE_BUSY` contention.
 
 ### 14.4 Cross-Shell Interactive Tests
 - `go-expect` driven tests for `bash`, `zsh`, `fish`:
@@ -670,6 +811,7 @@ Note:
 - Suggestion acceptance keys
 - Session start/end behavior
 - Non-interactive shell no-op behavior
+- Interactivity detection matrix (TTY and non-TTY combinations)
 
 ### 14.5 Docker Matrix
 - Distros: alpine, ubuntu, debian.
@@ -687,11 +829,13 @@ Note:
 - Kill daemon mid-session; shell remains functional.
 - Simulate stale socket, lock contention, DB busy.
 - Validate automatic recovery and bounded error logs.
+- Validate `SIGPIPE` resilience in daemon and CLI pipe scenarios (`clai suggest | head -1`).
 
 ### 14.8 Security Tests
 - Socket permission validation.
 - Event transport injection and malformed frame handling.
 - Incognito persistence guarantees.
+- Root/sudo session isolation and non-root daemon enforcement.
 
 ### 14.9 Deterministic Replay Validation
 - Maintain a replay corpus of sanitized command sessions with expected top-k suggestions per step.
@@ -707,6 +851,7 @@ Note:
 - Burst mode entries/dropped event counts and active duration.
 - Online learning update count, clamp count, and per-profile sample counts.
 - Search backend split (`fts5` vs fallback) and search latency percentiles.
+- FTS index size bytes and ratio versus primary DB size.
 
 ### 15.2 Structured Logging
 - Debug-level includes template ids and feature contributions.
@@ -724,7 +869,17 @@ Note:
 
 ## 16) Configuration Surface (V2)
 
-All values can be set in config and overridden with environment variables for testing.
+Config format and resolution:
+- File format is TOML.
+- Resolution order:
+- `$CLAI_CONFIG`
+- `$XDG_CONFIG_HOME/clai/config.toml`
+- `$HOME/.config/clai/config.toml`
+- built-in defaults
+- Environment overrides:
+- environment variables override config file values.
+- key mapping rule: `suggestions.enabled` -> `CLAI_SUGGESTIONS_ENABLED`.
+- reserved top-level overrides: `CLAI_DEBUG`, `CLAI_LOG_LEVEL`, `CLAI_SOCKET_PATH`.
 
 Core:
 - `suggestions.enabled=true`
@@ -737,6 +892,9 @@ Hook/transport:
 - `suggestions.hook_write_timeout_ms=20`
 - `suggestions.socket_path=""` (auto default)
 - `suggestions.ingest_sync_wait_ms=5`
+- `suggestions.interactive_require_tty=true`
+- `suggestions.cmd_raw_max_bytes=16384`
+- `suggestions.shim_mode=auto` (`auto|persistent|oneshot`)
 
 Ranking:
 - `suggestions.weights.transition=0.30`
@@ -767,6 +925,8 @@ Backpressure:
 - `suggestions.burst_events_threshold=10`
 - `suggestions.burst_window_ms=100`
 - `suggestions.burst_quiet_ms=500`
+- `suggestions.ingest_queue_max_events=8192`
+- `suggestions.ingest_queue_max_bytes=8388608`
 
 Task discovery:
 - `suggestions.task_playbook_enabled=true`
@@ -776,6 +936,15 @@ Task discovery:
 Search:
 - `suggestions.search_fts_enabled=true`
 - `suggestions.search_fallback_scan_limit=2000`
+- `suggestions.search_fts_tokenizer=trigram` (`trigram|unicode61`)
+
+Storage:
+- `suggestions.retention_days=90`
+- `suggestions.retention_max_events=500000`
+- `suggestions.sqlite_busy_timeout_ms=50`
+
+Cache:
+- `suggestions.cache_memory_budget_mb=50`
 
 Privacy:
 - `suggestions.incognito_mode=ephemeral` (`off|ephemeral|no_send`)
@@ -799,6 +968,7 @@ Behavioral gates:
 - Risk tagging invariant holds for destructive command patterns.
 - Correlated slot validity checks pass for templates with dependency sets.
 - Online learning guardrails hold (weights remain within configured ranges).
+- Hook behavior remains correct with persistent and fallback shim modes.
 
 ## 18) Acceptance Checklist
 
@@ -810,6 +980,7 @@ Behavioral gates:
 - Deterministic ranking and stable top-k behavior across repeated runs.
 - `.clai/tasks.yaml` discovery, reload, and boost behavior validated.
 - Deep-history `clai search` behavior validated with FTS and fallback backend.
+- CLI color and format contracts validated for TTY and non-TTY modes.
 
 ## 19) Correctness Invariants
 
@@ -835,3 +1006,7 @@ The following invariants are mandatory and must be continuously asserted in test
 - For templates with configured slot dependency sets, emitted multi-slot suggestions must match an observed tuple or exceed configured correlation confidence.
 - `I10 Learning Guardrails`:
 - Adaptive updates must never push any weight outside configured min/max bounds, and must preserve deterministic ordering for a fixed profile snapshot.
+- `I11 Event Size Boundedness`:
+- Persisted and indexed `cmd_raw` values must never exceed configured max byte limit, and truncated events must be marked.
+- `I12 Fail-Open Shell Safety`:
+- Loss of daemon, helper, pipe, or socket must not block prompt rendering or command execution.
