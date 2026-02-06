@@ -271,9 +271,19 @@ No migration bridge to V1 is required. V2 initializes and owns its schema.
 - `command_stat`
 - `slot_stat`
 - `slot_correlation`
+- `project_type_stat`
+- `project_type_transition`
+- `pipeline_event`
+- `pipeline_transition`
+- `pipeline_pattern`
+- `failure_recovery`
+- `workflow_pattern`
+- `workflow_step`
 - `task_candidate`
 - `suggestion_cache`
 - `suggestion_feedback`
+- `session_alias`
+- `dismissal_pattern`
 - `rank_weight_profile`
 - `command_event_fts` (virtual table)
 - `schema_migrations`
@@ -284,6 +294,7 @@ CREATE TABLE session (
   id TEXT PRIMARY KEY,
   shell TEXT NOT NULL,
   started_at_ms INTEGER NOT NULL,
+  project_types TEXT,
   host TEXT,
   user_name TEXT
 );
@@ -307,6 +318,7 @@ CREATE TABLE command_event (
 CREATE TABLE command_template (
   template_id TEXT PRIMARY KEY,
   cmd_norm TEXT NOT NULL,
+  tags TEXT,
   slot_count INTEGER NOT NULL,
   first_seen_ms INTEGER NOT NULL,
   last_seen_ms INTEGER NOT NULL
@@ -428,6 +440,16 @@ CREATE TABLE schema_migrations (
 );
 ```
 
+Additional schema objects:
+- Advanced V2 objects are also required for project-type priors, pipelines, failure recovery, workflows, aliases, and persistent dismissals:
+- `project_type_stat`, `project_type_transition`
+- `pipeline_event`, `pipeline_transition`, `pipeline_pattern`
+- `failure_recovery`
+- `workflow_pattern`, `workflow_step`
+- `session_alias`
+- `dismissal_pattern`
+- The full SQL sketch for these additive objects is maintained in `/Users/runger/.claude-worktrees/clai/happy-hypatia/specs/tech_suggestions_ext_v1_appendix.md`.
+
 ### 4.3 Storage Policies
 - SQLite WAL mode, one writer goroutine, batched commits every 25-50ms or 100 events.
 - Ephemeral events are never persisted to long-lived aggregates.
@@ -454,6 +476,10 @@ WAL and checkpoint policy:
 - Update `transition_stat` if previous template is known for session.
 - Update `slot_stat` values extracted from template/args alignment.
 - Update `slot_correlation` for configured slot tuples (example: `<namespace>|<pod>`).
+- Update project-type aggregates (`project_type_stat`, `project_type_transition`) when project types are active.
+- Update directory-scoped aggregates using `scope=dir:<hash>` for repo-relative cwd buckets.
+- For compound commands, update `pipeline_event`, `pipeline_transition`, and `pipeline_pattern`.
+- Update failure recovery aggregates when previous command in session failed.
 - Update in-memory cache index and invalidation markers.
 - If online ranking updates are enabled, enqueue async `rank_weight_profile` update work item after transaction commit.
 - For `ephemeral=1`, only in-memory session-scoped structures are updated; no SQLite write occurs.
@@ -461,6 +487,10 @@ WAL and checkpoint policy:
 - Busy retry policy:
 - on `SQLITE_BUSY` after busy timeout, requeue event once.
 - if second attempt fails, drop event, increment `ingest_drop_count`, and continue.
+- Keep write-path bounded with feature caps:
+- max project types per event
+- `pipeline_max_segments`
+- bounded workflow activation set per session (in-memory).
 
 ### 4.5 Corruption Recovery
 - On startup, if SQLite returns corruption/malformed errors:
@@ -484,6 +514,10 @@ WAL and checkpoint policy:
 - raw byte sequence is not preserved in V2.
 - locale transcoding is not attempted in V2; input is treated as UTF-8 byte stream.
 
+Pre-tokenization stages:
+- Alias expansion (session-scoped) is applied to first token before normalization; expansion depth is bounded and cycles are rejected.
+- Pipeline/compound splitter identifies unquoted operators (`|`, `|&`, `&&`, `||`, `;`) and creates segment views for pipeline-aware learning.
+
 ### 5.3 Event Size Limits
 - `cmd_raw` ingestion maximum is `16384` bytes (configurable).
 - Events exceeding limit are truncated to max length and marked `cmd_truncated=1`.
@@ -500,6 +534,7 @@ WAL and checkpoint policy:
 - `<url>`
 - `<msg>`
 - Optionally domain slots (`<branch>`, `<namespace>`, `<service>`).
+- Extract deterministic semantic tags into `command_template.tags` for describe-mode search (`tool`, `subcommand`, selected flag semantics, argument-pattern tags).
 
 ### 5.5 Template Identity
 - `template_id = sha256(cmd_norm)`.
@@ -519,15 +554,28 @@ WAL and checkpoint policy:
 
 ### 6.2 Retrieval Sources
 - Session transitions.
+- Failure recovery candidates (only when last command failed).
+- Active workflow next-step candidates.
+- Pipeline pattern recall.
 - Repo transitions.
+- Directory-scoped transitions.
 - Global transitions.
-- Session/repo/global frequency priors.
+- Session/repo/dir/global frequency priors.
+- Project-type transitions.
 - Task candidates from repo discovery.
+- Playbook conditional task triggers (`after`, `after_failure`).
+- Discovery candidates (low-priority gated source).
 - Typo correction candidates after failures.
 
 ### 6.3 Retrieval Budget
 - Retrieve up to 200 candidates total in ranked source order.
 - Hard cap per source to avoid source domination.
+- Recommended source caps:
+- failure recovery: 5
+- workflow next-step: 3
+- pipeline patterns: 10
+- project-type transitions: 30
+- discovery: 2
 
 ### 6.4 Prefix Filtering Modes
 - Empty prefix: pure next-step mode.
@@ -536,7 +584,7 @@ WAL and checkpoint policy:
 ## 7) Ranking and Post-Processing
 
 ### 7.1 Ranking Model (Deterministic Weighted Score)
-`score = w1*transition + w2*frequency + w3*success + w4*prefix + w5*affinity + w6*task + w7*feedback - w8*risk_penalty`
+`score = w1*transition_effective + w2*frequency + w3*success + w4*prefix + w5*affinity_enhanced + w6*task_extended + w7*feedback_extended + w9*project_type_affinity + w10*failure_recovery - w8*risk_penalty`
 
 Default initial weights:
 - `w1 transition = 0.30`
@@ -547,21 +595,29 @@ Default initial weights:
 - `w6 task = 0.05`
 - `w7 feedback = 0.15`
 - `w8 risk_penalty = 0.20`
+- `w9 project_type_affinity = 0.08`
+- `w10 failure_recovery = 0.12`
 
 Scoring notes:
 - Each feature is normalized into `[0, 1]` before weighting.
 - Transition and frequency values are log-scaled before normalization.
 - Risk penalty is applied post-aggregation and can force candidate suppression.
 - Per request, weight vector is resolved from `rank_weight_profile` (`session` -> `repo` -> `global_default`) and snapshotted for deterministic ordering within that request.
+- `transition_effective` may be amplified by workflow activation and pipeline confidence.
+- `affinity_enhanced` includes directory-scope locality.
+- `task_extended` includes playbook conditional trigger boosts.
+- `feedback_extended` includes persistent dismissal penalties.
 
 ### 7.2 Feature Definitions
-- `transition`: decayed edge weight from previous template.
+- `transition_effective`: decayed edge weight from previous template, optionally amplified by workflow and pipeline signals.
 - `frequency`: decayed command/template score.
 - `success`: success ratio for candidate template.
 - `prefix`: exact + fuzzy prefix match quality.
-- `affinity`: cwd/repo/branch proximity.
-- `task`: boost for discovered project tasks.
-- `feedback`: recent accept boost and dismiss penalty.
+- `affinity_enhanced`: cwd/repo/branch + directory-scope proximity.
+- `task_extended`: boost for discovered tasks and playbook trigger matches.
+- `feedback_extended`: recent accept boost plus persistent dismissal learning.
+- `project_type_affinity`: normalized strength of command in active project type(s).
+- `failure_recovery`: recovery relevance for recent non-zero exit context.
 - `risk_penalty`: destructive pattern penalty.
 
 ### 7.3 Confidence
@@ -608,6 +664,7 @@ Scoring notes:
 ### 8.1 Trigger
 - Primary trigger: previous command exit code `127`.
 - Optional trigger: explicit parser hints for common "unknown command" patterns.
+- Broader failure-context recovery is enabled when previous command exit code is non-zero.
 
 ### 8.2 Matching
 - Damerau-Levenshtein on first token and command stem.
@@ -616,6 +673,7 @@ Scoring notes:
 ### 8.3 Ranking Behavior
 - Typo-fixed candidate gets temporary high boost for immediate next prompt.
 - Boost decays quickly if not accepted.
+- Failure-recovery candidates are prioritized after failed commands and weighted by observed recovery success.
 
 ## 9) Learning Loop and Feedback
 
@@ -638,6 +696,9 @@ Feedback signal sources:
 - Edited-then-run updates slot statistics and normalizer correction maps.
 - Accepted and accepted_implicit events update `slot_correlation` counts for dependency sets when all required slot values are present.
 - Accepted events trigger adaptive weight update pipeline for the active profile.
+- Persistent dismissal learning:
+- repeated context-specific dismissals graduate from temporary to learned suppression.
+- explicit `never` action sets permanent block until explicit `unblock`.
 
 ### 9.3 Drift Control
 - Decay all feedback effects over time.
@@ -685,6 +746,9 @@ Hot-path limits:
 - Watch `.clai/tasks.yaml` with debounce; apply incremental refresh on checksum change.
 - Playbook entries use `source='playbook'` and receive configured boost (`suggestions.task_playbook_boost`) over auto-discovered tasks.
 - Invalid YAML never blocks suggestions; daemon keeps last valid snapshot and reports parse error in diagnostics.
+- Extended playbook mode:
+- support task dependencies (`after`) and failure dependencies (`after_failure`) for conditional suggestions.
+- support `workflows` seeding into workflow pattern store.
 
 ### 11.3 Data Contract
 - Each task candidate includes `kind`, `name`, `command_text`, optional description, `source`, and `priority_boost`.
@@ -698,6 +762,15 @@ Hot-path limits:
 - `tags` (optional)
 - `enabled` (optional, default true)
 - Parse failure is soft; previous valid set stays active until fixed.
+- Extended optional fields:
+- `after`: task/template triggers
+- `after_failure`: triggers only when previous command failed
+- `priority`: `low|normal|high`
+- optional `workflows` block with ordered `steps` arrays
+- Validation rules:
+- no circular `after` graphs
+- all referenced task names must resolve
+- workflow steps must normalize successfully.
 
 ## 12) Security and Privacy
 
@@ -736,16 +809,17 @@ API payload contract (JSON over local RPC transport wrapper):
 - `session_id`, `cwd`, `repo_key`, `prefix`, `cursor_pos`, `limit`, `include_low_confidence`, `last_cmd_raw`, `last_cmd_norm`, `last_cmd_ts_ms`, `last_event_seq`
 - `SuggestResponse`:
 - `suggestions[] { text, cmd_norm, source, score, confidence, reasons[], risk }`, `cache_status`, `latency_ms`
+- `SuggestResponse` may also include `timing_hint { user_speed_class, suggested_pause_threshold_ms }`
 - `SearchRequest`:
-- `query`, `scope`, `limit`, `repo_key`, `session_id`, `mode`
+- `query`, `scope`, `limit`, `repo_key`, `session_id`, `mode` (`fts|prefix|describe|auto`)
 - `SearchResponse`:
-- `results[] { cmd_raw, cmd_norm, ts_ms, repo_key, rank_score }`, `latency_ms`, `backend`
+- `results[] { cmd_raw, cmd_norm, ts_ms, repo_key, rank_score, tags?, matched_tags? }`, `latency_ms`, `backend`
 - `RecordFeedbackRequest`:
 - `session_id`, `action`, `suggested_text`, `executed_text`, `prefix`, `latency_ms`
 
 ### 13.2 CLI Commands
 - `clai suggest [prefix] --limit N --format text|json|fzf --color auto|always|never`
-- `clai search [query] --limit N --scope session|repo|global --mode fts|prefix --color auto|always|never`
+- `clai search [query] --limit N --scope session|repo|global --mode fts|prefix|describe|auto --color auto|always|never`
 - `clai suggest-feedback --action accepted|dismissed|edited`
 - `clai suggestions doctor`
 - `clai suggestd start|stop|status|reload`
@@ -754,6 +828,7 @@ Note:
 - `clai suggest-feedback` is diagnostic/manual tooling.
 - Primary feedback path is automatic from shell integrations and implicit matching heuristics.
 - `clai search` prefers SQLite FTS5 (`backend=fts5`) and falls back to prefix/LIKE scan (`backend=fallback`) when FTS is unavailable.
+- `describe` and `auto` search modes use deterministic tag matching (no LLM in hot path).
 
 ### 13.3 Error Model and Response Contract
 - All daemon API responses must include one of:
@@ -788,6 +863,13 @@ Note:
 - Shell version detection and degraded compatibility branch selection.
 - Bash trap chaining behavior with and without `bash-preexec`.
 - Fish adapter lint checks (`set -l`, `$status`, no process substitution).
+- Project-type marker detection precedence, overrides, and cache invalidation.
+- Pipeline splitter correctness for quoted operators, subshells, and heredoc boundaries.
+- Failure recovery classification and update math.
+- Workflow activation state transitions and timeout behavior.
+- Alias expansion depth/cycle protection and alias-preferred rendering.
+- Persistent dismissal state-machine transitions (`temporary|learned|permanent`).
+- Describe-mode tag extraction and synonym matching.
 
 ### 14.2 Property and Fuzz Tests
 - Fuzz malformed UTF-8 and shell-escaped sequences.
@@ -803,6 +885,8 @@ Note:
 - FTS5 index synchronization (`command_event` <-> `command_event_fts`) and fallback path correctness.
 - Retention pruning correctness (`90d` and `500k` thresholds).
 - Busy lock retry path under synthetic `SQLITE_BUSY` contention.
+- Retrieval priority order enforcement across all advanced sources.
+- Playbook `after`/`after_failure` triggers and workflow seeding behavior.
 
 ### 14.4 Cross-Shell Interactive Tests
 - `go-expect` driven tests for `bash`, `zsh`, `fish`:
@@ -824,6 +908,8 @@ Note:
 - Load test ingest burst (`10k` events) with durability checks.
 - Burst mode benchmark verifies queue stability under loop-like traffic.
 - Search benchmark verifies FTS query p95 budget under large history corpus.
+- Ingestion overhead benchmarks with project-type, pipeline, and failure-recovery features enabled.
+- Suggest latency benchmarks with workflow and directory-scoped retrieval active.
 
 ### 14.7 Reliability and Chaos Tests
 - Kill daemon mid-session; shell remains functional.
@@ -852,6 +938,11 @@ Note:
 - Online learning update count, clamp count, and per-profile sample counts.
 - Search backend split (`fts5` vs fallback) and search latency percentiles.
 - FTS index size bytes and ratio versus primary DB size.
+- Project-type detection cache hit rate and scan latency.
+- Pipeline splitter invocation count and segment distribution.
+- Failure-recovery hit rate and accepted recovery rate.
+- Workflow activation count and next-step acceptance rate.
+- Discovery suggestion show/accept/dismiss/ignore rates.
 
 ### 15.2 Structured Logging
 - Debug-level includes template ids and feature contributions.
@@ -866,6 +957,7 @@ Note:
 - Last discovery errors
 - FTS availability and last index sync status
 - Playbook parse status (`.clai/tasks.yaml`)
+- Active advanced features and shell-capability matrix (`zsh|bash|fish` support states)
 
 ## 16) Configuration Surface (V2)
 
@@ -937,597 +1029,9 @@ Search:
 - `suggestions.search_fts_enabled=true`
 - `suggestions.search_fallback_scan_limit=2000`
 - `suggestions.search_fts_tokenizer=trigram` (`trigram|unicode61`)
-
-Storage:
-- `suggestions.retention_days=90`
-- `suggestions.retention_max_events=500000`
-- `suggestions.sqlite_busy_timeout_ms=50`
-
-Cache:
-- `suggestions.cache_memory_budget_mb=50`
-
-Privacy:
-- `suggestions.incognito_mode=ephemeral` (`off|ephemeral|no_send`)
-- `suggestions.redact_sensitive_tokens=true`
-
-## 17) Quality Gates
-
-Build-time gates:
-- Unit + integration + interactive shell suites must pass.
-- Docker matrix (`alpine`, `ubuntu`, `debian`) must pass with deterministic test parallelism.
-- Fuzz suite must run for minimum configured time budget.
-
-Performance gates:
-- Hook overhead regression over baseline must be less than 15%.
-- Suggest P95 regression must be less than 10% between adjacent commits.
-- Cold-start daemon readiness under 500ms on CI runners.
-
-Behavioral gates:
-- Session isolation invariants hold.
-- Ephemeral mode persistence invariant holds (zero persistent writes from ephemeral events).
-- Risk tagging invariant holds for destructive command patterns.
-- Correlated slot validity checks pass for templates with dependency sets.
-- Online learning guardrails hold (weights remain within configured ranges).
-- Hook behavior remains correct with persistent and fallback shim modes.
-
-## 18) Acceptance Checklist
-
-- Suggestion API meets latency budgets.
-- Cross-shell tests pass on local and Docker matrix.
-- Non-interactive shells remain unaffected.
-- Incognito modes validated with persistence assertions.
-- Hook path remains non-blocking under daemon failure.
-- Deterministic ranking and stable top-k behavior across repeated runs.
-- `.clai/tasks.yaml` discovery, reload, and boost behavior validated.
-- Deep-history `clai search` behavior validated with FTS and fallback backend.
-- CLI color and format contracts validated for TTY and non-TTY modes.
-
-## 19) Correctness Invariants
-
-The following invariants are mandatory and must be continuously asserted in tests:
-
-- `I1 Session Isolation`:
-- Suggestions for `session_id=A` must not include session-scoped transitions derived exclusively from `session_id=B`.
-- `I2 Ephemeral Persistence`:
-- Events with `ephemeral=1` must not produce persistent writes to `command_event`, `command_stat`, `transition_stat`, or `slot_stat`.
-- `I3 Deterministic Ranking`:
-- With identical input state (DB snapshot + in-memory cache + clock seed), returned top-k must be byte-for-byte identical.
-- `I4 Bounded Hook Latency`:
-- Hook processing time must remain below configured timeout budget and never block shell prompt rendering.
-- `I5 Transactional Aggregate Consistency`:
-- After successful commit of a non-ephemeral `command_end`, dependent aggregate tables reflect the same event version atomically.
-- `I6 Risk Label Integrity`:
-- Commands matching destructive patterns must always carry risk metadata and applicable penalty before final ranking.
-- `I7 Cache Coherency`:
-- Any new `command_end` for a session invalidates stale cache entries for that session before the next suggest response.
-- `I8 Crash Safety`:
-- Daemon crash during ingestion must not leave partially applied aggregate updates visible after restart.
-- `I9 Correlated Slot Validity`:
-- For templates with configured slot dependency sets, emitted multi-slot suggestions must match an observed tuple or exceed configured correlation confidence.
-- `I10 Learning Guardrails`:
-- Adaptive updates must never push any weight outside configured min/max bounds, and must preserve deterministic ordering for a fixed profile snapshot.
-- `I11 Event Size Boundedness`:
-- Persisted and indexed `cmd_raw` values must never exceed configured max byte limit, and truncated events must be marked.
-- `I12 Fail-Open Shell Safety`:
-- Loss of daemon, helper, pipe, or socket must not block prompt rendering or command execution.
-
-## 20) Enhancement Pack (Additive, No Removal)
-
-This section integrates an additive set of V2 extensions. It does not remove any prior contracts in this document. Where an extended rule differs from earlier defaults, this section adds stricter or more specific behavior while keeping existing guarantees.
-
-### 20.1 Project-Type-Aware Context Scoping
-
-Problem:
-- Repo-level affinity is not enough for cross-repo transfer inside the same technical domain (for example Go-to-Go workflows).
-
-Detection:
-- On `cwd` change (derived from consecutive command events), daemon scans upward for markers.
-- Stop scanning at first `.git` root or after 5 directory levels.
-- Multiple markers may match and produce multiple project types.
-- Marker map:
-- `go.mod` -> `go`
-- `Cargo.toml` -> `rust`
-- `pyproject.toml`, `setup.py`, `requirements.txt` -> `python`
-- `package.json` -> `node`
-- `Gemfile` -> `ruby`
-- `pom.xml` -> `java-maven`
-- `build.gradle` -> `java-gradle`
-- `CMakeLists.txt` -> `cpp-cmake`
-- `Makefile` -> `make`
-- `Dockerfile`, `docker-compose.yml` -> `docker`
-- `helmfile.yaml` -> `k8s-helm`
-- `kustomization.yaml` -> `k8s-kustomize`
-- `terraform/*.tf` -> `terraform`
-- `serverless.yml` -> `serverless`
-- `.clai/project.yaml` -> user-defined override.
-- Persisted format in session context: sorted, pipe-delimited string, for example `docker|go|k8s-helm`.
-
-Schema additions:
-```sql
-ALTER TABLE session ADD COLUMN project_types TEXT;
-
-CREATE TABLE project_type_stat (
-  project_type TEXT NOT NULL,
-  template_id  TEXT NOT NULL,
-  score        REAL NOT NULL,
-  count        INTEGER NOT NULL,
-  last_seen_ms INTEGER NOT NULL,
-  PRIMARY KEY(project_type, template_id)
-);
-
-CREATE TABLE project_type_transition (
-  project_type      TEXT NOT NULL,
-  prev_template_id  TEXT NOT NULL,
-  next_template_id  TEXT NOT NULL,
-  weight            REAL NOT NULL,
-  count             INTEGER NOT NULL,
-  last_seen_ms      INTEGER NOT NULL,
-  PRIMARY KEY(project_type, prev_template_id, next_template_id)
-);
-```
-
-Ingestion extension:
-- For non-ephemeral `command_end` with `repo_key`, resolve project types using repo-key cache (`60s` TTL) plus fsnotify invalidation.
-- Upsert project-type frequency and transition rows for each active project type in the same write transaction.
-
-Candidate retrieval extension:
-- Add project-type transition retrieval source with cap `30`.
-- For multiple active types, union candidates and keep max weight per template.
-
-Ranking extension:
-- Add feature `project_type_affinity` and weight `w9`.
-- Formula extension appears in section 20.13.
-- Default: `suggestions.weights.project_type_affinity=0.08`.
-
-Custom types:
-- `.clai/project.yaml` may define:
-```yaml
-project_types:
-  - go
-  - k8s-helm
-  - custom:ml-pipeline
-```
-- When present, this file overrides auto-detection.
-
-### 20.2 Pipeline and Compound Command Awareness
-
-Problem:
-- Single-command normalization loses high-signal transitions within compound commands and pipelines.
-
-Splitter stage (before existing normalization):
-- Split on unquoted/unescaped operators: `|`, `|&`, `&&`, `||`, `;`.
-- Treat subshell bodies (`$()`, backticks) as opaque.
-- Ignore `&` as background operator for pipeline modeling.
-
-Schema additions:
-```sql
-CREATE TABLE pipeline_event (
-  id               INTEGER PRIMARY KEY AUTOINCREMENT,
-  command_event_id INTEGER NOT NULL REFERENCES command_event(id),
-  position         INTEGER NOT NULL,
-  operator         TEXT,
-  cmd_raw          TEXT NOT NULL,
-  cmd_norm         TEXT NOT NULL,
-  template_id      TEXT NOT NULL,
-  UNIQUE(command_event_id, position)
-);
-
-CREATE TABLE pipeline_transition (
-  scope            TEXT NOT NULL,
-  prev_template_id TEXT NOT NULL,
-  next_template_id TEXT NOT NULL,
-  operator         TEXT NOT NULL,
-  weight           REAL NOT NULL,
-  count            INTEGER NOT NULL,
-  last_seen_ms     INTEGER NOT NULL,
-  PRIMARY KEY(scope, prev_template_id, next_template_id, operator)
-);
-
-CREATE TABLE pipeline_pattern (
-  pattern_hash     TEXT PRIMARY KEY,
-  template_chain   TEXT NOT NULL,
-  operator_chain   TEXT NOT NULL,
-  scope            TEXT NOT NULL,
-  count            INTEGER NOT NULL,
-  last_seen_ms     INTEGER NOT NULL,
-  cmd_norm_display TEXT NOT NULL
-);
-```
-
-Ingestion extension:
-- After `command_event` insert, split command.
-- If segment count > 1:
-- insert `pipeline_event` rows
-- upsert adjacent `pipeline_transition` rows
-- upsert full `pipeline_pattern`.
-- Bound by `suggestions.pipeline_max_segments`.
-
-Suggestion modes:
-- Mode A (continuation): when prefix ends with pipeline/logical operator, predict only next segment.
-- Mode B (pattern recall): suggest full known multi-step pipeline pattern starting from first segment.
-
-Ranking integration:
-- For pattern recall, apply `pipeline_confidence` as transition amplifier.
-- For continuation mode, use pipeline-transition signal in place of generic transition for that candidate.
-
-Edge-case rules:
-- Respect quoted operators.
-- Treat heredoc body as opaque first segment content.
-- Do not split inside `$()` or backticks.
-
-### 20.3 Error-Context Recovery Suggestions
-
-Problem:
-- Exit code `127` typo repair exists, but broader non-zero failure recovery is not modeled.
-
-Schema addition:
-```sql
-CREATE TABLE failure_recovery (
-  scope                TEXT NOT NULL,
-  failed_template_id   TEXT NOT NULL,
-  exit_code_class      TEXT NOT NULL,
-  recovery_template_id TEXT NOT NULL,
-  weight               REAL NOT NULL,
-  count                INTEGER NOT NULL,
-  success_rate         REAL NOT NULL,
-  last_seen_ms         INTEGER NOT NULL,
-  source               TEXT NOT NULL DEFAULT 'learned',
-  PRIMARY KEY(scope, failed_template_id, exit_code_class, recovery_template_id)
-);
-```
-
-Exit classes:
-- `code:1`, `code:2`, `code:126`, `code:127`, `code:128+`, `code:255`, `nonzero`.
-
-Ingestion extension:
-- If previous command failed and current command succeeds, upsert failure->recovery edge and success-rate.
-- If previous and current both fail, apply negative evidence decay for candidate recovery edge.
-
-Retrieval extension:
-- When last command failed, add `failure_recovery` source near top priority with cap `5`.
-
-Ranking extension:
-- Add feature weight `w10` (`suggestions.weights.failure_recovery=0.12`).
-- `failure_recovery = recovery_weight * success_rate * recency_decay`.
-
-Bootstrap patterns:
-- Seed small set of common patterns with low initial weight and `source='bootstrap'`.
-- Safety gate:
-- bootstrap recoveries must pass existing risk policy before ranking.
-- destructive or high-risk bootstrap recoveries may be disabled by default and gated by config.
-
-### 20.4 Multi-Step Workflow Detection
-
-Problem:
-- First-order transitions cannot model longer workflows.
-
-Schema additions:
-```sql
-CREATE TABLE workflow_pattern (
-  pattern_id        TEXT PRIMARY KEY,
-  template_chain    TEXT NOT NULL,
-  display_chain     TEXT NOT NULL,
-  scope             TEXT NOT NULL,
-  step_count        INTEGER NOT NULL,
-  occurrence_count  INTEGER NOT NULL,
-  last_seen_ms      INTEGER NOT NULL,
-  avg_duration_ms   INTEGER
-);
-
-CREATE TABLE workflow_step (
-  pattern_id   TEXT NOT NULL REFERENCES workflow_pattern(pattern_id),
-  step_index   INTEGER NOT NULL,
-  template_id  TEXT NOT NULL,
-  PRIMARY KEY(pattern_id, step_index)
-);
-
-CREATE INDEX idx_workflow_step_template ON workflow_step(template_id);
-```
-
-Background mining:
-- Run every `suggestions.workflow_mine_interval_ms` or on session end.
-- Generate contiguous subsequences of length `3-6`.
-- Generate limited non-contiguous subsequences with max gap `2`.
-- Promote subsequences with minimum count threshold.
-- Prune subset patterns when longer patterns have near-equal support.
-
-Runtime activation:
-- In-memory activation state per session tracks pattern progress, recency, and score.
-- Expire stale activations by timeout or lack of advancement.
-
-Candidate generation:
-- Add source `workflow` for next-step suggestion, cap `3`.
-- Use existing slot fill rules for workflow next template.
-
-Ranking integration:
-- Workflow signal amplifies transition instead of adding new model dimension:
-- `effective_transition = base_transition + workflow_boost * activation_score`.
-
-UX metadata:
-- Include workflow progress reasons in `SuggestResponse.reasons[]`.
-
-### 20.5 Adaptive Suggestion Timing
-
-Problem:
-- Static suggestion timing is noisy for fast typists and delayed for exploratory users.
-
-Adapter-level cadence model:
-- Capture rolling typing metrics:
-- chars/sec
-- pause events over threshold
-- prefix length at pause
-- backspace count.
-
-State machine:
-- `IDLE` -> `TYPING` -> `FAST_TYPING` or `PAUSED` -> `REQUEST`.
-- Request immediately on pause.
-- Suppress frequent requests during fast typing.
-
-Shell support matrix:
-- `zsh`: full adaptive cadence via ZLE hooks.
-- `fish`: rely on fish-native cadence entry points; adapter augments where possible.
-- `bash`: fallback simplified policy on prompt update due hook limitations.
-
-Daemon hinting:
-- `SuggestResponse` may include:
-```json
-{
-  "timing_hint": {
-    "user_speed_class": "fast|moderate|exploratory",
-    "suggested_pause_threshold_ms": 250
-  }
-}
-```
-
-### 20.6 Alias Resolution and Rendering
-
-Problem:
-- Alias-heavy environments fragment template learning.
-
-Schema addition:
-```sql
-CREATE TABLE session_alias (
-  session_id TEXT NOT NULL,
-  alias_key  TEXT NOT NULL,
-  expansion  TEXT NOT NULL,
-  PRIMARY KEY(session_id, alias_key)
-);
-```
-
-Session metadata:
-- Capture alias map on `session_start` and keep in memory for normalization/rendering.
-
-Normalization extension:
-- First step expands alias in first token.
-- Iterative expansion bounded by `suggestions.alias_max_expansion_depth`.
-- Detect cycles and stop expansion safely.
-- Continue with existing normalization on expanded command.
-
-Dual representation:
-- Keep `cmd_raw` unexpanded for display and audit.
-- Normalize `cmd_norm` from expanded command for template identity.
-
-Rendering extension:
-- If alias-preferred rendering enabled, rewrite suggestion back to user alias form when mapping is available.
-
-Mid-session alias changes:
-- Recommended mode:
-- re-snapshot aliases after commands beginning with `alias`, `unalias`, or `abbr`.
-
-### 20.7 Persistent Dismissal Learning
-
-Problem:
-- Repeated dismissals should become durable context-specific suppression.
-
-Schema addition:
-```sql
-CREATE TABLE dismissal_pattern (
-  scope                  TEXT NOT NULL,
-  context_template_id    TEXT NOT NULL,
-  dismissed_template_id  TEXT NOT NULL,
-  dismissal_count        INTEGER NOT NULL,
-  last_dismissed_ms      INTEGER NOT NULL,
-  suppression_level      TEXT NOT NULL,
-  PRIMARY KEY(scope, context_template_id, dismissed_template_id)
-);
-```
-
-State machine:
-- `NONE` -> `TEMPORARY` -> `LEARNED` -> `PERMANENT`.
-- `LEARNED` threshold defaults to 3 dismissals in same context.
-- Explicit `never` feedback sets `PERMANENT` block.
-- Explicit `unblock` feedback reverses permanent suppression.
-- Acceptance in same context resets suppression.
-
-Ranking integration:
-- Add context-aware negative feedback contribution from dismissal state.
-- `PERMANENT` suppression may filter candidate before ranking.
-
-### 20.8 Directory-Scoped Frequency and Transitions
-
-Problem:
-- Repo-level scope is too coarse for monorepos.
-
-Directory scope key:
-- Compute path from repo root to cwd.
-- Truncate to max depth (`suggestions.directory_scope_max_depth`, default `3`).
-- Build scope id: `dir:` + hash(repo_key + "/" + dir_scope_path) prefix.
-
-Storage strategy:
-- Reuse existing `command_stat` and `transition_stat` `scope` column with `dir:<hash>` values.
-- No new table required.
-
-Ingestion extension:
-- For non-ephemeral repo events, upsert `command_stat` and `transition_stat` in directory scope.
-
-Retrieval extension:
-- Add directory-scoped transitions between repo and project-type sources.
-
-Affinity enhancement:
-- `affinity = 0.4*repo_match + 0.3*dir_scope_match + 0.2*branch_match + 0.1*cwd_exact_match`.
-
-### 20.9 Explainable Suggestions ("Why This?")
-
-Reason model:
-- Each suggestion returns top 1-3 reasons by contribution magnitude.
-- Standard reason shape:
-```go
-type SuggestionReason struct {
-  Type         string
-  Description  string
-  Contribution float64
-}
-```
-
-Reason types:
-- `transition`, `frequency`, `success`, `directory`, `project_type`, `task`, `workflow`, `failure_recovery`, `feedback`, `pipeline`, `discovery`.
-
-Generation:
-- Use weighted feature contributions post-score.
-- Drop negligible reasons below `suggestions.explain_min_contribution`.
-
-UX:
-- CLI JSON always includes `reasons[]`.
-- Interactive shell integrations may bind "show why" key and render concise hint line.
-
-### 20.10 Team Workflow Playbooks (Extended `.clai/tasks.yaml`)
-
-Extended file schema:
-```yaml
-tasks:
-  - name: deploy-staging
-    command: make deploy-staging
-    description: Deploy to staging
-  - name: smoke-test
-    command: make smoke-test
-    after: [deploy-staging]
-    priority: high
-  - name: lint-fix
-    command: make lint-fix
-    after_failure: [lint-check]
-
-workflows:
-  - name: full-deploy
-    steps:
-      - make test
-      - make build
-      - make deploy-staging
-      - make smoke-test
-      - make deploy-prod
-```
-
-Parser and validation:
-- Existing simple format remains valid.
-- Validate references in `after` and `after_failure`.
-- Detect and reject circular trigger chains.
-- Validate workflow step commands through normalizer.
-
-Engine integration:
-- `after` and `after_failure` create conditional task candidates with dedicated source tags.
-- Playbook workflows seed `workflow_pattern` with high initial support count.
-
-### 20.11 Command Discovery ("Did You Know?")
-
-Goal:
-- Low-priority discovery suggestions for useful commands user has not run.
-
-Candidate pools:
-- Project-type priors with zero personal usage.
-- Playbook tasks never executed by user.
-- Curated tool-common command sets.
-
-Filters:
-- Context relevance.
-- Novelty (zero-count for user history).
-- Source frequency threshold.
-- Cooldown window (`suggestions.discovery_cooldown_hours`).
-
-Display gate:
-- Only when prefix is empty.
-- Only when no high-confidence prediction exists.
-- Never displace high-confidence predictive suggestions.
-
-Feedback:
-- Accepted discovery enters normal learning.
-- Repeated dismissals feed persistent dismissal logic.
-
-### 20.12 Natural-Language Command Recall
-
-Problem:
-- Users remember intent, not command text.
-
-Schema alteration:
-```sql
-ALTER TABLE command_template ADD COLUMN tags TEXT;
-```
-
-Tagging:
-- Extract bounded semantic tags during normalization using deterministic rules.
-- Include tool, subcommand, flag semantics, argument patterns, and synonym mapping.
-- Controlled vocabulary (built-in; configurable extension path).
-
-Search modes:
-- Extend `clai search` with `--mode describe` and `--mode auto`.
-- `describe` uses tag overlap scoring.
-- `auto` merges FTS and describe scores and deduplicates by template.
-
-API extensions:
-- `SearchRequest.mode` supports `fts|prefix|describe|auto`.
-- `SearchResponse` may include `tags` and `matched_tags`.
-
-### 20.13 Integrated Retrieval Priority and Ranking Formula
-
-Extended retrieval priority:
-1. Session transitions
-2. Failure recovery candidates
-3. Active workflow next-step
-4. Pipeline pattern recall
-5. Repo transitions
-6. Directory-scoped transitions
-7. Project-type transitions
-8. Playbook conditional triggers
-9. Global transitions
-10. Discovery candidates (low priority gate)
-
-Extended scoring:
-```text
-score = w1*transition_effective
-      + w2*frequency
-      + w3*success
-      + w4*prefix
-      + w5*affinity_enhanced
-      + w6*task_extended
-      + w7*feedback_extended
-      + w9*project_type_affinity
-      + w10*failure_recovery
-      - w8*risk_penalty
-```
-
-Feature amplifiers:
-- `transition_effective` includes workflow and pipeline amplifiers.
-- `affinity_enhanced` includes directory scope effects.
-- `task_extended` includes playbook triggers.
-- `feedback_extended` includes persistent dismissal effects.
-
-### 20.14 Schema Delta Summary (Additive)
-
-New tables:
-- `project_type_stat`
-- `project_type_transition`
-- `pipeline_event`
-- `pipeline_transition`
-- `pipeline_pattern`
-- `failure_recovery`
-- `workflow_pattern`
-- `workflow_step`
-- `session_alias`
-- `dismissal_pattern`
-
-Altered tables:
-- `session.project_types` (column add)
-- `command_template.tags` (column add)
-
-### 20.15 Configuration Keys (Additive)
+- `suggestions.search_describe_enabled=true`
+- `suggestions.search_auto_mode_merge=true`
+- `suggestions.search_tag_vocabulary_path=""`
 
 Project type:
 - `suggestions.project_type_detection_enabled=true`
@@ -1593,7 +1097,92 @@ Discovery:
 - `suggestions.discovery_source_playbook=true`
 - `suggestions.discovery_source_tool_common=true`
 
-Describe search:
-- `suggestions.search_describe_enabled=true`
-- `suggestions.search_tag_vocabulary_path=""`
-- `suggestions.search_auto_mode_merge=true`
+Storage:
+- `suggestions.retention_days=90`
+- `suggestions.retention_max_events=500000`
+- `suggestions.sqlite_busy_timeout_ms=50`
+
+Cache:
+- `suggestions.cache_memory_budget_mb=50`
+
+Privacy:
+- `suggestions.incognito_mode=ephemeral` (`off|ephemeral|no_send`)
+- `suggestions.redact_sensitive_tokens=true`
+
+## 17) Quality Gates
+
+Build-time gates:
+- Unit + integration + interactive shell suites must pass.
+- Docker matrix (`alpine`, `ubuntu`, `debian`) must pass with deterministic test parallelism.
+- Fuzz suite must run for minimum configured time budget.
+
+Performance gates:
+- Hook overhead regression over baseline must be less than 15%.
+- Suggest P95 regression must be less than 10% between adjacent commits.
+- Cold-start daemon readiness under 500ms on CI runners.
+
+Behavioral gates:
+- Session isolation invariants hold.
+- Ephemeral mode persistence invariant holds (zero persistent writes from ephemeral events).
+- Risk tagging invariant holds for destructive command patterns.
+- Correlated slot validity checks pass for templates with dependency sets.
+- Online learning guardrails hold (weights remain within configured ranges).
+- Hook behavior remains correct with persistent and fallback shim modes.
+- Advanced retrieval order remains deterministic and stable across identical state.
+
+## 18) Acceptance Checklist
+
+- Suggestion API meets latency budgets.
+- Cross-shell tests pass on local and Docker matrix.
+- Non-interactive shells remain unaffected.
+- Incognito modes validated with persistence assertions.
+- Hook path remains non-blocking under daemon failure.
+- Deterministic ranking and stable top-k behavior across repeated runs.
+- `.clai/tasks.yaml` discovery, reload, and boost behavior validated.
+- Deep-history `clai search` behavior validated with FTS and fallback backend.
+- CLI color and format contracts validated for TTY and non-TTY modes.
+- Advanced features (project-type, pipeline, recovery, workflow, alias, dismissal, discovery, describe-search) validated with deterministic replay and integration suites.
+
+## 19) Correctness Invariants
+
+The following invariants are mandatory and must be continuously asserted in tests:
+
+- `I1 Session Isolation`:
+- Suggestions for `session_id=A` must not include session-scoped transitions derived exclusively from `session_id=B`.
+- `I2 Ephemeral Persistence`:
+- Events with `ephemeral=1` must not produce persistent writes to `command_event`, `command_stat`, `transition_stat`, or `slot_stat`.
+- `I3 Deterministic Ranking`:
+- With identical input state (DB snapshot + in-memory cache + clock seed), returned top-k must be byte-for-byte identical.
+- `I4 Bounded Hook Latency`:
+- Hook processing time must remain below configured timeout budget and never block shell prompt rendering.
+- `I5 Transactional Aggregate Consistency`:
+- After successful commit of a non-ephemeral `command_end`, dependent aggregate tables reflect the same event version atomically.
+- `I6 Risk Label Integrity`:
+- Commands matching destructive patterns must always carry risk metadata and applicable penalty before final ranking.
+- `I7 Cache Coherency`:
+- Any new `command_end` for a session invalidates stale cache entries for that session before the next suggest response.
+- `I8 Crash Safety`:
+- Daemon crash during ingestion must not leave partially applied aggregate updates visible after restart.
+- `I9 Correlated Slot Validity`:
+- For templates with configured slot dependency sets, emitted multi-slot suggestions must match an observed tuple or exceed configured correlation confidence.
+- `I10 Learning Guardrails`:
+- Adaptive updates must never push any weight outside configured min/max bounds, and must preserve deterministic ordering for a fixed profile snapshot.
+- `I11 Event Size Boundedness`:
+- Persisted and indexed `cmd_raw` values must never exceed configured max byte limit, and truncated events must be marked.
+- `I12 Fail-Open Shell Safety`:
+- Loss of daemon, helper, pipe, or socket must not block prompt rendering or command execution.
+- `I13 Retrieval Priority Determinism`:
+- Source ordering and per-source caps must be applied deterministically for identical state.
+- `I14 Alias Canonicalization`:
+- Equivalent alias and expanded forms must map to one canonical template identity.
+- `I15 Persistent Dismissal Safety`:
+- Permanent dismissals must be reversible and scoped correctly; they must not suppress unrelated templates.
+
+
+## 20) Appendix And Traceability
+
+The enhancement proposals are fully preserved in `/Users/runger/.claude-worktrees/clai/happy-hypatia/specs/tech_suggestions_ext_v1_appendix.md`.
+
+Normative rule:
+- Sections `0` through `19` in this document are the canonical specification.
+- The appendix is detailed supporting material and rationale; in case of conflict, this document takes precedence.
