@@ -26,7 +26,11 @@ It assumes no backward-compatibility constraints and no requirement to preserve 
 ### 1.1 Core Components
 - Shell Adapters (`bash`, `zsh`, `fish`): collect execution context and invoke `clai-hook`.
 - `clai-hook`: validates fields, lossily normalizes UTF-8, writes NDJSON events fire-and-forget.
-- `clai-suggestd` daemon: ingestion pipeline, feature extraction, candidate generation, ranking, cache, and feedback handling.
+- `clai-suggestd` daemon:
+- Ingestion pipeline with validation and normalization.
+- Feature extraction and online aggregate maintenance.
+- Candidate generation and deterministic ranking.
+- Suggestion cache and feedback processing.
 - SQLite datastore with WAL and migration lock
 
 ### 1.2 Design Principles
@@ -104,6 +108,13 @@ It assumes no backward-compatibility constraints and no requirement to preserve 
 - Run migrations.
 - Clean stale socket.
 - Start listeners.
+
+### 3.5 Backpressure and Failure Policy
+- Ingestion queue is bounded (default `8192` events).
+- When queue is full, daemon applies drop-oldest policy for non-critical telemetry events and increments `ingest_drop_count`.
+- `command_end` and `session_start/session_end` are high-priority and must be retained preferentially over optional telemetry.
+- Hook path remains fail-open: if connect or write exceeds timeout budget, event is dropped without blocking shell.
+- Daemon must never block suggestion serving on ingestion flush backlog.
 
 ## 4) Storage Model (V2 Schema)
 
@@ -217,6 +228,18 @@ CREATE TABLE schema_migrations (
 - Ephemeral events are never persisted to long-lived aggregates.
 - Optional retention policy by age and max rows.
 
+### 4.4 Write-Path Transaction Semantics
+- All writes for a single ingested event are applied in one transaction (`BEGIN IMMEDIATE ... COMMIT`) to preserve aggregate consistency.
+- Transaction order for non-ephemeral `command_end`:
+- Insert row in `command_event`.
+- Upsert `command_template`.
+- Update `command_stat` (frequency + success/failure counters).
+- Update `transition_stat` if previous template is known for session.
+- Update `slot_stat` values extracted from template/args alignment.
+- Update in-memory cache index and invalidation markers.
+- For `ephemeral=1`, only in-memory session-scoped structures are updated; no SQLite write occurs.
+- If transaction fails, daemon records error metric, abandons partial event effects, and keeps process alive.
+
 ## 5) Normalization and Template System
 
 ### 5.1 Goals
@@ -309,6 +332,16 @@ Scoring notes:
 - Fill slots from scoped histograms with confidence threshold.
 - Fallback order: session -> repo -> global.
 - If uncertain, return template with partially unfilled slots only if UX supports it; otherwise skip.
+
+### 7.6 Deterministic Ordering and Tie-Break Rules
+- Primary sort key: `score DESC`.
+- Secondary sort key: `confidence DESC`.
+- Tertiary sort key: `last_seen_ms DESC`.
+- Final tie-break: lexical `cmd_norm ASC` to guarantee stable output.
+- Candidate suppression rules:
+- Drop suggestions with `confidence < min_confidence` unless `include_low_confidence=true`.
+- Drop risky candidates when `risk_penalty` forces final score below `min_score`.
+- At most one suggestion per normalized template unless slot-filled variants differ by at least one non-trivial argument.
 
 ## 8) Typo Recovery
 
@@ -420,6 +453,21 @@ API payload contract (JSON over local RPC transport wrapper):
 - `clai suggest-feedback --action accepted|dismissed|edited`
 - `clai suggestions doctor`
 
+### 13.3 Error Model and Response Contract
+- All daemon API responses must include one of:
+- `ok=true` with payload.
+- `ok=false` with structured error `{ code, message, retryable }`.
+- Standard error codes:
+- `E_INVALID_ARGUMENT`: malformed request fields.
+- `E_DAEMON_UNAVAILABLE`: transport/listener unavailable.
+- `E_STORAGE_BUSY`: SQLite contention beyond retry budget.
+- `E_STORAGE_CORRUPT`: DB corruption detected; requires operator action.
+- `E_TIMEOUT`: operation exceeded hard timeout.
+- `E_INTERNAL`: unexpected internal error.
+- CLI behavior:
+- `clai suggest` falls back to empty output on daemon failure (non-zero only with `--strict`).
+- `clai search` returns user-facing error and non-zero exit on daemon/storage failures.
+
 ## 14) Testing Strategy (Extensive)
 
 ### 14.1 Unit Tests
@@ -468,6 +516,11 @@ API payload contract (JSON over local RPC transport wrapper):
 - Event transport injection and malformed frame handling.
 - Incognito persistence guarantees.
 
+### 14.9 Deterministic Replay Validation
+- Maintain a replay corpus of sanitized command sessions with expected top-k suggestions per step.
+- Replay runner executes with fixed clock and fixed random seed for deterministic comparisons.
+- Any change in top-k set, ordering, or confidence beyond configured thresholds requires explicit review approval.
+
 ## 15) Observability and Diagnostics
 
 ### 15.1 Metrics
@@ -487,7 +540,7 @@ API payload contract (JSON over local RPC transport wrapper):
 - Cache stats
 - Last discovery errors
 
-## 18) Configuration Surface (V2)
+## 16) Configuration Surface (V2)
 
 All values can be set in config and overridden with environment variables for testing.
 
@@ -522,7 +575,7 @@ Privacy:
 - `suggestions.incognito_mode=ephemeral` (`off|ephemeral|no_send`)
 - `suggestions.redact_sensitive_tokens=true`
 
-## 19) Quality Gates
+## 17) Quality Gates
 
 Build-time gates:
 - Unit + integration + interactive shell suites must pass.
@@ -539,21 +592,7 @@ Behavioral gates:
 - Ephemeral mode persistence invariant holds (zero persistent writes from ephemeral events).
 - Risk tagging invariant holds for destructive command patterns.
 
-## 16) Implementation Phases
-
-### Phase 1: Engine Core
-- Schema, ingest pipeline, normalization, ranking core, shell adapters.
-
-### Phase 2: Learning and Slot Filling
-- Feedback integration, slot stats, typo recovery.
-
-### Phase 3: Discovery and Hardening
-- Task discovery plugins, observability, chaos/perf stabilization.
-
-### Phase 4: Final Validation
-- Full cross-shell + Docker matrix and latency acceptance gates.
-
-## 17) Acceptance Checklist
+## 18) Acceptance Checklist
 
 - Suggestion API meets latency budgets.
 - Cross-shell tests pass on local and Docker matrix.
@@ -561,3 +600,24 @@ Behavioral gates:
 - Incognito modes validated with persistence assertions.
 - Hook path remains non-blocking under daemon failure.
 - Deterministic ranking and stable top-k behavior across repeated runs.
+
+## 19) Correctness Invariants
+
+The following invariants are mandatory and must be continuously asserted in tests:
+
+- `I1 Session Isolation`:
+- Suggestions for `session_id=A` must not include session-scoped transitions derived exclusively from `session_id=B`.
+- `I2 Ephemeral Persistence`:
+- Events with `ephemeral=1` must not produce persistent writes to `command_event`, `command_stat`, `transition_stat`, or `slot_stat`.
+- `I3 Deterministic Ranking`:
+- With identical input state (DB snapshot + in-memory cache + clock seed), returned top-k must be byte-for-byte identical.
+- `I4 Bounded Hook Latency`:
+- Hook processing time must remain below configured timeout budget and never block shell prompt rendering.
+- `I5 Transactional Aggregate Consistency`:
+- After successful commit of a non-ephemeral `command_end`, dependent aggregate tables reflect the same event version atomically.
+- `I6 Risk Label Integrity`:
+- Commands matching destructive patterns must always carry risk metadata and applicable penalty before final ranking.
+- `I7 Cache Coherency`:
+- Any new `command_end` for a session invalidates stale cache entries for that session before the next suggest response.
+- `I8 Crash Safety`:
+- Daemon crash during ingestion must not leave partially applied aggregate updates visible after restart.
