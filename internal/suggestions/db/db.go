@@ -38,7 +38,8 @@ type DB struct {
 // Options configures database initialization.
 type Options struct {
 	// Path is the path to the database file.
-	// If empty, defaults to ~/.clai/suggestions.db
+	// If empty, defaults to ~/.clai/suggestions_v2.db (V2) or
+	// ~/.clai/suggestions.db (V1, when UseV1 is true).
 	Path string
 
 	// LockTimeout is how long to wait for the daemon lock.
@@ -52,10 +53,24 @@ type Options struct {
 	// ReadOnly opens the database in read-only mode.
 	// No migrations will be run and no lock will be acquired.
 	ReadOnly bool
+
+	// UseV1 opens the V1 database (suggestions.db) instead of V2.
+	// This is for backward compatibility with existing V1 data.
+	UseV1 bool
 }
 
-// DefaultDBPath returns the default database path.
+// DefaultDBPath returns the default V2 database path (~/.clai/suggestions_v2.db).
 func DefaultDBPath() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+	return filepath.Join(home, ".clai", "suggestions_v2.db"), nil
+}
+
+// DefaultV1DBPath returns the default V1 database path (~/.clai/suggestions.db).
+// This is retained for backward compatibility with existing V1 data.
+func DefaultV1DBPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
@@ -70,7 +85,11 @@ func Open(ctx context.Context, opts Options) (*DB, error) {
 	dbPath := opts.Path
 	if dbPath == "" {
 		var err error
-		dbPath, err = DefaultDBPath()
+		if opts.UseV1 {
+			dbPath, err = DefaultV1DBPath()
+		} else {
+			dbPath, err = DefaultDBPath()
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -129,12 +148,18 @@ func Open(ctx context.Context, opts Options) (*DB, error) {
 
 	// Run migrations (unless read-only)
 	if !opts.ReadOnly {
-		if err := RunMigrations(ctx, db); err != nil {
+		var migErr error
+		if opts.UseV1 {
+			migErr = RunMigrations(ctx, db)
+		} else {
+			migErr = RunV2Migrations(ctx, db)
+		}
+		if migErr != nil {
 			db.Close()
 			if lock != nil {
 				lock.Release()
 			}
-			return nil, fmt.Errorf("failed to run migrations: %w", err)
+			return nil, fmt.Errorf("failed to run migrations: %w", migErr)
 		}
 	}
 
@@ -272,9 +297,16 @@ func (d *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) 
 	return d.db.BeginTx(ctx, opts)
 }
 
-// Validate checks that the schema is correctly initialized.
+// Validate checks that the V1 schema is correctly initialized.
+// For V2 databases, use ValidateV2 instead.
 func (d *DB) Validate(ctx context.Context) error {
 	return ValidateSchema(ctx, d.db)
+}
+
+// ValidateV2 checks that the V2 schema is correctly initialized.
+// This validates all 23 tables, indexes, and triggers required by V2.
+func (d *DB) ValidateV2(ctx context.Context) error {
+	return ValidateV2Schema(ctx, d.db)
 }
 
 // Version returns the current schema version.

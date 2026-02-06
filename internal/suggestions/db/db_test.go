@@ -10,6 +10,10 @@ import (
 	"time"
 )
 
+// =============================================================================
+// V1 Database Tests (backward compatibility)
+// =============================================================================
+
 func TestOpen_CreatesDatabase(t *testing.T) {
 	t.Parallel()
 
@@ -19,6 +23,7 @@ func TestOpen_CreatesDatabase(t *testing.T) {
 	db, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true, // Skip lock for parallel tests
+		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -40,6 +45,7 @@ func TestOpen_CreatesDirectory(t *testing.T) {
 	db, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true,
+		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -56,12 +62,12 @@ func TestOpen_CreatesDirectory(t *testing.T) {
 func TestOpen_RunsMigrations(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
 
-	// Verify all tables exist
+	// Verify all V1 tables exist
 	for _, table := range AllTables {
 		var name string
 		err := db.QueryRowContext(ctx, `
@@ -74,7 +80,7 @@ func TestOpen_RunsMigrations(t *testing.T) {
 		}
 	}
 
-	// Verify all indexes exist
+	// Verify all V1 indexes exist
 	for _, index := range AllIndexes {
 		var name string
 		err := db.QueryRowContext(ctx, `
@@ -91,7 +97,7 @@ func TestOpen_RunsMigrations(t *testing.T) {
 func TestOpen_WALModeEnabled(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	var journalMode string
@@ -109,7 +115,7 @@ func TestOpen_WALModeEnabled(t *testing.T) {
 func TestOpen_ForeignKeysEnabled(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	var foreignKeys int
@@ -127,7 +133,7 @@ func TestOpen_ForeignKeysEnabled(t *testing.T) {
 func TestDB_SchemaVersion(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -136,15 +142,15 @@ func TestDB_SchemaVersion(t *testing.T) {
 		t.Fatalf("Version() error = %v", err)
 	}
 
-	if version != SchemaVersion {
-		t.Errorf("Version() = %d, want %d", version, SchemaVersion)
+	if version != V1SchemaVersion {
+		t.Errorf("Version() = %d, want %d", version, V1SchemaVersion)
 	}
 }
 
 func TestDB_Validate(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	err := db.Validate(context.Background())
@@ -156,7 +162,7 @@ func TestDB_Validate(t *testing.T) {
 func TestDB_Close(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 
 	// Close should not error
 	if err := db.Close(); err != nil {
@@ -172,7 +178,7 @@ func TestDB_Close(t *testing.T) {
 func TestDB_PrepareStatement(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -200,10 +206,11 @@ func TestMigrations_RefuseNewerVersion(t *testing.T) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
 
-	// Create initial database
+	// Create initial V1 database
 	db, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true,
+		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -213,7 +220,7 @@ func TestMigrations_RefuseNewerVersion(t *testing.T) {
 	_, err = db.ExecContext(context.Background(), `
 		INSERT OR REPLACE INTO schema_migrations (version, applied_ts)
 		VALUES (?, ?)
-	`, SchemaVersion+10, time.Now().UnixMilli())
+	`, V1SchemaVersion+10, time.Now().UnixMilli())
 	if err != nil {
 		t.Fatalf("Failed to insert future version: %v", err)
 	}
@@ -223,6 +230,7 @@ func TestMigrations_RefuseNewerVersion(t *testing.T) {
 	_, err = Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true,
+		UseV1:    true,
 	})
 	if err == nil {
 		t.Fatal("Open() should fail with newer schema version")
@@ -245,6 +253,7 @@ func TestMigrations_Idempotent(t *testing.T) {
 		db, err := Open(context.Background(), Options{
 			Path:     dbPath,
 			SkipLock: true,
+			UseV1:    true,
 		})
 		if err != nil {
 			t.Fatalf("Open() iteration %d error = %v", i, err)
@@ -268,6 +277,7 @@ func TestLock_PreventsMultipleOpens(t *testing.T) {
 	db1, err := Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 100 * time.Millisecond,
+		UseV1:       true,
 	})
 	if err != nil {
 		t.Fatalf("First Open() error = %v", err)
@@ -278,6 +288,7 @@ func TestLock_PreventsMultipleOpens(t *testing.T) {
 	_, err = Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 100 * time.Millisecond,
+		UseV1:       true,
 	})
 	if err == nil {
 		t.Fatal("Second Open() should fail due to lock")
@@ -293,6 +304,7 @@ func TestLock_ReleasedOnClose(t *testing.T) {
 	db1, err := Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 100 * time.Millisecond,
+		UseV1:       true,
 	})
 	if err != nil {
 		t.Fatalf("First Open() error = %v", err)
@@ -303,6 +315,7 @@ func TestLock_ReleasedOnClose(t *testing.T) {
 	db2, err := Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 100 * time.Millisecond,
+		UseV1:       true,
 	})
 	if err != nil {
 		t.Fatalf("Second Open() after close error = %v", err)
@@ -329,6 +342,7 @@ func TestLock_ConcurrentStartup(t *testing.T) {
 			db, err := Open(context.Background(), Options{
 				Path:        dbPath,
 				LockTimeout: 100 * time.Millisecond,
+				UseV1:       true,
 			})
 			if err == nil {
 				successMu.Lock()
@@ -358,7 +372,8 @@ func TestLock_TimeoutBehavior(t *testing.T) {
 
 	// First open
 	db1, err := Open(context.Background(), Options{
-		Path: dbPath,
+		Path:  dbPath,
+		UseV1: true,
 	})
 	if err != nil {
 		t.Fatalf("First Open() error = %v", err)
@@ -370,6 +385,7 @@ func TestLock_TimeoutBehavior(t *testing.T) {
 	_, err = Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 200 * time.Millisecond,
+		UseV1:       true,
 	})
 	elapsed := time.Since(start)
 
@@ -400,7 +416,8 @@ func TestIsLocked(t *testing.T) {
 
 	// Open and check
 	db, err := Open(context.Background(), Options{
-		Path: dbPath,
+		Path:  dbPath,
+		UseV1: true,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -432,7 +449,8 @@ func TestGetLockHolderPID(t *testing.T) {
 
 	// Open
 	db, err := Open(context.Background(), Options{
-		Path: dbPath,
+		Path:  dbPath,
+		UseV1: true,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -456,6 +474,7 @@ func TestOpen_ReadOnly(t *testing.T) {
 	db, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true,
+		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("Initial Open() error = %v", err)
@@ -466,6 +485,7 @@ func TestOpen_ReadOnly(t *testing.T) {
 	roDb, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		ReadOnly: true,
+		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("ReadOnly Open() error = %v", err)
@@ -477,8 +497,8 @@ func TestOpen_ReadOnly(t *testing.T) {
 	if err != nil {
 		t.Errorf("Version() error = %v", err)
 	}
-	if version != SchemaVersion {
-		t.Errorf("Version() = %d, want %d", version, SchemaVersion)
+	if version != V1SchemaVersion {
+		t.Errorf("Version() = %d, want %d", version, V1SchemaVersion)
 	}
 
 	// Write should fail
@@ -493,7 +513,7 @@ func TestOpen_ReadOnly(t *testing.T) {
 func TestDB_ConcurrentReads(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -536,7 +556,7 @@ func TestDB_ConcurrentReads(t *testing.T) {
 func TestSchemaValidity_SessionTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -567,7 +587,7 @@ func TestSchemaValidity_SessionTable(t *testing.T) {
 func TestSchemaValidity_CommandEventTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -611,7 +631,7 @@ func TestSchemaValidity_CommandEventTable(t *testing.T) {
 func TestSchemaValidity_TransitionTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -650,7 +670,7 @@ func TestSchemaValidity_TransitionTable(t *testing.T) {
 func TestSchemaValidity_CommandScoreTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -696,7 +716,7 @@ func TestSchemaValidity_CommandScoreTable(t *testing.T) {
 func TestSchemaValidity_SlotValueTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -740,7 +760,7 @@ func TestSchemaValidity_SlotValueTable(t *testing.T) {
 func TestSchemaValidity_ProjectTaskTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -782,7 +802,7 @@ func TestSchemaValidity_ProjectTaskTable(t *testing.T) {
 func TestSchemaValidity_ForeignKeyEnforced(t *testing.T) {
 	t.Parallel()
 
-	db := newTestDB(t)
+	db := newTestV1DB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -798,9 +818,943 @@ func TestSchemaValidity_ForeignKeyEnforced(t *testing.T) {
 	}
 }
 
-// Helper functions
+// =============================================================================
+// V2 Database Tests
+// =============================================================================
 
-func newTestDB(t *testing.T) *DB {
+func TestV2Open_CreatesDatabase(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	db, err := Open(context.Background(), Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	// Verify database file was created
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		t.Error("V2 database file was not created")
+	}
+}
+
+func TestV2Open_SchemaVersion(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+	version, err := db.Version(ctx)
+	if err != nil {
+		t.Fatalf("Version() error = %v", err)
+	}
+
+	if version != SchemaVersion {
+		t.Errorf("Version() = %d, want %d", version, SchemaVersion)
+	}
+}
+
+func TestV2Open_ValidateAll23Tables(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+
+	ctx := context.Background()
+
+	err := db.ValidateV2(ctx)
+	if err != nil {
+		t.Fatalf("ValidateV2() error = %v", err)
+	}
+
+	// Also verify the exact count of tables (23)
+	if len(V2AllTables) != 23 {
+		t.Errorf("V2AllTables has %d entries, want 23", len(V2AllTables))
+	}
+}
+
+func TestV2Open_Idempotent(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	// Open and close multiple times
+	for i := 0; i < 3; i++ {
+		db, err := Open(context.Background(), Options{
+			Path:     dbPath,
+			SkipLock: true,
+		})
+		if err != nil {
+			t.Fatalf("Open() iteration %d error = %v", i, err)
+		}
+
+		if err := db.ValidateV2(context.Background()); err != nil {
+			t.Errorf("ValidateV2() iteration %d error = %v", i, err)
+		}
+
+		db.Close()
+	}
+}
+
+func TestV2Open_RefuseNewerVersion(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	// Create initial V2 database
+	db, err := Open(context.Background(), Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+
+	// Manually update schema version to a future version
+	_, err = db.ExecContext(context.Background(), `
+		INSERT OR REPLACE INTO schema_migrations (version, applied_ms)
+		VALUES (?, ?)
+	`, SchemaVersion+10, time.Now().UnixMilli())
+	if err != nil {
+		t.Fatalf("Failed to insert future version: %v", err)
+	}
+	db.Close()
+
+	// Try to open again - should fail
+	_, err = Open(context.Background(), Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err == nil {
+		t.Fatal("Open() should fail with newer schema version")
+	}
+
+	if !contains(err.Error(), "newer than supported") {
+		t.Errorf("Expected 'newer than supported' error, got: %v", err)
+	}
+}
+
+func TestV2_SessionTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	// Insert a V2 session with new column names
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO session (id, shell, started_at_ms, project_types, host, user_name)
+		VALUES ('sess-v2', 'zsh', 1000, 'go|docker', 'localhost', 'testuser')
+	`)
+	if err != nil {
+		t.Fatalf("Insert session error = %v", err)
+	}
+
+	var id, shell, projectTypes string
+	err = db.QueryRowContext(ctx, `
+		SELECT id, shell, project_types FROM session WHERE id = 'sess-v2'
+	`).Scan(&id, &shell, &projectTypes)
+	if err != nil {
+		t.Fatalf("Query session error = %v", err)
+	}
+	if id != "sess-v2" || shell != "zsh" || projectTypes != "go|docker" {
+		t.Errorf("Got id=%s, shell=%s, project_types=%s", id, shell, projectTypes)
+	}
+}
+
+func TestV2_CommandEventTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	// Insert session first
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO session (id, shell, started_at_ms) VALUES ('sess-v2', 'zsh', 1000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert session error = %v", err)
+	}
+
+	// Insert command event with V2 columns
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO command_event (session_id, ts_ms, cwd, repo_key, branch, cmd_raw, cmd_norm, cmd_truncated, template_id, exit_code, duration_ms)
+		VALUES ('sess-v2', 2000, '/home/user', 'abc123', 'main', 'git status', 'git status', 0, 'tpl-git-status', 0, 100)
+	`)
+	if err != nil {
+		t.Fatalf("Insert command_event error = %v", err)
+	}
+
+	var templateID string
+	err = db.QueryRowContext(ctx, `
+		SELECT template_id FROM command_event WHERE session_id = 'sess-v2'
+	`).Scan(&templateID)
+	if err != nil {
+		t.Fatalf("Query command_event error = %v", err)
+	}
+	if templateID != "tpl-git-status" {
+		t.Errorf("template_id = %s, want tpl-git-status", templateID)
+	}
+}
+
+func TestV2_CommandTemplateTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO command_template (template_id, cmd_norm, tags, slot_count, first_seen_ms, last_seen_ms)
+		VALUES ('tpl-git-status', 'git status', 'git|vcs|status', 0, 1000, 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert command_template error = %v", err)
+	}
+
+	var tags string
+	var slotCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT tags, slot_count FROM command_template WHERE template_id = 'tpl-git-status'
+	`).Scan(&tags, &slotCount)
+	if err != nil {
+		t.Fatalf("Query command_template error = %v", err)
+	}
+	if tags != "git|vcs|status" || slotCount != 0 {
+		t.Errorf("Got tags=%s, slot_count=%d", tags, slotCount)
+	}
+}
+
+func TestV2_TransitionStatTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO transition_stat (scope, prev_template_id, next_template_id, weight, count, last_seen_ms)
+		VALUES ('global', 'tpl-git-add', 'tpl-git-commit', 0.8, 15, 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert transition_stat error = %v", err)
+	}
+
+	var weight float64
+	err = db.QueryRowContext(ctx, `
+		SELECT weight FROM transition_stat
+		WHERE scope = 'global' AND prev_template_id = 'tpl-git-add'
+	`).Scan(&weight)
+	if err != nil {
+		t.Fatalf("Query transition_stat error = %v", err)
+	}
+	if weight != 0.8 {
+		t.Errorf("weight = %f, want 0.8", weight)
+	}
+}
+
+func TestV2_CommandStatTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO command_stat (scope, template_id, score, success_count, failure_count, last_seen_ms)
+		VALUES ('global', 'tpl-git-status', 5.5, 100, 2, 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert command_stat error = %v", err)
+	}
+
+	var successCount, failureCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT success_count, failure_count FROM command_stat
+		WHERE scope = 'global' AND template_id = 'tpl-git-status'
+	`).Scan(&successCount, &failureCount)
+	if err != nil {
+		t.Fatalf("Query command_stat error = %v", err)
+	}
+	if successCount != 100 || failureCount != 2 {
+		t.Errorf("Got success=%d, failure=%d", successCount, failureCount)
+	}
+}
+
+func TestV2_SlotStatTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO slot_stat (scope, template_id, slot_index, value, weight, count, last_seen_ms)
+		VALUES ('global', 'tpl-kubectl-get', 0, 'default', 0.9, 10, 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert slot_stat error = %v", err)
+	}
+
+	var weight float64
+	err = db.QueryRowContext(ctx, `
+		SELECT weight FROM slot_stat
+		WHERE scope = 'global' AND template_id = 'tpl-kubectl-get' AND slot_index = 0 AND value = 'default'
+	`).Scan(&weight)
+	if err != nil {
+		t.Fatalf("Query slot_stat error = %v", err)
+	}
+	if weight != 0.9 {
+		t.Errorf("weight = %f, want 0.9", weight)
+	}
+}
+
+func TestV2_SlotCorrelationTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO slot_correlation (scope, template_id, slot_key, tuple_hash, tuple_value_json, weight, count, last_seen_ms)
+		VALUES ('global', 'tpl-docker-run', '0:1', 'abc123', '["nginx","8080"]', 0.7, 5, 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert slot_correlation error = %v", err)
+	}
+}
+
+func TestV2_ProjectTypeStatTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO project_type_stat (project_type, template_id, score, count, last_seen_ms)
+		VALUES ('go', 'tpl-go-test', 8.5, 50, 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert project_type_stat error = %v", err)
+	}
+}
+
+func TestV2_ProjectTypeTransitionTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO project_type_transition (project_type, prev_template_id, next_template_id, weight, count, last_seen_ms)
+		VALUES ('go', 'tpl-go-build', 'tpl-go-test', 0.7, 30, 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert project_type_transition error = %v", err)
+	}
+}
+
+func TestV2_PipelineEventTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	// Insert session and command event first
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO session (id, shell, started_at_ms) VALUES ('sess-v2', 'zsh', 1000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert session error = %v", err)
+	}
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO command_event (id, session_id, ts_ms, cwd, cmd_raw, cmd_norm)
+		VALUES (1, 'sess-v2', 2000, '/tmp', 'cat file | grep pattern', 'cat {} | grep {}')
+	`)
+	if err != nil {
+		t.Fatalf("Insert command_event error = %v", err)
+	}
+
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO pipeline_event (command_event_id, position, operator, cmd_raw, cmd_norm, template_id)
+		VALUES (1, 0, NULL, 'cat file', 'cat {}', 'tpl-cat'),
+		       (1, 1, '|', 'grep pattern', 'grep {}', 'tpl-grep')
+	`)
+	if err != nil {
+		t.Fatalf("Insert pipeline_event error = %v", err)
+	}
+
+	var count int
+	err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM pipeline_event WHERE command_event_id = 1`).Scan(&count)
+	if err != nil {
+		t.Fatalf("Query pipeline_event error = %v", err)
+	}
+	if count != 2 {
+		t.Errorf("Got %d pipeline events, want 2", count)
+	}
+}
+
+func TestV2_PipelineTransitionTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO pipeline_transition (scope, prev_template_id, next_template_id, operator, weight, count, last_seen_ms)
+		VALUES ('global', 'tpl-cat', 'tpl-grep', '|', 0.9, 20, 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert pipeline_transition error = %v", err)
+	}
+}
+
+func TestV2_PipelinePatternTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO pipeline_pattern (pattern_hash, template_chain, operator_chain, scope, count, last_seen_ms, cmd_norm_display)
+		VALUES ('hash123', 'tpl-cat|tpl-grep', '|', 'global', 15, 2000, 'cat {} | grep {}')
+	`)
+	if err != nil {
+		t.Fatalf("Insert pipeline_pattern error = %v", err)
+	}
+}
+
+func TestV2_FailureRecoveryTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO failure_recovery (scope, failed_template_id, exit_code_class, recovery_template_id, weight, count, success_rate, last_seen_ms, source)
+		VALUES ('global', 'tpl-make-build', 'code:2', 'tpl-make-clean', 0.8, 10, 0.75, 2000, 'learned')
+	`)
+	if err != nil {
+		t.Fatalf("Insert failure_recovery error = %v", err)
+	}
+}
+
+func TestV2_WorkflowPatternTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO workflow_pattern (pattern_id, template_chain, display_chain, scope, step_count, occurrence_count, last_seen_ms, avg_duration_ms)
+		VALUES ('wf-1', 'tpl-git-add|tpl-git-commit|tpl-git-push', 'git add|git commit|git push', 'global', 3, 25, 2000, 5000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert workflow_pattern error = %v", err)
+	}
+}
+
+func TestV2_WorkflowStepTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	// Insert workflow pattern first
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO workflow_pattern (pattern_id, template_chain, display_chain, scope, step_count, occurrence_count, last_seen_ms)
+		VALUES ('wf-1', 'tpl-a|tpl-b|tpl-c', 'a|b|c', 'global', 3, 10, 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert workflow_pattern error = %v", err)
+	}
+
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO workflow_step (pattern_id, step_index, template_id) VALUES
+		('wf-1', 0, 'tpl-a'),
+		('wf-1', 1, 'tpl-b'),
+		('wf-1', 2, 'tpl-c')
+	`)
+	if err != nil {
+		t.Fatalf("Insert workflow_step error = %v", err)
+	}
+
+	// Verify index on template_id works
+	var patternID string
+	err = db.QueryRowContext(ctx, `
+		SELECT pattern_id FROM workflow_step WHERE template_id = 'tpl-b'
+	`).Scan(&patternID)
+	if err != nil {
+		t.Fatalf("Query workflow_step error = %v", err)
+	}
+	if patternID != "wf-1" {
+		t.Errorf("pattern_id = %s, want wf-1", patternID)
+	}
+}
+
+func TestV2_TaskCandidateTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO task_candidate (repo_key, kind, name, command_text, description, source, priority_boost, source_checksum, discovered_ms)
+		VALUES ('repo-123', 'npm', 'test', 'npm test', 'Run tests', 'auto', 0.5, 'sha256:abc', 2000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert task_candidate error = %v", err)
+	}
+
+	var source string
+	var boost float64
+	err = db.QueryRowContext(ctx, `
+		SELECT source, priority_boost FROM task_candidate WHERE repo_key = 'repo-123' AND name = 'test'
+	`).Scan(&source, &boost)
+	if err != nil {
+		t.Fatalf("Query task_candidate error = %v", err)
+	}
+	if source != "auto" || boost != 0.5 {
+		t.Errorf("Got source=%s, boost=%f", source, boost)
+	}
+}
+
+func TestV2_SuggestionCacheTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO suggestion_cache (cache_key, session_id, context_hash, suggestions_json, created_ms, ttl_ms)
+		VALUES ('key-1', 'sess-1', 'ctx-hash', '[]', 2000, 5000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert suggestion_cache error = %v", err)
+	}
+
+	var hitCount int
+	err = db.QueryRowContext(ctx, `
+		SELECT hit_count FROM suggestion_cache WHERE cache_key = 'key-1'
+	`).Scan(&hitCount)
+	if err != nil {
+		t.Fatalf("Query suggestion_cache error = %v", err)
+	}
+	if hitCount != 0 {
+		t.Errorf("hit_count = %d, want 0", hitCount)
+	}
+}
+
+func TestV2_SuggestionFeedbackTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO suggestion_feedback (session_id, ts_ms, prompt_prefix, suggested_text, action, executed_text, latency_ms)
+		VALUES ('sess-1', 2000, 'git ', 'git status', 'accepted', 'git status', 50)
+	`)
+	if err != nil {
+		t.Fatalf("Insert suggestion_feedback error = %v", err)
+	}
+}
+
+func TestV2_SessionAliasTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO session_alias (session_id, alias_key, expansion) VALUES
+		('sess-1', 'gs', 'git status'),
+		('sess-1', 'ga', 'git add')
+	`)
+	if err != nil {
+		t.Fatalf("Insert session_alias error = %v", err)
+	}
+
+	var expansion string
+	err = db.QueryRowContext(ctx, `
+		SELECT expansion FROM session_alias WHERE session_id = 'sess-1' AND alias_key = 'gs'
+	`).Scan(&expansion)
+	if err != nil {
+		t.Fatalf("Query session_alias error = %v", err)
+	}
+	if expansion != "git status" {
+		t.Errorf("expansion = %s, want 'git status'", expansion)
+	}
+}
+
+func TestV2_DismissalPatternTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO dismissal_pattern (scope, context_template_id, dismissed_template_id, dismissal_count, last_dismissed_ms, suppression_level)
+		VALUES ('global', 'tpl-git-add', 'tpl-rm-rf', 5, 2000, 'LEARNED')
+	`)
+	if err != nil {
+		t.Fatalf("Insert dismissal_pattern error = %v", err)
+	}
+}
+
+func TestV2_RankWeightProfileTable(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO rank_weight_profile (
+			profile_key, scope, updated_ms,
+			w_transition, w_frequency, w_success, w_prefix, w_affinity, w_task, w_feedback,
+			w_project_type_affinity, w_failure_recovery, w_risk_penalty,
+			sample_count, learning_rate
+		) VALUES (
+			'default', 'global', 2000,
+			0.25, 0.20, 0.15, 0.10, 0.10, 0.05, 0.05,
+			0.08, 0.12, 0.10,
+			1000, 0.01
+		)
+	`)
+	if err != nil {
+		t.Fatalf("Insert rank_weight_profile error = %v", err)
+	}
+}
+
+func TestV2_FTS5_InsertTrigger(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	// Insert session
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO session (id, shell, started_at_ms) VALUES ('sess-fts', 'zsh', 1000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert session error = %v", err)
+	}
+
+	// Insert non-ephemeral command event (should trigger FTS insert)
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO command_event (session_id, ts_ms, cwd, cmd_raw, cmd_norm, ephemeral)
+		VALUES ('sess-fts', 2000, '/tmp', 'git status --porcelain', 'git status --porcelain', 0)
+	`)
+	if err != nil {
+		t.Fatalf("Insert command_event error = %v", err)
+	}
+
+	// Search via FTS
+	var cmdRaw string
+	err = db.QueryRowContext(ctx, `
+		SELECT cmd_raw FROM command_event_fts WHERE command_event_fts MATCH 'porcelain'
+	`).Scan(&cmdRaw)
+	if err != nil {
+		t.Fatalf("FTS search error = %v", err)
+	}
+	if cmdRaw != "git status --porcelain" {
+		t.Errorf("FTS result = %s, want 'git status --porcelain'", cmdRaw)
+	}
+}
+
+func TestV2_FTS5_EphemeralNotIndexed(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	// Insert session
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO session (id, shell, started_at_ms) VALUES ('sess-eph', 'zsh', 1000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert session error = %v", err)
+	}
+
+	// Insert ephemeral command event (should NOT trigger FTS insert)
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO command_event (session_id, ts_ms, cwd, cmd_raw, cmd_norm, ephemeral)
+		VALUES ('sess-eph', 2000, '/tmp', 'secret-command --key=abc', 'secret-command --key=abc', 1)
+	`)
+	if err != nil {
+		t.Fatalf("Insert ephemeral command_event error = %v", err)
+	}
+
+	// FTS search should find nothing
+	var cmdRaw string
+	err = db.QueryRowContext(ctx, `
+		SELECT cmd_raw FROM command_event_fts WHERE command_event_fts MATCH 'secret'
+	`).Scan(&cmdRaw)
+	if err == nil {
+		t.Errorf("FTS should not contain ephemeral commands, found: %s", cmdRaw)
+	}
+}
+
+func TestV2_FTS5_DeleteTrigger(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	// Insert session
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO session (id, shell, started_at_ms) VALUES ('sess-del', 'zsh', 1000)
+	`)
+	if err != nil {
+		t.Fatalf("Insert session error = %v", err)
+	}
+
+	// Insert and then delete command event
+	_, err = db.ExecContext(ctx, `
+		INSERT INTO command_event (id, session_id, ts_ms, cwd, cmd_raw, cmd_norm, ephemeral)
+		VALUES (999, 'sess-del', 2000, '/tmp', 'unique-deletable-command', 'unique-deletable-command', 0)
+	`)
+	if err != nil {
+		t.Fatalf("Insert command_event error = %v", err)
+	}
+
+	// Verify it's in FTS
+	var count int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM command_event_fts WHERE command_event_fts MATCH 'deletable'
+	`).Scan(&count)
+	if err != nil {
+		t.Fatalf("FTS count error = %v", err)
+	}
+	if count != 1 {
+		t.Fatalf("Expected 1 FTS result before delete, got %d", count)
+	}
+
+	// Delete the command event
+	_, err = db.ExecContext(ctx, `DELETE FROM command_event WHERE id = 999`)
+	if err != nil {
+		t.Fatalf("Delete command_event error = %v", err)
+	}
+
+	// FTS should no longer find it
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM command_event_fts WHERE command_event_fts MATCH 'deletable'
+	`).Scan(&count)
+	if err != nil {
+		t.Fatalf("FTS count after delete error = %v", err)
+	}
+	if count != 0 {
+		t.Errorf("Expected 0 FTS results after delete, got %d", count)
+	}
+}
+
+func TestV2_SeparateFromV1(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	v1Path := filepath.Join(tmpDir, "suggestions.db")
+	v2Path := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	// Create V1 database
+	v1DB, err := Open(context.Background(), Options{
+		Path:     v1Path,
+		SkipLock: true,
+		UseV1:    true,
+	})
+	if err != nil {
+		t.Fatalf("V1 Open() error = %v", err)
+	}
+	defer v1DB.Close()
+
+	// Create V2 database
+	v2DB, err := Open(context.Background(), Options{
+		Path:     v2Path,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("V2 Open() error = %v", err)
+	}
+	defer v2DB.Close()
+
+	// Both should exist as separate files
+	if _, err := os.Stat(v1Path); os.IsNotExist(err) {
+		t.Error("V1 database file does not exist")
+	}
+	if _, err := os.Stat(v2Path); os.IsNotExist(err) {
+		t.Error("V2 database file does not exist")
+	}
+
+	// V1 should have V1 tables
+	if err := v1DB.Validate(context.Background()); err != nil {
+		t.Errorf("V1 Validate() error = %v", err)
+	}
+
+	// V2 should have V2 tables
+	if err := v2DB.ValidateV2(context.Background()); err != nil {
+		t.Errorf("V2 ValidateV2() error = %v", err)
+	}
+
+	// V1 should NOT have V2-only tables
+	var name string
+	err = v1DB.QueryRowContext(context.Background(), `
+		SELECT name FROM sqlite_master WHERE type='table' AND name='command_template'
+	`).Scan(&name)
+	if err == nil {
+		t.Error("V1 database should not have command_template table")
+	}
+
+	// V2 should NOT have V1-only tables
+	err = v2DB.QueryRowContext(context.Background(), `
+		SELECT name FROM sqlite_master WHERE type='table' AND name='transition'
+	`).Scan(&name)
+	if err == nil {
+		t.Error("V2 database should not have V1 transition table")
+	}
+}
+
+func TestV2_SchemaCountIs23(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+	ctx := context.Background()
+
+	// Count all user tables (excluding sqlite internal tables)
+	rows, err := db.QueryContext(ctx, `
+		SELECT name FROM sqlite_master
+		WHERE type='table' AND name NOT LIKE 'sqlite_%'
+		ORDER BY name
+	`)
+	if err != nil {
+		t.Fatalf("Query tables error = %v", err)
+	}
+	defer rows.Close()
+
+	var tableCount int
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatalf("Scan error = %v", err)
+		}
+		tableCount++
+	}
+	t.Logf("Found %d user tables in database", tableCount)
+
+	// command_event_fts creates multiple internal tables (command_event_fts,
+	// command_event_fts_config, command_event_fts_content, etc.)
+	// We count the logical tables from V2AllTables.
+	// Check that each V2AllTables entry exists in the DB.
+	for _, expected := range V2AllTables {
+		found := false
+		// Check tables
+		var name string
+		err := db.QueryRowContext(ctx, `
+			SELECT name FROM sqlite_master
+			WHERE name=? AND (type='table' OR type='view')
+		`, expected).Scan(&name)
+		if err == nil {
+			found = true
+		}
+		if !found {
+			t.Errorf("Expected table %q not found in database", expected)
+		}
+	}
+
+	// Verify V2AllTables has exactly 23 entries
+	if len(V2AllTables) != 23 {
+		t.Errorf("V2AllTables has %d entries, want 23", len(V2AllTables))
+	}
+}
+
+func TestV2_WALModeEnabled(t *testing.T) {
+	t.Parallel()
+
+	db := newTestV2DB(t)
+	defer db.Close()
+
+	var journalMode string
+	err := db.QueryRowContext(context.Background(),
+		"PRAGMA journal_mode").Scan(&journalMode)
+	if err != nil {
+		t.Fatalf("Failed to check journal mode: %v", err)
+	}
+
+	if journalMode != "wal" {
+		t.Errorf("Journal mode = %s, want wal", journalMode)
+	}
+}
+
+func TestV2_DefaultDBPath(t *testing.T) {
+	t.Parallel()
+
+	path, err := DefaultDBPath()
+	if err != nil {
+		t.Fatalf("DefaultDBPath() error = %v", err)
+	}
+
+	if path == "" {
+		t.Error("DefaultDBPath() returned empty string")
+	}
+
+	if !filepath.IsAbs(path) {
+		t.Errorf("DefaultDBPath() = %s is not absolute", path)
+	}
+
+	if filepath.Base(path) != "suggestions_v2.db" {
+		t.Errorf("DefaultDBPath() = %s does not end with suggestions_v2.db", path)
+	}
+}
+
+func TestV1_DefaultDBPath(t *testing.T) {
+	t.Parallel()
+
+	path, err := DefaultV1DBPath()
+	if err != nil {
+		t.Fatalf("DefaultV1DBPath() error = %v", err)
+	}
+
+	if path == "" {
+		t.Error("DefaultV1DBPath() returned empty string")
+	}
+
+	if filepath.Base(path) != "suggestions.db" {
+		t.Errorf("DefaultV1DBPath() = %s does not end with suggestions.db", path)
+	}
+}
+
+// =============================================================================
+// Helper functions
+// =============================================================================
+
+// newTestV1DB creates a V1 test database.
+func newTestV1DB(t *testing.T) *DB {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -808,7 +1762,26 @@ func newTestDB(t *testing.T) *DB {
 
 	db, err := Open(context.Background(), Options{
 		Path:     dbPath,
-		SkipLock: true, // Skip lock for parallel tests
+		SkipLock: true,
+		UseV1:    true,
+	})
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+
+	return db
+}
+
+// newTestV2DB creates a V2 test database.
+func newTestV2DB(t *testing.T) *DB {
+	t.Helper()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	db, err := Open(context.Background(), Options{
+		Path:     dbPath,
+		SkipLock: true,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -832,6 +1805,7 @@ var _ interface {
 	DB() *sql.DB
 	Close() error
 	Validate(context.Context) error
+	ValidateV2(context.Context) error
 	Version(context.Context) (int, error)
 	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
 	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)

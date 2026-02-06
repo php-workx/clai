@@ -20,6 +20,15 @@ message Ack {
   string error = 2;     // populated if ok=false
 }
 
+// ApiError provides structured error details per Section 13.3 error model.
+// Standard codes: E_INVALID_ARGUMENT, E_DAEMON_UNAVAILABLE, E_STORAGE_BUSY,
+// E_STORAGE_CORRUPT, E_TIMEOUT, E_UNSUPPORTED_TTY, E_INTERNAL.
+message ApiError {
+  string code = 1;        // Machine-readable error code (e.g. "E_TIMEOUT")
+  string message = 2;     // Human-readable error description
+  bool retryable = 3;     // Whether the client should retry
+}
+
 // ---------------------------------------------------------
 // Session Lifecycle
 // ---------------------------------------------------------
@@ -76,6 +85,14 @@ message SuggestRequest {
   int32 cursor_pos = 4;     // Cursor position in buffer
   bool include_ai = 5;      // Request AI suggestions (explicit trigger)
   int32 max_results = 6;    // Max suggestions to return (default: 5)
+
+  // V2 fields: last-command context for improved suggestion ranking
+  string repo_key = 7;              // Repository identifier for scoped suggestions
+  string last_cmd_raw = 8;          // Raw text of the last executed command
+  string last_cmd_norm = 9;         // Normalized form of the last executed command
+  int64 last_cmd_ts_ms = 10;        // Timestamp of last command (unix ms)
+  int64 last_event_seq = 11;        // Monotonic event sequence number
+  bool include_low_confidence = 12; // Include lower-confidence suggestions
 }
 
 message Suggestion {
@@ -84,11 +101,55 @@ message Suggestion {
   string source = 3;            // "session", "cwd", "global", "ai"
   double score = 4;             // Ranking score (0.0 to 1.0)
   string risk = 5;              // "safe", "destructive", or empty
+
+  // V2 fields: per-suggestion enrichment
+  string cmd_norm = 6;                    // Normalized command form
+  double confidence = 7;                  // Confidence score (0.0 to 1.0)
+  repeated SuggestionReason reasons = 8;  // Why this suggestion was ranked here
+}
+
+// SuggestionReason explains why a particular suggestion was ranked.
+message SuggestionReason {
+  string type = 1;           // Reason type (e.g. "recency", "frequency", "cwd_match")
+  string description = 2;   // Human-readable description
+  float contribution = 3;   // Weight contribution to final score (0.0 to 1.0)
+}
+
+// TimingHint provides adaptive timing information for shell integrations.
+message TimingHint {
+  string user_speed_class = 1;           // e.g. "fast", "moderate", "slow"
+  int32 suggested_pause_threshold_ms = 2; // Suggested pause before showing suggestions
 }
 
 message SuggestResponse {
   repeated Suggestion suggestions = 1;
   bool from_cache = 2;          // True if served from cache
+
+  // V2 fields: response-level metadata
+  string cache_status = 3;     // "hit", "miss", "stale" (more granular than from_cache)
+  int64 latency_ms = 4;        // Server-side processing time
+  TimingHint timing_hint = 5;  // Adaptive timing guidance for shell integration
+}
+
+// ---------------------------------------------------------
+// Feedback
+// ---------------------------------------------------------
+
+// RecordFeedbackRequest captures user feedback on suggestions.
+// Primary feedback path is automatic from shell integrations.
+message RecordFeedbackRequest {
+  string session_id = 1;      // Session that generated the suggestion
+  string action = 2;          // "accepted", "dismissed", "edited", "never", "unblock"
+  string suggested_text = 3;  // The suggestion that was shown
+  string executed_text = 4;   // What the user actually executed (for "edited")
+  string prefix = 5;          // The prefix/buffer when suggestion was shown
+  int64 latency_ms = 6;       // Time from suggestion display to user action
+}
+
+// RecordFeedbackResponse confirms feedback recording.
+message RecordFeedbackResponse {
+  bool ok = 1;
+  ApiError error = 2;         // Structured error if ok=false
 }
 
 // ---------------------------------------------------------
@@ -140,8 +201,17 @@ message DiagnoseResponse {
 }
 
 // ---------------------------------------------------------
-// History
+// History / Search
 // ---------------------------------------------------------
+
+// SearchMode controls the search strategy for history queries.
+enum SearchMode {
+  SEARCH_MODE_UNSPECIFIED = 0;  // Default: auto-detect best strategy
+  SEARCH_MODE_FTS = 1;          // Full-text search (SQLite FTS5)
+  SEARCH_MODE_PREFIX = 2;       // Prefix/LIKE scan
+  SEARCH_MODE_DESCRIBE = 3;     // Tag-based descriptive search (no LLM)
+  SEARCH_MODE_AUTO = 4;         // Auto-select best backend
+}
 
 message HistoryFetchRequest {
   string session_id = 1;   // Optional: filter by session (UUID v4)
@@ -149,16 +219,32 @@ message HistoryFetchRequest {
   int32  limit = 3;        // Page size
   int32  offset = 4;       // Pagination offset
   bool   global = 5;       // True = all sessions
+
+  // V2 fields: extended search capabilities
+  string repo_key = 6;     // Filter by repository
+  SearchMode mode = 7;     // Search strategy (fts, prefix, describe, auto)
+  string scope = 8;        // "session", "repo", "global"
 }
 
 message HistoryFetchResponse {
   repeated HistoryItem items = 1;
   bool at_end = 2;
+
+  // V2 fields: search metadata
+  int64 latency_ms = 3;   // Server-side search time
+  string backend = 4;     // Which backend served the query ("fts5", "fallback")
 }
 
 message HistoryItem {
   string command = 1;
   int64  timestamp_ms = 2;
+
+  // V2 fields: enriched result data
+  string cmd_norm = 3;           // Normalized command form
+  string repo_key = 4;           // Repository key for this command
+  double rank_score = 5;         // Relevance score from search
+  repeated string tags = 6;      // Descriptive tags for the command
+  repeated string matched_tags = 7; // Tags that matched the query
 }
 
 message HistoryImportRequest {
@@ -201,6 +287,10 @@ service ClaiService {
   rpc TextToCommand(TextToCommandRequest) returns (TextToCommandResponse);
   rpc NextStep(NextStepRequest) returns (NextStepResponse);
   rpc Diagnose(DiagnoseRequest) returns (DiagnoseResponse);
+
+  // Feedback (V2)
+  rpc RecordFeedback(RecordFeedbackRequest) returns (RecordFeedbackResponse);
+  rpc SuggestFeedback(RecordFeedbackRequest) returns (RecordFeedbackResponse);
 
   // History
   rpc FetchHistory(HistoryFetchRequest) returns (HistoryFetchResponse);
