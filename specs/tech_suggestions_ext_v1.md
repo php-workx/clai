@@ -141,6 +141,11 @@ Windows named-pipe contract:
 
 ### 3.5 Backpressure and Failure Policy
 - Ingestion queue is bounded (default `8192` events).
+- Burst-mode circuit breaker protects against script storms:
+- Enter burst mode when more than `suggestions.burst_events_threshold` events from one `session_id` arrive inside `suggestions.burst_window_ms` (defaults: `10` events in `100ms`).
+- While in burst mode, persist only boundary events (`first` and `last` `command_end` in a burst bucket) and update in-memory recency for intermediate events.
+- Exit burst mode after `suggestions.burst_quiet_ms` of silence (default `500ms`).
+- Emit `ingest_burst_mode_entries` and `ingest_burst_mode_dropped_events` metrics.
 - When queue is full, daemon applies drop-oldest policy for non-critical telemetry events and increments `ingest_drop_count`.
 - `command_end` and `session_start/session_end` are high-priority and must be retained preferentially over optional telemetry.
 - Hook path remains fail-open: if connect or write exceeds timeout budget, event is dropped without blocking shell.
@@ -165,9 +170,12 @@ No migration bridge to V1 is required. V2 initializes and owns its schema.
 - `transition_stat`
 - `command_stat`
 - `slot_stat`
+- `slot_correlation`
 - `task_candidate`
 - `suggestion_cache`
 - `suggestion_feedback`
+- `rank_weight_profile`
+- `command_event_fts` (virtual table)
 - `schema_migrations`
 
 ### 4.2 Schema Sketch
@@ -234,12 +242,27 @@ CREATE TABLE slot_stat (
   PRIMARY KEY(scope, template_id, slot_index, value)
 );
 
+CREATE TABLE slot_correlation (
+  scope TEXT NOT NULL,
+  template_id TEXT NOT NULL,
+  slot_key TEXT NOT NULL,
+  tuple_hash TEXT NOT NULL,
+  tuple_value_json TEXT NOT NULL,
+  weight REAL NOT NULL,
+  count INTEGER NOT NULL,
+  last_seen_ms INTEGER NOT NULL,
+  PRIMARY KEY(scope, template_id, slot_key, tuple_hash)
+);
+
 CREATE TABLE task_candidate (
   repo_key TEXT NOT NULL,
   kind TEXT NOT NULL,
   name TEXT NOT NULL,
   command_text TEXT NOT NULL,
   description TEXT,
+  source TEXT NOT NULL DEFAULT 'auto',
+  priority_boost REAL NOT NULL DEFAULT 0,
+  source_checksum TEXT,
   discovered_ms INTEGER NOT NULL,
   PRIMARY KEY(repo_key, kind, name)
 );
@@ -254,6 +277,45 @@ CREATE TABLE suggestion_feedback (
   executed_text TEXT,
   latency_ms INTEGER
 );
+
+CREATE TABLE rank_weight_profile (
+  profile_key TEXT PRIMARY KEY,
+  scope TEXT NOT NULL,
+  updated_ms INTEGER NOT NULL,
+  w_transition REAL NOT NULL,
+  w_frequency REAL NOT NULL,
+  w_success REAL NOT NULL,
+  w_prefix REAL NOT NULL,
+  w_affinity REAL NOT NULL,
+  w_task REAL NOT NULL,
+  w_feedback REAL NOT NULL,
+  w_risk_penalty REAL NOT NULL,
+  sample_count INTEGER NOT NULL,
+  learning_rate REAL NOT NULL
+);
+
+CREATE VIRTUAL TABLE command_event_fts USING fts5(
+  cmd_raw,
+  cmd_norm,
+  repo_key UNINDEXED,
+  session_id UNINDEXED,
+  content='command_event',
+  content_rowid='id',
+  tokenize='trigram'
+);
+
+CREATE TRIGGER command_event_ai AFTER INSERT ON command_event
+WHEN NEW.ephemeral = 0
+BEGIN
+  INSERT INTO command_event_fts(rowid, cmd_raw, cmd_norm, repo_key, session_id)
+  VALUES (NEW.id, NEW.cmd_raw, NEW.cmd_norm, NEW.repo_key, NEW.session_id);
+END;
+
+CREATE TRIGGER command_event_ad AFTER DELETE ON command_event
+BEGIN
+  INSERT INTO command_event_fts(command_event_fts, rowid, cmd_raw, cmd_norm, repo_key, session_id)
+  VALUES ('delete', OLD.id, OLD.cmd_raw, OLD.cmd_norm, OLD.repo_key, OLD.session_id);
+END;
 
 CREATE TABLE schema_migrations (
   version INTEGER PRIMARY KEY,
@@ -281,7 +343,9 @@ WAL and checkpoint policy:
 - Update `command_stat` (frequency + success/failure counters).
 - Update `transition_stat` if previous template is known for session.
 - Update `slot_stat` values extracted from template/args alignment.
+- Update `slot_correlation` for configured slot tuples (example: `<namespace>|<pod>`).
 - Update in-memory cache index and invalidation markers.
+- If online ranking updates are enabled, enqueue async `rank_weight_profile` update work item after transaction commit.
 - For `ephemeral=1`, only in-memory session-scoped structures are updated; no SQLite write occurs.
 - If transaction fails, daemon records error metric, abandons partial event effects, and keeps process alive.
 
@@ -317,6 +381,10 @@ WAL and checkpoint policy:
 ### 5.4 Template Identity
 - `template_id = sha256(cmd_norm)`.
 - Store `cmd_norm` and slot count in `command_template`.
+
+### 5.5 Slot Dependency Registry
+- Normalizer maintains optional per-template dependency sets for semantically coupled slots (for example `<namespace>` + `<pod>`, `<cluster>` + `<context>`).
+- Dependency sets are keyed by `slot_key` (pipe-delimited slot indexes such as `1|3`) and used by `slot_correlation`.
 
 ## 6) Candidate Generation Pipeline
 
@@ -361,6 +429,7 @@ Scoring notes:
 - Each feature is normalized into `[0, 1]` before weighting.
 - Transition and frequency values are log-scaled before normalization.
 - Risk penalty is applied post-aggregation and can force candidate suppression.
+- Per request, weight vector is resolved from `rank_weight_profile` (`session` -> `repo` -> `global_default`) and snapshotted for deterministic ordering within that request.
 
 ### 7.2 Feature Definitions
 - `transition`: decayed edge weight from previous template.
@@ -383,6 +452,8 @@ Scoring notes:
 ### 7.5 Slot Filling
 - Fill slots from scoped histograms with confidence threshold.
 - Fallback order: session -> repo -> global.
+- For templates with dependency sets, generate multi-slot assignments from `slot_correlation` first, then fill remaining independent slots from `slot_stat`.
+- Reject mixed assignments that violate correlation confidence threshold (`suggestions.slot_correlation_min_confidence`).
 - If uncertain, return template with partially unfilled slots only if UX supports it; otherwise skip.
 
 ### 7.6 Deterministic Ordering and Tie-Break Rules
@@ -394,6 +465,20 @@ Scoring notes:
 - Drop suggestions with `confidence < min_confidence` unless `include_low_confidence=true`.
 - Drop risky candidates when `risk_penalty` forces final score below `min_score`.
 - At most one suggestion per normalized template unless slot-filled variants differ by at least one non-trivial argument.
+
+### 7.7 Adaptive Weight Tuning (Online Learning)
+- Weight adaptation is online and per profile (`session`, `repo`, `global`) with strict guardrails.
+- Update trigger:
+- explicit `accepted` feedback with candidate snapshot
+- implicit acceptance from exact next-command match
+- Pairwise update rule (lightweight bandit-style):
+- positive sample = accepted suggestion feature vector `f_pos`
+- negative sample = highest-ranked unaccepted candidate feature vector `f_neg`
+- `w_next = clamp(w_prev + eta * (f_pos - f_neg), min_w, max_w)`
+- Renormalize non-penalty weights to keep bounded total contribution; keep `w_risk_penalty` in independent safe range.
+- Default `eta` is small (`0.02`) and decays with `sample_count` to avoid overfitting.
+- If feedback volume is below `suggestions.online_learning_min_samples`, engine uses static defaults only.
+- All updates are async and versioned; suggest path reads last committed profile snapshot only.
 
 ## 8) Typo Recovery
 
@@ -428,6 +513,8 @@ Feedback signal sources:
 - Accepted suggestions increase source-specific and template-specific priors.
 - Dismissed suggestions apply short-term suppression.
 - Edited-then-run updates slot statistics and normalizer correction maps.
+- Accepted and accepted_implicit events update `slot_correlation` counts for dependency sets when all required slot values are present.
+- Accepted events trigger adaptive weight update pipeline for the active profile.
 
 ### 9.3 Drift Control
 - Decay all feedback effects over time.
@@ -463,14 +550,28 @@ Hot-path limits:
 - Makefile targets.
 - `justfile` recipes.
 - Optional extensions (`taskfile`, `cargo`, `pnpm`).
+- Static team playbook file: `.clai/tasks.yaml`.
 
 ### 11.2 Discovery Runtime Rules
 - Run with timeout and output cap.
 - Sandboxed environment (no inherited secrets by default).
 - Errors are non-fatal and observable through diagnostics.
+- Watch `.clai/tasks.yaml` with debounce; apply incremental refresh on checksum change.
+- Playbook entries use `source='playbook'` and receive configured boost (`suggestions.task_playbook_boost`) over auto-discovered tasks.
+- Invalid YAML never blocks suggestions; daemon keeps last valid snapshot and reports parse error in diagnostics.
 
 ### 11.3 Data Contract
-- Each task candidate includes `kind`, `name`, `command_text`, optional description.
+- Each task candidate includes `kind`, `name`, `command_text`, optional description, `source`, and `priority_boost`.
+
+### 11.4 `.clai/tasks.yaml` Contract
+- File path is repository root relative: `.clai/tasks.yaml`.
+- Schema fields per entry:
+- `name` (required, unique within file)
+- `command` (required)
+- `description` (optional)
+- `tags` (optional)
+- `enabled` (optional, default true)
+- Parse failure is soft; previous valid set stays active until fixed.
 
 ## 12) Security and Privacy
 
@@ -503,18 +604,23 @@ API payload contract (JSON over local RPC transport wrapper):
 - `session_id`, `cwd`, `repo_key`, `prefix`, `cursor_pos`, `limit`, `include_low_confidence`, `last_cmd_raw`, `last_cmd_norm`, `last_cmd_ts_ms`, `last_event_seq`
 - `SuggestResponse`:
 - `suggestions[] { text, cmd_norm, source, score, confidence, reasons[], risk }`, `cache_status`, `latency_ms`
+- `SearchRequest`:
+- `query`, `scope`, `limit`, `repo_key`, `session_id`, `mode`
+- `SearchResponse`:
+- `results[] { cmd_raw, cmd_norm, ts_ms, repo_key, rank_score }`, `latency_ms`, `backend`
 - `RecordFeedbackRequest`:
 - `session_id`, `action`, `suggested_text`, `executed_text`, `prefix`, `latency_ms`
 
 ### 13.2 CLI Commands
 - `clai suggest [prefix] --limit N --format text|json|fzf`
-- `clai search [query] --limit N --scope session|repo|global`
+- `clai search [query] --limit N --scope session|repo|global --mode fts|prefix`
 - `clai suggest-feedback --action accepted|dismissed|edited`
 - `clai suggestions doctor`
 
 Note:
 - `clai suggest-feedback` is diagnostic/manual tooling.
 - Primary feedback path is automatic from shell integrations and implicit matching heuristics.
+- `clai search` prefers SQLite FTS5 (`backend=fts5`) and falls back to prefix/LIKE scan (`backend=fallback`) when FTS is unavailable.
 
 ### 13.3 Error Model and Response Contract
 - All daemon API responses must include one of:
@@ -536,9 +642,13 @@ Note:
 ### 14.1 Unit Tests
 - Normalization/tokenization edge cases.
 - Slot extraction and filling correctness.
+- Slot correlation join/fallback correctness and invalid-tuple rejection.
 - Ranking determinism and monotonicity.
+- Online learning update clamp/renormalize correctness and low-sample freeze behavior.
 - Feedback update math and decay behavior.
 - Timeout and non-blocking guarantees in hook sender.
+- Burst mode detector thresholds and quiet-window recovery.
+- `.clai/tasks.yaml` parser validation and merge precedence.
 
 ### 14.2 Property and Fuzz Tests
 - Fuzz malformed UTF-8 and shell-escaped sequences.
@@ -550,6 +660,8 @@ Note:
 - Session isolation and repo isolation correctness.
 - Cache hit/miss behavior and invalidation correctness.
 - Migration tests from empty DB to latest schema.
+- Burst-mode ingestion under command storms with bounded durable writes.
+- FTS5 index synchronization (`command_event` <-> `command_event_fts`) and fallback path correctness.
 
 ### 14.4 Cross-Shell Interactive Tests
 - `go-expect` driven tests for `bash`, `zsh`, `fish`:
@@ -568,6 +680,8 @@ Note:
 - Hook overhead micro-benchmarks.
 - Suggestion latency benchmark with warm/cold paths.
 - Load test ingest burst (`10k` events) with durability checks.
+- Burst mode benchmark verifies queue stability under loop-like traffic.
+- Search benchmark verifies FTS query p95 budget under large history corpus.
 
 ### 14.7 Reliability and Chaos Tests
 - Kill daemon mid-session; shell remains functional.
@@ -582,7 +696,7 @@ Note:
 ### 14.9 Deterministic Replay Validation
 - Maintain a replay corpus of sanitized command sessions with expected top-k suggestions per step.
 - Replay runner executes with fixed clock and fixed random seed for deterministic comparisons.
-- Any change in top-k set, ordering, or confidence beyond configured thresholds requires explicit review approval.
+- Any change in top-k set, ordering, confidence, or learned weight profile beyond configured thresholds requires explicit review approval.
 
 ## 15) Observability and Diagnostics
 
@@ -590,6 +704,9 @@ Note:
 - Suggest latency, cache hit ratio, accept rate, dismiss rate.
 - Ingest drop rate and timeout rate.
 - DB flush queue depth and flush latency.
+- Burst mode entries/dropped event counts and active duration.
+- Online learning update count, clamp count, and per-profile sample counts.
+- Search backend split (`fts5` vs fallback) and search latency percentiles.
 
 ### 15.2 Structured Logging
 - Debug-level includes template ids and feature contributions.
@@ -602,6 +719,8 @@ Note:
 - Migration version
 - Cache stats
 - Last discovery errors
+- FTS availability and last index sync status
+- Playbook parse status (`.clai/tasks.yaml`)
 
 ## 16) Configuration Surface (V2)
 
@@ -635,6 +754,28 @@ Learning:
 - `suggestions.feedback_penalty_dismiss=0.08`
 - `suggestions.slot_max_values_per_slot=20`
 - `suggestions.feedback_match_window_ms=5000`
+- `suggestions.online_learning_enabled=true`
+- `suggestions.online_learning_eta=0.02`
+- `suggestions.online_learning_min_samples=30`
+- `suggestions.weight_min=0.00`
+- `suggestions.weight_max=0.60`
+- `suggestions.weight_risk_min=0.10`
+- `suggestions.weight_risk_max=0.60`
+- `suggestions.slot_correlation_min_confidence=0.65`
+
+Backpressure:
+- `suggestions.burst_events_threshold=10`
+- `suggestions.burst_window_ms=100`
+- `suggestions.burst_quiet_ms=500`
+
+Task discovery:
+- `suggestions.task_playbook_enabled=true`
+- `suggestions.task_playbook_path=.clai/tasks.yaml`
+- `suggestions.task_playbook_boost=0.20`
+
+Search:
+- `suggestions.search_fts_enabled=true`
+- `suggestions.search_fallback_scan_limit=2000`
 
 Privacy:
 - `suggestions.incognito_mode=ephemeral` (`off|ephemeral|no_send`)
@@ -656,6 +797,8 @@ Behavioral gates:
 - Session isolation invariants hold.
 - Ephemeral mode persistence invariant holds (zero persistent writes from ephemeral events).
 - Risk tagging invariant holds for destructive command patterns.
+- Correlated slot validity checks pass for templates with dependency sets.
+- Online learning guardrails hold (weights remain within configured ranges).
 
 ## 18) Acceptance Checklist
 
@@ -665,6 +808,8 @@ Behavioral gates:
 - Incognito modes validated with persistence assertions.
 - Hook path remains non-blocking under daemon failure.
 - Deterministic ranking and stable top-k behavior across repeated runs.
+- `.clai/tasks.yaml` discovery, reload, and boost behavior validated.
+- Deep-history `clai search` behavior validated with FTS and fallback backend.
 
 ## 19) Correctness Invariants
 
@@ -686,3 +831,7 @@ The following invariants are mandatory and must be continuously asserted in test
 - Any new `command_end` for a session invalidates stale cache entries for that session before the next suggest response.
 - `I8 Crash Safety`:
 - Daemon crash during ingestion must not leave partially applied aggregate updates visible after restart.
+- `I9 Correlated Slot Validity`:
+- For templates with configured slot dependency sets, emitted multi-slot suggestions must match an observed tuple or exceed configured correlation confidence.
+- `I10 Learning Guardrails`:
+- Adaptive updates must never push any weight outside configured min/max bounds, and must preserve deterministic ordering for a fixed profile snapshot.
