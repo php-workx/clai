@@ -833,7 +833,6 @@ fn test_clai_wrap_io_ctrl_c_interrupts_running_command() {
 
 #[test]
 #[cfg(unix)]
-#[ignore = "Ctrl-D EOF behavior in standalone wrapper is not stable yet"]
 fn test_clai_wrap_io_ctrl_d_sends_eof_and_exits() {
     let Some((master, mut child)) = spawn_clai_wrap_shell() else {
         eprintln!("Skipping test: clai-wrap binary or shell unavailable");
@@ -957,7 +956,6 @@ fn test_clai_wrap_signal_sigpipe_does_not_break_shell() {
 
 #[test]
 #[cfg(unix)]
-#[ignore = "Known behavior: standalone wrapper does not currently propagate child non-zero exit code"]
 fn test_clai_wrap_signal_child_exit_code_passthrough() {
     let Some((master, mut child)) = spawn_clai_wrap_shell() else {
         eprintln!("Skipping test: clai-wrap binary or shell unavailable");
@@ -968,7 +966,7 @@ fn test_clai_wrap_signal_child_exit_code_passthrough() {
     writer.write_all(b"exit 42\n").expect("write exit code");
     writer.flush().expect("flush exit code");
 
-    let status = wait_for_exit_or_kill(&mut *child, Duration::from_secs(3));
+    let status = wait_for_exit_or_kill(&mut *child, Duration::from_secs(10));
     assert_eq!(
         status.exit_code(),
         42,

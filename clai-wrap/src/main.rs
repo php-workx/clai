@@ -217,7 +217,7 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
 
     // Start stdin reader thread
     let pty_writer_clone = Arc::clone(&pty_writer);
-    let stdin_thread = thread::spawn(move || {
+    let _stdin_thread = thread::spawn(move || {
         let mut stdin = std::io::stdin();
         let mut buf = [0u8; IO_BUFFER_SIZE];
 
@@ -243,6 +243,8 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
     let mut pty_buf = [0u8; IO_BUFFER_SIZE];
     let picker_open = false;
 
+    let mut child_exit_status = None;
+
     loop {
         // Check for signals
         if let Ok(Some(event)) = signal_handler.try_recv() {
@@ -254,8 +256,8 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
                     }
                 }
                 SignalEvent::ChildExit => {
-                    debug!("Child process exited");
-                    break;
+                    // SIGCHLD is advisory; resolve actual status through try_wait().
+                    debug!("Received child-exit signal");
                 }
                 SignalEvent::Interrupt => {
                     // Forward Ctrl-C to child (already handled by PTY)
@@ -289,10 +291,8 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
         // Check for child exit
         if let Ok(Some(status)) = pty_host.try_wait() {
             info!("Shell exited with status: {:?}", status.code());
-            shutdown.store(true, Ordering::SeqCst);
-
-            // Return the shell's exit code
-            std::process::exit(status.as_exit_code());
+            child_exit_status = Some(status);
+            break;
         }
 
         // Read from PTY (non-blocking would be better, but we'll use a small timeout)
@@ -336,7 +336,10 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
 
     // Cleanup
     shutdown.store(true, Ordering::SeqCst);
-    let _ = stdin_thread.join();
+
+    if let Some(status) = child_exit_status.or_else(|| pty_host.try_wait().ok().flatten()) {
+        std::process::exit(status.as_exit_code());
+    }
 
     Ok(())
 }
