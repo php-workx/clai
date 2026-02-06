@@ -12,6 +12,8 @@
 use std::env;
 use std::io::Write;
 use std::path::PathBuf;
+use std::process::{Command, Output, Stdio};
+use std::time::{Duration, Instant};
 
 use tempfile::NamedTempFile;
 
@@ -20,6 +22,41 @@ use clai_wrap::passthrough::{
 };
 use clai_wrap::raw_mode::{detect_tty, TtyStatus};
 use clai_wrap::standalone::{Feature, StandaloneError, StandaloneReason, StandaloneState};
+
+#[cfg(unix)]
+fn clai_wrap_binary() -> Option<PathBuf> {
+    for key in ["CARGO_BIN_EXE_clai-wrap", "CARGO_BIN_EXE_clai_wrap"] {
+        if let Some(path) = std::env::var_os(key).map(PathBuf::from) {
+            if path.exists() {
+                return Some(path);
+            }
+        }
+    }
+
+    let current_exe = std::env::current_exe().ok()?;
+    let deps_dir = current_exe.parent()?;
+    let target_dir = deps_dir.parent()?;
+    let binary = target_dir.join("clai-wrap");
+    if binary.exists() {
+        return Some(binary);
+    }
+
+    None
+}
+
+#[cfg(unix)]
+fn run_with_timeout(mut child: std::process::Child, timeout: Duration) -> Output {
+    let start = Instant::now();
+    while start.elapsed() < timeout {
+        match child.try_wait() {
+            Ok(Some(_)) => return child.wait_with_output().expect("collect child output"),
+            Ok(None) => std::thread::sleep(Duration::from_millis(10)),
+            Err(e) => panic!("failed to poll child: {e}"),
+        }
+    }
+    let _ = child.kill();
+    child.wait_with_output().expect("collect killed child output")
+}
 
 // ============================================================================
 // TTY Detection Tests
@@ -484,6 +521,65 @@ fn test_term_environment_handling() {
     } else {
         env::remove_var("TERM");
     }
+}
+
+#[test]
+#[cfg(unix)]
+fn test_non_tty_without_force_non_tty_fails_raw_mode() {
+    let Some(binary) = clai_wrap_binary() else {
+        eprintln!("Skipping test: clai-wrap binary unavailable");
+        return;
+    };
+
+    let child = Command::new(binary)
+        .args(["--standalone", "--shell", "/bin/sh", "--login-shell", "false"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn clai-wrap");
+
+    let output = run_with_timeout(child, Duration::from_secs(5));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        !output.status.success(),
+        "Expected failure when raw mode is required in non-TTY"
+    );
+    assert!(
+        stderr.contains("Failed to enter raw mode"),
+        "Expected raw-mode failure message, got: {stderr}"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn test_force_non_tty_allows_passthrough_with_piped_io() {
+    let Some(binary) = clai_wrap_binary() else {
+        eprintln!("Skipping test: clai-wrap binary unavailable");
+        return;
+    };
+
+    let mut child = Command::new(binary)
+        .args(["--force-non-tty", "--shell", "/bin/sh"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn clai-wrap");
+
+    let stdin = child.stdin.as_mut().expect("child stdin");
+    stdin
+        .write_all(b"echo FORCE_NON_TTY_OK\nexit\n")
+        .expect("write piped commands");
+
+    let output = run_with_timeout(child, Duration::from_secs(5));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    assert!(
+        stdout.contains("FORCE_NON_TTY_OK"),
+        "Expected passthrough command output, got: {stdout}"
+    );
 }
 
 // ============================================================================

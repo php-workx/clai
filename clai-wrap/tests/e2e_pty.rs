@@ -1120,6 +1120,90 @@ fn test_clai_wrap_resize_rapid_updates_keep_trailing_size() {
     assert!(output.contains("40 120"), "Output: {output}");
 }
 
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_encoding_utf8_passthrough() {
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    // UTF-8 bytes for "é✓" in octal escapes.
+    writer
+        .write_all(b"printf 'UTF8_OK:\\303\\251\\342\\234\\223\\n'\n")
+        .expect("write utf8 command");
+    writer.flush().expect("flush utf8 command");
+
+    let output = read_until_marker(&mut *reader, "UTF8_OK:", Duration::from_secs(8))
+        .expect("Expected UTF-8 payload to pass through");
+
+    let _ = child.kill();
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+
+    assert!(
+        output.contains("UTF8_OK:"),
+        "Expected UTF-8 marker in output, got: {output}"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_encoding_invalid_utf8_bytes_do_not_crash() {
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    // Emit bytes that are invalid standalone UTF-8 and then verify session stays alive.
+    writer
+        .write_all(b"printf '\\200\\201INVALID_BYTES\\n'; echo AFTER_INVALID_UTF8\n")
+        .expect("write invalid utf8 command");
+    writer.flush().expect("flush invalid utf8 command");
+
+    let output = read_until_marker(&mut *reader, "AFTER_INVALID_UTF8", Duration::from_secs(8))
+        .expect("Expected shell to continue after invalid UTF-8 bytes");
+
+    let _ = child.kill();
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+
+    assert!(
+        output.contains("AFTER_INVALID_UTF8"),
+        "Expected post-invalid-bytes marker, got: {output}"
+    );
+}
+
+#[test]
+#[cfg(unix)]
+#[ignore = "Locale warning behavior for non-UTF8 locales is not implemented/stable yet"]
+fn test_clai_wrap_encoding_non_utf8_locale_warning() {
+    let Some(binary) = clai_wrap_binary() else {
+        eprintln!("Skipping test: clai-wrap binary unavailable");
+        return;
+    };
+
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(default_pty_size())
+        .expect("Failed to create PTY");
+
+    let mut cmd = CommandBuilder::new(binary);
+    cmd.args(["--standalone", "--shell", "/bin/sh", "--login-shell", "false"]);
+    cmd.env("LANG", "C");
+    cmd.env("LC_ALL", "C");
+
+    let mut child = pair.slave.spawn_command(cmd).expect("spawn clai-wrap");
+    let mut writer = pair.master.take_writer().expect("writer");
+    writer.write_all(b"exit\n").expect("write exit");
+    writer.flush().expect("flush exit");
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+}
+
 // ============================================================================
 // Stress Tests
 // ============================================================================
