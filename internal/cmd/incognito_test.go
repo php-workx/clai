@@ -211,25 +211,44 @@ func TestEnableIncognito(t *testing.T) {
 
 func TestDisableIncognito(t *testing.T) {
 	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
 	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+	oldStderr := os.Stderr
+
+	rOut, wOut, _ := os.Pipe()
+	rErr, wErr, _ := os.Pipe()
+	os.Stdout = wOut
+	os.Stderr = wErr
+
+	done := make(chan struct{})
+	go func() {
+		_, _ = stdout.ReadFrom(rOut)
+		_, _ = stderr.ReadFrom(rErr)
+		close(done)
+	}()
 
 	err := disableIncognito()
 
-	w.Close()
-	stdout.ReadFrom(r)
+	wOut.Close()
+	wErr.Close()
 	os.Stdout = oldStdout
+	os.Stderr = oldStderr
+	<-done
 
 	if err != nil {
-		t.Errorf("disableIncognito() returned error: %v", err)
+		t.Fatalf("disableIncognito returned error: %v", err)
 	}
 
-	output := stdout.String()
-	if !strings.Contains(output, "unset CLAI_NO_RECORD") {
-		t.Errorf("expected 'unset CLAI_NO_RECORD' in output, got: %s", output)
+	outStr := stdout.String()
+	errStr := stderr.String()
+	if !strings.Contains(outStr, "unset CLAI_NO_RECORD") {
+		t.Errorf("expected unset CLAI_NO_RECORD in output, got: %s", outStr)
 	}
-	if !strings.Contains(output, "unset CLAI_EPHEMERAL") {
-		t.Errorf("expected 'unset CLAI_EPHEMERAL' in output, got: %s", output)
+	if !strings.Contains(outStr, "unset CLAI_EPHEMERAL") {
+		t.Errorf("expected unset CLAI_EPHEMERAL in output, got: %s", outStr)
+	}
+	if !strings.Contains(errStr, "disabled") {
+		t.Errorf("expected disabled message on stderr, got: %s", errStr)
 	}
 }

@@ -410,8 +410,20 @@ func (s *Service) FallbackEnabled() bool {
 // escapeFTS5Query escapes special characters for FTS5 queries.
 func escapeFTS5Query(query string) string {
 	// FTS5 special characters: " * ^ : ( ) -
-	// For simple substring matching, we wrap in quotes
-	escaped := strings.ReplaceAll(query, `"`, `""`)
+	// For simple substring matching, we wrap in quotes.
+	// If the user already supplied surrounding quotes, preserve that intent.
+	trimmed := strings.TrimSpace(query)
+	if trimmed == "" {
+		return `""`
+	}
+
+	if strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`) && len(trimmed) >= 2 {
+		inner := trimmed[1 : len(trimmed)-1]
+		inner = strings.ReplaceAll(inner, `"`, `""`)
+		return fmt.Sprintf(`"%s"`, inner)
+	}
+
+	escaped := strings.ReplaceAll(trimmed, `"`, `""`)
 	return fmt.Sprintf(`"%s"`, escaped)
 }
 

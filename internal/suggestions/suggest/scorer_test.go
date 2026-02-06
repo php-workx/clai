@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ import (
 )
 
 // createTestDB creates a temporary SQLite database for testing.
-func createTestDB(t *testing.T) *sql.DB {
+func createTestDB(t testing.TB) *sql.DB {
 	t.Helper()
 
 	dir, err := os.MkdirTemp("", "clai-scorer-test-*")
@@ -225,6 +226,64 @@ func TestScorer_Suggest_WithProjectTasks(t *testing.T) {
 	assert.NotEmpty(t, suggestions)
 	assert.Equal(t, "make test", suggestions[0].Command)
 	assert.Contains(t, suggestions[0].Reasons, ReasonProjectTask)
+}
+
+func BenchmarkScorer_Suggest_Latency(b *testing.B) {
+	db := createTestDB(b)
+
+	freqStore, err := score.NewFrequencyStore(db, score.DefaultFrequencyOptions())
+	require.NoError(b, err)
+	b.Cleanup(func() { freqStore.Close() })
+
+	transStore, err := score.NewTransitionStore(db)
+	require.NoError(b, err)
+	b.Cleanup(func() { transStore.Close() })
+
+	ctx := context.Background()
+	nowMs := time.Now().UnixMilli()
+
+	// Populate frequency data
+	for i := 0; i < 200; i++ {
+		cmd := "git status"
+		if i%3 == 0 {
+			cmd = "npm install"
+		}
+		require.NoError(b, freqStore.Update(ctx, score.ScopeGlobal, cmd, nowMs))
+	}
+
+	// Populate transition data
+	for i := 0; i < 100; i++ {
+		require.NoError(b, transStore.RecordTransition(ctx, score.ScopeGlobal, "git status", "git commit", nowMs))
+	}
+
+	scorer, err := NewScorer(ScorerDependencies{
+		DB:              db,
+		FreqStore:       freqStore,
+		TransitionStore: transStore,
+	}, DefaultScorerConfig())
+	require.NoError(b, err)
+
+	suggestCtx := SuggestContext{
+		LastCmd: "git status",
+		NowMs:   nowMs,
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_, err := scorer.Suggest(ctx, suggestCtx)
+		if err != nil {
+			b.Fatalf("Suggest error: %v", err)
+		}
+	}
+
+	b.StopTimer()
+	avg := time.Duration(int64(b.Elapsed()) / int64(b.N))
+	b.ReportMetric(float64(avg.Microseconds()), "us/op")
+	if avg > 20*time.Millisecond {
+		b.Fatalf("average suggest latency %v exceeds 20ms target", avg)
+	}
 }
 
 func TestScorer_Suggest_Deduplication(t *testing.T) {

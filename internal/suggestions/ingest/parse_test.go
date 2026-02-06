@@ -3,6 +3,7 @@ package ingest
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -410,6 +411,17 @@ func TestValidateEvent_ValidEvent(t *testing.T) {
 
 	err := ValidateEvent(ev)
 	assert.NoError(t, err)
+}
+
+func TestParseEvent_LargeCommand(t *testing.T) {
+	largeCmd := strings.Repeat("x", 40000)
+	data := validEventJSON(t, map[string]interface{}{
+		"cmd_raw": largeCmd,
+	})
+
+	ev, err := ParseEvent(data)
+	require.NoError(t, err)
+	assert.Equal(t, largeCmd, ev.CmdRaw)
 }
 
 // FuzzParseEvent performs fuzz testing on the ParseEvent function.

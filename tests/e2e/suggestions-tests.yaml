@@ -225,6 +225,20 @@ tests:
     expect:
       - screen_not_contains: "nstall"  # Ghost text gone
 
+  - name: "Typing clears ghost text"
+    description: "Typing additional characters clears the ghost text suggestion"
+    shells: [bash, zsh, fish]
+    tags: [suggestions, ghost-text, cross-shell]
+    setup:
+      - "git status"
+    steps:
+      - type: "git s"
+      - wait: "300ms"
+      - type: "x"
+      - wait: "200ms"
+    expect:
+      - screen_not_contains: "tatus"  # Ghost text cleared after typing
+
   - name: "Alt+Right accepts next token"
     description: "Alt+Right accepts one token of the suggestion at a time"
     shells: [bash, zsh, fish]

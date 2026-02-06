@@ -108,3 +108,30 @@ func TestRunSuggest_DisabledByConfig(t *testing.T) {
 		t.Fatalf("expected empty JSON array, got %q", output)
 	}
 }
+
+func TestRunSuggest_HistoryFallback_NoDaemon(t *testing.T) {
+	withSuggestGlobals(t, suggestGlobals{limit: 2, json: false})
+	t.Setenv("CLAI_HOME", t.TempDir())
+	t.Setenv("CLAI_CACHE", t.TempDir())
+	t.Setenv("CLAI_SESSION_ID", "")
+
+	histFile := filepath.Join(t.TempDir(), "zsh_history")
+	content := strings.Join([]string{
+		": 1700000000:0;git status",
+		": 1700000001:0;git diff",
+	}, "\n")
+	if err := os.WriteFile(histFile, []byte(content), 0644); err != nil {
+		t.Fatalf("WriteFile error: %v", err)
+	}
+	t.Setenv("HISTFILE", histFile)
+
+	output := captureStdout(t, func() {
+		if err := runSuggest(suggestCmd, []string{"git"}); err != nil {
+			t.Fatalf("runSuggest error: %v", err)
+		}
+	})
+
+	if strings.TrimSpace(output) == "" {
+		t.Fatalf("expected history fallback suggestion, got empty output")
+	}
+}

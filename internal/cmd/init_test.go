@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -123,6 +124,46 @@ func TestRunInit_UnsupportedShell(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "unsupported shell") {
 		t.Errorf("Error should mention unsupported shell, got: %v", err)
+	}
+}
+
+func TestRunInit_PreservesSessionID(t *testing.T) {
+	t.Setenv("CLAI_SESSION_ID", "session-fixed-123")
+
+	output := captureStdout(t, func() {
+		if err := runInit(initCmd, []string{"zsh"}); err != nil {
+			t.Fatalf("runInit error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "session-fixed-123") {
+		t.Fatalf("expected CLAI_SESSION_ID to be preserved, got output: %s", output)
+	}
+}
+
+func TestRunInit_GeneratesNewSessionID(t *testing.T) {
+	os.Unsetenv("CLAI_SESSION_ID")
+
+	output1 := captureStdout(t, func() {
+		if err := runInit(initCmd, []string{"zsh"}); err != nil {
+			t.Fatalf("runInit error: %v", err)
+		}
+	})
+
+	output2 := captureStdout(t, func() {
+		if err := runInit(initCmd, []string{"zsh"}); err != nil {
+			t.Fatalf("runInit error: %v", err)
+		}
+	})
+
+	re := regexp.MustCompile(`CLAI_SESSION_ID="([^"]+)"`)
+	m1 := re.FindStringSubmatch(output1)
+	m2 := re.FindStringSubmatch(output2)
+	if len(m1) < 2 || len(m2) < 2 {
+		t.Fatalf("expected session IDs in output")
+	}
+	if m1[1] == m2[1] {
+		t.Fatalf("expected different session IDs for new shells, got %q", m1[1])
 	}
 }
 

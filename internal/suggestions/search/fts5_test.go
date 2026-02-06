@@ -111,6 +111,30 @@ func TestService_Search_FTS5(t *testing.T) {
 	assert.Equal(t, "git status", results[0].CmdRaw)
 }
 
+func TestService_Search_QuotedPhrase(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDB(t)
+	svc, err := NewService(db, DefaultConfig())
+	require.NoError(t, err)
+	defer svc.Close()
+
+	require.True(t, svc.FTS5Available())
+
+	ctx := context.Background()
+
+	id1 := insertTestEvent(t, db, "echo exact phrase", "", "/home/user", false)
+	id2 := insertTestEvent(t, db, "echo exact", "", "/home/user", false)
+
+	require.NoError(t, svc.IndexEvent(ctx, id1))
+	require.NoError(t, svc.IndexEvent(ctx, id2))
+
+	results, err := svc.Search(ctx, "\"exact phrase\"", SearchOptions{})
+	require.NoError(t, err)
+	require.Len(t, results, 1)
+	assert.Equal(t, "echo exact phrase", results[0].CmdRaw)
+}
+
 func TestService_Search_RepoFilter(t *testing.T) {
 	t.Parallel()
 
@@ -301,6 +325,15 @@ func TestService_FallbackSearch(t *testing.T) {
 	// Insert events (skip indexing to test fallback)
 	insertTestEvent(t, db, "fallback test command", "", "/home/user", false)
 
+	// Force fallback path (simulate FTS5 unavailable)
+	svc.fts5Available = false
+
+	ctx := context.Background()
+	results, err := svc.Search(ctx, "fallback", SearchOptions{})
+	require.NoError(t, err)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "fallback test command", results[0].CmdRaw)
+
 	// Even without FTS5 index, fallback should work
 	// Note: FTS5 is available in modernc sqlite, so we just test the fallback path exists
 	assert.True(t, svc.FallbackEnabled())
@@ -314,6 +347,7 @@ func TestEscapeFTS5Query(t *testing.T) {
 		expected string
 	}{
 		{"simple", `"simple"`},
+		{`"exact phrase"`, `"exact phrase"`},
 		{`with "quotes"`, `"with ""quotes"""`},
 		{"docker run", `"docker run"`},
 		{"git commit -m", `"git commit -m"`},
