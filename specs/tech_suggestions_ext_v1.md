@@ -41,7 +41,17 @@ It assumes no backward-compatibility constraints and no requirement to preserve 
 - Shell Adapters (`bash`, `zsh`, `fish`): collect execution context and send events through a persistent helper channel by default.
 - `clai-shim` (persistent helper): long-running per-shell-process helper that validates fields, lossily normalizes UTF-8, and writes NDJSON events fire-and-forget to daemon IPC.
 - `clai-shim` (fallback exec mode): short-lived per-event mode for environments where persistent helper cannot be started; functionally equivalent with higher latency budget.
-- `clai-suggestd` daemon:
+
+Persistent helper lifecycle:
+- Started by shell adapter on `session_start` via `clai-shim --persistent` (background process, stdin from shell pipe).
+- Shell adapter stores PID in `$CLAI_SHIM_PID` for cleanup.
+- Terminated on shell exit via trap (`EXIT` handler sends `SIGTERM` to `$CLAI_SHIM_PID`).
+- If helper process dies mid-session (crash, OOM), shell adapter detects broken pipe on next write and falls back to oneshot mode for the remainder of the session. No restart is attempted to avoid loop.
+- Helper maintains a single gRPC connection to daemon with lazy reconnect on write failure (backoff: 100ms, 500ms, then give up and drop event).
+- In-process state: connection handle, session ID, and a bounded event buffer (max 16 events, ~64KB) for absorbing short daemon unavailability. Buffer is best-effort; overflow drops oldest event.
+- Resource overhead per shell: ~3MB RSS (Go runtime baseline), one goroutine for write loop.
+- Note: existing `clai-shim` is oneshot-only (`cmd/clai-shim/main.go`). Persistent mode is new work requiring a `--persistent` flag, stdin read loop, and background connection management.
+- `claid` daemon:
 - Ingestion pipeline with validation and normalization.
 - Feature extraction and online aggregate maintenance.
 - Candidate generation and deterministic ranking.
@@ -86,6 +96,13 @@ Fallback mode:
 - Install-time adapter probe must detect shell version and emit explicit diagnostics on unsupported versions.
 - macOS bash `3.2` must be detected and handled with clear warning + degraded compatibility mode (no preexec timing, postexec-only ingestion), unless user upgrades bash.
 
+Implementation milestone order:
+- Phase 1 (MVP): bash adapter — existing `internal/cmd/shell/bash/clai.bash` is the baseline; extend with V2 shim integration, feedback hooks, and session ID contract.
+- Phase 2: zsh adapter — highest-value addition (ghost text via ZLE POSTDISPLAY, full adaptive timing, native accept binding).
+- Phase 3: fish adapter — lowest friction (fish-native autosuggestion cadence, built-in `string` builtins, clean event model).
+- All three adapters share the same cross-shell contract (Sections 2.2-2.6). Shell-specific behavior is isolated to Section 2.4.
+- Adapters not yet implemented emit a clear diagnostic on `clai init <shell>` and degrade to no-suggestion mode without breaking the shell.
+
 ### 2.2 Hook Lifecycle Events
 - `session_start`: emitted once per interactive shell instance.
 - `command_start`: emitted before command execution.
@@ -97,7 +114,7 @@ Fallback mode:
 - `event_type`
 - `session_id`
 - `shell`
-- `ts_unix_ms`
+- `ts_ms`
 - `cwd`
 - `cmd_raw` (for command events)
 - `exit_code` (for `command_end`)
@@ -198,10 +215,24 @@ Hook-path stderr discipline:
 ### 3.1 Transport
 - Unix domain socket on macOS/Linux.
 - Transport abstraction keeps named-pipe backend reserved for future native Windows support.
+- Wire format: gRPC with protobuf over Unix domain socket.
+- The canonical service definition is `proto/clai/v1/clai.proto`.
+- JSON payload descriptions in Section 13 are logical schemas; implementations use protobuf wire encoding.
+- HTTP/JSON debug endpoints (Section 13.1 DebugStats) are served on a separate diagnostic listener when enabled.
+
+Transport migration note:
+- V2 retains gRPC-over-UDS as the primary transport to preserve compatibility with the existing `clai-shim` gRPC client and `ClaiService` proto definition.
+- Section 13 API names map to proto RPCs as follows:
+  - `IngestEvent` -> `CommandStarted` + `CommandEnded` (split by event type)
+  - `Suggest` -> `Suggest`
+  - `Search` -> `FetchHistory` (extended with search modes)
+  - `RecordFeedback` -> new RPC to add to proto
+  - `DebugStats` -> HTTP/JSON diagnostic endpoint (not gRPC)
+- The proto must be extended to add: `RecordFeedback`, `SuggestFeedback`, search mode fields on `FetchHistory`, and the additional request/response fields defined in Section 13.1.
 
 Windows named-pipe contract:
 - This is a forward-compatibility placeholder for V3 native Windows support.
-- Pipe path format: `\\\\.\\pipe\\clai-suggestd-<user-scope>`.
+- Pipe path format: `\\\\.\\pipe\\claid-<user-scope>`.
 - `<user-scope>` should be SID-based when available; fallback is a stable username hash.
 - Pipe ACL must restrict access to current user context.
 
@@ -223,7 +254,7 @@ Windows named-pipe contract:
 - On daemon startup:
 - Acquire lock using `flock`-style non-blocking exclusive lock.
 - If lock acquisition fails, inspect PID owner:
-- if owner is alive and process is `clai-suggestd`, exit with `E_DAEMON_UNAVAILABLE`.
+- if owner is alive and process is `claid`, exit with `E_DAEMON_UNAVAILABLE`.
 - if owner is stale, clean stale lock and retry lock acquisition once.
 - Run migrations.
 - Clean stale socket.
@@ -264,9 +295,9 @@ Windows parity note:
 - first `session_start` path attempts to start daemon opportunistically if not running.
 - Required mechanism:
 - `clai-shim session-start` attempts socket connect first.
-- on connect failure, fork+exec `clai-suggestd` in background with stdout/stderr redirected to daemon log path, then retry connect with bounded backoff.
+- on connect failure, fork+exec `claid` in background with stdout/stderr redirected to daemon log path, then retry connect with bounded backoff.
 - explicit management surface is required:
-- `clai suggestd start|stop|status|reload`.
+- `clai daemon start|stop|status|reload`.
 - Optional platform integration:
 - launchd (macOS) and systemd user service (Linux) recommended, not required.
 - Degraded behavior when daemon unavailable:
@@ -277,6 +308,13 @@ Windows parity note:
 ## 4) Storage Model (V2 Schema)
 
 No migration bridge to V1 is required. V2 initializes and owns its schema.
+
+V1 coexistence and data policy:
+- V2 uses a separate database file (`suggestions_v2.db`) alongside the existing V1 database (`suggestions.db`).
+- V1 data is not migrated automatically; V1 remains read-only for existing `clai search` until deprecated.
+- V2 starts with empty history and learns from new commands. Users who want V1 history in V2 can run an optional one-time import tool: `clai suggestions import-v1` (best-effort, skips events that fail V2 validation).
+- The import tool is not required for V2 to function and is not on the critical path.
+- V1 code (`internal/suggest/`) and V2 code (`internal/suggestions/`) coexist until V1 is explicitly removed in a future release.
 
 ### 4.1 Tables
 - `session`
@@ -428,6 +466,16 @@ CREATE TABLE rank_weight_profile (
   learning_rate REAL NOT NULL
 );
 
+CREATE TABLE suggestion_cache (
+  cache_key TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  context_hash TEXT NOT NULL,
+  suggestions_json TEXT NOT NULL,
+  created_ms INTEGER NOT NULL,
+  ttl_ms INTEGER NOT NULL,
+  hit_count INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE VIRTUAL TABLE command_event_fts USING fts5(
   cmd_raw,
   cmd_norm,
@@ -492,6 +540,17 @@ WAL and checkpoint policy:
 - `PRAGMA wal_checkpoint(TRUNCATE)` on low-activity windows
 - optional `VACUUM` on size/fragmentation threshold and only outside hot path.
 - FTS maintenance includes periodic `INSERT INTO command_event_fts(command_event_fts) VALUES('optimize')` off hot path.
+
+Background maintenance scheduling:
+- Maintenance runs on a dedicated goroutine with a ticker-based schedule.
+- Base interval: every `suggestions.maintenance_interval_ms` (default `300000`, i.e., 5 minutes).
+- Low-activity detection: fewer than `5` ingested events in the last maintenance interval qualifies as low-activity.
+- During low-activity windows: run `wal_checkpoint(TRUNCATE)` and FTS optimize.
+- During active windows: run `wal_checkpoint(PASSIVE)` only.
+- VACUUM trigger: when DB file size exceeds `suggestions.maintenance_vacuum_threshold_mb` (default `100`) AND freelist pages exceed 20% of total. VACUUM runs at most once per `24` hours.
+- Retention pruning runs in the same maintenance goroutine, using batched deletes of `1000` rows per iteration to avoid long-held write locks. Pruning yields between batches (100ms sleep) to allow ingestion writes.
+- If any maintenance operation fails, log error metric and continue; do not crash daemon.
+- Maintenance is skipped entirely while daemon is in startup or shutdown phase.
 
 ### 4.4 Write-Path Transaction Semantics
 - All writes for a single ingested event are applied in one transaction (`BEGIN IMMEDIATE ... COMMIT`) to preserve aggregate consistency.
@@ -680,6 +739,13 @@ Scoring notes:
 - Reject mixed assignments that violate correlation confidence threshold (`suggestions.slot_correlation_min_confidence`).
 - If uncertain, return template with partially unfilled slots only if UX supports it; otherwise skip.
 
+Slot value eviction:
+- Each `(scope, template_id, slot_index)` group is bounded by `suggestions.slot_max_values_per_slot` (default `20`).
+- When a new value would exceed the limit, evict the entry with the lowest `weight` in that group.
+- Tie-break for eviction: oldest `last_seen_ms` first.
+- Eviction is performed inline during the ingestion write transaction (DELETE + INSERT within the same transaction).
+- Eviction applies per-scope: session, repo, and global scopes maintain independent value sets.
+
 ### 7.6 Deterministic Ordering and Tie-Break Rules
 - Primary sort key: `score DESC`.
 - Secondary sort key: `confidence DESC`.
@@ -701,6 +767,10 @@ Scoring notes:
 - `w_next = clamp(w_prev + eta * (f_pos - f_neg), min_w, max_w)`
 - Renormalize non-penalty weights to keep bounded total contribution; keep `w_risk_penalty` in independent safe range.
 - Default `eta` is small (`0.02`) and decays with `sample_count` to avoid overfitting.
+- Decay formula: `eta_effective = eta_initial / (1 + sample_count / eta_decay_constant)`.
+- `eta_decay_constant` defaults to `500` (configurable as `suggestions.online_learning_eta_decay_constant`).
+- Floor: `eta_effective` is clamped to a minimum of `0.001` to prevent learning from halting entirely.
+- At 500 samples, effective rate is `0.01`; at 2000 samples, effective rate is `0.004`.
 - If feedback volume is below `suggestions.online_learning_min_samples`, engine uses static defaults only.
 - All updates are async and versioned; suggest path reads last committed profile snapshot only.
 
@@ -850,7 +920,7 @@ Hot-path limits:
 - `RecordFeedback(action, suggestion, executed)`
 - `DebugStats`
 
-API payload contract (JSON over local RPC transport wrapper):
+API payload contract (logical schema; wire encoding is protobuf per Section 3.1):
 - `IngestEventRequest`:
 - `event_type`, `session_id`, `shell`, `ts_ms`, `cwd`, `cmd_raw`, `cmd_truncated`, `exit_code`, `duration_ms`, `ephemeral`
 - `SuggestRequest`:
@@ -872,7 +942,7 @@ API payload contract (JSON over local RPC transport wrapper):
 - `clai search [query] --limit N --scope session|repo|global --mode fts|prefix|describe|auto --color auto|always|never`
 - `clai suggest-feedback --action accepted|dismissed|edited|never|unblock`
 - `clai suggestions doctor`
-- `clai suggestd start|stop|status|reload`
+- `clai daemon start|stop|status|reload`
 
 Note:
 - `clai suggest-feedback` is diagnostic/manual tooling.
@@ -896,9 +966,42 @@ Note:
 - `clai suggest` falls back to empty output on daemon failure (non-zero only with `--strict`).
 - `clai search` returns user-facing error and non-zero exit on daemon/storage failures.
 
+### 13.4 Input Validation Rules
+- All daemon API endpoints must validate inputs before processing.
+- Invalid inputs return `E_INVALID_ARGUMENT` with a descriptive message.
+
+Field validation table:
+
+| Field | Valid Range | On Invalid |
+|-------|------------|------------|
+| `session_id` | non-empty string, max 256 bytes | reject with `E_INVALID_ARGUMENT` |
+| `event_type` | known enum value | reject with `E_INVALID_ARGUMENT` |
+| `shell` | `bash`, `zsh`, `fish`, or empty | accept empty as unknown; reject other values |
+| `ts_ms` | positive integer, not in future by more than 60s | clamp future timestamps to now; reject zero/negative |
+| `cwd` | valid UTF-8, max 4096 bytes | truncate to max; replace invalid UTF-8 |
+| `cmd_raw` | 0-16384 bytes (per `cmd_raw_max_bytes`) | truncate + set `cmd_truncated=1`; empty is valid (e.g., Enter on empty prompt) |
+| `exit_code` | 0-255 | store raw; values >255 stored as-is for platform compat |
+| `duration_ms` | 0-86400000 (24 hours) | clamp negative to 0; clamp overflow to max |
+| `prefix` | 0-16384 bytes | truncate to `cmd_raw_max_bytes` silently |
+| `cursor_pos` | 0-len(prefix) | clamp to len(prefix) |
+| `limit` | 1-100 | clamp to range; 0 becomes default (5) |
+| `scope` | `session`, `repo`, `global` | reject unknown with `E_INVALID_ARGUMENT` |
+| `mode` | `fts`, `prefix`, `describe`, `auto` | reject unknown with `E_INVALID_ARGUMENT` |
+| `action` (feedback) | known enum value | reject unknown with `E_INVALID_ARGUMENT` |
+
+Config value validation (on daemon startup):
+- All timeout values must be positive integers; reject and refuse to start on negative or zero.
+- All weight values must be in `[0.0, 1.0]`; clamp and warn on out-of-range.
+- `workflow_min_steps` must be <= `workflow_max_steps`; reject and fall back to defaults on violation.
+- `cache_memory_budget_mb` must be >= 1; reject zero or negative.
+- `retention_days` must be >= 1; zero means "no time-based pruning" (count-based still applies).
+- Invalid config emits structured warning to daemon log and falls back to built-in defaults for the invalid key only.
+
 ## 14) Testing Strategy (Extensive)
 
 ### 14.1 Unit Tests
+- Input validation rules from Section 13.4 (boundary clamping, rejection, empty/null handling).
+- Config validation rules (invalid ranges, conflicting min/max, zero budgets).
 - Normalization/tokenization edge cases.
 - UTF-8 invalid sequence normalization and replacement behavior.
 - Event truncation marker behavior and max-size enforcement.
@@ -1012,11 +1115,11 @@ Note:
 ## 16) Configuration Surface (V2)
 
 Config format and resolution:
-- File format is TOML.
+- File format is YAML (consistent with existing `internal/config/config.go` which uses `gopkg.in/yaml.v3`).
 - Resolution order:
 - `$CLAI_CONFIG`
-- `$XDG_CONFIG_HOME/clai/config.toml`
-- `$HOME/.config/clai/config.toml`
+- `$XDG_CONFIG_HOME/clai/config.yaml`
+- `$HOME/.config/clai/config.yaml`
 - built-in defaults
 - Environment overrides:
 - environment variables override config file values.
@@ -1060,6 +1163,8 @@ Learning:
 - `suggestions.feedback_match_window_ms=5000`
 - `suggestions.online_learning_enabled=true`
 - `suggestions.online_learning_eta=0.02`
+- `suggestions.online_learning_eta_decay_constant=500`
+- `suggestions.online_learning_eta_floor=0.001`
 - `suggestions.online_learning_min_samples=30`
 - `suggestions.weight_min=0.00`
 - `suggestions.weight_max=0.60`
@@ -1154,6 +1259,8 @@ Discovery:
 Storage:
 - `suggestions.retention_days=90`
 - `suggestions.retention_max_events=500000`
+- `suggestions.maintenance_interval_ms=300000`
+- `suggestions.maintenance_vacuum_threshold_mb=100`
 - `suggestions.sqlite_busy_timeout_ms=50`
 
 Cache:
@@ -1163,7 +1270,32 @@ Privacy:
 - `suggestions.incognito_mode=ephemeral` (`off|ephemeral|no_send`)
 - `suggestions.redact_sensitive_tokens=true`
 
-### 16.1 Feature Flag Dependencies
+### 16.1 Config Value Validation
+
+On daemon startup, all config values are validated before listeners start. Validation follows these rules:
+
+| Category | Keys | Valid Range | On Invalid |
+|----------|------|-------------|------------|
+| Timeouts (ms) | `hard_timeout_ms`, `hook_connect_timeout_ms`, `hook_write_timeout_ms`, `ingest_sync_wait_ms`, `cache_ttl_ms` | >= 1 | Fall back to default, warn |
+| Weights | `weights.*` (all) | [0.0, 1.0] | Clamp to range, warn |
+| Counts | `max_results`, `ingest_queue_max_events`, `burst_events_threshold` | >= 1 | Fall back to default, warn |
+| Byte sizes | `cmd_raw_max_bytes`, `ingest_queue_max_bytes`, `cache_memory_budget_mb` | >= 1 | Fall back to default, warn |
+| Retention | `retention_days` | >= 1 (0 = disable time pruning) | Fall back to default, warn |
+| Retention | `retention_max_events` | >= 1000 | Clamp to 1000 min, warn |
+| Learning | `online_learning_eta` | (0.0, 1.0] | Fall back to default, warn |
+| Learning | `online_learning_min_samples` | >= 1 | Fall back to default, warn |
+| Ranges | `workflow_min_steps` <= `workflow_max_steps` | min <= max | Fall back to defaults for both, warn |
+| Ranges | `pipeline_max_segments` | [2, 32] | Clamp to range, warn |
+| Ranges | `directory_scope_max_depth` | [1, 10] | Clamp to range, warn |
+| Enums | `incognito_mode` | `off`, `ephemeral`, `no_send` | Fall back to default, warn |
+| Enums | `shim_mode` | `auto`, `persistent`, `oneshot` | Fall back to `auto`, warn |
+| Enums | `search_fts_tokenizer` | `trigram`, `unicode61` | Fall back to `trigram`, warn |
+
+- Validation never prevents daemon startup; all failures fall back to built-in defaults with structured warnings.
+- All validation warnings are emitted to daemon log at `WARN` level and surfaced by `clai suggestions doctor`.
+- Config reload via `SIGHUP` re-validates; invalid reloaded values keep the previous valid value.
+
+### 16.2 Feature Flag Dependencies
 - Feature flags are independent by default:
 - disabling a feature disables its ingestion writes, retrieval source, and ranking contribution only.
 - `task_playbook_extended.after_failure` is independent of `failure_recovery_enabled`; it depends only on prior command exit status.
