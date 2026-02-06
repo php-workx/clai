@@ -13,9 +13,38 @@ import (
 	"github.com/runger/clai/internal/config"
 )
 
+// ReloadFunc is a function called on SIGHUP to reload configuration.
+type ReloadFunc func() error
+
 // Run starts the daemon and blocks until shutdown.
-// It handles SIGTERM and SIGINT for graceful shutdown.
+// It handles signals for lifecycle management:
+//   - SIGTERM/SIGINT: graceful shutdown (drain queues, close DB, remove lock file)
+//   - SIGHUP: reload configuration from disk
+//   - SIGUSR1: graceful re-exec (exec self with same args after cleanup)
+//   - SIGPIPE: ignore (prevent crashes on broken pipe)
 func Run(ctx context.Context, cfg *ServerConfig) error {
+	// Check privilege safety
+	if err := CheckNotRoot(); err != nil {
+		return err
+	}
+
+	// Validate and ensure secure directory permissions
+	paths := cfg.Paths
+	if paths == nil {
+		paths = config.DefaultPaths()
+	}
+	if err := EnsureSecureDirectory(paths.BaseDir); err != nil {
+		return fmt.Errorf("failed to ensure secure base directory: %w", err)
+	}
+
+	// Acquire lock file to prevent double-start
+	lockPath := LockFilePath(paths.BaseDir)
+	lockFile := NewLockFile(lockPath)
+	if err := lockFile.Acquire(); err != nil {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer lockFile.Release()
+
 	server, err := NewServer(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
@@ -25,24 +54,68 @@ func Run(ctx context.Context, cfg *ServerConfig) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Ignore SIGPIPE to prevent crash on broken pipe
+	signal.Ignore(syscall.SIGPIPE)
+
 	// Handle signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	sigChan := make(chan os.Signal, 4)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGUSR1)
 	defer signal.Stop(sigChan)
 
 	go func() {
-		select {
-		case sig := <-sigChan:
-			server.logger.Info("received signal", "signal", sig)
-			server.Shutdown()
-			cancel()
-		case <-ctx.Done():
-			return
+		for {
+			select {
+			case sig := <-sigChan:
+				switch sig {
+				case syscall.SIGTERM, syscall.SIGINT:
+					server.logger.Info("received shutdown signal", "signal", sig)
+					server.Shutdown()
+					cancel()
+					return
+
+				case syscall.SIGHUP:
+					server.logger.Info("received SIGHUP, reloading configuration")
+					if cfg.ReloadFn != nil {
+						if err := cfg.ReloadFn(); err != nil {
+							server.logger.Error("failed to reload configuration", "error", err)
+						} else {
+							server.logger.Info("configuration reloaded successfully")
+						}
+					} else {
+						server.logger.Debug("no reload function configured, ignoring SIGHUP")
+					}
+
+				case syscall.SIGUSR1:
+					server.logger.Info("received SIGUSR1, initiating graceful re-exec")
+					server.Shutdown()
+					lockFile.Release()
+					reExec()
+					// reExec calls syscall.Exec which replaces the process,
+					// so we should not reach here on success.
+					// If we do reach here, it means re-exec failed.
+					server.logger.Error("re-exec failed, shutting down")
+					cancel()
+					return
+				}
+
+			case <-ctx.Done():
+				return
+			}
 		}
 	}()
 
 	// Start server (blocking)
 	return server.Start(ctx)
+}
+
+// reExec replaces the current process with a fresh copy of itself.
+func reExec() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	// syscall.Exec replaces the current process
+	_ = syscall.Exec(exe, os.Args, os.Environ())
 }
 
 // IsRunning checks if the daemon is currently running.

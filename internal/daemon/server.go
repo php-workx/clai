@@ -48,6 +48,10 @@ type Server struct {
 	shutdownOnce sync.Once
 	wg           sync.WaitGroup
 
+	// Backpressure
+	ingestionQueue *IngestionQueue
+	circuitBreaker *CircuitBreaker
+
 	// Metrics
 	mu             sync.RWMutex
 	commandsLogged int64
@@ -73,6 +77,10 @@ type ServerConfig struct {
 	// IdleTimeout is the duration after which the daemon exits if idle
 	// Default: 20 minutes
 	IdleTimeout time.Duration
+
+	// ReloadFn is called on SIGHUP to reload configuration.
+	// If nil, SIGHUP is ignored.
+	ReloadFn ReloadFunc
 }
 
 // NewServer creates a new daemon server with the given configuration.
@@ -110,6 +118,14 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		idleTimeout = 20 * time.Minute
 	}
 
+	// Create ingestion queue with default capacity (8192)
+	ingestQueue := NewIngestionQueue(0, logger)
+
+	// Create circuit breaker with defaults
+	cb := NewCircuitBreaker(&CircuitBreakerConfig{
+		Logger: logger,
+	})
+
 	now := time.Now()
 	return &Server{
 		store:          cfg.Store,
@@ -122,6 +138,8 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		lastActivity:   now,
 		idleTimeout:    idleTimeout,
 		shutdownChan:   make(chan struct{}),
+		ingestionQueue: ingestQueue,
+		circuitBreaker: cb,
 	}, nil
 }
 
