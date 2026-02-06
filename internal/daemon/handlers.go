@@ -14,6 +14,7 @@ import (
 	"github.com/runger/clai/internal/sanitize"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	"github.com/runger/clai/internal/suggestions/feedback"
 )
 
 // Common string constants to avoid duplication
@@ -432,6 +433,93 @@ func (s *Server) Diagnose(ctx context.Context, req *pb.DiagnoseRequest) (*pb.Dia
 		Explanation: resp.Explanation,
 		Fixes:       pbFixes,
 	}, nil
+}
+
+// RecordFeedback handles the RecordFeedback RPC.
+// It records user feedback on a suggestion.
+func (s *Server) RecordFeedback(ctx context.Context, req *pb.RecordFeedbackRequest) (*pb.RecordFeedbackResponse, error) {
+	s.touchActivity()
+	return s.handleRecordFeedback(ctx, req)
+}
+
+// SuggestFeedback handles the SuggestFeedback RPC.
+// It records user feedback on a suggestion (alias for RecordFeedback).
+func (s *Server) SuggestFeedback(ctx context.Context, req *pb.RecordFeedbackRequest) (*pb.RecordFeedbackResponse, error) {
+	s.touchActivity()
+	return s.handleRecordFeedback(ctx, req)
+}
+
+// handleRecordFeedback is the shared implementation for RecordFeedback and SuggestFeedback.
+func (s *Server) handleRecordFeedback(ctx context.Context, req *pb.RecordFeedbackRequest) (*pb.RecordFeedbackResponse, error) {
+	if s.feedbackStore == nil {
+		return &pb.RecordFeedbackResponse{
+			Ok: false,
+			Error: &pb.ApiError{
+				Code:    "E_NO_FEEDBACK_STORE",
+				Message: "feedback store not configured",
+			},
+		}, nil
+	}
+
+	if req.SessionId == "" {
+		return &pb.RecordFeedbackResponse{
+			Ok: false,
+			Error: &pb.ApiError{
+				Code:    "E_INVALID_REQUEST",
+				Message: "session_id is required",
+			},
+		}, nil
+	}
+	if req.SuggestedText == "" {
+		return &pb.RecordFeedbackResponse{
+			Ok: false,
+			Error: &pb.ApiError{
+				Code:    "E_INVALID_REQUEST",
+				Message: "suggested_text is required",
+			},
+		}, nil
+	}
+	if req.Action == "" {
+		return &pb.RecordFeedbackResponse{
+			Ok: false,
+			Error: &pb.ApiError{
+				Code:    "E_INVALID_REQUEST",
+				Message: "action is required",
+			},
+		}, nil
+	}
+
+	rec := feedback.FeedbackRecord{
+		SessionID:     req.SessionId,
+		SuggestedText: req.SuggestedText,
+		Action:        feedback.FeedbackAction(req.Action),
+		ExecutedText:  req.ExecutedText,
+		PromptPrefix:  req.Prefix,
+		LatencyMs:     req.LatencyMs,
+	}
+
+	_, err := s.feedbackStore.RecordFeedback(ctx, rec)
+	if err != nil {
+		s.logger.Warn("failed to record feedback",
+			"session_id", req.SessionId,
+			"action", req.Action,
+			"error", err,
+		)
+		return &pb.RecordFeedbackResponse{
+			Ok: false,
+			Error: &pb.ApiError{
+				Code:    "E_STORE_ERROR",
+				Message: err.Error(),
+			},
+		}, nil
+	}
+
+	s.logger.Debug("feedback recorded",
+		"session_id", req.SessionId,
+		"action", req.Action,
+	)
+
+	return &pb.RecordFeedbackResponse{Ok: true}, nil
 }
 
 // Ping handles the Ping RPC.

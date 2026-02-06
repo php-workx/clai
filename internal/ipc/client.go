@@ -196,6 +196,47 @@ func (c *Client) TextToCommand(ctx context.Context, sessionID, prompt, cwd strin
 	return c.client.TextToCommand(ctx, req)
 }
 
+// --- Feedback (Fire-and-Forget + Sync) ---
+
+// RecordFeedback sends suggestion feedback to the daemon (fire-and-forget).
+func (c *Client) RecordFeedback(sessionID, action, suggestedText, executedText, prefix string, latencyMs int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), FireAndForgetTimeout)
+	defer cancel()
+
+	req := &pb.RecordFeedbackRequest{
+		SessionId:     sessionID,
+		Action:        action,
+		SuggestedText: suggestedText,
+		ExecutedText:  executedText,
+		Prefix:        prefix,
+		LatencyMs:     latencyMs,
+	}
+
+	// Fire and forget - ignore errors
+	_, _ = c.client.RecordFeedback(ctx, req)
+}
+
+// RecordFeedbackSync sends suggestion feedback to the daemon and waits for a response.
+func (c *Client) RecordFeedbackSync(ctx context.Context, sessionID, action, suggestedText, executedText, prefix string, latencyMs int64) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, SuggestTimeout)
+	defer cancel()
+
+	req := &pb.RecordFeedbackRequest{
+		SessionId:     sessionID,
+		Action:        action,
+		SuggestedText: suggestedText,
+		ExecutedText:  executedText,
+		Prefix:        prefix,
+		LatencyMs:     latencyMs,
+	}
+
+	resp, err := c.client.RecordFeedback(ctx, req)
+	if err != nil {
+		return false, err
+	}
+	return resp.Ok, nil
+}
+
 // --- Ops ---
 
 // Ping checks if the daemon is responsive.

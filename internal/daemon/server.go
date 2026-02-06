@@ -19,6 +19,7 @@ import (
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	"github.com/runger/clai/internal/suggestions/feedback"
 )
 
 // Version is set at build time
@@ -47,6 +48,9 @@ type Server struct {
 	shutdownChan chan struct{}
 	shutdownOnce sync.Once
 	wg           sync.WaitGroup
+
+	// Feedback
+	feedbackStore *feedback.Store
 
 	// Backpressure
 	ingestionQueue *IngestionQueue
@@ -77,6 +81,9 @@ type ServerConfig struct {
 	// IdleTimeout is the duration after which the daemon exits if idle
 	// Default: 20 minutes
 	IdleTimeout time.Duration
+
+	// FeedbackStore is the suggestion feedback store (optional)
+	FeedbackStore *feedback.Store
 
 	// ReloadFn is called on SIGHUP to reload configuration.
 	// If nil, SIGHUP is ignored.
@@ -134,6 +141,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		paths:          paths,
 		logger:         logger,
 		sessionManager: NewSessionManager(),
+		feedbackStore:  cfg.FeedbackStore,
 		startTime:      now,
 		lastActivity:   now,
 		idleTimeout:    idleTimeout,

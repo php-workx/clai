@@ -34,6 +34,7 @@ func init() {
 	rootCmd.AddCommand(askCmd)
 	rootCmd.AddCommand(cmdCmd)
 	rootCmd.AddCommand(suggestCmd)
+	rootCmd.AddCommand(suggestFeedbackCmd)
 	rootCmd.AddCommand(historyCmd)
 	rootCmd.AddCommand(onCmd)
 	rootCmd.AddCommand(offCmd)
