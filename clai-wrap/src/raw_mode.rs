@@ -424,6 +424,61 @@ mod tests {
     #[cfg(unix)]
     mod unix_tests {
         use super::*;
+        use std::os::unix::io::RawFd;
+
+        struct PtyPair {
+            master: RawFd,
+            slave: RawFd,
+        }
+
+        impl PtyPair {
+            fn new() -> Option<Self> {
+                let mut master: libc::c_int = -1;
+                let mut slave: libc::c_int = -1;
+
+                // SAFETY: openpty() is called with valid pointers for master/slave fds.
+                let result = unsafe {
+                    libc::openpty(
+                        &mut master,
+                        &mut slave,
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                        std::ptr::null_mut(),
+                    )
+                };
+
+                if result == -1 {
+                    return None;
+                }
+
+                Some(Self { master, slave })
+            }
+        }
+
+        impl Drop for PtyPair {
+            fn drop(&mut self) {
+                // SAFETY: closing valid file descriptors is safe.
+                unsafe {
+                    libc::close(self.master);
+                    libc::close(self.slave);
+                }
+            }
+        }
+
+        fn get_termios(fd: RawFd) -> libc::termios {
+            let mut termios = std::mem::MaybeUninit::<libc::termios>::uninit();
+            // SAFETY: tcgetattr() is called with a valid fd and output pointer.
+            let result = unsafe { libc::tcgetattr(fd, termios.as_mut_ptr()) };
+            assert_eq!(result, 0, "Failed to get termios for fd {}", fd);
+            // SAFETY: tcgetattr succeeded and initialized termios.
+            unsafe { termios.assume_init() }
+        }
+
+        fn set_termios_now(fd: RawFd, termios: &libc::termios) {
+            // SAFETY: tcsetattr() is called with a valid fd and termios pointer.
+            let result = unsafe { libc::tcsetattr(fd, libc::TCSANOW, termios) };
+            assert_eq!(result, 0, "Failed to set termios for fd {}", fd);
+        }
 
         #[test]
         fn test_is_tty_with_pipe() {
@@ -483,74 +538,55 @@ mod tests {
         }
 
         #[test]
-        #[cfg_attr(not(feature = "tty_tests"), ignore)]
-        fn test_raw_mode_cycle_with_real_tty() {
-            // This test requires a real TTY - skip in CI
-            let status = detect_tty();
-            if !status.stdin {
-                eprintln!("Skipping test: stdin is not a TTY");
+        fn test_raw_mode_guard_restore_with_pseudo_tty() {
+            let Some(pty) = PtyPair::new() else {
+                eprintln!("Skipping test: failed to allocate pseudo TTY");
                 return;
-            }
+            };
 
-            // Enter raw mode
-            let guard = enter_raw_mode().expect("Failed to enter raw mode");
+            let original = get_termios(pty.slave);
 
-            // Verify we can access original settings
-            let _original = guard.original_termios();
+            // Simulate raw-like changes on the PTY slave before restoration.
+            let mut modified = original;
+            modified.c_lflag &= !(libc::ICANON | libc::ECHO);
+            set_termios_now(pty.slave, &modified);
 
-            // Manual restore should work
-            guard.restore().expect("Failed to restore");
+            let current = get_termios(pty.slave);
+            assert_eq!(current.c_lflag & libc::ICANON, 0);
+            assert_eq!(current.c_lflag & libc::ECHO, 0);
 
-            // Drop should also work (second restore is harmless)
+            let guard = RawModeGuard::new(original, pty.slave);
+            guard.restore().expect("manual restore should succeed");
             drop(guard);
+
+            let restored = get_termios(pty.slave);
+            assert_eq!(
+                restored.c_lflag & libc::ICANON,
+                original.c_lflag & libc::ICANON
+            );
+            assert_eq!(restored.c_lflag & libc::ECHO, original.c_lflag & libc::ECHO);
         }
 
         #[test]
-        #[cfg_attr(not(feature = "tty_tests"), ignore)]
-        fn test_drop_restores_settings() {
-            let status = detect_tty();
-            if !status.stdin {
-                eprintln!("Skipping test: stdin is not a TTY");
+        fn test_drop_restores_settings_on_pseudo_tty() {
+            let Some(pty) = PtyPair::new() else {
+                eprintln!("Skipping test: failed to allocate pseudo TTY");
                 return;
-            }
-
-            // Get original settings
-            let original = {
-                // SAFETY: Using MaybeUninit properly
-                let mut termios = std::mem::MaybeUninit::<libc::termios>::uninit();
-                let result = unsafe { libc::tcgetattr(libc::STDIN_FILENO, termios.as_mut_ptr()) };
-                assert_eq!(result, 0, "Failed to get termios");
-                unsafe { termios.assume_init() }
             };
 
-            // Enter raw mode in a scope
+            let original = get_termios(pty.slave);
+
+            // Simulate raw-like mode prior to guard drop restoration.
+            let mut modified = original;
+            modified.c_lflag &= !(libc::ICANON | libc::ECHO);
+            set_termios_now(pty.slave, &modified);
+
             {
-                let _guard = enter_raw_mode().expect("Failed to enter raw mode");
-                // Raw mode is now active
-
-                // Verify settings changed (at least ICANON should be off)
-                let current = {
-                    let mut termios = std::mem::MaybeUninit::<libc::termios>::uninit();
-                    let result =
-                        unsafe { libc::tcgetattr(libc::STDIN_FILENO, termios.as_mut_ptr()) };
-                    assert_eq!(result, 0);
-                    unsafe { termios.assume_init() }
-                };
-
-                // ICANON should be disabled in raw mode
-                assert_eq!(current.c_lflag & libc::ICANON, 0);
+                let _guard = RawModeGuard::new(original, pty.slave);
+                // Guard drops at scope end and must restore original settings.
             }
-            // Guard dropped, terminal should be restored
 
-            // Verify settings restored
-            let restored = {
-                let mut termios = std::mem::MaybeUninit::<libc::termios>::uninit();
-                let result = unsafe { libc::tcgetattr(libc::STDIN_FILENO, termios.as_mut_ptr()) };
-                assert_eq!(result, 0);
-                unsafe { termios.assume_init() }
-            };
-
-            // Key settings should match original
+            let restored = get_termios(pty.slave);
             assert_eq!(
                 restored.c_lflag & libc::ICANON,
                 original.c_lflag & libc::ICANON
