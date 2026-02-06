@@ -52,4 +52,5 @@ func init() {
 	rootCmd.AddCommand(claudeDaemonCmd) // Claude CLI daemon
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(doctorCmd)
+	rootCmd.AddCommand(suggestDoctorCmd)
 }

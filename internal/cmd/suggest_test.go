@@ -22,8 +22,12 @@ func TestRunSuggest_DisabledByEnv_JSON(t *testing.T) {
 		}
 	})
 
-	if strings.TrimSpace(output) != "[]" {
-		t.Fatalf("expected empty JSON array, got %q", output)
+	var resp suggestJSONResponse
+	if err := json.Unmarshal([]byte(output), &resp); err != nil {
+		t.Fatalf("json unmarshal error: %v", err)
+	}
+	if len(resp.Suggestions) != 0 {
+		t.Fatalf("expected empty suggestions, got %d", len(resp.Suggestions))
 	}
 }
 
@@ -70,18 +74,18 @@ func TestRunSuggest_HistoryFallback_JSONRisk(t *testing.T) {
 		}
 	})
 
-	var out []suggestOutput
-	if err := json.Unmarshal([]byte(output), &out); err != nil {
+	var resp suggestJSONResponse
+	if err := json.Unmarshal([]byte(output), &resp); err != nil {
 		t.Fatalf("json unmarshal error: %v", err)
 	}
-	if len(out) != 1 {
-		t.Fatalf("expected 1 suggestion, got %d", len(out))
+	if len(resp.Suggestions) != 1 {
+		t.Fatalf("expected 1 suggestion, got %d", len(resp.Suggestions))
 	}
-	if out[0].Text != "rm -rf /" {
-		t.Fatalf("unexpected suggestion: %q", out[0].Text)
+	if resp.Suggestions[0].Text != "rm -rf /" {
+		t.Fatalf("unexpected suggestion: %q", resp.Suggestions[0].Text)
 	}
-	if out[0].Risk != "destructive" {
-		t.Fatalf("expected destructive risk, got %q", out[0].Risk)
+	if resp.Suggestions[0].Risk != "destructive" {
+		t.Fatalf("expected destructive risk, got %q", resp.Suggestions[0].Risk)
 	}
 }
 
@@ -104,8 +108,12 @@ func TestRunSuggest_DisabledByConfig(t *testing.T) {
 		}
 	})
 
-	if strings.TrimSpace(output) != "[]" {
-		t.Fatalf("expected empty JSON array, got %q", output)
+	var resp suggestJSONResponse
+	if err := json.Unmarshal([]byte(output), &resp); err != nil {
+		t.Fatalf("json unmarshal error: %v", err)
+	}
+	if len(resp.Suggestions) != 0 {
+		t.Fatalf("expected empty suggestions, got %d", len(resp.Suggestions))
 	}
 }
 

@@ -143,6 +143,15 @@ func (n *Normalizer) Normalize(cmdRaw string) (cmdNorm string, slots []SlotValue
 			continue
 		}
 
+		// If token is already a slot placeholder, preserve it as-is
+		// for idempotency (re-normalizing normalized output).
+		if isSlotPlaceholder(token) {
+			result = append(result, token)
+			argIndex++
+			i++
+			continue
+		}
+
 		// It's a positional argument - determine slot type
 		slotType := n.detectSlotType(token)
 
@@ -176,8 +185,24 @@ type SlotValue struct {
 	Value string // Original value from the command
 }
 
+// isSlotPlaceholder returns true if the token is already a normalized slot
+// placeholder (e.g. "<path>", "<arg>"). This ensures idempotency: normalizing
+// an already-normalized command produces identical output.
+func isSlotPlaceholder(token string) bool {
+	switch token {
+	case SlotPath, SlotNum, SlotSHA, SlotURL, SlotMsg, SlotArg:
+		return true
+	}
+	return false
+}
+
 // detectSlotType determines the appropriate slot type for a token.
 func (n *Normalizer) detectSlotType(token string) string {
+	// Already a slot placeholder — preserve for idempotency
+	if isSlotPlaceholder(token) {
+		return token
+	}
+
 	// Check in order of specificity
 
 	// SHA first (most specific pattern)

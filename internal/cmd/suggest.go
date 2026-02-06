@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -14,12 +15,22 @@ import (
 	"github.com/runger/clai/internal/history"
 	"github.com/runger/clai/internal/ipc"
 	"github.com/runger/clai/internal/sanitize"
+	"github.com/runger/clai/internal/suggestions/explain"
+	"github.com/runger/clai/internal/suggestions/timing"
 )
 
 var (
-	suggestLimit  int
-	suggestJSON   bool
-	suggestFormat string
+	suggestLimit   int
+	suggestJSON    bool
+	suggestFormat  string
+	suggestExplain bool
+
+	// sessionTimingMu protects sessionTimingMachines.
+	sessionTimingMu sync.Mutex
+	// sessionTimingMachines maps session IDs to their typing cadence state machines.
+	// The CLI process is short-lived per invocation, but the map is kept for
+	// potential long-lived callers (e.g. tests, daemon embedding).
+	sessionTimingMachines = make(map[string]*timing.Machine)
 )
 
 var suggestCmd = &cobra.Command{
@@ -47,6 +58,7 @@ func init() {
 	suggestCmd.Flags().BoolVar(&suggestJSON, "json", false, "output suggestions as JSON (deprecated: use --format=json)")
 	suggestCmd.Flags().StringVar(&suggestFormat, "format", "text", "output format: text, json, or fzf")
 	suggestCmd.Flags().StringVar(&colorMode, "color", "auto", "color output: auto, always, or never")
+	suggestCmd.Flags().BoolVar(&suggestExplain, "explain", false, "include reasons explaining why each suggestion was ranked")
 }
 
 func runSuggest(cmd *cobra.Command, args []string) error {
@@ -65,9 +77,22 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 
 	if integrationDisabled() {
 		if format == "json" {
-			return writeSuggestJSON(nil)
+			return writeSuggestJSON(nil, nil)
 		}
 		return nil
+	}
+
+	// Record keystroke in the timing state machine for this session.
+	// Each invocation of "clai suggest" implicitly signals a keystroke.
+	var hint *timing.TimingHint
+	if cfg, err := config.Load(); err == nil && cfg.Suggestions.AdaptiveTimingEnabled {
+		machine := getSessionTimingMachine()
+		if machine != nil {
+			nowMs := time.Now().UnixMilli()
+			_, _ = machine.OnKeystroke(nowMs)
+			h := machine.Hint()
+			hint = &h
+		}
 	}
 
 	// Empty prefix - return cached AI suggestion
@@ -75,7 +100,7 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 		suggestion, _ := cache.ReadSuggestion()
 		if format == "json" {
 			if suggestion == "" {
-				return writeSuggestJSON(nil)
+				return writeSuggestJSON(nil, hint)
 			}
 			return writeSuggestJSON([]suggestOutput{{
 				Text:        suggestion,
@@ -83,7 +108,7 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 				Score:       0,
 				Description: "",
 				Risk:        riskFromText(suggestion),
-			}})
+			}}, hint)
 		}
 		if suggestion != "" {
 			fmt.Println(suggestion)
@@ -100,14 +125,14 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output based on format
-	return outputSuggestions(suggestions, format)
+	return outputSuggestions(suggestions, format, hint)
 }
 
 // outputSuggestions formats and outputs suggestions based on format type.
-func outputSuggestions(suggestions []suggestOutput, format string) error {
+func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.TimingHint) error {
 	switch format {
 	case "json":
-		return writeSuggestJSON(suggestions)
+		return writeSuggestJSON(suggestions, hint)
 	case "fzf":
 		// fzf format: plain commands, one per line (for piping to fzf)
 		for _, s := range suggestions {
@@ -132,11 +157,18 @@ func outputSuggestions(suggestions []suggestOutput, format string) error {
 }
 
 type suggestOutput struct {
-	Text        string  `json:"text"`
-	Source      string  `json:"source"`
-	Score       float64 `json:"score"`
-	Description string  `json:"description"`
-	Risk        string  `json:"risk"`
+	Text        string           `json:"text"`
+	Source      string           `json:"source"`
+	Score       float64          `json:"score"`
+	Description string           `json:"description"`
+	Risk        string           `json:"risk"`
+	Reasons     []explain.Reason `json:"reasons,omitempty"`
+}
+
+// suggestJSONResponse wraps suggestions with optional timing hint for JSON output.
+type suggestJSONResponse struct {
+	Suggestions []suggestOutput    `json:"suggestions"`
+	TimingHint  *timing.TimingHint `json:"timing_hint,omitempty"`
 }
 
 func riskFromText(text string) string {
@@ -146,13 +178,17 @@ func riskFromText(text string) string {
 	return ""
 }
 
-func writeSuggestJSON(suggestions []suggestOutput) error {
+func writeSuggestJSON(suggestions []suggestOutput, hint *timing.TimingHint) error {
 	if suggestions == nil {
 		suggestions = []suggestOutput{}
 	}
+	resp := suggestJSONResponse{
+		Suggestions: suggestions,
+		TimingHint:  hint,
+	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetEscapeHTML(false)
-	return enc.Encode(suggestions)
+	return enc.Encode(resp)
 }
 
 func getSuggestionsFromHistory(prefix string, limit int) []suggestOutput {
@@ -203,19 +239,72 @@ func getSuggestionsFromDaemon(prefix string, limit int) []suggestOutput {
 		return nil
 	}
 
-	// Convert to string slice
+	// Determine whether to include reasons in output.
+	includeReasons := suggestExplain
+	if !includeReasons {
+		if cfg, err := config.Load(); err == nil {
+			includeReasons = cfg.Suggestions.ExplainEnabled
+		}
+	}
+
+	// Convert to suggestOutput slice
 	results := make([]suggestOutput, len(daemonSuggestions))
 	for i, s := range daemonSuggestions {
-		results[i] = suggestOutput{
+		out := suggestOutput{
 			Text:        s.Text,
 			Source:      s.Source,
 			Score:       float64(s.Score),
 			Description: s.Description,
 			Risk:        s.Risk,
 		}
+
+		// Convert daemon-provided reasons to explain.Reason when enabled.
+		if includeReasons && len(s.Reasons) > 0 {
+			out.Reasons = make([]explain.Reason, len(s.Reasons))
+			for j, r := range s.Reasons {
+				out.Reasons[j] = explain.Reason{
+					Tag:          r.Type,
+					Description:  r.Description,
+					Contribution: float64(r.Contribution),
+				}
+			}
+		}
+
+		results[i] = out
 	}
 
 	return results
+}
+
+// getSessionTimingMachine returns the timing state machine for the current
+// session. Creates one on first access. Returns nil if no session ID is set.
+func getSessionTimingMachine() *timing.Machine {
+	sessionID := os.Getenv("CLAI_SESSION_ID")
+	if sessionID == "" {
+		return nil
+	}
+
+	sessionTimingMu.Lock()
+	defer sessionTimingMu.Unlock()
+
+	m, ok := sessionTimingMachines[sessionID]
+	if !ok {
+		cfg, err := config.Load()
+		var tc timing.Config
+		if err == nil {
+			// Convert CPS threshold to inter-keystroke ms threshold:
+			// e.g. 6.0 CPS => ~167ms per keystroke => threshold at 1000/6.0
+			if cfg.Suggestions.TypingFastThresholdCPS > 0 {
+				tc.FastThresholdMs = int64(1000.0 / cfg.Suggestions.TypingFastThresholdCPS)
+			}
+			if cfg.Suggestions.TypingPauseThresholdMs > 0 {
+				tc.PauseThresholdMs = int64(cfg.Suggestions.TypingPauseThresholdMs)
+			}
+		}
+		m = timing.NewMachine(tc)
+		sessionTimingMachines[sessionID] = m
+	}
+	return m
 }
 
 func integrationDisabled() bool {

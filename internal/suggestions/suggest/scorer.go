@@ -186,6 +186,41 @@ type scoreInfo struct {
 	recoveryBoost    float64
 }
 
+// ScoreBreakdown provides the per-feature score contributions for a suggestion.
+// This is used by the explain package to generate human-readable reasons.
+type ScoreBreakdown struct {
+	RepoTransition   float64
+	GlobalTransition float64
+	RepoFrequency    float64
+	GlobalFrequency  float64
+	ProjectTask      float64
+	Dangerous        float64
+	DirTransition    float64
+	DirFrequency     float64
+	WorkflowBoost    float64
+	PipelineConf     float64
+	DismissalPenalty float64
+	RecoveryBoost    float64
+}
+
+// ScoreBreakdown returns the per-feature score contributions for this suggestion.
+func (s *Suggestion) ScoreBreakdown() ScoreBreakdown {
+	return ScoreBreakdown{
+		RepoTransition:   s.scores.repoTransition,
+		GlobalTransition: s.scores.globalTransition,
+		RepoFrequency:    s.scores.repoFrequency,
+		GlobalFrequency:  s.scores.globalFrequency,
+		ProjectTask:      s.scores.projectTask,
+		Dangerous:        s.scores.dangerous,
+		DirTransition:    s.scores.dirTransition,
+		DirFrequency:     s.scores.dirFrequency,
+		WorkflowBoost:    s.scores.workflowBoost,
+		PipelineConf:     s.scores.pipelineConf,
+		DismissalPenalty: s.scores.dismissalPenalty,
+		RecoveryBoost:    s.scores.recoveryBoost,
+	}
+}
+
 // Scorer implements the multi-factor suggestion scoring algorithm.
 type Scorer struct {
 	db                *sql.DB
