@@ -250,6 +250,17 @@ fn host_command_available(command: &str) -> bool {
         .is_ok_and(|status| status.success())
 }
 
+#[cfg(unix)]
+fn localhost_ssh_available() -> bool {
+    std::process::Command::new("sh")
+        .args([
+            "-c",
+            "ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=2 localhost 'echo SSH_READY' >/dev/null 2>&1",
+        ])
+        .status()
+        .is_ok_and(|status| status.success())
+}
+
 // ============================================================================
 // Basic PTY Spawning Tests
 // ============================================================================
@@ -954,6 +965,50 @@ fn test_clai_wrap_fullscreen_man_quit_resume_shell() {
     let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
 
     assert!(output.contains("AFTER_MAN"), "Output: {output}");
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_ssh_localhost_command_resume_shell() {
+    if !host_command_available("ssh") {
+        eprintln!("Skipping test: ssh binary not available");
+        return;
+    }
+    if !localhost_ssh_available() {
+        eprintln!("Skipping test: localhost SSH server/auth not available");
+        return;
+    }
+    let Some((master, mut child)) = spawn_clai_wrap_shell() else {
+        eprintln!("Skipping test: clai-wrap binary or shell unavailable");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let mut writer = master.take_writer().expect("Failed to get writer");
+
+    writer
+        .write_all(
+            b"ssh -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=3 localhost 'echo SSH_WRAP_OK'\n",
+        )
+        .expect("write ssh command");
+    writer.flush().expect("flush ssh command");
+
+    let ssh_output = read_until_marker(&mut *reader, "SSH_WRAP_OK", Duration::from_secs(12))
+        .expect("Expected SSH command marker");
+    assert!(ssh_output.contains("SSH_WRAP_OK"), "Output: {ssh_output}");
+
+    writer
+        .write_all(b"echo AFTER_SSH\n")
+        .expect("write post-ssh marker");
+    writer.flush().expect("flush post-ssh marker");
+
+    let output = read_until_marker(&mut *reader, "AFTER_SSH", Duration::from_secs(8))
+        .expect("Expected shell to continue after SSH command");
+
+    let _ = child.kill();
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+
+    assert!(output.contains("AFTER_SSH"), "Output: {output}");
 }
 
 #[test]
