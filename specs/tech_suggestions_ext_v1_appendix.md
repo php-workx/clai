@@ -32,6 +32,9 @@ Detection:
 - `serverless.yml` -> `serverless`
 - `.clai/project.yaml` -> user-defined override.
 - Persisted format in session context: sorted, pipe-delimited string, for example `docker|go|k8s-helm`.
+- Marker matching rule:
+- direct markers use file existence at repo root.
+- glob marker `terraform/*.tf` means: directory `terraform/` exists and contains at least one `.tf` file.
 
 Schema additions:
 ```sql
@@ -79,6 +82,9 @@ project_types:
   - custom:ml-pipeline
 ```
 - When present, this file overrides auto-detection.
+- Unknown type handling:
+- project types are open-vocabulary.
+- unknown bare strings are accepted as-is (recommended convention for custom types remains `custom:<name>`).
 
 ### 20.2 Pipeline and Compound Command Awareness
 
@@ -89,6 +95,9 @@ Splitter stage (before existing normalization):
 - Split on unquoted/unescaped operators: `|`, `|&`, `&&`, `||`, `;`.
 - Treat subshell bodies (`$()`, backticks) as opaque.
 - Ignore `&` as background operator for pipeline modeling.
+- Operator storage rule:
+- store `|&` literally as operator value `|&` in `pipeline_event` and `pipeline_transition`.
+- for transition scoring, `|&` may reuse the same baseline operator prior as `|` unless explicit operator-specific model is enabled.
 
 Schema additions:
 ```sql
@@ -136,6 +145,10 @@ Ingestion extension:
 Suggestion modes:
 - Mode A (continuation): when prefix ends with pipeline/logical operator, predict only next segment.
 - Mode B (pattern recall): suggest full known multi-step pipeline pattern starting from first segment.
+- Mode A parser rule:
+- parse the full prefix through splitter.
+- use last complete segment template as lookup key for `pipeline_transition`.
+- if trailing partial segment exists, apply prefix filter to returned continuation candidates.
 
 Ranking integration:
 - For pattern recall, apply `pipeline_confidence` as transition amplifier.
@@ -216,7 +229,8 @@ CREATE INDEX idx_workflow_step_template ON workflow_step(template_id);
 ```
 
 Background mining:
-- Run every `suggestions.workflow_mine_interval_ms` or on session end.
+- Run every `suggestions.workflow_mine_interval_ms` and include active sessions using current command history snapshots.
+- Optionally run an additional sweep on explicit `session_end`.
 - Generate contiguous subsequences of length `3-6`.
 - Generate limited non-contiguous subsequences with max gap `2`.
 - Promote subsequences with minimum count threshold.
@@ -225,6 +239,8 @@ Background mining:
 Runtime activation:
 - In-memory activation state per session tracks pattern progress, recency, and score.
 - Expire stale activations by timeout or lack of advancement.
+- Stale activation rule:
+- default stale threshold is no advancement in last `5` session commands (`suggestions.workflow_stale_commands=5`).
 
 Candidate generation:
 - Add source `workflow` for next-step suggestion, cap `3`.
@@ -253,6 +269,10 @@ State machine:
 - `IDLE` -> `TYPING` -> `FAST_TYPING` or `PAUSED` -> `REQUEST`.
 - Request immediately on pause.
 - Suppress frequent requests during fast typing.
+- Minimal viable policy (V2 baseline):
+- if full state machine is unavailable in shell adapter, implement binary policy:
+- request suggestions on pause (`delta_ms > pause_threshold`) and on explicit prompt refresh.
+- full multi-state policy remains the target behavior for zsh integrations.
 
 Shell support matrix:
 - `zsh`: full adaptive cadence via ZLE hooks.
@@ -287,6 +307,12 @@ CREATE TABLE session_alias (
 
 Session metadata:
 - Capture alias map on `session_start` and keep in memory for normalization/rendering.
+- Capture commands by shell:
+- bash: `alias -p` and parse `alias name='expansion'`.
+- zsh: `alias -rL` and parse one alias per line.
+- fish: `abbr --show` and parse `abbr` definitions.
+- V2 exclusions:
+- zsh global aliases (`alias -gL`), zsh suffix aliases (`alias -sL`), fish functions-as-aliases.
 
 Normalization extension:
 - First step expands alias in first token.
@@ -300,6 +326,10 @@ Dual representation:
 
 Rendering extension:
 - If alias-preferred rendering enabled, rewrite suggestion back to user alias form when mapping is available.
+- Reverse-mapping algorithm:
+- build expansion->alias candidates from current alias map.
+- sort candidates by expansion length descending.
+- replace longest matching command prefix first.
 
 Mid-session alias changes:
 - Recommended mode:
@@ -426,6 +456,9 @@ Candidate pools:
 - Project-type priors with zero personal usage.
 - Playbook tasks never executed by user.
 - Curated tool-common command sets.
+- Tool-common source format:
+- use embedded static artifact (for example `assets/discovery_tool_common.yaml`) loaded at daemon startup.
+- schema: `tool`, `command_template`, `tags`, `risk_level`, `contexts`.
 
 Filters:
 - Context relevance.
@@ -456,6 +489,14 @@ Tagging:
 - Extract bounded semantic tags during normalization using deterministic rules.
 - Include tool, subcommand, flag semantics, argument patterns, and synonym mapping.
 - Controlled vocabulary (built-in; configurable extension path).
+- Concrete artifact requirements:
+- built-in vocabulary is embedded from static file (for example `assets/tag_vocabulary.yaml`) with deterministic startup validation.
+- optional override path merges additional tags without altering built-in semantics.
+- extraction interface:
+```go
+func ExtractTags(cmdNorm string, tool string, args []string, vocab TagVocabulary) []string
+```
+- minimum coverage set for V2 extractor tests must include git, docker, kubectl, npm, make, find, grep, and curl examples.
 
 Search modes:
 - Extend `clai search` with `--mode describe` and `--mode auto`.

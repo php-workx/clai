@@ -119,12 +119,22 @@ Bash coexistence requirements:
 - For bash `< 4.4`, define post-command hook in function `__clai_postcmd` and append `; __clai_postcmd` to `PROMPT_COMMAND` with idempotent guard.
 - Document expected behavior under `set -T`, `set -E`, and `shopt -s extdebug`: clai hooks remain best-effort and must not break existing trap semantics; diagnostics are emitted through doctor when unsafe combinations are detected.
 
+Bash `DEBUG` chaining pseudocode (implementation sketch):
+```bash
+__clai_original_debug_trap="$(trap -p DEBUG | sed "s/^trap -- '//;s/' DEBUG$//")"
+trap '__clai_preexec_hook "$BASH_COMMAND"; __clai_status=$?; if [[ -n "$__clai_original_debug_trap" ]]; then eval "$__clai_original_debug_trap"; fi; return $__clai_status' DEBUG
+```
+- Wrapper requirement: preserve original trap execution and do not swallow non-zero status from previous trap chain elements.
+
 Fish-specific implementation notes:
 - Use `set -l` for local variables; never use `local`.
 - Capture exit status with `set -l _clai_exit $status` as the first line of `fish_postexec`.
 - Do not rely on process substitution (`<()`, `>()`); use pipes or `psub` only when unavoidable.
 - Prefer autoloaded hook functions in `~/.config/fish/functions/` for deterministic load order and debuggability.
 - Prefer fish `string` builtins over external `sed`/`awk` for adapter text operations.
+- Fish alias capture scope for V2:
+- capture abbreviations via `abbr --show`.
+- do not capture function-backed aliases in V2 (including `alias`-generated wrapper functions).
 
 ### 2.5 Safety Rules
 - Interactive shell check required before installing hook behavior.
@@ -155,7 +165,9 @@ Hook-path stderr discipline:
 ### 2.7 Suggestion Presentation Contract
 - `clai suggest` is line-oriented in V2 (no built-in fullscreen TUI).
 - Default rendering mode per shell:
-- shell integrations may render inline hint text using native shell widget APIs
+- `zsh`: render ghost text using ZLE `POSTDISPLAY` strategy; clear on buffer mutation.
+- `fish`: use fish-native autosuggestion cadence/path where integration allows; clear on next edit/commandline change.
+- `bash`: render suggestion on a separate prompt-adjacent line (non-inline) to avoid invasive readline patching in V2.
 - CLI output remains plain line output unless explicit `--format` is requested.
 - Completion coexistence:
 - native shell completion remains bound to `Tab` by default
@@ -250,6 +262,9 @@ Windows parity note:
 ### 3.7 Daemon Lifecycle Management
 - Auto-start is required:
 - first `session_start` path attempts to start daemon opportunistically if not running.
+- Required mechanism:
+- `clai-shim session-start` attempts socket connect first.
+- on connect failure, fork+exec `clai-suggestd` in background with stdout/stderr redirected to daemon log path, then retry connect with bounded backoff.
 - explicit management surface is required:
 - `clai suggestd start|stop|status|reload`.
 - Optional platform integration:
@@ -287,6 +302,10 @@ No migration bridge to V1 is required. V2 initializes and owns its schema.
 - `rank_weight_profile`
 - `command_event_fts` (virtual table)
 - `schema_migrations`
+
+Schema lifecycle rule:
+- All tables listed in this section are created during initial DB setup regardless of feature-flag enablement state.
+- Feature flags gate runtime writes/reads only; they do not gate schema existence.
 
 ### 4.2 Schema Sketch
 ```sql
@@ -402,6 +421,8 @@ CREATE TABLE rank_weight_profile (
   w_affinity REAL NOT NULL,
   w_task REAL NOT NULL,
   w_feedback REAL NOT NULL,
+  w_project_type_affinity REAL NOT NULL,
+  w_failure_recovery REAL NOT NULL,
   w_risk_penalty REAL NOT NULL,
   sample_count INTEGER NOT NULL,
   learning_rate REAL NOT NULL
@@ -449,6 +470,8 @@ Additional schema objects:
 - `session_alias`
 - `dismissal_pattern`
 - The full SQL sketch for these additive objects is maintained in `/Users/runger/.claude-worktrees/clai/happy-hypatia/specs/tech_suggestions_ext_v1_appendix.md`.
+- Normative supplement rule:
+- Appendix sections `20.1` through `20.15` are normative for additive table SQL and algorithms referenced by this section.
 
 ### 4.3 Storage Policies
 - SQLite WAL mode, one writer goroutine, batched commits every 25-50ms or 100 events.
@@ -457,6 +480,10 @@ Additional schema objects:
 - retain last `90` days of `command_event` rows.
 - retain maximum `500000` `command_event` rows.
 - when both limits apply, prune oldest rows first.
+- Retention pruning semantics:
+- pruning `command_event` rows must trigger FTS delete synchronization via trigger path.
+- `pipeline_event` rows for pruned `command_event` rows are cascade-deleted (or equivalent explicit delete in same maintenance task).
+- aggregate tables (`command_stat`, `transition_stat`, `slot_stat`, `project_type_stat`, `project_type_transition`, `failure_recovery`) are cumulative and are not rewritten during pruning.
 
 WAL and checkpoint policy:
 - Set `PRAGMA wal_autocheckpoint=1000` (tunable).
@@ -491,6 +518,10 @@ WAL and checkpoint policy:
 - max project types per event
 - `pipeline_max_segments`
 - bounded workflow activation set per session (in-memory).
+- Advanced feature writes (`project_type_*`, directory-scope aggregates, `pipeline_*`, `failure_recovery`) are order-independent within the transaction after core writes complete.
+- Performance invariant:
+- combined write-path transaction must complete within `25ms` P95 on reference hardware.
+- if this invariant regresses, advanced feature writes may be shifted to a bounded deferred batch path while core writes remain synchronous.
 
 ### 4.5 Corruption Recovery
 - On startup, if SQLite returns corruption/malformed errors:
@@ -510,13 +541,16 @@ WAL and checkpoint policy:
 - Use shell-like tokenizer (`shlex` style) with robust fallback for malformed input.
 - Keep original raw command for audit/debug and rendering decisions.
 - UTF-8 normalization contract:
-- invalid UTF-8 is normalized with `strings.ToValidUTF8(..., \"\uFFFD\")`.
+- invalid UTF-8 is normalized with `strings.ToValidUTF8(..., "\uFFFD")`.
 - raw byte sequence is not preserved in V2.
 - locale transcoding is not attempted in V2; input is treated as UTF-8 byte stream.
 
 Pre-tokenization stages:
-- Alias expansion (session-scoped) is applied to first token before normalization; expansion depth is bounded and cycles are rejected.
-- Pipeline/compound splitter identifies unquoted operators (`|`, `|&`, `&&`, `||`, `;`) and creates segment views for pipeline-aware learning.
+- Ordered pre-normalization pipeline:
+1. alias expansion on first token (session-scoped; bounded depth; cycle detection).
+2. pipeline/compound split on unquoted operators (`|`, `|&`, `&&`, `||`, `;`).
+3. per-segment tokenization and normalization.
+- Implementation details for alias capture and splitter edge cases are specified in appendix sections `20.2` and `20.6`.
 
 ### 5.3 Event Size Limits
 - `cmd_raw` ingestion maximum is `16384` bytes (configurable).
@@ -535,6 +569,9 @@ Pre-tokenization stages:
 - `<msg>`
 - Optionally domain slots (`<branch>`, `<namespace>`, `<service>`).
 - Extract deterministic semantic tags into `command_template.tags` for describe-mode search (`tool`, `subcommand`, selected flag semantics, argument-pattern tags).
+- Tag vocabulary contract:
+- initial vocabulary is deterministic and embedded in code (plus optional override path).
+- extraction rules and examples are specified in appendix section `20.12`.
 
 ### 5.5 Template Identity
 - `template_id = sha256(cmd_norm)`.
@@ -553,19 +590,19 @@ Pre-tokenization stages:
 - Recent feedback for immediate personalization.
 
 ### 6.2 Retrieval Sources
-- Session transitions.
-- Failure recovery candidates (only when last command failed).
-- Active workflow next-step candidates.
-- Pipeline pattern recall.
-- Repo transitions.
-- Directory-scoped transitions.
-- Global transitions.
-- Session/repo/dir/global frequency priors.
-- Project-type transitions.
-- Task candidates from repo discovery.
-- Playbook conditional task triggers (`after`, `after_failure`).
-- Discovery candidates (low-priority gated source).
-- Typo correction candidates after failures.
+Priority order:
+1. Session transitions.
+2. Failure recovery candidates (only when last command failed).
+3. Active workflow next-step candidates.
+4. Pipeline pattern recall.
+5. Repo transitions.
+6. Directory-scoped transitions.
+7. Project-type transitions.
+8. Playbook conditional task triggers (`after`, `after_failure`).
+9. Global transitions.
+10. Session/repo/dir/global frequency priors.
+11. Typo correction candidates after failures (when applicable).
+12. Discovery candidates (low-priority gated source).
 
 ### 6.3 Retrieval Budget
 - Retrieve up to 200 candidates total in ranked source order.
@@ -607,9 +644,17 @@ Scoring notes:
 - `affinity_enhanced` includes directory-scope locality.
 - `task_extended` includes playbook conditional trigger boosts.
 - `feedback_extended` includes persistent dismissal penalties.
+- Amplifier formulas:
+- `transition_effective = clamp(base_transition + workflow_boost*activation_score + pipeline_confidence*pipeline_transition_weight, 0, 1)`
+- `affinity_enhanced = 0.4*repo_match + 0.3*dir_scope_match + 0.2*branch_match + 0.1*cwd_exact_match`
+- `task_extended = clamp(base_task_score + playbook_after_boost, 0, 1)` when playbook trigger matches, otherwise `base_task_score`
+- `feedback_extended = base_feedback + dismissal_penalty(context, candidate)` where dismissal penalty is in `[-1, 0]`
+- Score scale rule:
+- final weighted score is not renormalized to `[0,1]`; thresholds (`min_score`) and margins operate on raw weighted scale.
 
 ### 7.2 Feature Definitions
 - `transition_effective`: decayed edge weight from previous template, optionally amplified by workflow and pipeline signals.
+- `pipeline_transition_weight`: normalized pipeline-transition support signal in `[0,1]` when continuation/pattern context applies.
 - `frequency`: decayed command/template score.
 - `success`: success ratio for candidate template.
 - `prefix`: exact + fuzzy prefix match quality.
@@ -682,6 +727,8 @@ Scoring notes:
 - `dismissed`
 - `edited_then_run`
 - `ignored_timeout`
+- `never` (explicit permanent suppression)
+- `unblock` (explicit reversal of permanent suppression)
 
 Feedback signal sources:
 - Explicit signals from shell UX integrations that support accept/dismiss bindings (zsh/fish widgets, picker accept actions).
@@ -699,6 +746,7 @@ Feedback signal sources:
 - Persistent dismissal learning:
 - repeated context-specific dismissals graduate from temporary to learned suppression.
 - explicit `never` action sets permanent block until explicit `unblock`.
+- Detailed suppression state-machine semantics are specified in appendix section `20.7`.
 
 ### 9.3 Drift Control
 - Decay all feedback effects over time.
@@ -807,6 +855,8 @@ API payload contract (JSON over local RPC transport wrapper):
 - `event_type`, `session_id`, `shell`, `ts_ms`, `cwd`, `cmd_raw`, `cmd_truncated`, `exit_code`, `duration_ms`, `ephemeral`
 - `SuggestRequest`:
 - `session_id`, `cwd`, `repo_key`, `prefix`, `cursor_pos`, `limit`, `include_low_confidence`, `last_cmd_raw`, `last_cmd_norm`, `last_cmd_ts_ms`, `last_event_seq`
+- Project-type and alias context resolution:
+- daemon resolves `project_types` and alias map from session state keyed by `session_id`; these are not required request payload fields.
 - `SuggestResponse`:
 - `suggestions[] { text, cmd_norm, source, score, confidence, reasons[], risk }`, `cache_status`, `latency_ms`
 - `SuggestResponse` may also include `timing_hint { user_speed_class, suggested_pause_threshold_ms }`
@@ -820,7 +870,7 @@ API payload contract (JSON over local RPC transport wrapper):
 ### 13.2 CLI Commands
 - `clai suggest [prefix] --limit N --format text|json|fzf --color auto|always|never`
 - `clai search [query] --limit N --scope session|repo|global --mode fts|prefix|describe|auto --color auto|always|never`
-- `clai suggest-feedback --action accepted|dismissed|edited`
+- `clai suggest-feedback --action accepted|dismissed|edited|never|unblock`
 - `clai suggestions doctor`
 - `clai suggestd start|stop|status|reload`
 
@@ -987,6 +1037,10 @@ Hook/transport:
 - `suggestions.interactive_require_tty=true`
 - `suggestions.cmd_raw_max_bytes=16384`
 - `suggestions.shim_mode=auto` (`auto|persistent|oneshot`)
+- shim mode behavior:
+- `auto` (default): attempt persistent helper on session start; on helper startup/connect failure, fall back to oneshot for remainder of session.
+- `persistent`: require persistent helper; emit diagnostic and disable suggestions if unavailable.
+- `oneshot`: always fork/exec helper per event.
 
 Ranking:
 - `suggestions.weights.transition=0.30`
@@ -1109,6 +1163,13 @@ Privacy:
 - `suggestions.incognito_mode=ephemeral` (`off|ephemeral|no_send`)
 - `suggestions.redact_sensitive_tokens=true`
 
+### 16.1 Feature Flag Dependencies
+- Feature flags are independent by default:
+- disabling a feature disables its ingestion writes, retrieval source, and ranking contribution only.
+- `task_playbook_extended.after_failure` is independent of `failure_recovery_enabled`; it depends only on prior command exit status.
+- `alias_resolution_enabled` affects template identity. If disabled after prior enabled history, template convergence may diverge until re-enabled; this is an expected limitation.
+- workflow mining may run independently of pipeline awareness; when pipeline awareness is disabled, workflows are mined from command-level template sequences only.
+
 ## 17) Quality Gates
 
 Build-time gates:
@@ -1186,3 +1247,4 @@ The enhancement proposals are fully preserved in `/Users/runger/.claude-worktree
 Normative rule:
 - Sections `0` through `19` in this document are the canonical specification.
 - The appendix is detailed supporting material and rationale; in case of conflict, this document takes precedence.
+- Exception: where sections in this document explicitly mark appendix content as a normative supplement (for example additive SQL sketches), that referenced appendix content is part of the implementation contract.
