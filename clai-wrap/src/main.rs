@@ -4,6 +4,7 @@
 //! intelligent command suggestions, history search, and autocomplete features.
 
 use std::io::{Read, Write};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -17,6 +18,8 @@ use clai_wrap::osc133::Osc133Parser;
 use clai_wrap::pty_host::PtyHost;
 use clai_wrap::ring_buffer::SpscRingBuffer;
 use clai_wrap::selection_inject::SelectionInjector;
+#[cfg(unix)]
+use clai_wrap::standalone::{StandaloneReason, StandaloneState};
 use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::EnvFilter;
 
@@ -32,6 +35,9 @@ const DEFAULT_BUFFER_CAP: usize = 4 * 1024 * 1024;
 
 /// I/O buffer size for reads
 const IO_BUFFER_SIZE: usize = 4096;
+
+/// Warning printed when clai-wrap is started from inside another clai-wrap session.
+const NESTED_WRAPPER_WARNING: &str = "clai-wrap: nested wrapper detected (CLAI_WRAP already set)";
 
 fn main() -> Result<()> {
     // Parse CLI arguments
@@ -55,6 +61,9 @@ fn main() -> Result<()> {
     debug!("Buffer capacity: {} bytes", cli.buffer_cap);
     debug!("Daemon enabled: {}", cli.daemon_enabled());
     debug!("UI enabled: {}", cli.ui_enabled());
+    if let Some(warning) = nested_wrapper_warning_message() {
+        eprintln!("{warning}");
+    }
 
     // Run the main wrapper logic based on operation mode
     match cli.operation_mode() {
@@ -149,12 +158,21 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
     let shell_path = cli.shell_path();
     debug!("Using shell: {:?}", shell_path);
 
+    let standalone_state = init_standalone_history(cli, &shell_path)?;
+    if standalone_state.has_history() {
+        debug!(
+            "Loaded {} history entries from {:?}",
+            standalone_state.history_count(),
+            standalone_state.history_path()
+        );
+    }
+
     // Initialize denylist for privacy gate
     let _denylist = Denylist::with_defaults();
 
     // Create PTY and spawn shell
-    let mut pty_host =
-        PtyHost::new(Some(shell_path.clone())).context("Failed to create PTY")?;
+    let mut pty_host = PtyHost::new_with_login(Some(shell_path.clone()), cli.login_shell)
+        .context("Failed to create PTY")?;
 
     info!("Shell spawned with PID: {:?}", pty_host.child_pid());
 
@@ -383,4 +401,88 @@ fn get_terminal_size() -> Option<(u16, u16)> {
 fn get_terminal_size() -> Option<(u16, u16)> {
     // Use crossterm for Windows
     crossterm::terminal::size().ok()
+}
+
+fn nested_wrapper_warning_message() -> Option<&'static str> {
+    if std::env::var_os("CLAI_WRAP").is_some() {
+        Some(NESTED_WRAPPER_WARNING)
+    } else {
+        None
+    }
+}
+
+#[cfg(unix)]
+fn init_standalone_history(cli: &Cli, shell_path: &Path) -> Result<StandaloneState> {
+    let mut state = StandaloneState::new(StandaloneReason::DaemonUnavailable);
+
+    if let Some(history_path) = cli.history_file.as_deref() {
+        state
+            .load_history_from(history_path)
+            .with_context(|| format!("failed to load history file {:?}", history_path))?;
+        return Ok(state);
+    }
+
+    if let Some(shell_name) = shell_path.file_name().and_then(|name| name.to_str()) {
+        if let Err(err) = state.init_history(shell_name) {
+            debug!("No local history loaded for shell {shell_name}: {err}");
+        }
+    }
+
+    Ok(state)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[cfg(unix)]
+    use std::path::Path;
+    use std::sync::Mutex;
+    use tempfile::NamedTempFile;
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    fn test_nested_wrapper_warning_message_set() {
+        let _lock = ENV_LOCK.lock().expect("lock env");
+        std::env::set_var("CLAI_WRAP", "1");
+        let warning = nested_wrapper_warning_message();
+        std::env::remove_var("CLAI_WRAP");
+
+        assert_eq!(
+            warning,
+            Some("clai-wrap: nested wrapper detected (CLAI_WRAP already set)")
+        );
+    }
+
+    #[test]
+    fn test_nested_wrapper_warning_message_unset() {
+        let _lock = ENV_LOCK.lock().expect("lock env");
+        std::env::remove_var("CLAI_WRAP");
+        let warning = nested_wrapper_warning_message();
+        assert!(warning.is_none());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_init_standalone_history_uses_history_file_cli_option() {
+        let mut history = NamedTempFile::new().expect("create temp history");
+        use std::io::Write as _;
+        writeln!(history, "git status").expect("write history entry");
+        writeln!(history, "cargo test").expect("write history entry");
+        history.flush().expect("flush history file");
+
+        let cli = Cli::parse_from_args([
+            "clai-wrap",
+            "--history-file",
+            history.path().to_str().expect("utf8 history path"),
+        ]);
+
+        let state = init_standalone_history(&cli, Path::new("/bin/bash"))
+            .expect("initialize standalone history");
+
+        assert!(state.has_history(), "history should be loaded from --history-file");
+        assert_eq!(state.history_count(), 2);
+        assert_eq!(state.history_path(), Some(history.path()));
+    }
 }

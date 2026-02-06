@@ -58,7 +58,17 @@ impl PtyHost {
     /// - Failed to create PTY pair
     /// - Failed to spawn the shell process
     pub fn new(shell_path: Option<PathBuf>) -> Result<Self> {
-        Self::with_size(shell_path, None)
+        Self::with_size_and_login(shell_path, None, true)
+    }
+
+    /// Creates a new PTY Host and controls whether `-l` is passed to the shell.
+    ///
+    /// # Arguments
+    ///
+    /// * `shell_path` - Optional path to the shell to spawn.
+    /// * `login_shell` - Whether to pass `-l` to the shell process.
+    pub fn new_with_login(shell_path: Option<PathBuf>, login_shell: bool) -> Result<Self> {
+        Self::with_size_and_login(shell_path, None, login_shell)
     }
 
     /// Creates a new PTY Host with a specific terminal size.
@@ -76,6 +86,15 @@ impl PtyHost {
     ///
     /// Returns an error if PTY creation or shell spawning fails.
     pub fn with_size(shell_path: Option<PathBuf>, size: Option<PtySize>) -> Result<Self> {
+        Self::with_size_and_login(shell_path, size, true)
+    }
+
+    /// Internal constructor that controls both PTY size and login-shell behavior.
+    fn with_size_and_login(
+        shell_path: Option<PathBuf>,
+        size: Option<PtySize>,
+        login_shell: bool,
+    ) -> Result<Self> {
         // Determine terminal size
         let pty_size = size.unwrap_or_else(|| {
             get_terminal_size().unwrap_or(PtySize {
@@ -100,8 +119,10 @@ impl PtyHost {
         // Build command for the shell
         let mut cmd = CommandBuilder::new(&shell);
 
-        // Launch as login shell with -l flag (if supported)
-        cmd.arg("-l");
+        if login_shell {
+            // Launch as login shell with -l flag (if supported)
+            cmd.arg("-l");
+        }
 
         // Set CLAI_WRAP=1 environment variable
         cmd.env(CLAI_WRAP_ENV_VAR, "1");
@@ -350,6 +371,12 @@ fn get_default_shell() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use std::fs;
+    #[cfg(unix)]
+    use std::os::unix::fs::PermissionsExt;
+    #[cfg(unix)]
+    use tempfile::NamedTempFile;
     use std::time::Duration;
 
     #[test]
@@ -646,6 +673,51 @@ mod tests {
             assert!(!status.success());
             assert_eq!(status.exit_code(), 42u32);
         }
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_new_with_login_disabled_does_not_pass_login_flag() {
+        let script = NamedTempFile::new().expect("create temp script");
+        let script_path = script.path().to_path_buf();
+
+        fs::write(
+            &script_path,
+            "#!/bin/sh\nprintf 'ARGC=%s\\nARG1=%s\\n' \"$#\" \"$1\"\n",
+        )
+        .expect("write script");
+        let perms = fs::Permissions::from_mode(0o755);
+        fs::set_permissions(&script_path, perms).expect("set script executable");
+
+        let mut host =
+            PtyHost::new_with_login(Some(script_path), false).expect("spawn pty host");
+        let mut reader = host.reader().expect("pty reader");
+
+        let mut output = String::new();
+        let mut buf = [0u8; 1024];
+        let start = std::time::Instant::now();
+        while start.elapsed() < Duration::from_secs(2) {
+            match reader.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    output.push_str(&String::from_utf8_lossy(&buf[..n]));
+                    if output.contains("ARGC=") {
+                        break;
+                    }
+                }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(10));
+                }
+                Err(_) => break,
+            }
+        }
+
+        let _ = host.wait();
+
+        assert!(
+            output.contains("ARGC=0"),
+            "expected no extra args, got output: {output}"
+        );
     }
 
     #[test]

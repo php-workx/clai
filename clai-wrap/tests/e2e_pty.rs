@@ -15,6 +15,12 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
+use tempfile::NamedTempFile;
+
+#[cfg(unix)]
+use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 /// Default timeout for PTY operations.
 const PTY_TIMEOUT: Duration = Duration::from_secs(5);
@@ -102,6 +108,20 @@ fn drain_output(reader: &mut dyn Read, max_duration: Duration) -> String {
     }
 
     output
+}
+
+#[cfg(unix)]
+fn clai_wrap_binary() -> Option<PathBuf> {
+    std::env::var_os("CARGO_BIN_EXE_clai-wrap").map(PathBuf::from)
+}
+
+#[cfg(unix)]
+fn create_shell_script(content: &str) -> NamedTempFile {
+    let script = NamedTempFile::new().expect("create temp shell script");
+    fs::write(script.path(), content).expect("write shell script");
+    fs::set_permissions(script.path(), fs::Permissions::from_mode(0o755))
+        .expect("set script executable");
+    script
 }
 
 // ============================================================================
@@ -469,6 +489,127 @@ fn test_pty_spawn_bash_if_available() {
     let _ = child.wait();
 
     assert!(output.contains("bash_e2e_test"), "Output: {}", output);
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_login_shell_disabled_does_not_pass_l_flag() {
+    let Some(binary) = clai_wrap_binary() else {
+        eprintln!("Skipping test: CARGO_BIN_EXE_clai-wrap not available");
+        return;
+    };
+
+    let script = create_shell_script("#!/bin/sh\nprintf 'ARGC=%s\\nARG1=%s\\n' \"$#\" \"$1\"\n");
+
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(default_pty_size())
+        .expect("Failed to create PTY");
+
+    let mut cmd = CommandBuilder::new(binary);
+    cmd.args([
+        "--standalone",
+        "--shell",
+        script.path().to_str().expect("utf8 script path"),
+        "--login-shell=false",
+    ]);
+
+    let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn clai-wrap");
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .expect("Failed to get reader");
+
+    let output = read_until_marker(&mut *reader, "ARGC=", PTY_TIMEOUT).expect("Failed to read");
+    let status = child.wait().expect("Failed to wait");
+
+    assert!(
+        output.contains("ARGC=0"),
+        "Expected no extra shell args, got output: {output}"
+    );
+    assert!(status.success(), "Expected successful exit");
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_warns_on_nested_wrapper_env() {
+    let Some(binary) = clai_wrap_binary() else {
+        eprintln!("Skipping test: CARGO_BIN_EXE_clai-wrap not available");
+        return;
+    };
+
+    let script = create_shell_script("#!/bin/sh\necho nested_warning_probe\n");
+
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(default_pty_size())
+        .expect("Failed to create PTY");
+
+    let mut cmd = CommandBuilder::new(binary);
+    cmd.args([
+        "--standalone",
+        "--shell",
+        script.path().to_str().expect("utf8 script path"),
+        "--login-shell=false",
+    ]);
+    cmd.env("CLAI_WRAP", "1");
+
+    let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn clai-wrap");
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .expect("Failed to get reader");
+
+    let output = read_until_marker(
+        &mut *reader,
+        "clai-wrap: nested wrapper detected (CLAI_WRAP already set)",
+        PTY_TIMEOUT,
+    )
+    .expect("Failed to read nested warning");
+    let status = child.wait().expect("Failed to wait");
+
+    assert!(
+        output.contains("clai-wrap: nested wrapper detected (CLAI_WRAP already set)"),
+        "Expected nested warning in output, got: {output}"
+    );
+    assert!(status.success(), "Expected successful exit");
+}
+
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_fails_fast_with_invalid_history_file() {
+    let Some(binary) = clai_wrap_binary() else {
+        eprintln!("Skipping test: CARGO_BIN_EXE_clai-wrap not available");
+        return;
+    };
+
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(default_pty_size())
+        .expect("Failed to create PTY");
+
+    let mut cmd = CommandBuilder::new(binary);
+    cmd.args([
+        "--standalone",
+        "--history-file",
+        "/definitely/nonexistent/history-for-e2e-test",
+    ]);
+
+    let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn clai-wrap");
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .expect("Failed to get reader");
+
+    let output = read_until_marker(&mut *reader, "failed to load history file", PTY_TIMEOUT)
+        .expect("Failed to read error output");
+    let status = child.wait().expect("Failed to wait");
+
+    assert!(
+        output.contains("failed to load history file"),
+        "Expected history file load error, got output: {output}"
+    );
+    assert!(!status.success(), "Expected non-zero exit for invalid history file");
 }
 
 // ============================================================================
