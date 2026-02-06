@@ -1229,7 +1229,7 @@ fn test_clai_wrap_encoding_invalid_utf8_bytes_do_not_crash() {
 
 #[test]
 #[cfg(unix)]
-#[ignore = "Locale warning behavior for non-UTF8 locales is not implemented/stable yet"]
+#[ignore = "Covered deterministically in e2e_modes; PTY variant can block in CI"]
 fn test_clai_wrap_encoding_non_utf8_locale_warning() {
     let Some(binary) = clai_wrap_binary() else {
         eprintln!("Skipping test: clai-wrap binary unavailable");

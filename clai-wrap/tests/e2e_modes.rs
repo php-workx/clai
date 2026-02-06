@@ -637,6 +637,43 @@ fn test_force_non_tty_allows_passthrough_with_piped_io() {
 
 #[test]
 #[cfg(unix)]
+fn test_non_utf8_locale_logs_warning_in_debug_mode() {
+    let Some(binary) = clai_wrap_binary() else {
+        eprintln!("Skipping test: clai-wrap binary unavailable");
+        return;
+    };
+
+    let mut child = Command::new(binary)
+        .args(["--force-non-tty", "--debug", "--shell", "/bin/sh"])
+        .env("LC_ALL", "C")
+        .env("LANG", "C")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn clai-wrap");
+
+    let stdin = child.stdin.as_mut().expect("child stdin");
+    stdin
+        .write_all(b"echo LOCALE_WARNING_OK\nexit\n")
+        .expect("write locale warning test commands");
+
+    let output = run_with_timeout(child, Duration::from_secs(5));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+
+    assert!(
+        stdout.contains("LOCALE_WARNING_OK"),
+        "Expected passthrough output, got: {stdout}"
+    );
+    assert!(
+        stderr.contains("non-UTF-8 locale detected"),
+        "Expected non-UTF8 locale warning in debug logs, got: {stderr}"
+    );
+}
+
+#[test]
+#[cfg(unix)]
 fn test_reset_terminal_restores_termios_on_corrupted_tty() {
     let Some(binary) = clai_wrap_binary() else {
         eprintln!("Skipping test: clai-wrap binary unavailable");

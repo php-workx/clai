@@ -64,6 +64,9 @@ fn main() -> Result<()> {
     if let Some(warning) = nested_wrapper_warning_message() {
         eprintln!("{warning}");
     }
+    if let Some(locale_warning) = locale_warning_message() {
+        warn!("{locale_warning}");
+    }
 
     // Run the main wrapper logic based on operation mode
     match cli.operation_mode() {
@@ -414,6 +417,33 @@ fn nested_wrapper_warning_message() -> Option<&'static str> {
     }
 }
 
+fn locale_warning_message() -> Option<String> {
+    let locale = std::env::var("LC_ALL")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| ("LC_ALL", value))
+        .or_else(|| {
+            std::env::var("LANG")
+                .ok()
+                .filter(|value| !value.trim().is_empty())
+                .map(|value| ("LANG", value))
+        })?;
+
+    if is_utf8_locale(&locale.1) {
+        return None;
+    }
+
+    Some(format!(
+        "non-UTF-8 locale detected ({}={}); output will use lossy UTF-8 conversion when needed",
+        locale.0, locale.1
+    ))
+}
+
+fn is_utf8_locale(locale_value: &str) -> bool {
+    let normalized = locale_value.to_ascii_lowercase();
+    normalized.contains("utf-8") || normalized.contains("utf8")
+}
+
 #[cfg(unix)]
 fn init_standalone_history(cli: &Cli, shell_path: &Path) -> Result<StandaloneState> {
     let mut state = StandaloneState::new(StandaloneReason::DaemonUnavailable);
@@ -463,6 +493,47 @@ mod tests {
         let _lock = ENV_LOCK.lock().expect("lock env");
         std::env::remove_var("CLAI_WRAP");
         let warning = nested_wrapper_warning_message();
+        assert!(warning.is_none());
+    }
+
+    #[test]
+    fn test_locale_warning_message_for_non_utf8_lang() {
+        let _lock = ENV_LOCK.lock().expect("lock env");
+        std::env::remove_var("LC_ALL");
+        std::env::set_var("LANG", "C");
+
+        let warning = locale_warning_message();
+
+        std::env::remove_var("LANG");
+        assert!(warning.is_some());
+        let warning_text = warning.unwrap();
+        assert!(warning_text.contains("non-UTF-8 locale detected"));
+        assert!(warning_text.contains("LANG=C"));
+    }
+
+    #[test]
+    fn test_locale_warning_message_prefers_lc_all() {
+        let _lock = ENV_LOCK.lock().expect("lock env");
+        std::env::set_var("LC_ALL", "C");
+        std::env::set_var("LANG", "en_US.UTF-8");
+
+        let warning = locale_warning_message();
+
+        std::env::remove_var("LC_ALL");
+        std::env::remove_var("LANG");
+        assert!(warning.is_some());
+        assert!(warning.unwrap().contains("LC_ALL=C"));
+    }
+
+    #[test]
+    fn test_locale_warning_message_not_emitted_for_utf8() {
+        let _lock = ENV_LOCK.lock().expect("lock env");
+        std::env::set_var("LANG", "en_US.UTF-8");
+        std::env::remove_var("LC_ALL");
+
+        let warning = locale_warning_message();
+
+        std::env::remove_var("LANG");
         assert!(warning.is_none());
     }
 

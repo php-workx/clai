@@ -204,6 +204,38 @@ fn test_picker_filter_git_commands() {
 }
 
 #[test]
+fn test_picker_filter_cjk_wide_characters() {
+    let items = vec![
+        PickerItem::new("echo \u{4e2d}\u{6587}"),
+        PickerItem::new("echo ascii"),
+        PickerItem::new("echo \u{65e5}\u{672c}\u{8a9e}"),
+    ];
+    let mut picker = Picker::new(items);
+
+    picker.update_query("\u{4e2d}");
+
+    assert_eq!(picker.filtered_count(), 1);
+    let selected = picker.selected_item().expect("Should have selection");
+    assert_eq!(selected.text, "echo \u{4e2d}\u{6587}");
+}
+
+#[test]
+fn test_picker_filter_emoji_entries() {
+    let items = vec![
+        PickerItem::new("echo deploy \u{1f680}"),
+        PickerItem::new("echo smoke-test"),
+        PickerItem::new("echo success \u{2705}"),
+    ];
+    let mut picker = Picker::new(items);
+
+    picker.update_query("\u{1f680}");
+
+    assert_eq!(picker.filtered_count(), 1);
+    let selected = picker.selected_item().expect("Should have selection");
+    assert_eq!(selected.text, "echo deploy \u{1f680}");
+}
+
+#[test]
 fn test_picker_navigation() {
     let items = vec![
         PickerItem::new("first"),
