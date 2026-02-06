@@ -56,6 +56,7 @@ _CLAI_LAST_COMMAND=""
 
 # Current suggestion state
 _AI_CURRENT_SUGGESTION=""
+_AI_LAST_ACCEPTED=""
 _AI_IN_PASTE=false
 
 # Disable zsh-autosuggestions when clai is active
@@ -93,6 +94,10 @@ _ai_update_suggestion() {
     # Hide ghost text when disabled, picker active, buffer empty, or cursor not at EOL
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] || [[ -z "$BUFFER" ]] || [[ $CURSOR -ne ${#BUFFER} ]]; then
         _clai_zsh_autosuggest_restore
+        # Dismiss feedback if suggestion was visible and buffer changed
+        if [[ -n "$_AI_CURRENT_SUGGESTION" ]]; then
+            (clai suggest-feedback --action=dismissed --suggested="$_AI_CURRENT_SUGGESTION" >/dev/null 2>&1 &)
+        fi
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
         region_highlight=()
@@ -180,13 +185,17 @@ zle -N bracketed-paste _ai_bracketed_paste
 _ai_forward_char() {
     if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} && "$_AI_CURRENT_SUGGESTION" == "$BUFFER"* ]]; then
         # At end of buffer with valid suggestion prefix - accept it
+        local accepted="$_AI_CURRENT_SUGGESTION"
         BUFFER="$_AI_CURRENT_SUGGESTION"
         CURSOR=${#BUFFER}
         _AI_CURRENT_SUGGESTION=""
+        _AI_LAST_ACCEPTED="$accepted"
         POSTDISPLAY=""
         region_highlight=()
         # Clear AI suggestion file if we used it
         > "$_AI_SUGGEST_FILE"
+        # Record accepted feedback (fire and forget)
+        (clai suggest-feedback --action=accepted --suggested="$accepted" >/dev/null 2>&1 &)
         zle reset-prompt
     else
         # Normal forward char (or stale suggestion - ignore it)
@@ -228,8 +237,12 @@ zle -N _ai_accept_token
 # Bind Alt+Right to accept next token (common escape sequence)
 bindkey '\e[1;3C' _ai_accept_token
 
-# ZLE widget: Clear suggestion
+# ZLE widget: Clear suggestion (Escape dismisses)
 _ai_clear_suggestion() {
+    if [[ -n "$_AI_CURRENT_SUGGESTION" ]]; then
+        # Record dismissed feedback (fire and forget)
+        (clai suggest-feedback --action=dismissed --suggested="$_AI_CURRENT_SUGGESTION" >/dev/null 2>&1 &)
+    fi
     _AI_CURRENT_SUGGESTION=""
     POSTDISPLAY=""
     > "$_AI_SUGGEST_FILE"
@@ -300,6 +313,11 @@ _ai_voice_accept_line() {
     fi
     # Normal accept-line behavior
     _AI_VOICE_MODE=false
+    # Track edited suggestion feedback: if user modified an accepted suggestion
+    if [[ -n "$_AI_LAST_ACCEPTED" && -n "$BUFFER" && "$BUFFER" != "$_AI_LAST_ACCEPTED" ]]; then
+        (clai suggest-feedback --action=edited --suggested="$_AI_LAST_ACCEPTED" --executed="$BUFFER" >/dev/null 2>&1 &)
+    fi
+    _AI_LAST_ACCEPTED=""
     _AI_CURRENT_SUGGESTION=""
     POSTDISPLAY=""
     region_highlight=()

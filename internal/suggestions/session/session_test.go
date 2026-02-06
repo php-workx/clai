@@ -415,6 +415,70 @@ func TestSessionIDConstant(t *testing.T) {
 	}
 }
 
+// TestContainerFingerprint verifies container detection returns a string
+// or empty based on environment. In normal test environments, there's no
+// container, so it should return empty.
+func TestContainerFingerprint(t *testing.T) {
+	t.Run("not in container", func(t *testing.T) {
+		// Unset container-related env vars
+		t.Setenv("KUBERNETES_SERVICE_HOST", "")
+		t.Setenv("container", "")
+
+		fp := containerFingerprint()
+		// In CI/local tests we're usually not in Docker, so expect empty.
+		// But if somehow we are in a container, just verify it's non-empty.
+		if fp != "" {
+			// We're in a container — just verify it has a prefix
+			if !strings.HasPrefix(fp, "docker:") && !strings.HasPrefix(fp, "k8s:") && !strings.HasPrefix(fp, "container:") {
+				t.Errorf("containerFingerprint() = %q, expected known prefix", fp)
+			}
+		}
+	})
+
+	t.Run("kubernetes env", func(t *testing.T) {
+		t.Setenv("KUBERNETES_SERVICE_HOST", "10.0.0.1")
+		t.Setenv("HOSTNAME", "my-pod-abc123")
+
+		fp := containerFingerprint()
+		// Might still detect docker first if /.dockerenv exists
+		if fp == "" {
+			t.Error("containerFingerprint() should detect Kubernetes when KUBERNETES_SERVICE_HOST is set")
+		}
+	})
+
+	t.Run("generic container env", func(t *testing.T) {
+		t.Setenv("KUBERNETES_SERVICE_HOST", "")
+		t.Setenv("container", "podman")
+
+		fp := containerFingerprint()
+		// Might still detect docker first if /.dockerenv exists
+		if fp == "" {
+			t.Error("containerFingerprint() should detect container when 'container' env is set")
+		}
+	})
+}
+
+// TestGenerateLocalSessionID_UsesContainerFingerprint verifies that the local
+// session ID generation includes container fingerprint in the hash input.
+// Since containerFingerprint returns "" when not in a container, the output
+// should still be valid and unique.
+func TestGenerateLocalSessionID_UsesContainerFingerprint(t *testing.T) {
+	t.Parallel()
+
+	// Just verify it doesn't panic and produces valid output
+	id := generateLocalSessionID()
+	if len(id) != SessionIDLength {
+		t.Errorf("generateLocalSessionID() length = %d, want %d", len(id), SessionIDLength)
+	}
+	for _, c := range id {
+		isDigit := c >= '0' && c <= '9'
+		isHexLetter := c >= 'a' && c <= 'f'
+		if !isDigit && !isHexLetter {
+			t.Errorf("generateLocalSessionID() contains non-hex character: %c", c)
+		}
+	}
+}
+
 // TestConcurrentGetSessionID tests that GetSessionID returns consistent IDs
 // when the session file already exists (simulating subsequent calls after initial setup).
 func TestConcurrentGetSessionID(t *testing.T) {

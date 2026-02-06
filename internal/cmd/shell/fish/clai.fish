@@ -63,6 +63,9 @@ function _ai_accept_suggestion
         if test -n "$suggestion"
             commandline -r $suggestion
             commandline -f end-of-line
+            # Record accepted feedback (fire and forget)
+            clai suggest-feedback --action=accepted --suggested="$suggestion" >/dev/null 2>&1 &
+            disown %1 2>/dev/null
             # Clear the suggestion
             echo -n "" > $_AI_SUGGEST_FILE
             return
@@ -75,8 +78,16 @@ end
 # Bind Alt+Enter to accept suggestion (Tab is used for completions in Fish)
 bind \e\r _ai_accept_suggestion
 
-# Clear suggestion with Escape
+# Clear suggestion with Escape (dismiss feedback)
 function _ai_clear_suggestion
+    if test -s $_AI_SUGGEST_FILE
+        set -l suggestion (cat $_AI_SUGGEST_FILE)
+        if test -n "$suggestion"
+            # Record dismissed feedback (fire and forget)
+            clai suggest-feedback --action=dismissed --suggested="$suggestion" >/dev/null 2>&1 &
+            disown %1 2>/dev/null
+        end
+    end
     echo -n "" > $_AI_SUGGEST_FILE
     set -g _AI_VOICE_MODE false
     commandline -f repaint
@@ -440,6 +451,12 @@ end
 function _ai_voice_execute
     # If picker is open, accept the current selection (don't execute)
     if test "$_CLAI_PICKER_ACTIVE" = "true"
+        # Record accepted feedback for picker selection (fire and forget)
+        set -l selected $_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX]
+        if test -n "$selected"
+            clai suggest-feedback --action=accepted --suggested="$selected" >/dev/null 2>&1 &
+            disown %1 2>/dev/null
+        end
         _clai_picker_close
         return
     end

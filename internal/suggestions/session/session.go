@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/runger/clai/internal/suggestions/transport"
@@ -66,8 +67,9 @@ func GetSessionID(t transport.Transport) (string, error) {
 }
 
 // generateLocalSessionID generates a session ID locally using SHA256.
-// The ID is derived from: hostname + PID + timestamp + random bytes.
+// The ID is derived from: hostname + PID + timestamp + random bytes + container fingerprint.
 // This provides a stable, unique identifier per shell instance.
+// Random seed uses 16 bytes (128 bits) from crypto/rand, exceeding the 64-bit minimum.
 func generateLocalSessionID() string {
 	hostname, _ := os.Hostname()
 	if hostname == "" {
@@ -77,21 +79,63 @@ func generateLocalSessionID() string {
 	pid := os.Getpid()
 	timestamp := time.Now().UnixNano()
 
-	// Add random bytes for uniqueness
+	// Add random bytes for uniqueness (128 bits from crypto/rand)
 	randomBytes := make([]byte, 16)
 	if _, err := rand.Read(randomBytes); err != nil {
 		// Fallback to less random but still unique data
 		randomBytes = []byte(fmt.Sprintf("%d%d", timestamp, pid))
 	}
 
+	// Add container fingerprint for disambiguation in containerized environments
+	containerFP := containerFingerprint()
+
 	// Combine all components
-	input := fmt.Sprintf("%s|%d|%d|%s", hostname, pid, timestamp, hex.EncodeToString(randomBytes))
+	input := fmt.Sprintf("%s|%d|%d|%s|%s", hostname, pid, timestamp, hex.EncodeToString(randomBytes), containerFP)
 
 	// Hash with SHA256
 	hash := sha256.Sum256([]byte(input))
 
 	// Return first SessionIDLength/2 bytes as hex (SessionIDLength hex chars)
 	return hex.EncodeToString(hash[:SessionIDLength/2])
+}
+
+// containerFingerprint returns a string identifying the container environment,
+// or an empty string if not running in a container. This helps disambiguate
+// session IDs when hostname and PID may collide across containers.
+func containerFingerprint() string {
+	// Check /.dockerenv (Docker)
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		// Read container ID from cgroup (Linux)
+		if data, err := os.ReadFile("/proc/self/cgroup"); err == nil {
+			lines := strings.Split(string(data), "\n")
+			for _, line := range lines {
+				// Extract container ID from cgroup path
+				if idx := strings.LastIndex(line, "/"); idx >= 0 {
+					id := line[idx+1:]
+					if len(id) >= 12 {
+						return "docker:" + id[:12]
+					}
+				}
+			}
+		}
+		return "docker:unknown"
+	}
+
+	// Check for Kubernetes (KUBERNETES_SERVICE_HOST is always set in k8s pods)
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+		podName := os.Getenv("HOSTNAME")
+		if podName == "" {
+			podName = "unknown"
+		}
+		return "k8s:" + podName
+	}
+
+	// Check for generic container indicators
+	if os.Getenv("container") != "" {
+		return "container:" + os.Getenv("container")
+	}
+
+	return ""
 }
 
 // GenerateLocalSessionIDWithInputs generates a session ID from specific inputs.

@@ -645,3 +645,77 @@ func TestShellScripts_Embedded(t *testing.T) {
 		})
 	}
 }
+
+// TestShellScripts_FeedbackBindings verifies that all shell scripts contain
+// feedback calls using `clai suggest-feedback` for accepted, dismissed, and
+// (where applicable) edited actions.
+func TestShellScripts_FeedbackBindings(t *testing.T) {
+	shells := []struct {
+		name     string
+		path     string
+		required []string
+	}{
+		{
+			"zsh", "shell/zsh/clai.zsh",
+			[]string{
+				"suggest-feedback --action=accepted",
+				"suggest-feedback --action=dismissed",
+				"suggest-feedback --action=edited",
+			},
+		},
+		{
+			"bash", "shell/bash/clai.bash",
+			[]string{
+				"suggest-feedback --action=accepted",
+				"suggest-feedback --action=dismissed",
+			},
+		},
+		{
+			"fish", "shell/fish/clai.fish",
+			[]string{
+				"suggest-feedback --action=accepted",
+				"suggest-feedback --action=dismissed",
+			},
+		},
+	}
+
+	for _, sh := range shells {
+		t.Run(sh.name, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(sh.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", sh.path, err)
+			}
+			script := string(content)
+
+			for _, req := range sh.required {
+				if !strings.Contains(script, req) {
+					t.Errorf("%s missing feedback binding: %q", sh.path, req)
+				}
+			}
+		})
+	}
+}
+
+// TestZshScript_FeedbackTracksLastAccepted verifies that the zsh script
+// tracks the last accepted suggestion for edit detection.
+func TestZshScript_FeedbackTracksLastAccepted(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	// Must have _AI_LAST_ACCEPTED state variable
+	if !strings.Contains(script, "_AI_LAST_ACCEPTED") {
+		t.Error("zsh script missing _AI_LAST_ACCEPTED state variable for edit tracking")
+	}
+
+	// Must clear _AI_LAST_ACCEPTED on accept-line
+	body := extractFunctionBody(script, "_ai_voice_accept_line")
+	if body == "" {
+		t.Fatal("_ai_voice_accept_line() not found in zsh script")
+	}
+	if !strings.Contains(body, `_AI_LAST_ACCEPTED=""`) {
+		t.Error("_ai_voice_accept_line() should clear _AI_LAST_ACCEPTED after checking for edits")
+	}
+}

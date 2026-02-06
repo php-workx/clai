@@ -425,6 +425,11 @@ _clai_picker_cancel() {
 # The macro "\C-x\C-a\C-x\C-b" calls this via bind -x, then \C-x\C-b fires.
 _clai_pre_accept() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        # Record accepted feedback for picker selection (fire and forget)
+        local selected="${_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX]}"
+        if [[ -n "$selected" ]]; then
+            (clai suggest-feedback --action=accepted --suggested="$selected" >/dev/null 2>&1 &)
+        fi
         # Accept the current selection and close the picker
         _clai_picker_close
         # Swallow the accept-line that follows in the macro
@@ -503,6 +508,8 @@ accept() {
     if [[ -s "$_AI_SUGGEST_FILE" ]]; then
         local suggestion=$(cat "$_AI_SUGGEST_FILE")
         if [[ -n "$suggestion" ]]; then
+            # Record accepted feedback (fire and forget)
+            (clai suggest-feedback --action=accepted --suggested="$suggestion" >/dev/null 2>&1 &)
             # Clear suggestion
             > "$_AI_SUGGEST_FILE"
             # Execute the suggestion
@@ -515,8 +522,15 @@ accept() {
     return 1
 }
 
-# Clear suggestion
+# Clear suggestion (dismiss)
 clear-suggestion() {
+    if [[ -s "$_AI_SUGGEST_FILE" ]]; then
+        local suggestion=$(cat "$_AI_SUGGEST_FILE")
+        if [[ -n "$suggestion" ]]; then
+            # Record dismissed feedback (fire and forget)
+            (clai suggest-feedback --action=dismissed --suggested="$suggestion" >/dev/null 2>&1 &)
+        fi
+    fi
     > "$_AI_SUGGEST_FILE"
     echo "Suggestion cleared"
 }

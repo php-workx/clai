@@ -46,9 +46,12 @@ func init() {
 	suggestCmd.Flags().IntVarP(&suggestLimit, "limit", "n", 1, "maximum number of suggestions to return")
 	suggestCmd.Flags().BoolVar(&suggestJSON, "json", false, "output suggestions as JSON (deprecated: use --format=json)")
 	suggestCmd.Flags().StringVar(&suggestFormat, "format", "text", "output format: text, json, or fzf")
+	suggestCmd.Flags().StringVar(&colorMode, "color", "auto", "color output: auto, always, or never")
 }
 
 func runSuggest(cmd *cobra.Command, args []string) error {
+	applyColorMode()
+
 	prefix := ""
 	if len(args) > 0 {
 		prefix = args[0]

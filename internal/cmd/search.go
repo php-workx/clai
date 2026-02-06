@@ -37,6 +37,7 @@ func init() {
 	searchCmd.Flags().BoolVar(&searchJSON, "json", false, "output results as JSON")
 	searchCmd.Flags().BoolVar(&searchRepo, "repo", false, "search only within current repository (future)")
 	searchCmd.Flags().IntVarP(&searchLimit, "limit", "n", 20, "maximum number of results")
+	searchCmd.Flags().StringVar(&colorMode, "color", "auto", "color output: auto, always, or never")
 
 	rootCmd.AddCommand(searchCmd)
 }
@@ -55,6 +56,8 @@ type searchResponse struct {
 }
 
 func runSearch(cmd *cobra.Command, args []string) error {
+	applyColorMode()
+
 	query := args[0]
 
 	// Use history search for now (FTS5 will be added later)
