@@ -237,13 +237,12 @@ func createLoggingShim(t *testing.T) (string, string) {
 log="${CLAI_SHIM_LOG:-%s}"
 cmd="$1"
 shift
-{
-  printf "%%s" "$cmd"
-  for arg in "$@"; do
-    printf "\t%%s" "$arg"
-  done
-  printf "\n"
-} >> "$log"
+tab=$(printf '\t')
+line="$cmd"
+for arg in "$@"; do
+  line="${line}${tab}${arg}"
+done
+printf "%%s\n" "$line" >> "$log"
 exit 0
 `, logPath)
 
@@ -277,7 +276,7 @@ func readShimLogLines(t *testing.T, logPath string) []string {
 
 func findShimLine(lines []string, cmd string) string {
 	for _, line := range lines {
-		if strings.HasPrefix(line, cmd+"\t") || line == cmd {
+		if strings.HasPrefix(line, cmd+"\t") || line == cmd || strings.Contains(line, cmd+"\t") {
 			return line
 		}
 	}
