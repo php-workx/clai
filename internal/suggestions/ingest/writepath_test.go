@@ -1048,9 +1048,12 @@ func TestBuildSlotKey(t *testing.T) {
 func TestClassifyExitCode(t *testing.T) {
 	t.Parallel()
 
-	assert.Equal(t, "code:0", classifyExitCode(0))
-	assert.Equal(t, "code:1", classifyExitCode(1))
-	assert.Equal(t, "code:127", classifyExitCode(127))
+	// Now uses semantic classification via recovery.Classifier
+	assert.Equal(t, "class:unknown", classifyExitCode(0))
+	assert.Equal(t, "class:general", classifyExitCode(1))
+	assert.Equal(t, "class:not_found", classifyExitCode(127))
+	assert.Equal(t, "class:sigint", classifyExitCode(130))
+	assert.Equal(t, "class:sigkill", classifyExitCode(137))
 }
 
 func TestBuildOperatorChain(t *testing.T) {

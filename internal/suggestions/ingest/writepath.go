@@ -19,6 +19,7 @@ import (
 
 	"github.com/runger/clai/internal/suggestions/event"
 	"github.com/runger/clai/internal/suggestions/normalize"
+	"github.com/runger/clai/internal/suggestions/recovery"
 )
 
 // ScopeGlobal is the global scope identifier for aggregate tables.
@@ -915,8 +916,11 @@ func buildOperatorChain(segments []normalize.Segment) string {
 }
 
 // classifyExitCode classifies an exit code for failure recovery lookup.
+// It uses the recovery package's semantic classifier to produce keys like
+// "class:not_found" instead of raw "code:127".
 func classifyExitCode(exitCode int) string {
-	return fmt.Sprintf("code:%d", exitCode)
+	classifier := recovery.NewClassifier(nil)
+	return classifier.ClassifyToKey(exitCode)
 }
 
 // PrepareWriteContext creates a WritePathContext from a validated event.
