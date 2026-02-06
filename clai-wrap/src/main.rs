@@ -248,9 +248,11 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
                     break;
                 }
                 SignalEvent::Suspend => {
-                    // Close picker if open, then allow suspend
                     debug!("Received SIGTSTP");
-                    // TODO: Close picker if open
+                    if picker_open {
+                        // When picker UI is integrated, close it here before suspend
+                        // to avoid corrupted terminal state on resume
+                    }
                 }
                 SignalEvent::Continue => {
                     // Re-enter raw mode handled automatically
