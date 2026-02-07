@@ -658,6 +658,29 @@ func TestFishScript_UpArrowApplicationModeBinding(t *testing.T) {
 	}
 }
 
+func TestBashScript_HistoryPickerUsesPromptQuery(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
+	if err != nil {
+		t.Fatalf("Failed to read bash script: %v", err)
+	}
+	script := string(content)
+
+	required := []string{
+		`_CLAI_PICKER_QUERY=""`,
+		`local query="${1-$_CLAI_PICKER_QUERY}"`,
+		`_CLAI_PICKER_QUERY="$picker_query"`,
+		`if ! _clai_picker_load_history "$_CLAI_PICKER_QUERY"; then`,
+		`_clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply`,
+		`_clai_tui_picker_open "$picker_query"`,
+	}
+
+	for _, pattern := range required {
+		if !strings.Contains(script, pattern) {
+			t.Errorf("bash script missing prompt-query behavior %s", pattern)
+		}
+	}
+}
+
 // TestInitPlaceholderReplacement verifies that init.go replaces both
 // CLAI_SESSION_ID and CLAI_UP_ARROW_HISTORY placeholders.
 func TestInitPlaceholderReplacement(t *testing.T) {

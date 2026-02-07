@@ -117,7 +117,7 @@ _clai_tab_handler() {
             *)       _CLAI_HISTORY_SCOPE="session" ;;
         esac
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
         # Swallow the follow-up so menu-complete doesn't fire
         bind '"\C-x\C-t": ""'
     else
@@ -140,11 +140,12 @@ _clai_has_tui_picker() {
 }
 
 _clai_tui_picker_open() {
+    local query="${1-$READLINE_LINE}"
     if ! _clai_has_tui_picker; then
         return 2
     fi
     local result exit_code saved_line="$READLINE_LINE"
-    result=$(clai-picker history --query="$READLINE_LINE" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    result=$(clai-picker history --query="$query" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
     exit_code=$?
     if [ $exit_code -eq 0 ]; then
         READLINE_LINE="$result"
@@ -164,6 +165,7 @@ _CLAI_PICKER_ACTIVE=false
 _CLAI_PICKER_MODE=""
 _CLAI_PICKER_INDEX=0
 _CLAI_PICKER_ORIG_LINE=""
+_CLAI_PICKER_QUERY=""
 _CLAI_PICKER_ITEMS=()
 _CLAI_HISTORY_SCOPE="session"
 _CLAI_FALLBACK_ACTIVE=false
@@ -265,14 +267,18 @@ _clai_history_args() {
 }
 
 _clai_picker_load_history() {
+    local query="${1-$_CLAI_PICKER_QUERY}"
+    if [[ -z "$query" ]]; then
+        query="$READLINE_LINE"
+    fi
     local -a args raw
     local IFS=$'\n'
     args=($(_clai_history_args))
     unset IFS
     if ((BASH_VERSINFO[0] >= 4)); then
-        mapfile -t raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
+        mapfile -t raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$query" 2>/dev/null)
     else
-        _clai_read_lines raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
+        _clai_read_lines raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$query" 2>/dev/null)
     fi
     # Deduplicate preserving order
     if ((BASH_VERSINFO[0] >= 4)); then
@@ -336,6 +342,7 @@ _clai_picker_apply() {
 }
 
 _clai_history_up() {
+    local picker_query="$READLINE_LINE"
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
         if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
             _clai_picker_cancel
@@ -346,7 +353,7 @@ _clai_history_up() {
     # Try TUI picker first (when inline picker is not already active).
     # exit code 2 means "fallback to inline picker".
     if [[ "$_CLAI_PICKER_ACTIVE" != "true" ]] && _clai_has_tui_picker; then
-        _clai_tui_picker_open
+        _clai_tui_picker_open "$picker_query"
         local tui_status=$?
         if [[ $tui_status -ne 2 ]]; then
             return 0
@@ -357,12 +364,13 @@ _clai_history_up() {
     fi
     if [[ "$_CLAI_PICKER_ACTIVE" != "true" || "$_CLAI_PICKER_MODE" != "history" ]]; then
         _CLAI_PICKER_ORIG_LINE="$READLINE_LINE"
+        _CLAI_PICKER_QUERY="$picker_query"
         _CLAI_PICKER_MODE="history"
         _CLAI_PICKER_INDEX=0
         _CLAI_PICKER_ACTIVE=true
         # Install Enter macro so picker can intercept it
         bind '"\C-m": "\C-x\C-a\C-x\C-b"'
-        if ! _clai_picker_load_history; then
+        if ! _clai_picker_load_history "$_CLAI_PICKER_QUERY"; then
             _CLAI_PICKER_ACTIVE=false
             bind '"\C-m": accept-line'
             return 0
@@ -408,6 +416,7 @@ _clai_picker_close() {
     _CLAI_PICKER_MODE=""
     _CLAI_PICKER_ITEMS=()
     _CLAI_PICKER_INDEX=0
+    _CLAI_PICKER_QUERY=""
     # Restore normal Enter (remove macro that routes through bind -x)
     bind '"\C-m": accept-line'
 }
@@ -439,7 +448,7 @@ _clai_history_scope_session() {
     _CLAI_HISTORY_SCOPE="session"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
     fi
 }
 
@@ -447,7 +456,7 @@ _clai_history_scope_cwd() {
     _CLAI_HISTORY_SCOPE="cwd"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
     fi
 }
 
@@ -455,7 +464,7 @@ _clai_history_scope_global() {
     _CLAI_HISTORY_SCOPE="global"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
     fi
 }
 
