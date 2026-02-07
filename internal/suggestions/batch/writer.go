@@ -12,10 +12,12 @@ package batch
 import (
 	"context"
 	"database/sql"
+	"log"
 	"sync"
 	"time"
 
 	"github.com/runger/clai/internal/suggestions/event"
+	"github.com/runger/clai/internal/suggestions/ingest"
 )
 
 // Default configuration values per spec Section 10.3.
@@ -44,6 +46,11 @@ type Options struct {
 	// QueueSize is the size of the event channel buffer.
 	// Defaults to DefaultQueueSize (500).
 	QueueSize int
+
+	// WritePathConfig configures the ingest.WritePath call per event.
+	// When set, each event in the batch also populates V2 aggregate tables
+	// (command_template, command_stat, transition_stat, etc.) via WritePath.
+	WritePathConfig *ingest.WritePathConfig
 }
 
 // DefaultOptions returns the default batch writer options.
@@ -53,6 +60,13 @@ func DefaultOptions() Options {
 		MaxBatchSize:  DefaultMaxBatchSize,
 		QueueSize:     DefaultQueueSize,
 	}
+}
+
+// sessionState tracks per-session state for transition tracking across batches.
+type sessionState struct {
+	lastTemplateID string
+	lastExitCode   int
+	lastFailed     bool
 }
 
 // Writer batches events and writes them to SQLite in transactions.
@@ -66,6 +80,9 @@ type Writer struct {
 	doneCh    chan struct{}
 	stoppedCh chan struct{}
 	stopOnce  sync.Once
+
+	// Per-session state for transition tracking (only accessed from writeLoop goroutine)
+	sessions map[string]*sessionState
 
 	// Metrics
 	mu             sync.RWMutex
@@ -99,6 +116,7 @@ func NewWriter(db *sql.DB, opts Options) *Writer {
 		flushCh:   make(chan struct{}, 1),
 		doneCh:    make(chan struct{}),
 		stoppedCh: make(chan struct{}),
+		sessions:  make(map[string]*sessionState),
 	}
 }
 
@@ -212,12 +230,66 @@ func (w *Writer) writeLoop() {
 	}
 }
 
-// writeBatch writes a batch of events to the database in a single transaction.
+// writeBatch writes a batch of events to the database.
+// When WritePathConfig is set, each event is processed through ingest.WritePath
+// which populates all V2 aggregate tables atomically. WritePath errors for
+// individual events are logged but do not fail the entire batch.
+// When WritePathConfig is nil, events are written as raw INSERTs only.
 func (w *Writer) writeBatch(batch []*event.CommandEvent) error {
 	if len(batch) == 0 {
 		return nil
 	}
 
+	if w.opts.WritePathConfig != nil {
+		return w.writeBatchV2(batch)
+	}
+	return w.writeBatchRaw(batch)
+}
+
+// writeBatchV2 processes each event through ingest.WritePath, populating
+// all V2 aggregate tables. Per-session lastTemplateID is tracked for
+// transition support across batches.
+func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
+	ctx := context.Background()
+
+	for _, ev := range batch {
+		// Look up per-session state for transition tracking
+		sess := w.sessions[ev.SessionID]
+		if sess == nil {
+			sess = &sessionState{}
+			w.sessions[ev.SessionID] = sess
+		}
+
+		// Build the WritePathContext with transition state
+		wctx := ingest.PrepareWriteContext(
+			ev,
+			"", // repoKey - not yet computed by batch writer
+			"", // branch - not yet computed by batch writer
+			sess.lastTemplateID,
+			sess.lastExitCode,
+			sess.lastFailed,
+			nil, // aliases
+		)
+
+		result, err := ingest.WritePath(ctx, w.db, wctx, *w.opts.WritePathConfig)
+		if err != nil {
+			log.Printf("batch: WritePath error for event (session=%s, cmd=%q): %v",
+				ev.SessionID, ev.CmdRaw, err)
+			continue // Skip this event, don't fail the batch
+		}
+
+		// Update per-session state for next event's transitions
+		sess.lastTemplateID = result.TemplateID
+		sess.lastExitCode = ev.ExitCode
+		sess.lastFailed = ev.ExitCode != 0
+	}
+
+	return nil
+}
+
+// writeBatchRaw writes a batch of events as raw INSERTs in a single transaction.
+// This is the legacy path used when WritePathConfig is nil.
+func (w *Writer) writeBatchRaw(batch []*event.CommandEvent) error {
 	ctx := context.Background()
 
 	tx, err := w.db.BeginTx(ctx, nil)
@@ -226,12 +298,13 @@ func (w *Writer) writeBatch(batch []*event.CommandEvent) error {
 	}
 	defer tx.Rollback() //nolint:errcheck // Rollback is best-effort after commit
 
-	// Prepare statement within transaction for better performance
+	// Prepare statement within transaction for better performance.
+	// Columns match V2 schema: command_event table (no shell column; ts -> ts_ms).
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO command_event (
-			session_id, shell, cwd, cmd_raw, cmd_norm, exit_code,
-			duration_ms, repo_key, branch, ts
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			session_id, ts_ms, cwd, repo_key, branch,
+			cmd_raw, cmd_norm, exit_code, duration_ms
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return err
@@ -248,15 +321,14 @@ func (w *Writer) writeBatch(batch []*event.CommandEvent) error {
 		// For now, insert with raw command; normalization is done upstream
 		_, err := stmt.ExecContext(ctx,
 			ev.SessionID,
-			string(ev.Shell),
+			ev.Ts, // ts_ms
 			ev.Cwd,
+			"", // repo_key - computed by git context
+			"", // branch - computed by git context
 			ev.CmdRaw,
 			ev.CmdRaw, // cmd_norm - to be replaced with normalized version
 			ev.ExitCode,
 			durationMs,
-			"",    // repo_key - computed by git context
-			"",    // branch - computed by git context
-			ev.Ts, // timestamp
 		)
 		if err != nil {
 			return err
