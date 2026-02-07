@@ -101,11 +101,14 @@ func (m *mockStore) QueryHistoryCommands(ctx context.Context, q storage.CommandQ
 			norm = strings.ToLower(c.Command)
 		}
 		// Substring filter (matches against normalized command)
-		if q.Substring != "" && !strings.Contains(norm, q.Substring) {
+		if q.Substring != "" && !strings.Contains(norm, strings.ToLower(q.Substring)) {
 			continue
 		}
 		// Session filter
 		if q.SessionID != nil && c.SessionID != *q.SessionID {
+			continue
+		}
+		if q.ExcludeSessionID != "" && c.SessionID == q.ExcludeSessionID {
 			continue
 		}
 		existing, ok := seen[norm]
@@ -2169,6 +2172,28 @@ func TestHandler_FetchHistory_SubstringFilter(t *testing.T) {
 	}
 }
 
+func TestHandler_FetchHistory_SubstringFilterCaseInsensitive(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServerWithCommands(t)
+	ctx := context.Background()
+
+	req := &pb.HistoryFetchRequest{
+		Global: true,
+		Query:  "GiT",
+		Limit:  50,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	if len(resp.Items) != 2 {
+		t.Errorf("expected 2 items matching case-insensitive query, got %d", len(resp.Items))
+	}
+}
+
 func TestHandler_FetchHistory_Deduplication(t *testing.T) {
 	t.Parallel()
 
@@ -2334,6 +2359,40 @@ func TestHandler_FetchHistory_EmptyResult(t *testing.T) {
 
 	if !resp.AtEnd {
 		t.Error("expected at_end=true for empty result")
+	}
+}
+
+func TestMockStore_QueryHistoryCommands_ExcludeSessionID(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.commands["cmd-1"] = &storage.Command{
+		CommandID:     "cmd-1",
+		SessionID:     "session-a",
+		Command:       "git status",
+		CommandNorm:   "git status",
+		TsStartUnixMs: 1000,
+	}
+	store.commands["cmd-2"] = &storage.Command{
+		CommandID:     "cmd-2",
+		SessionID:     "session-b",
+		Command:       "git log",
+		CommandNorm:   "git log",
+		TsStartUnixMs: 2000,
+	}
+
+	rows, err := store.QueryHistoryCommands(context.Background(), storage.CommandQuery{
+		ExcludeSessionID: "session-b",
+		Deduplicate:      true,
+	})
+	if err != nil {
+		t.Fatalf("QueryHistoryCommands failed: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("expected 1 row after exclusion, got %d", len(rows))
+	}
+	if rows[0].Command != "git status" {
+		t.Fatalf("expected remaining command to be git status, got %q", rows[0].Command)
 	}
 }
 
