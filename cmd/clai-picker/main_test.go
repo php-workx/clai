@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/muesli/termenv"
 
 	"github.com/runger/clai/internal/config"
+	"github.com/runger/clai/internal/picker"
 )
 
 // --- Query sanitization tests ---
@@ -429,6 +431,33 @@ func TestSocketPath_CustomOverride(t *testing.T) {
 	path := socketPath(cfg)
 	if path != "/tmp/test.sock" {
 		t.Errorf("expected %q, got %q", "/tmp/test.sock", path)
+	}
+}
+
+type neverEndingProvider struct {
+	fetches int
+}
+
+func (p *neverEndingProvider) Fetch(_ context.Context, _ picker.Request) (picker.Response, error) {
+	p.fetches++
+	return picker.Response{
+		Items: []string{"a", "b"},
+		AtEnd: false,
+	}, nil
+}
+
+func TestFetchFzfItems_PageCap(t *testing.T) {
+	provider := &neverEndingProvider{}
+	opts := &pickerOpts{query: "git"}
+
+	items := fetchFzfItems(context.Background(), provider, opts, "", nil, 2)
+
+	// 100 capped pages x 2 items/page.
+	if got, want := len(items), 200; got != want {
+		t.Fatalf("expected %d items, got %d", want, got)
+	}
+	if got, want := provider.fetches, 100; got != want {
+		t.Fatalf("expected %d fetches, got %d", want, got)
 	}
 }
 

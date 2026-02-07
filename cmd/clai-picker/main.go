@@ -435,7 +435,9 @@ func fetchFzfItems(
 ) []string {
 	var allItems []string
 	offset := 0
-	for {
+	const maxFzfPages = 100
+	truncated := true
+	for page := 0; page < maxFzfPages; page++ {
 		resp, err := provider.Fetch(ctx, picker.Request{
 			Query:   opts.query,
 			TabID:   tabID,
@@ -449,9 +451,13 @@ func fetchFzfItems(
 		}
 		allItems = append(allItems, resp.Items...)
 		if resp.AtEnd || len(resp.Items) == 0 {
+			truncated = false
 			break
 		}
 		offset += len(resp.Items)
+	}
+	if truncated && len(allItems) > 0 {
+		debugLog("fzf backend: reached max page cap (%d)", maxFzfPages)
 	}
 	return allItems
 }
