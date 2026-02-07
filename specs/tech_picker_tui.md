@@ -85,9 +85,12 @@ Unknown flags cause exit 1 with usage printed to stderr. `--help` and `--version
 
 Exit behavior:
 - Success: exit 0 with selected item on stdout (followed by a single newline; `$()` capture strips it).
-- Cancel: exit 1 with no output.
+- Cancel: exit 1 with no output on stdout or stderr.
 - No terminal / TERM=dumb: exit 2 with no output (cannot open `/dev/tty` or terminal incapable).
 - Invalid flags/args: exit 1 with error to stderr.
+
+Shell glue only needs to branch on exit code; stderr remains diagnostic for
+human-facing error details.
 
 ### Query Semantics
 `--query` is **substring match** for v1 (no fuzzy). Filtered results are ordered by timestamp descending (most recent first) within the selected scope. Case sensitivity is controlled by config (default: case-insensitive).
