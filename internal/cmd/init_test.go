@@ -284,6 +284,28 @@ func TestZshScript_EditingWidgetsDismissPicker(t *testing.T) {
 	}
 }
 
+// TestZshScript_SelfInsertSkipsSuggestForQueuedInput verifies that zsh does
+// not call clai suggest for each queued character during paste-like input.
+func TestZshScript_SelfInsertSkipsSuggestForQueuedInput(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	body := extractFunctionBody(script, "_ai_self_insert")
+	if body == "" {
+		t.Fatal("_ai_self_insert() not found")
+	}
+
+	if !strings.Contains(body, "KEYS_QUEUED_COUNT") {
+		t.Error("_ai_self_insert should guard on KEYS_QUEUED_COUNT to avoid per-char suggest during paste")
+	}
+	if !strings.Contains(body, `_AI_IN_PASTE`) {
+		t.Error("_ai_self_insert should preserve _AI_IN_PASTE guard")
+	}
+}
+
 // TestZshScript_ForwardCharValidatesSuggestionPrefix verifies that the
 // right-arrow accept widget checks that _AI_CURRENT_SUGGESTION starts with
 // BUFFER before accepting. Without this check, a stale suggestion after

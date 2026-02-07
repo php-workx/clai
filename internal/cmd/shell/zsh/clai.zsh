@@ -122,7 +122,9 @@ _ai_update_suggestion() {
 _ai_self_insert() {
     _clai_dismiss_picker
     zle .self-insert
-    if [[ "$_AI_IN_PASTE" == "true" ]]; then
+    # During bracketed paste (or any queued bulk input), avoid running
+    # `clai suggest` per character. Recompute once when the queue drains.
+    if [[ "$_AI_IN_PASTE" == "true" ]] || [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
         return
     fi
     _ai_update_suggestion
