@@ -14,6 +14,7 @@ import (
 	"github.com/runger/clai/internal/sanitize"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	"github.com/runger/clai/internal/suggestions/backfill"
 	"github.com/runger/clai/internal/suggestions/feedback"
 )
 
@@ -694,6 +695,13 @@ func (s *Server) ImportHistory(ctx context.Context, req *pb.HistoryImportRequest
 		"shell", shell,
 		"count", count,
 	)
+
+	// Seed V2 suggestions tables (non-fatal)
+	if s.v2db != nil {
+		if err := backfill.Seed(ctx, s.v2db.DB(), entries, shell); err != nil {
+			s.logger.Warn("V2 backfill failed (non-fatal)", "error", err)
+		}
+	}
 
 	return &pb.HistoryImportResponse{
 		ImportedCount: int32(count),

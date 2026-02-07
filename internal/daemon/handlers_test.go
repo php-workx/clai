@@ -3,6 +3,8 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +14,7 @@ import (
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
 )
 
 // mockStore implements storage.Store for testing.
@@ -2378,4 +2381,178 @@ func TestStripANSI(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ============================================================================
+// ImportHistory V2 backfill tests
+// ============================================================================
+
+// TestImportHistory_V2BackfillCalled verifies that V2 backfill writes
+// command_event rows into the V2 database after a successful V1 import.
+func TestImportHistory_V2BackfillCalled(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "v2_backfill_test.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	// Create a bash history file with timestamped entries
+	histPath := filepath.Join(tmpDir, "bash_history")
+	histContent := "#1700000000\ngit status\n#1700000100\nls -la\n#1700000200\necho hello\n"
+	if err := writeTestFile(histPath, histContent); err != nil {
+		t.Fatalf("failed to write test history file: %v", err)
+	}
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	req := &pb.HistoryImportRequest{
+		Shell:       "bash",
+		HistoryPath: histPath,
+	}
+
+	resp, err := server.ImportHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("ImportHistory failed: %v", err)
+	}
+
+	if resp.Error != "" {
+		t.Fatalf("ImportHistory returned error: %s", resp.Error)
+	}
+
+	if resp.ImportedCount != 3 {
+		t.Errorf("expected ImportedCount=3, got %d", resp.ImportedCount)
+	}
+
+	// Verify V2 backfill wrote command_event rows
+	var v2Count int
+	err = v2db.DB().QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM command_event WHERE session_id = 'backfill-bash'`,
+	).Scan(&v2Count)
+	if err != nil {
+		t.Fatalf("failed to query V2 command_event: %v", err)
+	}
+
+	if v2Count != 3 {
+		t.Errorf("expected 3 command_event rows in V2 DB, got %d", v2Count)
+	}
+}
+
+// TestImportHistory_V2BackfillNilDB verifies that ImportHistory works normally
+// when v2db is nil (no panic, no error).
+func TestImportHistory_V2BackfillNilDB(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	// Create a bash history file
+	histPath := filepath.Join(tmpDir, "bash_history")
+	histContent := "#1700000000\ngit status\n#1700000100\nls -la\n"
+	if err := writeTestFile(histPath, histContent); err != nil {
+		t.Fatalf("failed to write test history file: %v", err)
+	}
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  nil, // explicitly nil
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.HistoryImportRequest{
+		Shell:       "bash",
+		HistoryPath: histPath,
+	}
+
+	resp, err := server.ImportHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("ImportHistory failed: %v", err)
+	}
+
+	if resp.Error != "" {
+		t.Fatalf("ImportHistory returned error: %s", resp.Error)
+	}
+
+	if resp.ImportedCount != 2 {
+		t.Errorf("expected ImportedCount=2, got %d", resp.ImportedCount)
+	}
+}
+
+// TestImportHistory_V2BackfillFailureNonFatal verifies that if V2 backfill
+// fails, the V1 import response is still success with the correct count.
+func TestImportHistory_V2BackfillFailureNonFatal(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "v2_fail_test.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+
+	// Close the V2 database to force backfill failure
+	v2db.Close()
+
+	// Create a bash history file
+	histPath := filepath.Join(tmpDir, "bash_history")
+	histContent := "#1700000000\ngit status\n#1700000100\nls -la\n#1700000200\necho hello\n"
+	if err := writeTestFile(histPath, histContent); err != nil {
+		t.Fatalf("failed to write test history file: %v", err)
+	}
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db, // closed DB - backfill will fail
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	req := &pb.HistoryImportRequest{
+		Shell:       "bash",
+		HistoryPath: histPath,
+	}
+
+	resp, err := server.ImportHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("ImportHistory should not return error when V2 backfill fails: %v", err)
+	}
+
+	if resp.Error != "" {
+		t.Fatalf("ImportHistory should not return error message when V2 backfill fails: %s", resp.Error)
+	}
+
+	// V1 import should still succeed with correct count
+	if resp.ImportedCount != 3 {
+		t.Errorf("expected ImportedCount=3 (V1 still succeeds), got %d", resp.ImportedCount)
+	}
+}
+
+// writeTestFile is a helper that writes content to a file for testing.
+func writeTestFile(path, content string) error {
+	return os.WriteFile(path, []byte(content), 0644)
 }
