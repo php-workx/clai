@@ -15,7 +15,7 @@ Options:
   --severity <level>          blocker|high|medium|low|info (default: high)
   --project-key <key>         Sonar project key (auto-detected if omitted)
   --host-url <url>            SonarQube URL (default: SONAR_HOST_URL or http://localhost:9000)
-  --output-dir <dir>          Output directory (default: .sonarqube-autofix)
+  --output-dir <dir>          Output directory (default: .sonarqube)
   --list-only                 Print aggregated findings by severity and exit 0
   --token <token>             Sonar token
   --user <user>               Sonar username
@@ -31,11 +31,11 @@ EOF
 }
 
 log() {
-  printf '[sonarqube-autofix] %s\n' "$*"
+  printf '[sonarqube] %s\n' "$*"
 }
 
 fail() {
-  printf '[sonarqube-autofix] error: %s\n' "$*" >&2
+  printf '[sonarqube] error: %s\n' "$*" >&2
   exit 1
 }
 
@@ -106,7 +106,7 @@ HOST_URL="${SONAR_HOST_URL:-http://localhost:9000}"
 BASE_REF="${SONAR_BASE_REF:-}"
 SEVERITY="${SONAR_SEVERITY_THRESHOLD:-high}"
 PROJECT_KEY="${SONAR_PROJECT_KEY:-}"
-OUTPUT_DIR="${SONAR_OUTPUT_DIR:-.sonarqube-autofix}"
+OUTPUT_DIR="${SONAR_OUTPUT_DIR:-.sonarqube}"
 SONAR_TOKEN="${SONAR_TOKEN:-}"
 SONAR_USER="${SONAR_USER:-}"
 SONAR_PASSWORD="${SONAR_PASSWORD:-}"

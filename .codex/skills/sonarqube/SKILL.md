@@ -23,7 +23,7 @@ Runs SonarQube/SonarCloud against files changed on the current branch, then iter
 - `scripts/run_changed_scan.sh`: starts local SonarQube container if needed, scans changed files, writes findings
 - `scripts/collect_changed_issues.py`: queries SonarQube API and filters findings to changed files at/above threshold
 
-Outputs (default directory `.sonarqube-autofix/`):
+Outputs (default directory `.sonarqube/`):
 - `changed-files.txt`
 - `sonar-scanner.log`
 - `findings.json`
@@ -73,7 +73,7 @@ bash "<path-to-skill>/scripts/run_changed_scan.sh" --severity "${SEVERITY:-high}
 
 8. Fix loop (no user checkpoints).
 - Set `MAX_PASSES=8` unless user specified another limit.
-- On each pass with exit code `3`, read `.sonarqube-autofix/findings.json` and fix highest-severity findings first.
+- On each pass with exit code `3`, read `.sonarqube/findings.json` and fix highest-severity findings first.
 - Keep changes minimal and local to files in `changed-files.txt`.
 - After each pass run relevant verification (`make test` preferred; if too slow, run targeted tests for touched packages/files).
 - Re-run `run_changed_scan.sh` after fixes.
