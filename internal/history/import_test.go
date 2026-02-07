@@ -297,19 +297,15 @@ func TestTrimToLimit(t *testing.T) {
 // --- ImportForShell tests ---
 
 func TestImportForShell_Auto(t *testing.T) {
-	// Set SHELL to zsh for testing
-	oldShell := os.Getenv("SHELL")
-	defer os.Setenv("SHELL", oldShell)
-
-	os.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("SHELL", "/bin/zsh")
 	shell := DetectShell()
 	assert.Equal(t, "zsh", shell)
 
-	os.Setenv("SHELL", "/usr/local/bin/bash")
+	t.Setenv("SHELL", "/usr/local/bin/bash")
 	shell = DetectShell()
 	assert.Equal(t, "bash", shell)
 
-	os.Setenv("SHELL", "/usr/bin/fish")
+	t.Setenv("SHELL", "/usr/bin/fish")
 	shell = DetectShell()
 	assert.Equal(t, "fish", shell)
 }
