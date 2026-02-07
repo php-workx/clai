@@ -692,6 +692,21 @@ func TestFishScript_DateNanosecondsGuardIsNumeric(t *testing.T) {
 	}
 }
 
+func TestFishScript_DisownUsesLatestJob(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+	if err != nil {
+		t.Fatalf("Failed to read fish script: %v", err)
+	}
+	script := string(content)
+
+	if strings.Contains(script, `disown %1`) {
+		t.Error("fish script still uses fragile disown %1 pattern")
+	}
+	if !strings.Contains(script, `disown 2>/dev/null`) {
+		t.Error("fish script missing disown call for background shim jobs")
+	}
+}
+
 func TestBashScript_HistoryPickerUsesPromptQuery(t *testing.T) {
 	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
 	if err != nil {
