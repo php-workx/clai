@@ -610,8 +610,51 @@ func TestBashScript_MacOSOptionHMacroTranslation(t *testing.T) {
 	if !strings.Contains(script, `bind '"˙": "\C-x\C-h"'`) {
 		t.Error("bash script missing macro translation of ˙ to \\C-x\\C-h")
 	}
-	if !strings.Contains(script, `bind -x '"\C-x\C-h": _clai_tui_picker_open'`) {
-		t.Error("bash script missing bind -x for \\C-x\\C-h")
+	if !strings.Contains(script, `bind -x '"\C-x\C-h": _clai_history_up'`) {
+		t.Error("bash script missing bind -x for \\C-x\\C-h history picker")
+	}
+}
+
+func TestBashScript_HistoryPickerBindings(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
+	if err != nil {
+		t.Fatalf("Failed to read bash script: %v", err)
+	}
+	script := string(content)
+
+	required := []string{
+		`bind -x '"\eh": _clai_history_up'`,
+		`bind -x '"\C-x\C-a": _clai_pre_accept'`,
+		`bind '"\C-x\C-b": accept-line'`,
+		`bind '"\eOA": "\C-x\C-p"'`,
+		`bind '"\eOB": "\C-x\C-n"'`,
+		`bind -x '"\C-x\C-p": _clai_up_arrow'`,
+		`bind -x '"\C-x\C-n": _clai_down_arrow'`,
+	}
+
+	for _, binding := range required {
+		if !strings.Contains(script, binding) {
+			t.Errorf("bash script missing history picker binding %s", binding)
+		}
+	}
+}
+
+func TestFishScript_UpArrowApplicationModeBinding(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+	if err != nil {
+		t.Fatalf("Failed to read fish script: %v", err)
+	}
+	script := string(content)
+
+	required := []string{
+		`bind \e\[A _clai_up_arrow`,
+		`bind \eOA _clai_up_arrow`,
+	}
+
+	for _, binding := range required {
+		if !strings.Contains(script, binding) {
+			t.Errorf("fish script missing up-arrow binding %s", binding)
+		}
 	}
 }
 

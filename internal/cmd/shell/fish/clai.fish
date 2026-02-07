@@ -104,25 +104,24 @@ end
 
 function _clai_tui_picker_open
     if test "$CLAI_OFF" = "1"; or _clai_session_off
-        commandline -f up-line
-        return
+        return 2
     end
     if not _clai_has_tui_picker
-        commandline -f up-line
-        return
+        return 2
     end
-    set -l saved_buffer (commandline)
     set -l result (clai-picker history --query=(commandline) --session=$CLAI_SESSION_ID --cwd=$PWD 2>/dev/null)
     set -l exit_code $status
     if test $exit_code -eq 0
         commandline -r -- $result
         commandline -f end-of-line
+        commandline -f repaint
+        return 0
     else if test $exit_code -eq 2
-        commandline -f up-line
-        return
+        return 2
     end
     # exit_code 1 = cancel, keep original buffer
     commandline -f repaint
+    return 1
 end
 
 # ============================================
@@ -311,10 +310,14 @@ function _clai_history_up
         commandline -f history-search-backward
         return
     end
-    # Try TUI picker first (when inline picker is not already active)
+    # Try TUI picker first (when inline picker is not already active).
+    # Status 2 means "fallback to inline picker".
     if test "$_CLAI_PICKER_ACTIVE" != "true"; and _clai_has_tui_picker
         _clai_tui_picker_open
-        return
+        set -l tui_status $status
+        if test $tui_status -ne 2
+            return
+        end
     end
     if not _clai_config_enabled
         commandline -f history-search-backward
@@ -406,27 +409,20 @@ function _clai_history_scope_global
     end
 end
 
-# Alt/Option+H opens TUI picker.
+# Alt/Option+H opens history picker (TUI when available, inline fallback).
 # \eh works when the terminal sends ESC for Alt. The literal ˙ covers
 # macOS Terminal.app/iTerm2 defaults where Option+H produces U+02D9.
-bind \eh _clai_tui_picker_open
-bind ˙ _clai_tui_picker_open
+bind \eh _clai_history_up
+bind ˙ _clai_history_up
 
-# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
-# (with fallback to shell default). Otherwise shell defaults are used.
+# When up_arrow_opens_history is enabled, Up arrow opens history picker
+# (TUI when available, inline fallback). Otherwise shell defaults are used.
 if test "$CLAI_UP_ARROW_HISTORY" = "true"
     function _clai_up_arrow
-        if test "$CLAI_OFF" = "1"; or _clai_session_off
-            commandline -f history-search-backward
-            return
-        end
-        if _clai_has_tui_picker
-            _clai_tui_picker_open
-        else
-            commandline -f history-search-backward
-        end
+        _clai_history_up
     end
     bind \e\[A _clai_up_arrow
+    bind \eOA _clai_up_arrow
 end
 
 # ============================================
@@ -706,6 +702,7 @@ function _clai_disable
     # Restore default keybindings
     bind \t complete
     bind \e\[A history-search-backward
+    bind \eOA history-search-backward
     bind \e\[B history-search-forward
     bind \r execute
 

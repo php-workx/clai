@@ -343,10 +343,14 @@ _clai_history_up() {
         _clai_fallback_history_up
         return 0
     fi
-    # Try TUI picker first (when inline picker is not already active)
+    # Try TUI picker first (when inline picker is not already active).
+    # exit code 2 means "fallback to inline picker".
     if [[ "$_CLAI_PICKER_ACTIVE" != "true" ]] && _clai_has_tui_picker; then
         _clai_tui_picker_open
-        return 0
+        local tui_status=$?
+        if [[ $tui_status -ne 2 ]]; then
+            return 0
+        fi
     fi
     if [[ "$_CLAI_FALLBACK_ACTIVE" == "true" ]]; then
         _clai_fallback_reset
@@ -393,7 +397,9 @@ _clai_history_down() {
             _CLAI_PICKER_INDEX=$((${#_CLAI_PICKER_ITEMS[@]} - 1))
         fi
         _clai_picker_apply
+        return 0
     fi
+    _clai_fallback_history_down
 }
 
 _clai_picker_close() {
@@ -460,26 +466,36 @@ _clai_history_scope_global() {
 # sequences — it fails with "cannot find keymap for command". Work around by
 # using a readline macro to translate arrow escapes to Ctrl-X prefixed
 # sequences, then bind those with -x.
-# Alt/Option+H opens TUI picker.
+# Alt/Option+H opens history picker (TUI when available, inline fallback).
 # '\eh' works when the terminal sends ESC for Alt (Linux, macOS with Meta key).
 # On macOS, Option+H produces ˙ (U+02D9). bash 3.2 cannot bind -x to multi-byte
 # chars, so we use a macro to translate it to a Ctrl sequence we can bind -x to.
-bind -x '"\eh": _clai_tui_picker_open'
-bind -x '"\C-x\C-h": _clai_tui_picker_open'
+bind -x '"\eh": _clai_history_up'
+bind -x '"\C-x\C-h": _clai_history_up'
 bind '"˙": "\C-x\C-h"'
 
 # When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
-# (with fallback to shell default). Otherwise shell defaults are used.
+# (with inline fallback). Otherwise shell defaults are used.
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
     _clai_up_arrow() {
-        if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-            return 0
-        fi
-        _clai_tui_picker_open
+        _clai_history_up
+    }
+    _clai_down_arrow() {
+        _clai_history_down
     }
     bind '"\e[A": "\C-x\C-p"'
+    bind '"\eOA": "\C-x\C-p"'
+    bind '"\e[B": "\C-x\C-n"'
+    bind '"\eOB": "\C-x\C-n"'
     bind -x '"\C-x\C-p": _clai_up_arrow'
+    bind -x '"\C-x\C-n": _clai_down_arrow'
 fi
+
+# Enter: normally accept-line. When picker is open, _clai_history_up installs
+# a macro "\C-x\C-a\C-x\C-b" that routes through _clai_pre_accept to intercept.
+# _clai_picker_close restores accept-line.
+bind -x '"\C-x\C-a": _clai_pre_accept'
+bind '"\C-x\C-b": accept-line'
 
 # Show AI suggestion in prompt when available (for AI-generated suggestions)
 _ai_show_suggestion() {
@@ -803,7 +819,9 @@ _clai_disable() {
     # Restore default keybindings
     bind '"\C-m": accept-line'
     bind '"\e[A": previous-history'
+    bind '"\eOA": previous-history'
     bind '"\e[B": next-history'
+    bind '"\eOB": next-history'
     bind '"\t": complete'
     bind "set show-all-if-ambiguous off"
 
