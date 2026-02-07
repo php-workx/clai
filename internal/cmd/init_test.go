@@ -376,6 +376,45 @@ func TestZshScript_AcceptLineClearsGhostText(t *testing.T) {
 	}
 }
 
+// TestZshScript_DefaultCompletionAndHistoryClearGhostText verifies that
+// default Tab completion and history navigation clear ghost text state first.
+func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	for _, fn := range []string{"_ai_expand_or_complete", "_ai_up_line_or_history", "_ai_down_line_or_history"} {
+		body := extractFunctionBody(script, fn)
+		if body == "" {
+			t.Fatalf("%s() not found", fn)
+		}
+		for _, required := range []string{"_ai_clear_ghost_text", `POSTDISPLAY=""`, "region_highlight=()"} {
+			if required == "_ai_clear_ghost_text" {
+				if !strings.Contains(body, required) {
+					t.Errorf("%s() should call %s before delegating", fn, required)
+				}
+				continue
+			}
+			// Defensive: either clear inline in function body or via helper.
+			if !strings.Contains(script, required) {
+				t.Errorf("zsh script missing ghost text clear primitive %q", required)
+			}
+		}
+	}
+
+	for _, bind := range []string{
+		"zle -N expand-or-complete _ai_expand_or_complete",
+		"zle -N up-line-or-history _ai_up_line_or_history",
+		"zle -N down-line-or-history _ai_down_line_or_history",
+	} {
+		if !strings.Contains(script, bind) {
+			t.Errorf("missing zle binding: %s", bind)
+		}
+	}
+}
+
 // TestZshScript_PickerRenderAndPaging verifies that the picker:
 // 1. Renders items in forward order (newest at top, closest to input)
 // 2. Tracks paging state (_CLAI_PICKER_PAGE, _CLAI_PICKER_AT_END)

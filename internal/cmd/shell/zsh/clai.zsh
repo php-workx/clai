@@ -136,6 +136,36 @@ _clai_dismiss_picker() {
     [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] && _clai_picker_close
 }
 
+# Clear inline ghost text state (without touching suggestion cache on disk).
+_ai_clear_ghost_text() {
+    _AI_CURRENT_SUGGESTION=""
+    POSTDISPLAY=""
+    region_highlight=()
+}
+
+# ZLE widget: Tab completion should dismiss ghost text first.
+_ai_expand_or_complete() {
+    _clai_dismiss_picker
+    _ai_clear_ghost_text
+    zle .expand-or-complete
+}
+zle -N expand-or-complete _ai_expand_or_complete
+
+# ZLE widget: History navigation should clear stale ghost text first.
+_ai_up_line_or_history() {
+    _clai_dismiss_picker
+    _ai_clear_ghost_text
+    zle .up-line-or-history
+}
+zle -N up-line-or-history _ai_up_line_or_history
+
+_ai_down_line_or_history() {
+    _clai_dismiss_picker
+    _ai_clear_ghost_text
+    zle .down-line-or-history
+}
+zle -N down-line-or-history _ai_down_line_or_history
+
 # ZLE widget: Update suggestion after backspace
 _ai_backward_delete_char() {
     _clai_dismiss_picker
@@ -805,6 +835,7 @@ bindkey '˙' _clai_tui_picker_open
 # (with fallback to shell default). Otherwise shell defaults are used.
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
     _clai_up_arrow() {
+        _ai_clear_ghost_text
         if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
             zle .up-line-or-history
             return
@@ -828,6 +859,9 @@ _clai_disable() {
     export CLAI_OFF=1
 
     # Restore default ZLE widgets (undo custom overrides)
+    zle -A .expand-or-complete expand-or-complete
+    zle -A .up-line-or-history up-line-or-history
+    zle -A .down-line-or-history down-line-or-history
     zle -A .self-insert self-insert
     zle -A .backward-delete-char backward-delete-char
     zle -A .backward-char backward-char
