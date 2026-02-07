@@ -410,6 +410,7 @@ func TestResolveTabs_UnknownFallsBackToAll(t *testing.T) {
 // --- Socket path tests ---
 
 func TestSocketPath_DefaultWhenEmpty(t *testing.T) {
+	t.Setenv("CLAI_SOCKET", "")
 	cfg := config.DefaultConfig()
 	cfg.Daemon.SocketPath = ""
 
@@ -421,6 +422,7 @@ func TestSocketPath_DefaultWhenEmpty(t *testing.T) {
 }
 
 func TestSocketPath_CustomOverride(t *testing.T) {
+	t.Setenv("CLAI_SOCKET", "")
 	cfg := config.DefaultConfig()
 	cfg.Daemon.SocketPath = "/tmp/test.sock"
 
