@@ -7,6 +7,8 @@ description: Use when you need a coding agent to run SonarQube/SonarCloud checks
 
 **YOU MUST EXECUTE THIS WORKFLOW. Do not just describe it.**
 
+This skill is maintained for backward compatibility. Prefer `/sonarqube` for new usage.
+
 Runs SonarQube/SonarCloud against files changed on the current branch, then iteratively fixes findings at/above a target severity (`high` by default) until clean or blocked.
 
 ## Inputs

@@ -1,13 +1,11 @@
 ---
-name: sonarqube-autofix
+name: sonarqube
 description: Use when you need a coding agent to run SonarQube/SonarCloud checks on current-branch changes, either list aggregated findings by severity or autonomously fix findings at/above a chosen severity threshold.
 ---
 
-# SonarQube Autofix
+# SonarQube
 
 **YOU MUST EXECUTE THIS WORKFLOW. Do not just describe it.**
-
-This skill is maintained for backward compatibility. Prefer `/sonarqube` for new usage.
 
 Runs SonarQube/SonarCloud against files changed on the current branch, then iteratively fixes findings at/above a target severity (`high` by default) until clean or blocked.
 
@@ -34,6 +32,9 @@ Outputs (default directory `.sonarqube-autofix/`):
 ## Autonomous Workflow
 
 1. Resolve action from intent.
+- If invoked as `/sonarqube` with no explicit action, first show supported actions and ask once:
+  - `autofix`: apply fixes for findings at/above threshold
+  - `list`: show aggregated findings by severity (no code changes)
 - `autofix` keywords: `autofix`, `fix`, `address`, `resolve`, `complete`, `remediate`.
 - `list` keywords: `list`, `show`, `find`, `report`, `summary`, `aggregate`, `count`.
 - If ambiguous, ask once: `Do you want autofix or list? (autofix/list)`.
