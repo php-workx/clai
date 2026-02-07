@@ -2552,6 +2552,243 @@ func TestImportHistory_V2BackfillFailureNonFatal(t *testing.T) {
 	}
 }
 
+// ============================================================================
+// CommandEnded V2 batch writer tests
+// ============================================================================
+
+// TestCommandEnded_FeedsV2 verifies that CommandEnded enqueues events to the
+// V2 batch writer after V1 storage succeeds.
+func TestCommandEnded_FeedsV2(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "v2_cmd_ended_test.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	// Start the batch writer
+	server.batchWriter.Start()
+
+	// Start a session
+	_, err = server.SessionStart(ctx, &pb.SessionStartRequest{
+		SessionId: "v2-session",
+		Cwd:       "/home/user",
+		Client:    &pb.ClientInfo{Shell: "zsh"},
+	})
+	if err != nil {
+		t.Fatalf("SessionStart failed: %v", err)
+	}
+
+	// CommandStarted stashes data for V2
+	_, err = server.CommandStarted(ctx, &pb.CommandStartRequest{
+		SessionId:   "v2-session",
+		CommandId:   "v2-cmd-1",
+		Cwd:         "/home/user/project",
+		Command:     "make build",
+		GitRepoName: "clai",
+		GitBranch:   "main",
+	})
+	if err != nil {
+		t.Fatalf("CommandStarted failed: %v", err)
+	}
+
+	// CommandEnded should enqueue to V2 batch writer
+	resp, err := server.CommandEnded(ctx, &pb.CommandEndRequest{
+		SessionId:  "v2-session",
+		CommandId:  "v2-cmd-1",
+		ExitCode:   0,
+		DurationMs: 250,
+	})
+	if err != nil {
+		t.Fatalf("CommandEnded failed: %v", err)
+	}
+	if !resp.Ok {
+		t.Fatalf("CommandEnded returned ok=false: %s", resp.Error)
+	}
+
+	// Stop the batch writer to flush all pending events (blocks until done)
+	server.batchWriter.Stop()
+
+	// Verify event appears in V2 DB
+	var v2Count int
+	err = v2db.DB().QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM command_event WHERE session_id = ? AND cmd_raw = ?`,
+		"v2-session", "make build",
+	).Scan(&v2Count)
+	if err != nil {
+		t.Fatalf("failed to query V2 command_event: %v", err)
+	}
+
+	if v2Count != 1 {
+		t.Errorf("expected 1 command_event row in V2 DB, got %d", v2Count)
+	}
+
+	// Verify exit code and duration in the V2 row
+	var exitCode int
+	var durationMs int64
+	err = v2db.DB().QueryRowContext(ctx,
+		`SELECT exit_code, duration_ms FROM command_event WHERE session_id = ? AND cmd_raw = ?`,
+		"v2-session", "make build",
+	).Scan(&exitCode, &durationMs)
+	if err != nil {
+		t.Fatalf("failed to query V2 event details: %v", err)
+	}
+
+	if exitCode != 0 {
+		t.Errorf("expected exit_code=0, got %d", exitCode)
+	}
+	if durationMs != 250 {
+		t.Errorf("expected duration_ms=250, got %d", durationMs)
+	}
+}
+
+// TestCommandEnded_V2NilGraceful verifies that CommandEnded works normally
+// when batchWriter is nil (V2 disabled).
+func TestCommandEnded_V2NilGraceful(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  nil, // V2 disabled
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	// Verify batchWriter is nil
+	if server.batchWriter != nil {
+		t.Fatal("expected batchWriter to be nil when V2DB is nil")
+	}
+
+	ctx := context.Background()
+
+	// Start session and command
+	_, _ = server.SessionStart(ctx, &pb.SessionStartRequest{
+		SessionId: "nil-v2-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	})
+
+	_, _ = server.CommandStarted(ctx, &pb.CommandStartRequest{
+		SessionId: "nil-v2-session",
+		CommandId: "nil-v2-cmd",
+		Cwd:       "/tmp",
+		Command:   "echo hello",
+	})
+
+	// CommandEnded should succeed without V2
+	resp, err := server.CommandEnded(ctx, &pb.CommandEndRequest{
+		SessionId:  "nil-v2-session",
+		CommandId:  "nil-v2-cmd",
+		ExitCode:   0,
+		DurationMs: 50,
+	})
+	if err != nil {
+		t.Fatalf("CommandEnded failed: %v", err)
+	}
+	if !resp.Ok {
+		t.Errorf("CommandEnded returned ok=false: %s", resp.Error)
+	}
+
+	// V1 counter should still be incremented
+	if server.getCommandsLogged() != 1 {
+		t.Errorf("expected commandsLogged=1, got %d", server.getCommandsLogged())
+	}
+}
+
+// TestCommandEnded_ExitCodeRecorded verifies that a non-zero exit code is
+// correctly recorded in the V2 event.
+func TestCommandEnded_ExitCodeRecorded(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "v2_exitcode_test.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	server.batchWriter.Start()
+
+	// Start session + command
+	_, _ = server.SessionStart(ctx, &pb.SessionStartRequest{
+		SessionId: "exitcode-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	})
+
+	_, _ = server.CommandStarted(ctx, &pb.CommandStartRequest{
+		SessionId: "exitcode-session",
+		CommandId: "exitcode-cmd",
+		Cwd:       "/tmp",
+		Command:   "false",
+	})
+
+	// CommandEnded with exit_code=1
+	resp, err := server.CommandEnded(ctx, &pb.CommandEndRequest{
+		SessionId:  "exitcode-session",
+		CommandId:  "exitcode-cmd",
+		ExitCode:   1,
+		DurationMs: 10,
+	})
+	if err != nil {
+		t.Fatalf("CommandEnded failed: %v", err)
+	}
+	if !resp.Ok {
+		t.Fatalf("CommandEnded returned ok=false: %s", resp.Error)
+	}
+
+	// Stop the batch writer to flush all pending events (blocks until done)
+	server.batchWriter.Stop()
+
+	// Verify exit_code=1 in V2 DB
+	var exitCode int
+	err = v2db.DB().QueryRowContext(ctx,
+		`SELECT exit_code FROM command_event WHERE session_id = ? AND cmd_raw = ?`,
+		"exitcode-session", "false",
+	).Scan(&exitCode)
+	if err != nil {
+		t.Fatalf("failed to query V2 event: %v", err)
+	}
+
+	if exitCode != 1 {
+		t.Errorf("expected exit_code=1 in V2 event, got %d", exitCode)
+	}
+}
+
 // writeTestFile is a helper that writes content to a file for testing.
 func writeTestFile(path, content string) error {
 	return os.WriteFile(path, []byte(content), 0644)

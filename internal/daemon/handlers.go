@@ -15,6 +15,7 @@ import (
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
 	"github.com/runger/clai/internal/suggestions/backfill"
+	"github.com/runger/clai/internal/suggestions/event"
 	"github.com/runger/clai/internal/suggestions/feedback"
 )
 
@@ -191,6 +192,25 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 	}
 
 	s.incrementCommandsLogged()
+
+	// Feed V2 batch writer (async, non-blocking)
+	if s.batchWriter != nil {
+		if info, ok := s.sessionManager.Get(req.SessionId); ok {
+			durationMs := req.DurationMs
+			ev := &event.CommandEvent{
+				Version:    event.EventVersion,
+				Type:       event.EventTypeCommandEnd,
+				SessionID:  req.SessionId,
+				Shell:      event.Shell(info.Shell),
+				Cwd:        info.LastCmdCWD,
+				CmdRaw:     info.LastCmdRaw,
+				ExitCode:   int(req.ExitCode),
+				DurationMs: &durationMs,
+				Ts:         time.Now().UnixMilli(),
+			}
+			s.batchWriter.Enqueue(ev)
+		}
+	}
 
 	s.logger.Debug("command ended",
 		"command_id", req.CommandId,
