@@ -12,7 +12,7 @@ actionable SonarQube findings at or above the selected severity threshold.
 
 Options:
   --base-ref <ref>            Git ref used to compute changed files
-  --severity <level>          all|low|medium|high|critical (default: medium)
+  --severity <level>          blocker|high|medium|low|info (default: high)
   --project-key <key>         Sonar project key (auto-detected if omitted)
   --host-url <url>            SonarQube URL (default: SONAR_HOST_URL or http://localhost:9000)
   --output-dir <dir>          Output directory (default: .sonarqube-autofix)
@@ -103,7 +103,7 @@ ensure_sonarqube_available() {
 
 HOST_URL="${SONAR_HOST_URL:-http://localhost:9000}"
 BASE_REF="${SONAR_BASE_REF:-}"
-SEVERITY="${SONAR_SEVERITY_THRESHOLD:-medium}"
+SEVERITY="${SONAR_SEVERITY_THRESHOLD:-high}"
 PROJECT_KEY="${SONAR_PROJECT_KEY:-}"
 OUTPUT_DIR="${SONAR_OUTPUT_DIR:-.sonarqube-autofix}"
 SONAR_TOKEN="${SONAR_TOKEN:-}"
@@ -163,10 +163,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$SEVERITY" in
-  all|low|medium|high|critical)
+  blocker|high|medium|low|info|critical|all)
     ;;
   *)
-    fail "invalid severity '$SEVERITY' (expected all|low|medium|high|critical)"
+    fail "invalid severity '$SEVERITY' (expected blocker|high|medium|low|info)"
     ;;
 esac
 

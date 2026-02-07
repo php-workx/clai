@@ -23,10 +23,13 @@ SEVERITY_ORDER = {
 }
 
 THRESHOLD_TO_SEVERITY = {
-    "all": "INFO",
+    "info": "INFO",
     "low": "MINOR",
     "medium": "MAJOR",
     "high": "CRITICAL",
+    "blocker": "BLOCKER",
+    # Backward-compatible aliases.
+    "all": "INFO",
     "critical": "BLOCKER",
 }
 
@@ -36,7 +39,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host-url", required=True)
     parser.add_argument("--project-key", required=True)
     parser.add_argument("--changed-files", required=True)
-    parser.add_argument("--severity-threshold", default="medium", choices=sorted(THRESHOLD_TO_SEVERITY.keys()))
+    parser.add_argument(
+        "--severity-threshold",
+        default="high",
+        help="Severity threshold: blocker|high|medium|low|info (aliases: critical, all)",
+    )
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--output-md", required=True)
     parser.add_argument("--token", default="")
@@ -197,18 +204,24 @@ def write_markdown(path: str, project_key: str, threshold: str, changed_count: i
 
 def main() -> int:
     args = parse_args()
+    threshold = args.severity_threshold.lower().strip()
+    if threshold not in THRESHOLD_TO_SEVERITY:
+        raise RuntimeError(
+            "invalid severity threshold "
+            f"'{args.severity_threshold}' (expected blocker|high|medium|low|info)"
+        )
 
     changed_files = load_changed_files(args.changed_files)
     headers = build_headers(args.token, args.user, args.password)
 
     raw_issues = fetch_issues(args.host_url, args.project_key, headers)
-    findings = filter_issues(raw_issues, changed_files, args.severity_threshold)
+    findings = filter_issues(raw_issues, changed_files, threshold)
 
     severity_counts = Counter(item["severity"] for item in findings)
     output = {
         "summary": {
             "project_key": args.project_key,
-            "severity_threshold": args.severity_threshold,
+            "severity_threshold": threshold,
             "changed_files": len(changed_files),
             "findings": len(findings),
             "severity_counts": dict(sorted(severity_counts.items())),
@@ -226,7 +239,7 @@ def main() -> int:
     write_markdown(
         path=args.output_md,
         project_key=args.project_key,
-        threshold=args.severity_threshold,
+        threshold=threshold,
         changed_count=len(changed_files),
         findings=findings,
     )
