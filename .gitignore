@@ -13,3 +13,16 @@ coverage.html
 
 # Beads export state (machine-specific paths)
 .beads/export-state/*.json
+/.scannerwork/.sonar_lock
+/.scannerwork/report-task.txt
+/.scannerwork/sonar-go-to-slang-darwin-amd64
+/.sonarqube/changed-files.txt
+/.sonarqube/findings.json
+/.sonarqube/findings.md
+/.sonarqube/findings-info.json
+/.sonarqube/findings-info.md
+/.sonarqube/sonar-scanner.log
+/.sonarqube-autofix/changed-files.txt
+/.sonarqube-autofix/findings.json
+/.sonarqube-autofix/findings.md
+/.sonarqube-autofix/sonar-scanner.log
