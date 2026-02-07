@@ -16,6 +16,7 @@ import (
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	"github.com/runger/clai/internal/suggestions/batch"
 	suggestdb "github.com/runger/clai/internal/suggestions/db"
 )
 
@@ -1259,6 +1260,268 @@ func TestNewServer_V2DB_UnwritablePath(t *testing.T) {
 	}
 	if server.store != store {
 		t.Error("V1 store should still be operational")
+	}
+}
+
+// TestNewServer_WithBatchWriter verifies the server creates a batch writer when V2DB is provided.
+func TestNewServer_WithBatchWriter(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	if server.batchWriter == nil {
+		t.Error("batchWriter should be initialized when V2DB is provided")
+	}
+	if server.v2db != v2db {
+		t.Error("v2db should be set to the provided database")
+	}
+}
+
+// TestNewServer_BatchWriterNilWithoutV2 verifies the batch writer is nil when V2DB is not provided.
+func TestNewServer_BatchWriterNilWithoutV2(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  nil,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	if server.batchWriter != nil {
+		t.Error("batchWriter should be nil when V2DB is not provided")
+	}
+	if server.v2Scorer != nil {
+		t.Error("v2Scorer should be nil when V2Scorer config is not provided")
+	}
+}
+
+// TestNewServer_CustomBatchWriter verifies a custom batch writer is used when provided.
+func TestNewServer_CustomBatchWriter(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	// Create a custom batch writer
+	customWriter := batch.NewWriter(v2db.DB(), batch.DefaultOptions())
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store:       store,
+		V2DB:        v2db,
+		BatchWriter: customWriter,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	if server.batchWriter != customWriter {
+		t.Error("batchWriter should be the custom writer provided in config")
+	}
+}
+
+// TestServer_BatchWriterLifecycle verifies that the batch writer is started during
+// Start() and stopped during Shutdown().
+func TestServer_BatchWriterLifecycle(t *testing.T) {
+	t.Parallel()
+
+	// Use /tmp directly to avoid Unix socket path length limits on macOS
+	tmpDir, err := os.MkdirTemp("/tmp", "clai-bw-test-")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	paths := &config.Paths{
+		BaseDir: tmpDir,
+	}
+	if err := paths.EnsureDirectories(); err != nil {
+		t.Fatalf("failed to create directories: %v", err)
+	}
+
+	logBuf := &bytes.Buffer{}
+	logger := slog.New(slog.NewTextHandler(logBuf, nil))
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store:       store,
+		V2DB:        v2db,
+		Paths:       paths,
+		Logger:      logger,
+		IdleTimeout: 1 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	if server.batchWriter == nil {
+		t.Fatal("batchWriter should be initialized")
+	}
+
+	// Start the server in background
+	serverCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- server.Start(serverCtx)
+	}()
+
+	// Wait for server to start (socket to be created)
+	socketPath := paths.SocketFile()
+	for i := 0; i < 100; i++ {
+		time.Sleep(20 * time.Millisecond)
+		if _, err := os.Stat(socketPath); err == nil {
+			break
+		}
+		// Check if server returned an error
+		select {
+		case err := <-serverErr:
+			if err != nil {
+				t.Fatalf("server.Start failed: %v", err)
+			}
+		default:
+		}
+	}
+
+	// The batch writer should now be started (Start was called inside Server.Start).
+	// We can verify it's functional by checking that Stats() returns valid data.
+	stats := server.batchWriter.Stats()
+	// Initial stats should show zero events
+	if stats.EventsWritten != 0 {
+		t.Errorf("expected 0 events written initially, got %d", stats.EventsWritten)
+	}
+
+	// Shutdown the server, which should stop the batch writer
+	cancel()
+	server.Shutdown()
+
+	// Wait for server to stop
+	select {
+	case err := <-serverErr:
+		if err != nil {
+			t.Errorf("unexpected server error: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Error("server did not stop in time")
+	}
+
+	// After shutdown, the batch writer's Stop() should have been called.
+	// Calling Stop() again should be safe (it's idempotent via sync.Once).
+	server.batchWriter.Stop()
+}
+
+// TestServer_BatchWriterNilLifecycle verifies Start and Shutdown work when batch writer is nil.
+func TestServer_BatchWriterNilLifecycle(t *testing.T) {
+	t.Parallel()
+
+	// Use /tmp directly to avoid Unix socket path length limits on macOS
+	tmpDir, err := os.MkdirTemp("/tmp", "clai-nobw-test-")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	paths := &config.Paths{
+		BaseDir: tmpDir,
+	}
+	if err := paths.EnsureDirectories(); err != nil {
+		t.Fatalf("failed to create directories: %v", err)
+	}
+
+	logBuf := &bytes.Buffer{}
+	logger := slog.New(slog.NewTextHandler(logBuf, nil))
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store:       store,
+		V2DB:        nil, // No V2DB means no batch writer
+		Paths:       paths,
+		Logger:      logger,
+		IdleTimeout: 1 * time.Hour,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	if server.batchWriter != nil {
+		t.Fatal("batchWriter should be nil without V2DB")
+	}
+
+	// Start the server - should work fine without batch writer
+	serverCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	serverErr := make(chan error, 1)
+	go func() {
+		serverErr <- server.Start(serverCtx)
+	}()
+
+	// Wait for server to start
+	socketPath := paths.SocketFile()
+	for i := 0; i < 100; i++ {
+		time.Sleep(20 * time.Millisecond)
+		if _, err := os.Stat(socketPath); err == nil {
+			break
+		}
+	}
+
+	// Shutdown - should work fine without batch writer
+	cancel()
+	server.Shutdown()
+
+	select {
+	case err := <-serverErr:
+		if err != nil {
+			t.Errorf("unexpected server error: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Error("server did not stop in time")
 	}
 }
 

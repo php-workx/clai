@@ -19,9 +19,11 @@ import (
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	"github.com/runger/clai/internal/suggestions/batch"
 	suggestdb "github.com/runger/clai/internal/suggestions/db"
 	"github.com/runger/clai/internal/suggestions/feedback"
 	"github.com/runger/clai/internal/suggestions/maintenance"
+	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
 // Version is set at build time
@@ -57,6 +59,12 @@ type Server struct {
 
 	// Maintenance
 	maintenanceRunner *maintenance.Runner
+
+	// V2 batch writer (nil if V2 disabled)
+	batchWriter *batch.Writer
+
+	// V2 scorer (nil if V2 disabled)
+	v2Scorer *suggest2.Scorer
 
 	// Backpressure
 	ingestionQueue *IngestionQueue
@@ -99,6 +107,15 @@ type ServerConfig struct {
 	// V2DB is the V2 suggestions database (optional, enables V2 features).
 	// If nil, V2 features are disabled and the daemon operates with V1 only.
 	V2DB *suggestdb.DB
+
+	// BatchWriter is the V2 batch event writer (optional).
+	// If nil and V2DB is non-nil, a default batch writer is created.
+	BatchWriter *batch.Writer
+
+	// V2Scorer is the V2 suggestion scorer (optional).
+	// If nil, V2 scoring is not available until dependencies are initialized
+	// (see the separate scorer dependency initialization).
+	V2Scorer *suggest2.Scorer
 
 	// ReloadFn is called on SIGHUP to reload configuration.
 	// If nil, SIGHUP is ignored.
@@ -148,6 +165,21 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		Logger: logger,
 	})
 
+	// Initialize V2 batch writer (nil-safe: only if V2DB is available)
+	var bw *batch.Writer
+	if cfg.BatchWriter != nil {
+		bw = cfg.BatchWriter
+	} else if cfg.V2DB != nil {
+		bw = batch.NewWriter(cfg.V2DB.DB(), batch.DefaultOptions())
+	}
+
+	// Initialize V2 scorer (nil-safe: only if explicitly provided)
+	// Full scorer dependency wiring is handled separately.
+	var v2scorer *suggest2.Scorer
+	if cfg.V2Scorer != nil {
+		v2scorer = cfg.V2Scorer
+	}
+
 	now := time.Now()
 	return &Server{
 		store:             cfg.Store,
@@ -163,6 +195,8 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		idleTimeout:       idleTimeout,
 		shutdownChan:      make(chan struct{}),
 		maintenanceRunner: cfg.MaintenanceRunner,
+		batchWriter:       bw,
+		v2Scorer:          v2scorer,
 		ingestionQueue:    ingestQueue,
 		circuitBreaker:    cb,
 	}, nil
@@ -227,6 +261,11 @@ func (s *Server) Start(ctx context.Context) error {
 		}()
 	}
 
+	// Start V2 batch writer (if configured)
+	if s.batchWriter != nil {
+		s.batchWriter.Start()
+	}
+
 	// Serve gRPC requests in a goroutine
 	errChan := make(chan error, 1)
 	go func() {
@@ -256,6 +295,11 @@ func (s *Server) Shutdown() {
 
 		// Signal shutdown
 		close(s.shutdownChan)
+
+		// Stop V2 batch writer (flushes pending events)
+		if s.batchWriter != nil {
+			s.batchWriter.Stop()
+		}
 
 		// Stop gRPC server
 		if s.grpcServer != nil {
