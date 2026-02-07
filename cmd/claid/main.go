@@ -11,6 +11,7 @@ import (
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/daemon"
 	"github.com/runger/clai/internal/storage"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
 )
 
 func main() {
@@ -42,13 +43,25 @@ func run() error {
 	}
 	defer store.Close()
 
+	// Open V2 suggestions database (graceful degradation if unavailable)
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{})
+	if err != nil {
+		logger.Warn("V2 suggestions database unavailable, continuing with V1 only", "error", err)
+		// v2db stays nil — graceful degradation
+	}
+	if v2db != nil {
+		defer v2db.Close()
+	}
+
 	// Create server config
 	cfg := &daemon.ServerConfig{
 		Store:  store,
+		V2DB:   v2db,
 		Paths:  paths,
 		Logger: logger,
 	}
 
 	// Run the daemon (blocks until shutdown)
-	return daemon.Run(context.Background(), cfg)
+	return daemon.Run(ctx, cfg)
 }

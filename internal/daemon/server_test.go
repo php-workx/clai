@@ -5,6 +5,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -15,6 +16,7 @@ import (
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
 )
 
 func TestNewServer_Success(t *testing.T) {
@@ -1150,6 +1152,113 @@ func TestServer_InitialActivity(t *testing.T) {
 	if activity.Before(before) || activity.After(after) {
 		t.Errorf("initial lastActivity should be between %v and %v, got %v",
 			before, after, activity)
+	}
+}
+
+// TestNewServer_WithV2DB verifies the server starts successfully with a V2 database.
+func TestNewServer_WithV2DB(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	if server.v2db != v2db {
+		t.Error("v2db should be set to the provided database")
+	}
+	if server.store != store {
+		t.Error("store should still be set")
+	}
+}
+
+// TestNewServer_WithoutV2DB verifies the server starts successfully without V2 database
+// (graceful degradation - V1 only mode).
+func TestNewServer_WithoutV2DB(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  nil,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	if server.v2db != nil {
+		t.Error("v2db should be nil when not provided")
+	}
+	if server.store != store {
+		t.Error("store should still be set for V1 operation")
+	}
+}
+
+// TestNewServer_V2DB_UnwritablePath verifies graceful degradation when V2 DB path is unwritable.
+// This simulates the pattern used in cmd/claid/main.go where Open failure is handled
+// by warning and continuing with v2db = nil.
+func TestNewServer_V2DB_UnwritablePath(t *testing.T) {
+	t.Parallel()
+
+	// Create an unwritable directory to simulate V2 DB open failure
+	tmpDir := t.TempDir()
+	unwritableDir := filepath.Join(tmpDir, "readonly")
+	if err := os.MkdirAll(unwritableDir, 0555); err != nil {
+		t.Fatalf("failed to create unwritable dir: %v", err)
+	}
+	defer os.Chmod(unwritableDir, 0755) // restore for cleanup
+
+	dbPath := filepath.Join(unwritableDir, "subdir", "suggestions_v2.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	// We expect this to fail because the directory is not writable
+	if err == nil {
+		// If running as root, the permission restriction may not apply
+		v2db.Close()
+		t.Skip("running as root; permission test not applicable")
+	}
+
+	// v2db should be nil after the failed open
+	if v2db != nil {
+		t.Fatal("v2db should be nil after failed open")
+	}
+
+	// Daemon should still start successfully with V2DB = nil
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  nil, // simulating graceful degradation from main.go
+	})
+	if err != nil {
+		t.Fatalf("NewServer should succeed without V2DB: %v", err)
+	}
+
+	if server.v2db != nil {
+		t.Error("v2db should be nil for graceful degradation")
+	}
+	if server.store != store {
+		t.Error("V1 store should still be operational")
 	}
 }
 

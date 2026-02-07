@@ -19,6 +19,7 @@ import (
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
 	"github.com/runger/clai/internal/suggestions/feedback"
 	"github.com/runger/clai/internal/suggestions/maintenance"
 )
@@ -32,6 +33,7 @@ type Server struct {
 
 	// Dependencies
 	store    storage.Store
+	v2db     *suggestdb.DB // V2 suggestions database (optional, enables V2 features)
 	ranker   suggest.Ranker
 	registry *provider.Registry
 
@@ -94,6 +96,10 @@ type ServerConfig struct {
 	// ingested command event for activity tracking.
 	MaintenanceRunner *maintenance.Runner
 
+	// V2DB is the V2 suggestions database (optional, enables V2 features).
+	// If nil, V2 features are disabled and the daemon operates with V1 only.
+	V2DB *suggestdb.DB
+
 	// ReloadFn is called on SIGHUP to reload configuration.
 	// If nil, SIGHUP is ignored.
 	ReloadFn ReloadFunc
@@ -145,6 +151,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 	now := time.Now()
 	return &Server{
 		store:             cfg.Store,
+		v2db:              cfg.V2DB,
 		ranker:            ranker,
 		registry:          registry,
 		paths:             paths,
