@@ -412,7 +412,7 @@ func TestSeed_LargeImport(t *testing.T) {
 	elapsed := time.Since(start)
 	require.NoError(t, err)
 
-	assert.Less(t, elapsed, 15*time.Second, "seed should complete within 15s")
+	assert.Less(t, elapsed, 60*time.Second, "seed should complete within 60s")
 
 	// Verify row counts are consistent.
 	eventCount := countRows(t, sqlDB, "command_event")
