@@ -18,6 +18,19 @@ Runs SonarQube/SonarCloud against files changed on the current branch, then iter
 - `host_url`: SonarQube URL (default `http://localhost:9000`)
 - `auth`: prefer `SONAR_TOKEN`; fallback `SONAR_USER` + `SONAR_PASSWORD`
 
+## Severity Models
+
+This skill understands both Sonar severity models and maps them consistently:
+
+- Software-quality labels: `blocker|high|medium|low|info` (preferred input)
+- API/legacy labels: `blocker|critical|major|minor|info`
+- Mapping used by this skill:
+  - `blocker` -> `BLOCKER`
+  - `high`/`critical` -> `CRITICAL`
+  - `medium`/`major` -> `MAJOR`
+  - `low`/`minor` -> `MINOR`
+  - `info` -> `INFO`
+
 ## Bundled Scripts
 
 - `scripts/run_changed_scan.sh`: starts local SonarQube container if needed, scans changed files, writes findings
@@ -49,6 +62,7 @@ Outputs (default directory `.sonarqube/`):
 - If user/context explicitly provides severity, use it.
 - If missing, ask once: `Which severity threshold? (blocker/high/medium/low/info)`.
 - If unanswered/ambiguous, default to `high`.
+- Accept both models on input (`medium` or `major`, `high` or `critical`, etc.) and apply the mapping above.
 
 4. For `cloud` mode, check MCP availability automatically before scanning.
 - Check available MCP servers and templates.

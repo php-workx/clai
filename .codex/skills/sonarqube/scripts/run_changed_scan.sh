@@ -12,7 +12,7 @@ actionable SonarQube findings at or above the selected severity threshold.
 
 Options:
   --base-ref <ref>            Git ref used to compute changed files
-  --severity <level>          blocker|high|medium|low|info (default: high)
+  --severity <level>          blocker|high|medium|low|info (aliases: critical|major|minor|all)
   --project-key <key>         Sonar project key (auto-detected if omitted)
   --host-url <url>            SonarQube URL (default: SONAR_HOST_URL or http://localhost:9000)
   --output-dir <dir>          Output directory (default: .sonarqube)
@@ -168,8 +168,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+SEVERITY="$(printf '%s' "$SEVERITY" | tr '[:upper:]' '[:lower:]')"
+
 case "$SEVERITY" in
-  blocker|high|medium|low|info|critical|all)
+  blocker|high|medium|low|info|critical|major|minor|all)
     ;;
   *)
     fail "invalid severity '$SEVERITY' (expected blocker|high|medium|low|info)"

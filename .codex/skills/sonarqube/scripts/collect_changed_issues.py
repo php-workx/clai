@@ -23,14 +23,18 @@ SEVERITY_ORDER = {
 }
 
 THRESHOLD_TO_SEVERITY = {
+    # Software-quality model (UI-first names).
     "info": "INFO",
     "low": "MINOR",
     "medium": "MAJOR",
     "high": "CRITICAL",
     "blocker": "BLOCKER",
-    # Backward-compatible aliases.
+    # API/legacy aliases.
+    "minor": "MINOR",
+    "major": "MAJOR",
+    "critical": "CRITICAL",
+    # Backward-compatible alias.
     "all": "INFO",
-    "critical": "BLOCKER",
 }
 
 
@@ -42,7 +46,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--severity-threshold",
         default="high",
-        help="Severity threshold: blocker|high|medium|low|info (aliases: critical, all)",
+        help=(
+            "Severity threshold: blocker|high|medium|low|info "
+            "(aliases: critical|major|minor|all)"
+        ),
     )
     parser.add_argument("--output-json", required=True)
     parser.add_argument("--output-md", required=True)
@@ -208,7 +215,8 @@ def main() -> int:
     if threshold not in THRESHOLD_TO_SEVERITY:
         raise RuntimeError(
             "invalid severity threshold "
-            f"'{args.severity_threshold}' (expected blocker|high|medium|low|info)"
+            f"'{args.severity_threshold}' "
+            "(expected blocker|high|medium|low|info; aliases: critical|major|minor|all)"
         )
 
     changed_files = load_changed_files(args.changed_files)
