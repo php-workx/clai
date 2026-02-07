@@ -15,6 +15,7 @@ func TestConfigCmd_List(t *testing.T) {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
+		"suggestions.scorer_version",
 		"history.picker_backend",
 		"history.picker_open_on_empty",
 		"history.picker_page_size",

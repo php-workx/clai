@@ -66,6 +66,9 @@ type Server struct {
 	// V2 scorer (nil if V2 disabled)
 	v2Scorer *suggest2.Scorer
 
+	// Scorer version: "v1" (default), "v2", or "blend"
+	scorerVersion string
+
 	// Backpressure
 	ingestionQueue *IngestionQueue
 	circuitBreaker *CircuitBreaker
@@ -116,6 +119,11 @@ type ServerConfig struct {
 	// If nil, V2 scoring is not available until dependencies are initialized
 	// (see the separate scorer dependency initialization).
 	V2Scorer *suggest2.Scorer
+
+	// ScorerVersion controls which suggestion scorer is used: "v1", "v2", or "blend".
+	// Default: "v1". When "v2" or "blend" is selected and V2Scorer is nil,
+	// falls back to "v1" with a warning.
+	ScorerVersion string
 
 	// ReloadFn is called on SIGHUP to reload configuration.
 	// If nil, SIGHUP is ignored.
@@ -182,6 +190,18 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		v2scorer = initV2Scorer(cfg.V2DB.DB(), logger)
 	}
 
+	// Determine scorer version with fallback logic
+	scorerVersion := cfg.ScorerVersion
+	if scorerVersion == "" {
+		scorerVersion = "v1"
+	}
+	if (scorerVersion == "v2" || scorerVersion == "blend") && v2scorer == nil {
+		logger.Warn("scorer_version requires V2 scorer but V2 is unavailable; falling back to v1",
+			"requested", scorerVersion,
+		)
+		scorerVersion = "v1"
+	}
+
 	now := time.Now()
 	return &Server{
 		store:             cfg.Store,
@@ -199,6 +219,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		maintenanceRunner: cfg.MaintenanceRunner,
 		batchWriter:       bw,
 		v2Scorer:          v2scorer,
+		scorerVersion:     scorerVersion,
 		ingestionQueue:    ingestQueue,
 		circuitBreaker:    cb,
 	}, nil

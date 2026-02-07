@@ -167,6 +167,9 @@ type SuggestionsConfig struct {
 	DirectoryScopingEnabled bool `yaml:"directory_scoping_enabled"` // Enable directory scoping
 	DirectoryScopeMaxDepth  int  `yaml:"directory_scope_max_depth"` // Max directory scope depth
 
+	// --- Scorer version ---
+	ScorerVersion string `yaml:"scorer_version"` // v1|v2|blend - which suggestion scorer to use
+
 	// --- Explainability ---
 	ExplainEnabled         bool    `yaml:"explain_enabled"`          // Enable explainability
 	ExplainMaxReasons      int     `yaml:"explain_max_reasons"`      // Max reasons in explanation
@@ -380,6 +383,9 @@ func DefaultSuggestionsConfig() SuggestionsConfig {
 		// Directory scope
 		DirectoryScopingEnabled: true,
 		DirectoryScopeMaxDepth:  3,
+
+		// Scorer version
+		ScorerVersion: "v1",
 
 		// Explainability
 		ExplainEnabled:         true,
@@ -687,6 +693,8 @@ func (c *Config) getSuggestionsField(field string) (string, error) {
 		return strconv.Itoa(c.Suggestions.MaxAI), nil
 	case "show_risk_warning":
 		return strconv.FormatBool(c.Suggestions.ShowRiskWarning), nil
+	case "scorer_version":
+		return c.Suggestions.ScorerVersion, nil
 	default:
 		return "", fmt.Errorf("unknown field: suggestions.%s", field)
 	}
@@ -724,6 +732,11 @@ func (c *Config) setSuggestionsField(field, value string) error {
 			return fmt.Errorf("invalid value for show_risk_warning: %w", err)
 		}
 		c.Suggestions.ShowRiskWarning = v
+	case "scorer_version":
+		if !isValidScorerVersion(value) {
+			return fmt.Errorf("invalid scorer_version: %s (must be v1, v2, or blend)", value)
+		}
+		c.Suggestions.ScorerVersion = value
 	default:
 		return fmt.Errorf("unknown field: suggestions.%s", field)
 	}
@@ -922,6 +935,7 @@ func ListKeys() []string {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
+		"suggestions.scorer_version",
 		"history.picker_backend",
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
@@ -1092,6 +1106,12 @@ func (s *SuggestionsConfig) ValidateAndFix() []ValidationWarning {
 		s.ShimMode = "auto"
 	}
 
+	// --- Enum: scorer_version ---
+	if !isValidScorerVersion(s.ScorerVersion) {
+		warn("scorer_version", fmt.Sprintf("must be v1, v2, or blend, got %q; falling back to v1", s.ScorerVersion))
+		s.ScorerVersion = "v1"
+	}
+
 	// --- Enum: search_fts_tokenizer ---
 	if !isValidFTSTokenizer(s.SearchFTSTokenizer) {
 		warn("search_fts_tokenizer", fmt.Sprintf("must be trigram or unicode61, got %q; falling back to trigram", s.SearchFTSTokenizer))
@@ -1122,6 +1142,15 @@ func isValidShimMode(mode string) bool {
 func isValidFTSTokenizer(tokenizer string) bool {
 	switch tokenizer {
 	case "trigram", "unicode61":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidScorerVersion(version string) bool {
+	switch version {
+	case "v1", "v2", "blend":
 		return true
 	default:
 		return false
