@@ -15,7 +15,7 @@ import (
 //   - Charset sequences: ESC ( B, ESC ) B, etc.
 //   - Other two-byte escapes: ESC followed by a single byte in [#()*+\-./]
 var ansiRE = regexp.MustCompile(`\x1b(?:` +
-	`\[[?]?[0-9;]*[A-Za-z]` + // CSI sequences (SGR, cursor, private-mode, etc.)
+	`\[[0-9;?]*[ -/]*[@-~]` + // CSI sequences (incl. private-mode + intermediates)
 	`|` +
 	`\].*?(?:\x1b\\|\x07)` + // OSC sequences (terminated by ST or BEL)
 	`|` +

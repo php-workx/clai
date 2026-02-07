@@ -55,6 +55,7 @@ func TestStripANSI_PrivateMode(t *testing.T) {
 		{"bracketed paste mode", "\x1b[?2004hcontent\x1b[?2004l", "content"},
 		{"mixed with SGR", "\x1b[?25l\x1b[31mred\x1b[0m\x1b[?25h", "red"},
 		{"multiple params", "\x1b[?1;25h", ""},
+		{"CSI with intermediate bytes", "\x1b[1 qblock", "block"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
