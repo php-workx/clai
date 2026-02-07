@@ -562,7 +562,7 @@ func (s *Server) ImportHistory(ctx context.Context, req *pb.HistoryImportRequest
 	case "bash":
 		entries, err = history.ImportBashHistory(req.HistoryPath)
 	case "zsh":
-		entries, err = history.ImportZshHistory(req.HistoryPath)
+		entries, err = history.ImportZshHistory(ctx, req.HistoryPath)
 	case "fish":
 		entries, err = history.ImportFishHistory(req.HistoryPath)
 	default:

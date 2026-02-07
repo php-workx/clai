@@ -1,6 +1,7 @@
 package history
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -106,7 +107,7 @@ func TestImportZshHistory_Extended(t *testing.T) {
 : 1706000003:10;echo hello
 `
 	path := writeTempFile(t, content)
-	entries, err := ImportZshHistory(path)
+	entries, err := ImportZshHistory(context.Background(), path)
 	require.NoError(t, err)
 
 	assert.Len(t, entries, 3)
@@ -128,7 +129,7 @@ git status
 echo hello
 `
 	path := writeTempFile(t, content)
-	entries, err := ImportZshHistory(path)
+	entries, err := ImportZshHistory(context.Background(), path)
 	require.NoError(t, err)
 
 	assert.Len(t, entries, 3)
@@ -144,7 +145,7 @@ alpine
 : 1706000002:0;ls -la
 `
 	path := writeTempFile(t, content)
-	entries, err := ImportZshHistory(path)
+	entries, err := ImportZshHistory(context.Background(), path)
 	require.NoError(t, err)
 
 	assert.Len(t, entries, 2)
@@ -159,7 +160,7 @@ func TestImportZshHistory_EscapedBackslash(t *testing.T) {
 : 1706000002:0;ls -la
 `
 	path := writeTempFile(t, content)
-	entries, err := ImportZshHistory(path)
+	entries, err := ImportZshHistory(context.Background(), path)
 	require.NoError(t, err)
 
 	assert.Len(t, entries, 2)
@@ -169,9 +170,19 @@ func TestImportZshHistory_EscapedBackslash(t *testing.T) {
 
 func TestImportZshHistory_EmptyFile(t *testing.T) {
 	path := writeTempFile(t, "")
-	entries, err := ImportZshHistory(path)
+	entries, err := ImportZshHistory(context.Background(), path)
 	require.NoError(t, err)
 	assert.Empty(t, entries)
+}
+
+func TestImportZshHistory_ContextCanceled(t *testing.T) {
+	path := writeTempFile(t, ": 1706000001:0;echo hello\n")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	entries, err := ImportZshHistory(ctx, path)
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Nil(t, entries)
 }
 
 // --- Fish history import tests ---
@@ -325,6 +336,8 @@ func TestDecodeFishEscapes(t *testing.T) {
 // --- ImportForShell tests ---
 
 func TestImportForShell_Bash(t *testing.T) {
+	t.Setenv("SHELL", "/bin/bash")
+
 	// Create a temp bash history file
 	dir := t.TempDir()
 	histFile := filepath.Join(dir, ".bash_history")
@@ -434,9 +447,21 @@ func TestDetectShell_FullPaths(t *testing.T) {
 // --- Path resolution tests ---
 
 func TestBashHistoryPath_WithHISTFILE(t *testing.T) {
+	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv("BASH_VERSION", "5.2.0")
 	t.Setenv("HISTFILE", "/custom/path/.bash_history")
 	path := bashHistoryPath()
 	assert.Equal(t, "/custom/path/.bash_history", path)
+}
+
+func TestBashHistoryPath_WithHISTFILE_NonBashIgnoresEnv(t *testing.T) {
+	t.Setenv("SHELL", "/bin/zsh")
+	t.Setenv("BASH_VERSION", "")
+	t.Setenv("HISTFILE", "/custom/path/.bash_history")
+
+	path := bashHistoryPath()
+	home, _ := os.UserHomeDir()
+	assert.Equal(t, filepath.Join(home, ".bash_history"), path)
 }
 
 func TestBashHistoryPath_WithoutHISTFILE(t *testing.T) {

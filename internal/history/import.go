@@ -3,6 +3,7 @@ package history
 
 import (
 	"bufio"
+	"context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -81,7 +82,14 @@ func ImportBashHistory(path string) ([]ImportEntry, error) {
 // Zsh extended history format: `: <timestamp>:<duration>;<command>`
 // Handles multiline commands with backslash continuation.
 // Returns up to MaxImportEntries most recent entries.
-func ImportZshHistory(path string) ([]ImportEntry, error) {
+func ImportZshHistory(ctx context.Context, path string) ([]ImportEntry, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
 	if path == "" {
 		path = zshHistoryPath()
 	}
@@ -104,6 +112,9 @@ func ImportZshHistory(path string) ([]ImportEntry, error) {
 
 	var p importParser
 	for scanner.Scan() {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		p.processLine(scanner.Text())
 	}
 
@@ -116,6 +127,9 @@ func ImportZshHistory(path string) ([]ImportEntry, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
@@ -313,7 +327,7 @@ func decodeFishEscapes(s string) string {
 
 // bashHistoryPath returns the path to bash history file.
 func bashHistoryPath() string {
-	if histFile := os.Getenv("HISTFILE"); histFile != "" {
+	if histFile := os.Getenv("HISTFILE"); histFile != "" && shellLooksLikeBash() {
 		return histFile
 	}
 	home, err := os.UserHomeDir()
@@ -367,6 +381,15 @@ func DetectShell() string {
 // ImportForShell imports history for the specified shell.
 // Shell can be "bash", "zsh", "fish", or "auto" (detect from SHELL env).
 func ImportForShell(shell string) ([]ImportEntry, error) {
+	return ImportForShellWithContext(context.Background(), shell)
+}
+
+// ImportForShellWithContext imports history for the specified shell with
+// cancellation support for zsh history parsing.
+func ImportForShellWithContext(ctx context.Context, shell string) ([]ImportEntry, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if shell == "auto" || shell == "" {
 		shell = DetectShell()
 	}
@@ -375,10 +398,18 @@ func ImportForShell(shell string) ([]ImportEntry, error) {
 	case "bash":
 		return ImportBashHistory("")
 	case "zsh":
-		return ImportZshHistory("")
+		return ImportZshHistory(ctx, "")
 	case "fish":
 		return ImportFishHistory("")
 	default:
 		return nil, nil
 	}
+}
+
+func shellLooksLikeBash() bool {
+	if os.Getenv("BASH_VERSION") != "" {
+		return true
+	}
+	shell := strings.ToLower(os.Getenv("SHELL"))
+	return strings.Contains(shell, "bash")
 }
