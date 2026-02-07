@@ -698,6 +698,7 @@ _clai_picker_accept() {
 }
 
 _clai_picker_up() {
+    _ai_clear_ghost_text
     # Fast path: if picker is already open, navigate without external commands
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         local last_index=$((${#_CLAI_PICKER_ITEMS[@]} - 1))
@@ -729,7 +730,7 @@ _clai_picker_up() {
     fi
     # Not in picker — try TUI picker first, then inline picker
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-        zle .up-line-or-history
+        _ai_up_line_or_history
         return
     fi
     if _clai_has_tui_picker; then
@@ -737,7 +738,7 @@ _clai_picker_up() {
         return
     fi
     if ! _clai_config_enabled; then
-        zle .up-line-or-history
+        _ai_up_line_or_history
         return
     fi
     _clai_picker_open history
@@ -753,7 +754,7 @@ _clai_picker_down() {
         # At bottom (index 0): do nothing
         return
     fi
-    zle .down-line-or-history
+    _ai_down_line_or_history
 }
 
 _clai_picker_suggest() {
@@ -826,6 +827,15 @@ zle -N _clai_history_scope_cwd
 zle -N _clai_history_scope_global
 zle -N send-break _clai_picker_break
 
+# Bind inline picker controls.
+bindkey '^I' _clai_picker_suggest
+bindkey '^M' _clai_picker_accept
+bindkey '^[[B' _clai_picker_down
+bindkey '^[OB' _clai_picker_down
+bindkey '^Xs' _clai_history_scope_session
+bindkey '^Xd' _clai_history_scope_cwd
+bindkey '^Xg' _clai_history_scope_global
+
 # Alt/Option+H opens TUI picker.
 # '\eh' works when the terminal sends ESC for Alt (Linux, or macOS with
 # "Use Option as Meta key" enabled). The literal '˙' covers macOS
@@ -836,21 +846,8 @@ bindkey '˙' _clai_tui_picker_open
 # When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
 # (with fallback to shell default). Otherwise shell defaults are used.
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
-    _clai_up_arrow() {
-        _ai_clear_ghost_text
-        if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-            zle .up-line-or-history
-            return
-        fi
-        if _clai_has_tui_picker; then
-            _clai_tui_picker_open
-        else
-            zle .up-line-or-history
-        fi
-    }
-    zle -N _clai_up_arrow
-    bindkey '^[[A' _clai_up_arrow    # Up arrow (CSI mode)
-    bindkey '^[OA' _clai_up_arrow    # Up arrow (application mode)
+    bindkey '^[[A' _clai_picker_up    # Up arrow (CSI mode)
+    bindkey '^[OA' _clai_picker_up    # Up arrow (application mode)
 fi
 
 # ============================================

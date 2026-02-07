@@ -247,6 +247,32 @@ func TestZshScript_ApplicationModeArrowBindings(t *testing.T) {
 	}
 }
 
+func TestZshScript_PickerWidgetsAreBound(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	required := []string{
+		`bindkey '^I' _clai_picker_suggest`,
+		`bindkey '^M' _clai_picker_accept`,
+		`bindkey '^[[B' _clai_picker_down`,
+		`bindkey '^[OB' _clai_picker_down`,
+		`bindkey '^Xs' _clai_history_scope_session`,
+		`bindkey '^Xd' _clai_history_scope_cwd`,
+		`bindkey '^Xg' _clai_history_scope_global`,
+		`bindkey '^[[A' _clai_picker_up`,
+		`bindkey '^[OA' _clai_picker_up`,
+	}
+
+	for _, binding := range required {
+		if !strings.Contains(script, binding) {
+			t.Errorf("zsh script missing picker binding %s", binding)
+		}
+	}
+}
+
 // TestZshScript_EditingWidgetsDismissPicker verifies that all editing and
 // cursor-movement ZLE widgets call _clai_dismiss_picker to close the
 // suggestion menu when the user starts editing.
