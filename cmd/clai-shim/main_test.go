@@ -77,3 +77,8 @@ func TestParseFlags_ValueStartsWithDash(t *testing.T) {
 	assert.Equal(t, "true", result["flag1"])
 	assert.Equal(t, "true", result["flag2"])
 }
+
+func TestParseFlags_SingleDashValue(t *testing.T) {
+	result := parseFlags([]string{"--flag", "-value"})
+	assert.Equal(t, "-value", result["flag"])
+}
