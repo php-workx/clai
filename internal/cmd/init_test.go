@@ -677,6 +677,21 @@ func TestFishScript_TUIPickerQuotesSingleValueArgs(t *testing.T) {
 	}
 }
 
+func TestFishScript_DateNanosecondsGuardIsNumeric(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+	if err != nil {
+		t.Fatalf("Failed to read fish script: %v", err)
+	}
+	script := string(content)
+
+	if !strings.Contains(script, `set -l _ns (command date +%s%N 2>/dev/null)`) {
+		t.Error("fish script missing guarded nanosecond timestamp capture")
+	}
+	if !strings.Contains(script, `string match -rq '^[0-9]+$' -- $_ns`) {
+		t.Error("fish script missing numeric nanosecond guard")
+	}
+}
+
 func TestBashScript_HistoryPickerUsesPromptQuery(t *testing.T) {
 	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
 	if err != nil {

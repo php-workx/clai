@@ -581,9 +581,11 @@ function _clai_preexec --on-event fish_preexec
 
     # Generate unique command ID
     set -g _CLAI_COMMAND_ID "$CLAI_SESSION_ID-"(date +%s)"-"(random)
-    # Store start time in milliseconds. Use nanoseconds if available (GNU coreutils).
-    if command date +%s%N >/dev/null 2>&1
-        set -g _CLAI_COMMAND_START_TIME (math (command date +%s%N) / 1000000)
+    # Store start time in milliseconds. Use nanoseconds if available.
+    # On macOS/BSD, date +%s%N may output a literal trailing "N".
+    set -l _ns (command date +%s%N 2>/dev/null)
+    if string match -rq '^[0-9]+$' -- $_ns
+        set -g _CLAI_COMMAND_START_TIME (math $_ns / 1000000)
     else
         set -g _CLAI_COMMAND_START_TIME (math (command date +%s) \* 1000)
     end
@@ -602,10 +604,11 @@ function _clai_postexec --on-event fish_postexec
         return
     end
 
-    # Calculate end time in milliseconds. Use nanoseconds if available (GNU coreutils).
+    # Calculate end time in milliseconds. Use nanoseconds if available.
     set -l end_time
-    if command date +%s%N >/dev/null 2>&1
-        set end_time (math (command date +%s%N) / 1000000)
+    set -l _ns (command date +%s%N 2>/dev/null)
+    if string match -rq '^[0-9]+$' -- $_ns
+        set end_time (math $_ns / 1000000)
     else
         set end_time (math (command date +%s) \* 1000)
     end
