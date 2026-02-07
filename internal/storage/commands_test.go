@@ -1296,6 +1296,104 @@ func TestSQLiteStore_QueryHistoryCommands_EmptyResult(t *testing.T) {
 	}
 }
 
+func TestSQLiteStore_QueryHistoryCommands_TimestampTieStillDedupes(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	session := &Session{
+		SessionID:       "tie-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Same normalized command and identical timestamp.
+	for i, cmdText := range []string{"git status", "git   status"} {
+		cmd := &Command{
+			CommandID:     "tie-cmd-" + string(rune('a'+i)),
+			SessionID:     session.SessionID,
+			TsStartUnixMs: 1700000005000,
+			CWD:           "/tmp",
+			Command:       cmdText,
+			IsSuccess:     boolPtr(true),
+		}
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand() error = %v", err)
+		}
+	}
+
+	results, err := store.QueryHistoryCommands(ctx, CommandQuery{Limit: 100})
+	if err != nil {
+		t.Fatalf("QueryHistoryCommands() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1 deduped result", len(results))
+	}
+}
+
+func TestSQLiteStore_QueryCommands_LikeEscaping(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	session := &Session{
+		SessionID:       "escape-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	commands := []string{"abc%def", "abcXdef", "foo_bar", "fooXbar"}
+	for i, c := range commands {
+		cmd := &Command{
+			CommandID:     "escape-cmd-" + string(rune('a'+i)),
+			SessionID:     session.SessionID,
+			TsStartUnixMs: int64(1700000001000 + i),
+			CWD:           "/tmp",
+			Command:       c,
+			IsSuccess:     boolPtr(true),
+		}
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand() error = %v", err)
+		}
+	}
+
+	prefixResults, err := store.QueryCommands(ctx, CommandQuery{
+		Prefix: "abc%def",
+		Limit:  100,
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands(prefix) error = %v", err)
+	}
+	if len(prefixResults) != 1 || prefixResults[0].Command != "abc%def" {
+		t.Fatalf("prefix escape mismatch: got %+v", prefixResults)
+	}
+
+	substringResults, err := store.QueryCommands(ctx, CommandQuery{
+		Substring: "foo_bar",
+		Limit:     100,
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands(substring) error = %v", err)
+	}
+	if len(substringResults) != 1 || substringResults[0].Command != "foo_bar" {
+		t.Fatalf("substring escape mismatch: got %+v", substringResults)
+	}
+}
+
 func TestSQLiteStore_QueryCommands_StatusWithOtherFilters(t *testing.T) {
 	t.Parallel()
 

@@ -5,11 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/runger/clai/internal/cmdutil"
 )
 
-const commandNormLikeClause = " AND command_norm LIKE ?"
+const commandNormLikeClause = " AND command_norm LIKE ? ESCAPE '\\'"
 
 // ErrCommandNotFound is returned when a command is not found.
 var ErrCommandNotFound = errors.New("command not found")
@@ -199,62 +200,54 @@ func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) 
 }
 
 func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
-	// Build WHERE clause conditions for inner subquery (no table prefix needed)
-	// and outer query (with 'c.' prefix for the commands table alias)
 	innerWhere := " WHERE 1=1"
-	outerWhere := " WHERE 1=1"
 	args := make([]interface{}, 0)
 
 	if q.SessionID != nil {
 		innerWhere += " AND session_id = ?"
-		outerWhere += " AND c.session_id = ?"
 		args = append(args, *q.SessionID)
 	}
 	if q.ExcludeSessionID != "" {
 		innerWhere += " AND session_id != ?"
-		outerWhere += " AND c.session_id != ?"
 		args = append(args, q.ExcludeSessionID)
 	}
 	if q.CWD != nil {
 		innerWhere += " AND cwd = ?"
-		outerWhere += " AND c.cwd = ?"
 		args = append(args, *q.CWD)
 	}
 	if q.Prefix != "" {
+		prefix := escapeLikePattern(q.Prefix)
 		innerWhere += commandNormLikeClause
-		outerWhere += " AND c.command_norm LIKE ?"
-		args = append(args, q.Prefix+"%")
+		args = append(args, prefix+"%")
 	}
 	if q.Substring != "" {
+		substring := escapeLikePattern(q.Substring)
 		innerWhere += commandNormLikeClause
-		outerWhere += " AND c.command_norm LIKE ?"
-		args = append(args, "%"+q.Substring+"%")
+		args = append(args, "%"+substring+"%")
 	}
 	if q.SuccessOnly {
 		innerWhere += " AND is_success = 1"
-		outerWhere += " AND c.is_success = 1"
 	}
 	if q.FailureOnly {
 		innerWhere += " AND is_success = 0"
-		outerWhere += " AND c.is_success = 0"
 	}
 
-	// Use subquery to get deterministic results: the actual command text from
-	// the row with the latest timestamp for each command_norm.
-	// The subquery finds MAX(ts_start_unix_ms) per command_norm, then we join
-	// back to get the actual row with that timestamp.
+	// Use a window function to deterministically keep only the latest row per
+	// command_norm. Include id as a tie-breaker when timestamps are equal.
 	query := `
-		SELECT c.command, c.ts_start_unix_ms
-		FROM commands c
-		INNER JOIN (
-			SELECT command_norm, MAX(ts_start_unix_ms) as max_ts
+		SELECT command, ts_start_unix_ms
+		FROM (
+			SELECT
+				command,
+				ts_start_unix_ms,
+				ROW_NUMBER() OVER (
+					PARTITION BY command_norm
+					ORDER BY ts_start_unix_ms DESC, id DESC
+				) AS rn
 			FROM commands` + innerWhere + `
-			GROUP BY command_norm
-		) latest ON c.command_norm = latest.command_norm AND c.ts_start_unix_ms = latest.max_ts` + outerWhere + `
-		ORDER BY c.ts_start_unix_ms DESC`
-
-	// Args are used twice: once for subquery, once for outer WHERE
-	args = append(args, args...)
+		) ranked
+		WHERE rn = 1
+		ORDER BY ts_start_unix_ms DESC`
 
 	if q.Limit > 0 {
 		query += " LIMIT ?"
@@ -299,11 +292,11 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	}
 	if q.Prefix != "" {
 		query += commandNormLikeClause
-		args = append(args, q.Prefix+"%")
+		args = append(args, escapeLikePattern(q.Prefix)+"%")
 	}
 	if q.Substring != "" {
 		query += commandNormLikeClause
-		args = append(args, "%"+q.Substring+"%")
+		args = append(args, "%"+escapeLikePattern(q.Substring)+"%")
 	}
 	if q.SuccessOnly {
 		query += " AND is_success = 1"
@@ -330,6 +323,13 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	}
 
 	return query, args
+}
+
+func escapeLikePattern(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `%`, `\%`)
+	escaped = strings.ReplaceAll(escaped, `_`, `\_`)
+	return escaped
 }
 
 func scanCommandRow(rows *sql.Rows) (Command, error) {
