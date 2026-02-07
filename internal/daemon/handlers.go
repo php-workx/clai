@@ -156,6 +156,9 @@ func (s *Server) CommandStarted(ctx context.Context, req *pb.CommandStartRequest
 		return &pb.Ack{Ok: false, Error: err.Error()}, nil
 	}
 
+	// Stash command data in session for V2 pipeline (CommandEnded reads it back)
+	s.sessionManager.StashCommand(req.SessionId, req.CommandId, req.Command, req.Cwd, req.GitRepoName, req.GitBranch)
+
 	s.logger.Debug("command started",
 		"command_id", req.CommandId,
 		"session_id", req.SessionId,

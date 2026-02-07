@@ -15,6 +15,13 @@ type SessionInfo struct {
 	CWD          string
 	StartedAt    time.Time
 	LastActivity time.Time
+
+	// Stashed command data from CommandStarted for CommandEnded to read.
+	LastCmdRaw    string // Raw command from CommandStarted
+	LastCmdCWD    string // CWD from CommandStarted
+	LastGitRepo   string // Git repo name from CommandStarted
+	LastGitBranch string // Git branch from CommandStarted
+	LastCmdID     string // Command ID from CommandStarted
 }
 
 // SessionManager tracks active sessions.
@@ -87,6 +94,21 @@ func (m *SessionManager) UpdateCWD(sessionID, cwd string) {
 
 	if info, ok := m.sessions[sessionID]; ok {
 		info.CWD = cwd
+		info.LastActivity = time.Now()
+	}
+}
+
+// StashCommand stores command data from CommandStarted for later retrieval by CommandEnded.
+func (m *SessionManager) StashCommand(sessionID, cmdID, cmdRaw, cwd, gitRepo, gitBranch string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if info, ok := m.sessions[sessionID]; ok {
+		info.LastCmdRaw = cmdRaw
+		info.LastCmdCWD = cwd
+		info.LastGitRepo = gitRepo
+		info.LastGitBranch = gitBranch
+		info.LastCmdID = cmdID
 		info.LastActivity = time.Now()
 	}
 }
