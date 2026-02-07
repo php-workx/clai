@@ -22,6 +22,7 @@ import (
 	"github.com/runger/clai/internal/suggestions/batch"
 	suggestdb "github.com/runger/clai/internal/suggestions/db"
 	"github.com/runger/clai/internal/suggestions/feedback"
+	"github.com/runger/clai/internal/suggestions/ingest"
 	"github.com/runger/clai/internal/suggestions/maintenance"
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
@@ -178,7 +179,9 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 	if cfg.BatchWriter != nil {
 		bw = cfg.BatchWriter
 	} else if cfg.V2DB != nil {
-		bw = batch.NewWriter(cfg.V2DB.DB(), batch.DefaultOptions())
+		opts := batch.DefaultOptions()
+		opts.WritePathConfig = &ingest.WritePathConfig{}
+		bw = batch.NewWriter(cfg.V2DB.DB(), opts)
 	}
 
 	// Initialize V2 scorer: use explicit scorer if provided, otherwise

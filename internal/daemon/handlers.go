@@ -204,6 +204,8 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 				Shell:      event.Shell(info.Shell),
 				Cwd:        info.LastCmdCWD,
 				CmdRaw:     info.LastCmdRaw,
+				RepoKey:    info.LastGitRepo,
+				Branch:     info.LastGitBranch,
 				ExitCode:   int(req.ExitCode),
 				DurationMs: &durationMs,
 				Ts:         time.Now().UnixMilli(),

@@ -12,7 +12,7 @@ package batch
 import (
 	"context"
 	"database/sql"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -51,6 +51,9 @@ type Options struct {
 	// When set, each event in the batch also populates V2 aggregate tables
 	// (command_template, command_stat, transition_stat, etc.) via WritePath.
 	WritePathConfig *ingest.WritePathConfig
+
+	// Logger is the structured logger (optional, uses slog.Default if nil).
+	Logger *slog.Logger
 }
 
 // DefaultOptions returns the default batch writer options.
@@ -62,18 +65,24 @@ func DefaultOptions() Options {
 	}
 }
 
+// maxSessionEntries is the maximum number of session entries to keep in memory.
+// When exceeded, the oldest entries are evicted.
+const maxSessionEntries = 256
+
 // sessionState tracks per-session state for transition tracking across batches.
 type sessionState struct {
 	lastTemplateID string
 	lastExitCode   int
 	lastFailed     bool
+	lastSeen       time.Time
 }
 
 // Writer batches events and writes them to SQLite in transactions.
 // It is safe for concurrent use.
 type Writer struct {
-	db   *sql.DB
-	opts Options
+	db     *sql.DB
+	opts   Options
+	logger *slog.Logger
 
 	eventCh   chan *event.CommandEvent
 	flushCh   chan struct{}
@@ -109,9 +118,15 @@ func NewWriter(db *sql.DB, opts Options) *Writer {
 		opts.QueueSize = DefaultQueueSize
 	}
 
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	return &Writer{
 		db:        db,
 		opts:      opts,
+		logger:    logger,
 		eventCh:   make(chan *event.CommandEvent, opts.QueueSize),
 		flushCh:   make(chan struct{}, 1),
 		doneCh:    make(chan struct{}),
@@ -263,8 +278,8 @@ func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
 		// Build the WritePathContext with transition state
 		wctx := ingest.PrepareWriteContext(
 			ev,
-			"", // repoKey - not yet computed by batch writer
-			"", // branch - not yet computed by batch writer
+			ev.RepoKey,
+			ev.Branch,
 			sess.lastTemplateID,
 			sess.lastExitCode,
 			sess.lastFailed,
@@ -273,8 +288,11 @@ func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
 
 		result, err := ingest.WritePath(ctx, w.db, wctx, *w.opts.WritePathConfig)
 		if err != nil {
-			log.Printf("batch: WritePath error for event (session=%s, cmd=%q): %v",
-				ev.SessionID, ev.CmdRaw, err)
+			w.logger.Warn("batch WritePath error",
+				"session_id", ev.SessionID,
+				"cmd_raw", ev.CmdRaw,
+				"error", err,
+			)
 			continue // Skip this event, don't fail the batch
 		}
 
@@ -282,9 +300,49 @@ func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
 		sess.lastTemplateID = result.TemplateID
 		sess.lastExitCode = ev.ExitCode
 		sess.lastFailed = ev.ExitCode != 0
+		sess.lastSeen = time.Now()
+	}
+
+	// Evict stale sessions if map exceeds bound
+	if len(w.sessions) > maxSessionEntries {
+		w.evictStaleSessions()
 	}
 
 	return nil
+}
+
+// evictStaleSessions removes the oldest half of session entries when the map exceeds bounds.
+func (w *Writer) evictStaleSessions() {
+	// Find the oldest entries and remove them
+	type entry struct {
+		id       string
+		lastSeen time.Time
+	}
+	entries := make([]entry, 0, len(w.sessions))
+	for id, s := range w.sessions {
+		entries = append(entries, entry{id: id, lastSeen: s.lastSeen})
+	}
+	// Simple approach: remove entries older than 1 hour first
+	cutoff := time.Now().Add(-1 * time.Hour)
+	removed := 0
+	for _, e := range entries {
+		if e.lastSeen.Before(cutoff) {
+			delete(w.sessions, e.id)
+			removed++
+		}
+	}
+	// If still over limit, remove oldest half
+	if len(w.sessions) > maxSessionEntries && removed == 0 {
+		count := 0
+		target := len(w.sessions) / 2
+		for id := range w.sessions {
+			if count >= target {
+				break
+			}
+			delete(w.sessions, id)
+			count++
+		}
+	}
 }
 
 // writeBatchRaw writes a batch of events as raw INSERTs in a single transaction.

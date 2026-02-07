@@ -48,6 +48,12 @@ type CommandEvent struct {
 	// CmdRaw is the raw command string as entered by the user.
 	CmdRaw string `json:"cmd_raw"`
 
+	// RepoKey is the git repository identifier (empty if not in a repo).
+	RepoKey string `json:"repo_key,omitempty"`
+
+	// Branch is the current git branch (empty if not in a repo).
+	Branch string `json:"branch,omitempty"`
+
 	// ExitCode is the exit code of the command.
 	ExitCode int `json:"exit_code"`
 
