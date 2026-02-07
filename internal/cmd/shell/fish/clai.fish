@@ -109,7 +109,7 @@ function _clai_tui_picker_open
     if not _clai_has_tui_picker
         return 2
     end
-    set -l result (clai-picker history --query=(commandline) --session=$CLAI_SESSION_ID --cwd=$PWD 2>/dev/null)
+    set -l result (clai-picker history --query=(commandline) --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
     set -l exit_code $status
     if test $exit_code -eq 0
         commandline -r -- $result

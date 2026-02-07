@@ -658,6 +658,25 @@ func TestFishScript_UpArrowApplicationModeBinding(t *testing.T) {
 	}
 }
 
+func TestFishScript_TUIPickerQuotesSingleValueArgs(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+	if err != nil {
+		t.Fatalf("Failed to read fish script: %v", err)
+	}
+	script := string(content)
+
+	required := []string{
+		`--session="$CLAI_SESSION_ID"`,
+		`--cwd="$PWD"`,
+	}
+
+	for _, arg := range required {
+		if !strings.Contains(script, arg) {
+			t.Errorf("fish script missing quoted argument %s", arg)
+		}
+	}
+}
+
 func TestBashScript_HistoryPickerUsesPromptQuery(t *testing.T) {
 	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
 	if err != nil {
