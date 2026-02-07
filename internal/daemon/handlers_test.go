@@ -2434,6 +2434,16 @@ func TestStripANSI(t *testing.T) {
 			input:    "text\x1b[2Amore",
 			expected: "textmore",
 		},
+		{
+			name:     "OSC title sequence",
+			input:    "\x1b]0;title\x07git status",
+			expected: "git status",
+		},
+		{
+			name:     "private mode sequence",
+			input:    "\x1b[?25lhidden\x1b[?25h",
+			expected: "hidden",
+		},
 	}
 
 	for _, tt := range tests {

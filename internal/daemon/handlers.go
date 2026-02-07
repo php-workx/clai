@@ -457,7 +457,15 @@ func (s *Server) GetStatus(ctx context.Context, req *pb.Ack) (*pb.StatusResponse
 }
 
 // ansiRegexp matches ANSI escape sequences for stripping from command text.
-var ansiRegexp = regexp.MustCompile(`\x1b\[[0-9;]*[a-zA-Z]`)
+var ansiRegexp = regexp.MustCompile(`\x1b(?:` +
+	`\[[0-9;?]*[ -/]*[@-~]` + // CSI sequences (incl. private modes)
+	`|` +
+	`\].*?(?:\x1b\\|\x07)` + // OSC sequences (ST or BEL terminated)
+	`|` +
+	`[()][A-B0-2]` + // Charset designation
+	`|` +
+	`[#()*+\-./][A-Za-z0-9]` + // Other two-byte escape sequences
+	`)`)
 
 // stripANSI removes ANSI escape sequences from a string.
 func stripANSI(s string) string {
