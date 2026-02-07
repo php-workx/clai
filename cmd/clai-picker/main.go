@@ -244,13 +244,13 @@ func dispatchBackend(backend string, cfg *config.Config, opts *pickerOpts) int {
 	case "fzf":
 		return dispatchFzf(ctx, cfg, opts)
 	case "clai":
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltin(ctx, cfg, opts)
 	case "builtin":
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltin(ctx, cfg, opts)
 	default:
 		// Unknown backend, fall back to builtin.
 		debugLog("unknown backend %q, falling back to builtin", backend)
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltin(ctx, cfg, opts)
 	}
 }
 
@@ -319,7 +319,7 @@ func socketPath(cfg *config.Config) string {
 }
 
 // dispatchBuiltin runs the built-in Bubble Tea TUI.
-func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
+func dispatchBuiltin(_ context.Context, cfg *config.Config, opts *pickerOpts) int {
 	tabs := resolveTabs(cfg, opts)
 	provider := picker.NewHistoryProvider(socketPath(cfg))
 	defer provider.Close()
@@ -378,7 +378,7 @@ func dispatchFzf(ctx context.Context, cfg *config.Config, opts *pickerOpts) int 
 	_, err := exec.LookPath("fzf")
 	if err != nil {
 		debugLog("fzf not found on PATH, falling back to builtin")
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltin(ctx, cfg, opts)
 	}
 
 	result, cancelled, err := runFzfBackend(ctx, cfg, opts)
