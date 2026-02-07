@@ -1525,6 +1525,60 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 	}
 }
 
+// TestNewServer_V2ScorerInitialized verifies that the V2 scorer is auto-initialized
+// when a V2DB is provided but no explicit V2Scorer is configured.
+func TestNewServer_V2ScorerInitialized(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	if server.v2Scorer == nil {
+		t.Error("v2Scorer should be non-nil when V2DB is provided")
+	}
+	if server.v2db != v2db {
+		t.Error("v2db should be set to the provided database")
+	}
+}
+
+// TestNewServer_V2ScorerNilWithoutV2 verifies that the V2 scorer is nil
+// when no V2DB is provided (V1-only mode).
+func TestNewServer_V2ScorerNilWithoutV2(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  nil,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	if server.v2Scorer != nil {
+		t.Error("v2Scorer should be nil when V2DB is not provided")
+	}
+}
+
 // Ensure mock types satisfy their interfaces.
 var _ storage.Store = (*mockStore)(nil)
 var _ storage.Store = (*mockStoreWithPruning)(nil)

@@ -173,11 +173,13 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		bw = batch.NewWriter(cfg.V2DB.DB(), batch.DefaultOptions())
 	}
 
-	// Initialize V2 scorer (nil-safe: only if explicitly provided)
-	// Full scorer dependency wiring is handled separately.
+	// Initialize V2 scorer: use explicit scorer if provided, otherwise
+	// auto-initialize from V2DB with partial dependency wiring.
 	var v2scorer *suggest2.Scorer
 	if cfg.V2Scorer != nil {
 		v2scorer = cfg.V2Scorer
+	} else if cfg.V2DB != nil {
+		v2scorer = initV2Scorer(cfg.V2DB.DB(), logger)
 	}
 
 	now := time.Now()
