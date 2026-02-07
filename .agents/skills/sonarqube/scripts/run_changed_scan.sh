@@ -225,8 +225,25 @@ done
 : > "$CHANGED_FILE_LIST"
 if [[ "${#CHANGED_FILES[@]}" -eq 0 ]]; then
   log "no changed files between $BASE_REF and HEAD"
-  printf '{"summary":{"project_key":"%s","severity_threshold":"%s","changed_files":0,"findings":0,"severity_counts":{}},"findings":[]}\n' \
-    "${PROJECT_KEY:-unknown}" "$SEVERITY" > "$OUTPUT_DIR_ABS/findings.json"
+  python3 - "$OUTPUT_DIR_ABS/findings.json" "${PROJECT_KEY:-unknown}" "$SEVERITY" <<'PY'
+import json
+import sys
+
+output_path, project_key, severity = sys.argv[1], sys.argv[2], sys.argv[3]
+payload = {
+    "summary": {
+        "project_key": project_key,
+        "severity_threshold": severity,
+        "changed_files": 0,
+        "findings": 0,
+        "severity_counts": {},
+    },
+    "findings": [],
+}
+with open(output_path, "w", encoding="utf-8") as fh:
+    json.dump(payload, fh, separators=(",", ":"))
+    fh.write("\n")
+PY
   cat > "$OUTPUT_DIR_ABS/findings.md" <<EOF
 # SonarQube Findings (Changed Files)
 
