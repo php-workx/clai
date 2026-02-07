@@ -16,6 +16,7 @@ Options:
   --project-key <key>         Sonar project key (auto-detected if omitted)
   --host-url <url>            SonarQube URL (default: SONAR_HOST_URL or http://localhost:9000)
   --output-dir <dir>          Output directory (default: .sonarqube-autofix)
+  --list-only                 Print aggregated findings by severity and exit 0
   --token <token>             Sonar token
   --user <user>               Sonar username
   --password <password>       Sonar password
@@ -113,6 +114,7 @@ AUTOSTART="${SONAR_AUTOSTART_CONTAINER:-true}"
 CONTAINER_NAME="${SONARQUBE_CONTAINER_NAME:-clai-sonarqube}"
 CONTAINER_IMAGE="${SONARQUBE_IMAGE:-sonarqube:lts-community}"
 WAIT_SECONDS="${SONARQUBE_WAIT_SECONDS:-300}"
+LIST_ONLY="${SONAR_LIST_ONLY:-false}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -135,6 +137,10 @@ while [[ $# -gt 0 ]]; do
     --output-dir)
       OUTPUT_DIR="${2:-}"
       shift 2
+      ;;
+    --list-only)
+      LIST_ONLY="true"
+      shift
       ;;
     --token)
       SONAR_TOKEN="${2:-}"
@@ -304,6 +310,31 @@ elif [[ "$ISSUE_EXIT" -eq 3 ]]; then
   log "findings found at/above '$SEVERITY' on changed files"
 else
   fail "failed to collect SonarQube findings"
+fi
+
+if [[ "$LIST_ONLY" == "true" ]]; then
+  python3 - "$OUTPUT_DIR_ABS/findings.json" <<'PY'
+import json
+import sys
+
+path = sys.argv[1]
+with open(path, "r", encoding="utf-8") as fh:
+    data = json.load(fh)
+
+summary = data.get("summary", {})
+counts = summary.get("severity_counts", {})
+order = ("BLOCKER", "CRITICAL", "MAJOR", "MINOR", "INFO")
+
+print("SonarQube Aggregated Findings")
+print(f"- Project: {summary.get('project_key', 'unknown')}")
+print(f"- Threshold: {summary.get('severity_threshold', 'unknown')}")
+print(f"- Changed files: {summary.get('changed_files', 0)}")
+print(f"- Findings: {summary.get('findings', 0)}")
+print("- Severity counts:")
+for sev in order:
+    print(f"  - {sev}: {counts.get(sev, 0)}")
+PY
+  exit 0
 fi
 
 exit "$ISSUE_EXIT"
