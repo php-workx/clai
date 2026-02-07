@@ -39,7 +39,7 @@ var daemonStartCmd = &cobra.Command{
 		}
 
 		fmt.Print("Starting daemon...")
-		err := ipc.SpawnAndWait(5 * time.Second)
+		err := ipc.SpawnAndWaitContext(cmd.Context(), 5*time.Second)
 		if err != nil {
 			fmt.Printf(daemonFailedFmt, colorRed, colorReset)
 			return err
@@ -85,7 +85,7 @@ var daemonRestartCmd = &cobra.Command{
 
 		// Start
 		fmt.Print("Starting daemon...")
-		err := ipc.SpawnAndWait(5 * time.Second)
+		err := ipc.SpawnAndWaitContext(cmd.Context(), 5*time.Second)
 		if err != nil {
 			fmt.Printf(daemonFailedFmt, colorRed, colorReset)
 			return err

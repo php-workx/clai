@@ -1,6 +1,7 @@
 package ipc
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -33,7 +34,7 @@ func EnsureDaemon() error {
 		}
 		// Socket exists but can't connect - might be stale
 		// Remove it and try to spawn
-		os.Remove(SocketPath())
+		_ = os.Remove(SocketPath())
 	}
 
 	// Try to spawn the daemon
@@ -43,9 +44,23 @@ func EnsureDaemon() error {
 // SpawnDaemon starts the daemon process in the background.
 // It does not wait for the daemon to be ready.
 func SpawnDaemon() error {
+	return SpawnDaemonContext(context.Background())
+}
+
+// SpawnDaemonContext starts the daemon process in the background and supports
+// cancellation before process creation.
+func SpawnDaemonContext(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	// Ensure run directory exists
 	if err := os.MkdirAll(RunDir(), 0755); err != nil {
 		return fmt.Errorf("failed to create run dir: %w", err)
+	}
+
+	if err := removeStaleSocket(); err != nil {
+		return err
 	}
 
 	// Find daemon binary
@@ -87,24 +102,37 @@ func SpawnDaemon() error {
 // SpawnAndWait spawns the daemon and waits for it to become available.
 // timeout specifies how long to wait for the daemon to start.
 func SpawnAndWait(timeout time.Duration) error {
-	if err := SpawnDaemon(); err != nil {
+	return SpawnAndWaitContext(context.Background(), timeout)
+}
+
+// SpawnAndWaitContext spawns the daemon and waits for readiness with
+// cancellation support.
+func SpawnAndWaitContext(ctx context.Context, timeout time.Duration) error {
+	if err := SpawnDaemonContext(ctx); err != nil {
 		return err
 	}
 
 	// Wait for socket to become available
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if SocketExists() {
-			conn, err := QuickDial()
-			if err == nil {
-				conn.Close()
-				return nil
+	deadline := time.NewTimer(timeout)
+	defer deadline.Stop()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-deadline.C:
+			return fmt.Errorf("daemon did not start within %v", timeout)
+		case <-ticker.C:
+			if SocketExists() {
+				conn, err := QuickDial()
+				if err == nil {
+					conn.Close()
+					return nil
+				}
 			}
 		}
-		time.Sleep(10 * time.Millisecond)
 	}
-
-	return fmt.Errorf("daemon did not start within %v", timeout)
 }
 
 // findDaemonBinary locates the daemon executable
@@ -165,4 +193,19 @@ func IsDaemonRunning() bool {
 	}
 	conn.Close()
 	return true
+}
+
+func removeStaleSocket() error {
+	if !SocketExists() {
+		return nil
+	}
+	conn, err := QuickDial()
+	if err == nil {
+		conn.Close()
+		return nil
+	}
+	if err := os.Remove(SocketPath()); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove stale socket: %w", err)
+	}
+	return nil
 }
