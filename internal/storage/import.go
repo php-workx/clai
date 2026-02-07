@@ -167,10 +167,22 @@ func insertImportedEntries(
 }
 
 func importSessionStart(entries []history.ImportEntry, fallback int64) int64 {
-	if entries[0].Timestamp.IsZero() {
+	sessionStart := fallback
+	found := false
+	for _, entry := range entries {
+		if entry.Timestamp.IsZero() {
+			continue
+		}
+		ts := entry.Timestamp.UnixMilli()
+		if !found || ts < sessionStart {
+			sessionStart = ts
+			found = true
+		}
+	}
+	if !found {
 		return fallback
 	}
-	return entries[0].Timestamp.UnixMilli()
+	return sessionStart
 }
 
 func importEntryTimestamp(entry history.ImportEntry, fallback int64) int64 {
