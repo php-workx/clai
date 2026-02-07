@@ -20,7 +20,7 @@ Add a first-party TUI picker (Bubble Tea) that provides a consistent **history**
 - Replacing native shell completion systems.
 - Windows/PowerShell support in this phase.
 - Mouse interaction (click/scroll) in v1.
-- Full screen reader accessibility in v1.
+- Full-screen reader accessibility in v1.
 
 ## User Experience
 ### Entry
@@ -135,7 +135,7 @@ These keys must be added to `internal/config/config.go` as a new `HistoryConfig`
 
 ## Input Sanitization
 - **--query:** max 4096 bytes. Strip control characters (0x00-0x1F except 0x09 tab). Reject embedded newlines. If exceeded, truncate to 4096 bytes and proceed.
-- **History items from providers:** strip ANSI escape sequences before display AND before stdout output. Use a comprehensive regex that covers SGR (`\x1b\[[0-9;]*[a-zA-Z]`), OSC sequences (`\x1b\][^\a]*\a`), and character set selection (`\x1b\([B0UK]`), or use an existing ANSI stripping library. Multi-line commands: display with a visual `\n` indicator in the list; output the full multi-line command as-is on stdout (shell handles multi-line insertion).
+- **History items from providers:** strip ANSI escape sequences before display AND before stdout output. Use a comprehensive regex that covers CSI (`\x1b\[[0-9;?]*[ -/]*[@-~]`), OSC sequences (`\x1b\].*?(?:\x1b\\|\x07)`), and character set selection (`\x1b\([B0UK]`), or use an existing ANSI stripping library. Multi-line commands: display with a visual `\n` indicator in the list; output the full multi-line command as-is on stdout (shell handles multi-line insertion).
 - **Selected output:** raw UTF-8 text only, no terminal escape codes. Followed by a single newline.
 
 ## Encoding
