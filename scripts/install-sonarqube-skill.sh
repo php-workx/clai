@@ -22,11 +22,13 @@ else
   DEST_CLAUDE_BASE="${CLAUDE_SKILLS_DIR:-$HOME/.agents/skills}"
 fi
 DEST_CODEX_BASE="${CODEX_SKILLS_DIR:-$HOME/.codex/skills}"
+DEST_CODEX_PROMPTS_BASE="${CODEX_PROMPTS_DIR:-$HOME/.codex/prompts}"
 
 DEST_CLAUDE="$DEST_CLAUDE_BASE/$SKILL_NAME"
 DEST_CODEX="$DEST_CODEX_BASE/$SKILL_NAME"
 
 mkdir -p "$DEST_CLAUDE_BASE" "$DEST_CODEX_BASE"
+mkdir -p "$DEST_CODEX_PROMPTS_BASE"
 
 # Remove deprecated alias if present.
 rm -rf "$DEST_CLAUDE_BASE/sonarqube-autofix" "$DEST_CODEX_BASE/sonarqube-autofix"
@@ -40,9 +42,16 @@ chmod +x "$DEST_CLAUDE/scripts/run_changed_scan.sh" \
   "$DEST_CODEX/scripts/run_changed_scan.sh" \
   "$DEST_CODEX/scripts/collect_changed_issues.py"
 
+PROMPT_SRC="$REPO_ROOT/.codex/prompts/sonarqube.md"
+if [[ -f "$PROMPT_SRC" ]]; then
+  cp "$PROMPT_SRC" "$DEST_CODEX_PROMPTS_BASE/sonarqube.md"
+fi
+
 cat <<EOF
 Installed $SKILL_NAME:
 - Claude: $DEST_CLAUDE
 - Codex:  $DEST_CODEX
+Codex slash command prompt:
+- $DEST_CODEX_PROMPTS_BASE/sonarqube.md
 Removed deprecated alias (if it existed): sonarqube-autofix
 EOF
