@@ -8,6 +8,20 @@ Common issues and solutions for clai.
 clai status
 ```
 
+## Hidden Diagnostics
+
+`clai doctor` and `clai logs` are still available but hidden from the default
+CLI help to keep the main command list focused.
+
+- `clai doctor`: Run integration checks for daemon, shell hooks, and binaries.
+  ```bash
+  clai doctor
+  ```
+- `clai logs`: Show daemon log output for debugging runtime issues.
+  ```bash
+  clai logs --tail 200
+  ```
+
 ## Common Issues
 
 ### Suggestions Don’t Appear
