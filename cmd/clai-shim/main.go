@@ -23,6 +23,10 @@ import (
 	"github.com/runger/clai/internal/ipc"
 )
 
+func signalAwareContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+}
+
 // Version info - injected at build time via ldflags
 var (
 	Version   = "dev"
@@ -307,7 +311,10 @@ func runSuggest() {
 	}
 	defer client.Close()
 
-	suggestions := client.Suggest(context.Background(), sessionID, cwd, buffer, cursorPos, false, limit)
+	ctx, stop := signalAwareContext()
+	defer stop()
+
+	suggestions := client.Suggest(ctx, sessionID, cwd, buffer, cursorPos, false, limit)
 	if len(suggestions) == 0 {
 		return
 	}
@@ -350,7 +357,10 @@ func runTextToCommand() {
 	}
 	defer client.Close()
 
-	resp, err := client.TextToCommand(context.Background(), sessionID, prompt, cwd, 3)
+	ctx, stop := signalAwareContext()
+	defer stop()
+
+	resp, err := client.TextToCommand(ctx, sessionID, prompt, cwd, 3)
 	if err != nil || resp == nil || len(resp.Suggestions) == 0 {
 		return
 	}
@@ -425,7 +435,7 @@ func runImportHistory() {
 	defer client.Close()
 
 	// Create signal-aware context for graceful cancellation
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signalAwareContext()
 	defer stop()
 
 	resp, err := client.ImportHistory(ctx, shell, historyPath, ifNotExists, force)
