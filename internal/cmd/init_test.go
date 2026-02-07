@@ -583,6 +583,22 @@ func TestInitPlaceholderReplacement(t *testing.T) {
 	}
 }
 
+func TestGenerateSessionID_FormatAndUniqueness(t *testing.T) {
+	id1 := generateSessionID()
+	id2 := generateSessionID()
+
+	uuidLike := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
+	if !uuidLike.MatchString(id1) {
+		t.Errorf("session ID %q does not match UUID v4 format", id1)
+	}
+	if !uuidLike.MatchString(id2) {
+		t.Errorf("session ID %q does not match UUID v4 format", id2)
+	}
+	if id1 == id2 {
+		t.Errorf("generateSessionID returned duplicate IDs: %q", id1)
+	}
+}
+
 func TestShellScripts_Embedded(t *testing.T) {
 	// Verify all shell scripts are properly embedded
 	shells := []string{
