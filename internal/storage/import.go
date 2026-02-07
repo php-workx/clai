@@ -3,12 +3,15 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"runtime"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	sqlite "modernc.org/sqlite"
+	sqlite3 "modernc.org/sqlite/lib"
 
 	"github.com/runger/clai/internal/cmdutil"
 	"github.com/runger/clai/internal/history"
@@ -193,6 +196,11 @@ func importEntryTimestamp(entry history.ImportEntry, fallback int64) int64 {
 }
 
 func isUniqueConstraintError(err error) bool {
+	var sqliteErr *sqlite.Error
+	if errors.As(err, &sqliteErr) {
+		code := sqliteErr.Code()
+		return code == sqlite3.SQLITE_CONSTRAINT || code == sqlite3.SQLITE_CONSTRAINT_UNIQUE
+	}
 	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
