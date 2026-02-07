@@ -87,10 +87,10 @@ go install github.com/sorenisanerd/gotty@latest
 **Usage:**
 ```bash
 # Start with bash + clai integration
-gotty -w bash --rcfile <(echo 'source ~/.clai/shell/bash.sh')
+gotty -a 127.0.0.1 -w bash --rcfile <(echo 'source ~/.clai/shell/bash.sh')
 
 # Start with zsh
-gotty -w zsh -c 'source ~/.clai/shell/zsh.zsh; exec zsh'
+gotty -a 127.0.0.1 -w zsh -c 'source ~/.clai/shell/zsh.zsh; exec zsh'
 ```
 
 ### 3.2 Option B: ttyd
@@ -298,7 +298,7 @@ Store in `tests/e2e/artifacts/`:
 ```makefile
 # Start terminal server for testing
 test-server:
-    gotty -w -p 8080 bash --rcfile scripts/test-shell-init.sh
+    gotty -a 127.0.0.1 -w -p 8080 bash --rcfile scripts/test-shell-init.sh
 
 # Run tests (requires Claude session)
 test-e2e:
