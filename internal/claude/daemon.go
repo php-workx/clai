@@ -129,6 +129,11 @@ func StartDaemonProcess() error {
 		}
 		return fmt.Errorf("failed to start daemon: %w", err)
 	}
+	if logFile != nil {
+		// Child inherited the descriptor; close parent's copy to avoid leaking fds
+		// across repeated start attempts.
+		logFile.Close()
+	}
 
 	// Write PID file
 	os.WriteFile(pidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0644)
