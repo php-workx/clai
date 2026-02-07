@@ -38,7 +38,10 @@ const (
 )
 
 // maxQueryLen is the maximum length of a query string in bytes.
-const maxQueryLen = 4096
+const (
+	maxQueryLen  = 4096
+	pickerErrFmt = "clai-picker: %v\n"
+)
 
 // pickerOpts holds the parsed command-line options for the history subcommand.
 type pickerOpts struct {
@@ -59,19 +62,19 @@ func main() {
 func run(args []string) int {
 	// Step 1: Check /dev/tty is openable.
 	if err := checkTTY(); err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrFmt, err)
 		return exitFallback
 	}
 
 	// Step 2: Check TERM != "dumb".
 	if err := checkTERM(); err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrFmt, err)
 		return exitFallback
 	}
 
 	// Step 3: Check terminal width >= 20 columns.
 	if err := checkTermWidth(); err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrFmt, err)
 		return exitFallback
 	}
 
@@ -87,7 +90,7 @@ func run(args []string) int {
 	lockPath := cacheDir + "/picker.lock"
 	lockFd, err := acquireLock(lockPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrFmt, err)
 		return exitFallback
 	}
 	defer releaseLock(lockFd)
@@ -115,7 +118,7 @@ func run(args []string) int {
 
 	opts, err := parseHistoryFlags(args[1:])
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrFmt, err)
 		return exitFallback
 	}
 
@@ -255,39 +258,50 @@ func dispatchBackend(backend string, cfg *config.Config, opts *pickerOpts) int {
 // If opts.tabs is empty, all configured tabs are returned.
 // Variable substitution is performed on tab Args values.
 func resolveTabs(cfg *config.Config, opts *pickerOpts) []config.TabDef {
-	var srcTabs []config.TabDef
-	if opts.tabs == "" {
-		srcTabs = cfg.History.PickerTabs
-	} else {
-		ids := strings.Split(opts.tabs, ",")
-		idSet := make(map[string]bool, len(ids))
-		for _, id := range ids {
-			idSet[strings.TrimSpace(id)] = true
-		}
-		for _, t := range cfg.History.PickerTabs {
-			if idSet[t.ID] {
-				srcTabs = append(srcTabs, t)
-			}
-		}
-		// If no matches, return all configured tabs as fallback.
-		if len(srcTabs) == 0 {
-			srcTabs = cfg.History.PickerTabs
-		}
+	srcTabs := selectPickerTabs(cfg.History.PickerTabs, opts.tabs)
+	return substituteTabArgs(srcTabs, opts.session)
+}
+
+func selectPickerTabs(allTabs []config.TabDef, tabIDs string) []config.TabDef {
+	if tabIDs == "" {
+		return allTabs
 	}
 
-	// Substitute variables in tab Args.
+	idSet := parseTabIDSet(tabIDs)
+	selected := make([]config.TabDef, 0, len(idSet))
+	for _, t := range allTabs {
+		if _, ok := idSet[t.ID]; ok {
+			selected = append(selected, t)
+		}
+	}
+	if len(selected) == 0 {
+		return allTabs
+	}
+	return selected
+}
+
+func parseTabIDSet(tabIDs string) map[string]struct{} {
+	parts := strings.Split(tabIDs, ",")
+	idSet := make(map[string]struct{}, len(parts))
+	for _, id := range parts {
+		idSet[strings.TrimSpace(id)] = struct{}{}
+	}
+	return idSet
+}
+
+func substituteTabArgs(srcTabs []config.TabDef, sessionID string) []config.TabDef {
 	tabs := make([]config.TabDef, len(srcTabs))
 	for i, t := range srcTabs {
 		tabs[i] = t
-		if len(t.Args) > 0 {
-			tabs[i].Args = make(map[string]string, len(t.Args))
-			for k, v := range t.Args {
-				// Replace $CLAI_SESSION_ID with the actual session ID.
-				if v == "$CLAI_SESSION_ID" && opts.session != "" {
-					v = opts.session
-				}
-				tabs[i].Args[k] = v
+		if len(t.Args) == 0 {
+			continue
+		}
+		tabs[i].Args = make(map[string]string, len(t.Args))
+		for k, v := range t.Args {
+			if v == "$CLAI_SESSION_ID" && sessionID != "" {
+				v = sessionID
 			}
+			tabs[i].Args[k] = v
 		}
 	}
 	return tabs
@@ -391,22 +405,36 @@ func runFzfBackend(ctx context.Context, cfg *config.Config, opts *pickerOpts) (s
 	defer provider.Close()
 	tabs := resolveTabs(cfg, opts)
 
-	// Use the first tab for fzf (fzf doesn't support tabs).
-	var tabID string
-	var tabOpts map[string]string
-	if len(tabs) > 0 {
-		tabID = tabs[0].ID
-		tabOpts = tabs[0].Args
-	}
-
-	// Fetch all items by paginating until AtEnd.
-	var allItems []string
-	offset := 0
+	tabID, tabOpts := fzfTabContext(tabs)
 	limit := cfg.History.PickerPageSize
 	if limit <= 0 {
 		limit = 100
 	}
+	allItems := fetchFzfItems(ctx, provider, opts, tabID, tabOpts, limit)
+	if len(allItems) == 0 {
+		return "", false, nil
+	}
 
+	return runFzfSelection(ctx, opts.query, allItems)
+}
+
+func fzfTabContext(tabs []config.TabDef) (string, map[string]string) {
+	if len(tabs) == 0 {
+		return "", nil
+	}
+	return tabs[0].ID, tabs[0].Args
+}
+
+func fetchFzfItems(
+	ctx context.Context,
+	provider picker.Provider,
+	opts *pickerOpts,
+	tabID string,
+	tabOpts map[string]string,
+	limit int,
+) []string {
+	var allItems []string
+	offset := 0
 	for {
 		resp, err := provider.Fetch(ctx, picker.Request{
 			Query:   opts.query,
@@ -425,15 +453,13 @@ func runFzfBackend(ctx context.Context, cfg *config.Config, opts *pickerOpts) (s
 		}
 		offset += len(resp.Items)
 	}
+	return allItems
+}
 
-	if len(allItems) == 0 {
-		return "", false, nil
-	}
-
-	// Build fzf command with context for Ctrl+C handling.
+func runFzfSelection(ctx context.Context, query string, allItems []string) (string, bool, error) {
 	args := []string{"--no-sort", "--exact"}
-	if opts.query != "" {
-		args = append(args, "--query", opts.query)
+	if query != "" {
+		args = append(args, "--query", query)
 	}
 
 	cmd := exec.CommandContext(ctx, "fzf", args...)

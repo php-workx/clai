@@ -213,78 +213,74 @@ func ImportFishHistory(path string) ([]ImportEntry, error) {
 	}
 	defer file.Close()
 
-	var entries []ImportEntry
-	var currentCmd string
-	var currentTimestamp time.Time
-
 	scanner := bufio.NewScanner(file)
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
-	inPaths := false // Track if we're in the paths section
+	var parser fishImportParser
 	for scanner.Scan() {
-		line := scanner.Text()
-
-		// New entry starts with "- cmd: "
-		if strings.HasPrefix(line, "- cmd: ") {
-			// Save previous entry if exists
-			if currentCmd != "" {
-				entries = append(entries, ImportEntry{
-					Command:   decodeFishEscapes(currentCmd),
-					Timestamp: currentTimestamp,
-				})
-			}
-			currentCmd = strings.TrimPrefix(line, "- cmd: ")
-			currentTimestamp = time.Time{}
-			inPaths = false
-			continue
-		}
-
-		// Timestamp line: "  when: <ts>"
-		if strings.HasPrefix(line, "  when: ") {
-			tsStr := strings.TrimPrefix(line, "  when: ")
-			if ts, err := strconv.ParseInt(tsStr, 10, 64); err == nil {
-				currentTimestamp = time.Unix(ts, 0)
-			}
-			inPaths = false
-			continue
-		}
-
-		// Paths section start
-		if strings.HasPrefix(line, "  paths:") {
-			inPaths = true
-			continue
-		}
-
-		// Skip paths entries (lines starting with "    - ")
-		if inPaths && strings.HasPrefix(line, "    - ") {
-			continue
-		}
-
-		// Any other indented line when in paths section
-		if inPaths && strings.HasPrefix(line, "    ") {
-			continue
-		}
-
-		// Reset paths flag if we hit a non-indented line
-		if !strings.HasPrefix(line, " ") {
-			inPaths = false
-		}
+		parser.processLine(scanner.Text())
 	}
 
-	// Save final entry
-	if currentCmd != "" {
-		entries = append(entries, ImportEntry{
-			Command:   decodeFishEscapes(currentCmd),
-			Timestamp: currentTimestamp,
-		})
-	}
+	parser.flushCurrent()
 
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
 
-	return trimToLimit(entries, MaxImportEntries), nil
+	return trimToLimit(parser.entries, MaxImportEntries), nil
+}
+
+type fishImportParser struct {
+	entries          []ImportEntry
+	currentCmd       string
+	currentTimestamp time.Time
+	inPaths          bool
+}
+
+func (p *fishImportParser) processLine(line string) {
+	switch {
+	case strings.HasPrefix(line, "- cmd: "):
+		p.startEntry(strings.TrimPrefix(line, "- cmd: "))
+	case strings.HasPrefix(line, "  when: "):
+		p.parseTimestamp(strings.TrimPrefix(line, "  when: "))
+	case strings.HasPrefix(line, "  paths:"):
+		p.inPaths = true
+	case p.inPaths && strings.HasPrefix(line, "    - "):
+		return
+	case p.inPaths && strings.HasPrefix(line, "    "):
+		return
+	default:
+		if !strings.HasPrefix(line, " ") {
+			p.inPaths = false
+		}
+	}
+}
+
+func (p *fishImportParser) startEntry(cmd string) {
+	p.flushCurrent()
+	p.currentCmd = cmd
+	p.currentTimestamp = time.Time{}
+	p.inPaths = false
+}
+
+func (p *fishImportParser) parseTimestamp(raw string) {
+	if ts, err := strconv.ParseInt(raw, 10, 64); err == nil {
+		p.currentTimestamp = time.Unix(ts, 0)
+	}
+	p.inPaths = false
+}
+
+func (p *fishImportParser) flushCurrent() {
+	if p.currentCmd == "" {
+		return
+	}
+	p.entries = append(p.entries, ImportEntry{
+		Command:   decodeFishEscapes(p.currentCmd),
+		Timestamp: p.currentTimestamp,
+	})
+	p.currentCmd = ""
+	p.currentTimestamp = time.Time{}
 }
 
 // decodeFishEscapes decodes fish shell escape sequences.

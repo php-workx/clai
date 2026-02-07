@@ -197,68 +197,93 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
-		m.state = stateCancelled
-		m.cancelInflight()
-		return m, tea.Quit
+		return m.handleEscKey()
 
 	case tea.KeyCtrlC:
-		if m.selection >= 0 && m.selection < len(m.items) {
-			return m, copyToClipboard(m.items[m.selection])
-		}
-		return m, nil
+		return m.handleCtrlCKey()
 
 	case tea.KeyEnter:
-		if m.selection >= 0 && m.selection < len(m.items) {
-			m.result = m.items[m.selection]
-		}
-		m.cancelInflight()
-		return m, tea.Quit
+		return m.handleEnterKey()
 
 	case tea.KeyUp:
-		if m.state == stateLoading {
-			return m, nil
-		}
-		if m.layout == LayoutBottomUp {
-			if m.selection < len(m.items)-1 {
-				m.selection++
-			}
-		} else {
-			if m.selection > 0 {
-				m.selection--
-			}
-		}
-		return m, nil
+		return m.handleUpKey()
 
 	case tea.KeyDown:
-		if m.state == stateLoading {
-			return m, nil
-		}
-		if m.layout == LayoutBottomUp {
-			if m.selection > 0 {
-				m.selection--
-			}
-		} else {
-			if m.selection < len(m.items)-1 {
-				m.selection++
-			}
-		}
-		return m, nil
+		return m.handleDownKey()
 
 	case tea.KeyTab:
-		if len(m.tabs) > 1 {
-			m.activeTab = (m.activeTab + 1) % len(m.tabs)
-			m.offset = 0
-			return m, m.startFetch()
+		return m.handleTabKey()
+	}
+
+	return m.handleTextInputKey(msg)
+}
+
+func (m Model) handleEscKey() (tea.Model, tea.Cmd) {
+	m.state = stateCancelled
+	m.cancelInflight()
+	return m, tea.Quit
+}
+
+func (m Model) handleCtrlCKey() (tea.Model, tea.Cmd) {
+	if m.selection < 0 || m.selection >= len(m.items) {
+		return m, nil
+	}
+	return m, copyToClipboard(m.items[m.selection])
+}
+
+func (m Model) handleEnterKey() (tea.Model, tea.Cmd) {
+	if m.selection >= 0 && m.selection < len(m.items) {
+		m.result = m.items[m.selection]
+	}
+	m.cancelInflight()
+	return m, tea.Quit
+}
+
+func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
+	if m.state == stateLoading {
+		return m, nil
+	}
+	if m.layout == LayoutBottomUp {
+		if m.selection < len(m.items)-1 {
+			m.selection++
 		}
 		return m, nil
 	}
+	if m.selection > 0 {
+		m.selection--
+	}
+	return m, nil
+}
 
-	// Delegate all other keys (typing, backspace, etc.) to textinput.
+func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
+	if m.state == stateLoading {
+		return m, nil
+	}
+	if m.layout == LayoutBottomUp {
+		if m.selection > 0 {
+			m.selection--
+		}
+		return m, nil
+	}
+	if m.selection < len(m.items)-1 {
+		m.selection++
+	}
+	return m, nil
+}
+
+func (m Model) handleTabKey() (tea.Model, tea.Cmd) {
+	if len(m.tabs) <= 1 {
+		return m, nil
+	}
+	m.activeTab = (m.activeTab + 1) % len(m.tabs)
+	m.offset = 0
+	return m, m.startFetch()
+}
+
+func (m Model) handleTextInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	prevQuery := m.textInput.Value()
 	var cmd tea.Cmd
 	m.textInput, cmd = m.textInput.Update(msg)
-
-	// If the query changed, trigger a debounced search.
 	if m.textInput.Value() != prevQuery {
 		m.offset = 0
 		return m, tea.Batch(cmd, m.startDebounce())

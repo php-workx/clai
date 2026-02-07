@@ -49,45 +49,61 @@ func (s *SQLiteStore) ImportHistory(ctx context.Context, entries []history.Impor
 	sessionID := ImportSessionID(shell)
 	now := time.Now().UnixMilli()
 
-	// Start a transaction
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer tx.Rollback()
 
-	// Delete existing imported commands for this shell
-	_, err = tx.ExecContext(ctx, `DELETE FROM commands WHERE session_id = ?`, sessionID)
+	if err := resetImportedShellData(ctx, tx, sessionID); err != nil {
+		return 0, err
+	}
+	if err := createImportedSession(ctx, tx, sessionID, importSessionStart(entries, now), shell); err != nil {
+		return 0, err
+	}
+
+	stmt, err := prepareImportCommandStmt(ctx, tx)
 	if err != nil {
-		return 0, fmt.Errorf("failed to delete old imports: %w", err)
+		return 0, err
 	}
+	defer stmt.Close()
 
-	// Delete existing imported session for this shell (if any)
-	_, err = tx.ExecContext(ctx, `DELETE FROM sessions WHERE session_id = ?`, sessionID)
+	imported, err := insertImportedEntries(ctx, stmt, entries, sessionID, now)
 	if err != nil {
-		return 0, fmt.Errorf("failed to delete old session: %w", err)
+		return 0, err
 	}
 
-	// Create the import session
-	// Use the oldest entry's timestamp as the session start time
-	var sessionStart int64
-	if !entries[0].Timestamp.IsZero() {
-		sessionStart = entries[0].Timestamp.UnixMilli()
-	} else {
-		sessionStart = now
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	_, err = tx.ExecContext(ctx, `
+	return imported, nil
+}
+
+func resetImportedShellData(ctx context.Context, tx *sql.Tx, sessionID string) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM commands WHERE session_id = ?`, sessionID); err != nil {
+		return fmt.Errorf("failed to delete old imports: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM sessions WHERE session_id = ?`, sessionID); err != nil {
+		return fmt.Errorf("failed to delete old session: %w", err)
+	}
+	return nil
+}
+
+func createImportedSession(ctx context.Context, tx *sql.Tx, sessionID string, sessionStart int64, shell string) error {
+	_, err := tx.ExecContext(ctx, `
 		INSERT INTO sessions (
 			session_id, started_at_unix_ms, ended_at_unix_ms,
 			shell, os, hostname, username, initial_cwd
 		) VALUES (?, ?, NULL, ?, ?, NULL, NULL, ?)
 	`, sessionID, sessionStart, shell, runtime.GOOS, "/")
 	if err != nil {
-		return 0, fmt.Errorf("failed to create import session: %w", err)
+		return fmt.Errorf("failed to create import session: %w", err)
 	}
+	return nil
+}
 
-	// Prepare the insert statement for commands
+func prepareImportCommandStmt(ctx context.Context, tx *sql.Tx) (*sql.Stmt, error) {
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO commands (
 			command_id, session_id, ts_start_unix_ms, ts_end_unix_ms,
@@ -98,39 +114,36 @@ func (s *SQLiteStore) ImportHistory(ctx context.Context, entries []history.Impor
 		) VALUES (?, ?, ?, NULL, NULL, ?, ?, ?, ?, NULL, 1, NULL, NULL, NULL, NULL, ?, ?, ?)
 	`)
 	if err != nil {
-		return 0, fmt.Errorf("failed to prepare insert statement: %w", err)
+		return nil, fmt.Errorf("failed to prepare insert statement: %w", err)
 	}
-	defer stmt.Close()
+	return stmt, nil
+}
 
-	// Insert all entries
+func insertImportedEntries(
+	ctx context.Context,
+	stmt *sql.Stmt,
+	entries []history.ImportEntry,
+	sessionID string,
+	now int64,
+) (int, error) {
 	imported := 0
 	for _, entry := range entries {
 		if entry.Command == "" {
 			continue
 		}
 
-		// Use entry timestamp or fall back to current time
-		var tsStart int64
-		if !entry.Timestamp.IsZero() {
-			tsStart = entry.Timestamp.UnixMilli()
-		} else {
-			// Use now + index to preserve ordering for entries without timestamps
-			tsStart = now + int64(imported)
-		}
+		tsStart := importEntryTimestamp(entry, now+int64(imported))
 
-		// Normalize and hash the command
 		norm := cmdutil.NormalizeCommand(entry.Command)
 		hash := cmdutil.HashCommand(norm)
 
-		// Compute derived metadata
 		isSudo := cmdutil.IsSudo(entry.Command)
 		pipeCount := cmdutil.CountPipes(entry.Command)
 		wordCount := cmdutil.CountWords(entry.Command)
 
-		// Generate unique command ID
 		cmdID := uuid.New().String()
 
-		_, err = stmt.ExecContext(ctx,
+		_, err := stmt.ExecContext(ctx,
 			cmdID,
 			sessionID,
 			tsStart,
@@ -143,21 +156,32 @@ func (s *SQLiteStore) ImportHistory(ctx context.Context, entries []history.Impor
 			wordCount,
 		)
 		if err != nil {
-			// Only ignore duplicate key errors (UNIQUE constraint), propagate others
-			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			if isUniqueConstraintError(err) {
 				continue
 			}
 			return 0, fmt.Errorf("failed to insert command: %w", err)
 		}
 		imported++
 	}
-
-	// Commit the transaction
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("failed to commit transaction: %w", err)
-	}
-
 	return imported, nil
+}
+
+func importSessionStart(entries []history.ImportEntry, fallback int64) int64 {
+	if entries[0].Timestamp.IsZero() {
+		return fallback
+	}
+	return entries[0].Timestamp.UnixMilli()
+}
+
+func importEntryTimestamp(entry history.ImportEntry, fallback int64) int64 {
+	if entry.Timestamp.IsZero() {
+		return fallback
+	}
+	return entry.Timestamp.UnixMilli()
+}
+
+func isUniqueConstraintError(err error) bool {
+	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 // boolToInt converts a bool to an int (0 or 1) for SQLite storage.
