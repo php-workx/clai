@@ -203,7 +203,10 @@ if [[ -z "$PROJECT_KEY" ]]; then
   PROJECT_KEY="$(basename "$REPO_ROOT")"
 fi
 
-mapfile -t DIFF_FILES < <(git -C "$REPO_ROOT" diff --name-only --diff-filter=ACMRTUXB "$BASE_COMMIT..HEAD")
+DIFF_FILES=()
+while IFS= read -r file; do
+  DIFF_FILES+=("$file")
+done < <(git -C "$REPO_ROOT" diff --name-only --diff-filter=ACMRTUXB "$BASE_COMMIT..HEAD")
 CHANGED_FILES=()
 for file in "${DIFF_FILES[@]}"; do
   if [[ -f "$REPO_ROOT/$file" ]]; then
