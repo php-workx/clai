@@ -22,9 +22,11 @@ type mockProvider struct {
 	atEnd bool
 	err   error
 	delay time.Duration // Optional delay to simulate slow fetch
+	last  Request
 }
 
 func (p *mockProvider) Fetch(ctx context.Context, req Request) (Response, error) {
+	p.last = req
 	if p.delay > 0 {
 		select {
 		case <-time.After(p.delay):
@@ -140,6 +142,27 @@ func TestInit_TransitionsToLoading(t *testing.T) {
 	assert.Equal(t, stateLoaded, m.state)
 	assert.Equal(t, []string{"ls", "cd"}, m.items)
 	assert.True(t, m.atEnd)
+}
+
+func TestInit_FetchUsesConfiguredPageSize(t *testing.T) {
+	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	m := newTestModel(p).WithPageSize(7)
+
+	m = initAndLoad(t, m)
+
+	assert.Equal(t, stateLoaded, m.state)
+	assert.Equal(t, 7, p.last.Limit)
+}
+
+func TestInit_FetchDefaultsToVisibleListHeight(t *testing.T) {
+	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	m := newTestModel(p)
+	expected := m.listHeight()
+
+	m = initAndLoad(t, m)
+
+	assert.Equal(t, stateLoaded, m.state)
+	assert.Equal(t, expected, p.last.Limit)
 }
 
 func TestLoading_ToEmpty(t *testing.T) {

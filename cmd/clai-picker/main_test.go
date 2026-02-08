@@ -566,3 +566,46 @@ func TestResolveTabs_DoesNotModifyOriginalConfig(t *testing.T) {
 		}
 	}
 }
+
+func TestWithRuntimeTabOptions_AddsCaseSensitiveFlag(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.History.PickerCaseSensitive = true
+
+	tabs := []config.TabDef{
+		{
+			ID:   "session",
+			Args: map[string]string{"session": "abc"},
+		},
+		{
+			ID:   "global",
+			Args: nil,
+		},
+	}
+
+	withOptions := withRuntimeTabOptions(tabs, cfg)
+
+	if withOptions[0].Args["case_sensitive"] != "true" {
+		t.Fatalf("expected case_sensitive=true on first tab, got %q", withOptions[0].Args["case_sensitive"])
+	}
+	if withOptions[1].Args["case_sensitive"] != "true" {
+		t.Fatalf("expected case_sensitive=true on second tab, got %q", withOptions[1].Args["case_sensitive"])
+	}
+}
+
+func TestWithRuntimeTabOptions_DoesNotMutateInputTabs(t *testing.T) {
+	cfg := config.DefaultConfig()
+	cfg.History.PickerCaseSensitive = true
+
+	original := []config.TabDef{
+		{
+			ID:   "session",
+			Args: map[string]string{"session": "abc"},
+		},
+	}
+
+	_ = withRuntimeTabOptions(original, cfg)
+
+	if _, ok := original[0].Args["case_sensitive"]; ok {
+		t.Fatal("expected original tab args to remain unchanged")
+	}
+}

@@ -597,6 +597,69 @@ func TestHistoryProvider_QueryAndPaginationMapping(t *testing.T) {
 	}
 }
 
+func TestHistoryProvider_CaseSensitiveFilterEnabled(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockClaiService{
+		items: []*pb.HistoryItem{
+			{Command: "Git show --stat", TimestampMs: 2000},
+			{Command: "git status", TimestampMs: 1000},
+		},
+		atEnd: true,
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 8,
+		Query:     "Git",
+		Limit:     10,
+		Options: map[string]string{
+			"case_sensitive": "true",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if got := len(resp.Items); got != 1 {
+		t.Fatalf("expected 1 case-sensitive match, got %d", got)
+	}
+	if resp.Items[0] != "Git show --stat" {
+		t.Fatalf("unexpected item: %q", resp.Items[0])
+	}
+}
+
+func TestHistoryProvider_CaseSensitiveFilterDisabled(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockClaiService{
+		items: []*pb.HistoryItem{
+			{Command: "Git show --stat", TimestampMs: 2000},
+			{Command: "git status", TimestampMs: 1000},
+		},
+		atEnd: true,
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 9,
+		Query:     "Git",
+		Limit:     10,
+		Options: map[string]string{
+			"case_sensitive": "false",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if got := len(resp.Items); got != 2 {
+		t.Fatalf("expected 2 case-insensitive matches, got %d", got)
+	}
+}
+
 func TestHistoryProvider_RPCFailure(t *testing.T) {
 	t.Parallel()
 

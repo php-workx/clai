@@ -595,6 +595,33 @@ func TestShellScripts_UpArrowHistoryPlaceholder(t *testing.T) {
 	}
 }
 
+// TestShellScripts_PickerOpenOnEmptyPlaceholder verifies that all shell scripts
+// contain the {{CLAI_PICKER_OPEN_ON_EMPTY}} placeholder that init.go replaces.
+func TestShellScripts_PickerOpenOnEmptyPlaceholder(t *testing.T) {
+	shells := []string{
+		"shell/zsh/clai.zsh",
+		"shell/bash/clai.bash",
+		"shell/fish/clai.fish",
+	}
+
+	for _, path := range shells {
+		t.Run(path, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", path, err)
+			}
+			script := string(content)
+
+			if !strings.Contains(script, "{{CLAI_PICKER_OPEN_ON_EMPTY}}") {
+				t.Errorf("%s missing {{CLAI_PICKER_OPEN_ON_EMPTY}} placeholder", path)
+			}
+			if !strings.Contains(script, "CLAI_PICKER_OPEN_ON_EMPTY") {
+				t.Errorf("%s missing CLAI_PICKER_OPEN_ON_EMPTY variable usage", path)
+			}
+		})
+	}
+}
+
 // TestShellScripts_UpArrowConditionalBinding verifies that Up arrow is only
 // bound to the TUI picker when CLAI_UP_ARROW_HISTORY is "true".
 func TestShellScripts_UpArrowConditionalBinding(t *testing.T) {
@@ -617,6 +644,31 @@ func TestShellScripts_UpArrowConditionalBinding(t *testing.T) {
 
 			if !strings.Contains(script, sh.guard) {
 				t.Errorf("%s missing conditional guard %q for Up arrow binding", sh.path, sh.guard)
+			}
+		})
+	}
+}
+
+func TestShellScripts_OpenOnEmptyGuards(t *testing.T) {
+	shells := []struct {
+		path  string
+		guard string
+	}{
+		{"shell/zsh/clai.zsh", `"$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$BUFFER"`},
+		{"shell/bash/clai.bash", `"$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$picker_query"`},
+		{"shell/fish/clai.fish", `"$CLAI_PICKER_OPEN_ON_EMPTY" != "true"; and test -z (commandline)`},
+	}
+
+	for _, sh := range shells {
+		t.Run(sh.path, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(sh.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", sh.path, err)
+			}
+			script := string(content)
+
+			if !strings.Contains(script, sh.guard) {
+				t.Errorf("%s missing open-on-empty guard %q", sh.path, sh.guard)
 			}
 		})
 	}
@@ -773,15 +825,22 @@ func TestInitPlaceholderReplacement(t *testing.T) {
 	// Simulate the replacement that init.go performs.
 	replaced := strings.ReplaceAll(script, "{{CLAI_SESSION_ID}}", "test-session-id")
 	replaced = strings.ReplaceAll(replaced, "{{CLAI_UP_ARROW_HISTORY}}", "false")
+	replaced = strings.ReplaceAll(replaced, "{{CLAI_PICKER_OPEN_ON_EMPTY}}", "false")
 
 	if strings.Contains(replaced, "{{CLAI_UP_ARROW_HISTORY}}") {
 		t.Error("placeholder {{CLAI_UP_ARROW_HISTORY}} not replaced")
+	}
+	if strings.Contains(replaced, "{{CLAI_PICKER_OPEN_ON_EMPTY}}") {
+		t.Error("placeholder {{CLAI_PICKER_OPEN_ON_EMPTY}} not replaced")
 	}
 	if strings.Contains(replaced, "{{CLAI_SESSION_ID}}") {
 		t.Error("placeholder {{CLAI_SESSION_ID}} not replaced")
 	}
 	if !strings.Contains(replaced, "CLAI_UP_ARROW_HISTORY:=false") {
 		t.Error("expected CLAI_UP_ARROW_HISTORY:=false after replacement")
+	}
+	if !strings.Contains(replaced, "CLAI_PICKER_OPEN_ON_EMPTY:=false") {
+		t.Error("expected CLAI_PICKER_OPEN_ON_EMPTY:=false after replacement")
 	}
 }
 
