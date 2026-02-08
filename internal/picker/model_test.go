@@ -958,6 +958,29 @@ func TestTopDown_View_NoSeparator(t *testing.T) {
 	assert.NotContains(t, view, "──")
 }
 
+func TestRightArrow_CopiesSelectedItemToFilterForRefinement(t *testing.T) {
+	p := &mockProvider{items: []string{"git status", "git stash pop"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	// Select second item.
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = result.(Model)
+	require.Equal(t, 1, m.selection)
+
+	// Simulate prior pagination to confirm refinement resets offset.
+	m.offset = 10
+	prevDebounceID := m.debounceID
+
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = result.(Model)
+
+	assert.Equal(t, "git stash pop", m.textInput.Value())
+	assert.Equal(t, 0, m.offset)
+	assert.Greater(t, m.debounceID, prevDebounceID)
+	assert.NotNil(t, cmd, "right arrow should schedule a debounced fetch")
+}
+
 func TestWithLayout(t *testing.T) {
 	p := &mockProvider{}
 	m := NewModel(defaultTabs(), p)

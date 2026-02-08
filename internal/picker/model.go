@@ -211,6 +211,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyDown:
 		return m.handleDownKey()
 
+	case tea.KeyRight:
+		return m.handleRightKey()
+
 	case tea.KeyTab:
 		return m.handleTabKey()
 	}
@@ -269,6 +272,22 @@ func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
 		m.selection++
 	}
 	return m, nil
+}
+
+func (m Model) handleRightKey() (tea.Model, tea.Cmd) {
+	if m.selection < 0 || m.selection >= len(m.items) {
+		return m, nil
+	}
+
+	query := ValidateUTF8(StripANSI(m.items[m.selection]))
+	if m.textInput.Value() == query {
+		return m, nil
+	}
+
+	m.textInput.SetValue(query)
+	m.textInput.CursorEnd()
+	m.offset = 0
+	return m, m.startDebounce()
 }
 
 func (m Model) handleTabKey() (tea.Model, tea.Cmd) {
