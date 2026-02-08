@@ -20,6 +20,7 @@ export CLAI_CURRENT_SHELL=bash
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
 : ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
+: ${CLAI_PICKER_OPEN_ON_EMPTY:={{CLAI_PICKER_OPEN_ON_EMPTY}}}
 
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
@@ -347,6 +348,10 @@ _clai_history_up() {
         if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
             _clai_picker_cancel
         fi
+        _clai_fallback_history_up
+        return 0
+    fi
+    if [[ "$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$picker_query" && "$_CLAI_PICKER_ACTIVE" != "true" ]]; then
         _clai_fallback_history_up
         return 0
     fi

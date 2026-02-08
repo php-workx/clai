@@ -103,6 +103,7 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 	}
 
 	// Map optional fields from Options map.
+	caseSensitive := false
 	if req.Options != nil {
 		// Accept both "session_id" and "session" for the session filter.
 		if sid, ok := req.Options["session_id"]; ok {
@@ -113,6 +114,7 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 		if g, ok := req.Options["global"]; ok && g == "true" {
 			baseReq.Global = true
 		}
+		caseSensitive = req.Options["case_sensitive"] == "true"
 	}
 
 	targetUnique := int(baseReq.Limit)
@@ -143,6 +145,9 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 		for _, item := range grpcResp.Items {
 			cmd := strings.TrimSpace(ValidateUTF8(StripANSI(item.Command)))
 			if cmd == "" {
+				continue
+			}
+			if caseSensitive && req.Query != "" && !strings.Contains(cmd, req.Query) {
 				continue
 			}
 			key := cmdutil.NormalizeCommand(cmd)

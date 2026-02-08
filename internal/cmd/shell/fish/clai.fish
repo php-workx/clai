@@ -30,6 +30,9 @@ end
 if not set -q CLAI_UP_ARROW_HISTORY
     set -gx CLAI_UP_ARROW_HISTORY {{CLAI_UP_ARROW_HISTORY}}
 end
+if not set -q CLAI_PICKER_OPEN_ON_EMPTY
+    set -gx CLAI_PICKER_OPEN_ON_EMPTY {{CLAI_PICKER_OPEN_ON_EMPTY}}
+end
 
 # Ensure cache directory exists
 mkdir -p $CLAI_CACHE
@@ -104,6 +107,9 @@ end
 
 function _clai_tui_picker_open
     if test "$CLAI_OFF" = "1"; or _clai_session_off
+        return 2
+    end
+    if test "$CLAI_PICKER_OPEN_ON_EMPTY" != "true"; and test -z (commandline)
         return 2
     end
     if not _clai_has_tui_picker
@@ -307,6 +313,10 @@ end
 
 function _clai_history_up
     if test "$CLAI_OFF" = "1"; or _clai_session_off
+        commandline -f history-search-backward
+        return
+    end
+    if test "$CLAI_PICKER_OPEN_ON_EMPTY" != "true"; and test -z (commandline); and test "$_CLAI_PICKER_ACTIVE" != "true"
         commandline -f history-search-backward
         return
     end

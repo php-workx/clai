@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -139,6 +140,11 @@ func run(args []string) int {
 			tabIDs[i] = t.ID
 		}
 		opts.tabs = strings.Join(tabIDs, ",")
+	}
+
+	// Respect runtime config for opening picker on empty query.
+	if opts.query == "" && !cfg.History.PickerOpenOnEmpty {
+		return exitFallback
 	}
 
 	// Step 8: Dispatch to backend.
@@ -320,7 +326,7 @@ func socketPath(cfg *config.Config) string {
 
 // dispatchBuiltin runs the built-in Bubble Tea TUI.
 func dispatchBuiltin(_ context.Context, cfg *config.Config, opts *pickerOpts) int {
-	tabs := resolveTabs(cfg, opts)
+	tabs := withRuntimeTabOptions(resolveTabs(cfg, opts), cfg)
 	provider := picker.NewHistoryProvider(socketPath(cfg))
 	defer provider.Close()
 
@@ -403,7 +409,7 @@ func dispatchFzf(ctx context.Context, cfg *config.Config, opts *pickerOpts) int 
 func runFzfBackend(ctx context.Context, cfg *config.Config, opts *pickerOpts) (string, bool, error) {
 	provider := picker.NewHistoryProvider(socketPath(cfg))
 	defer provider.Close()
-	tabs := resolveTabs(cfg, opts)
+	tabs := withRuntimeTabOptions(resolveTabs(cfg, opts), cfg)
 
 	tabID, tabOpts := fzfTabContext(tabs)
 	limit := cfg.History.PickerPageSize
@@ -416,6 +422,33 @@ func runFzfBackend(ctx context.Context, cfg *config.Config, opts *pickerOpts) (s
 	}
 
 	return runFzfSelection(ctx, opts.query, allItems)
+}
+
+func withRuntimeTabOptions(tabs []config.TabDef, cfg *config.Config) []config.TabDef {
+	if len(tabs) == 0 {
+		return tabs
+	}
+
+	out := make([]config.TabDef, len(tabs))
+	caseSensitive := strconv.FormatBool(cfg.History.PickerCaseSensitive)
+	for i, tab := range tabs {
+		out[i] = tab
+		if tab.Args == nil {
+			out[i].Args = map[string]string{
+				"case_sensitive": caseSensitive,
+			}
+			continue
+		}
+
+		args := make(map[string]string, len(tab.Args)+1)
+		for k, v := range tab.Args {
+			args[k] = v
+		}
+		args["case_sensitive"] = caseSensitive
+		out[i].Args = args
+	}
+
+	return out
 }
 
 func fzfTabContext(tabs []config.TabDef) (string, map[string]string) {

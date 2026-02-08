@@ -22,6 +22,7 @@ export CLAI_CURRENT_SHELL=zsh
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
 : ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
+: ${CLAI_PICKER_OPEN_ON_EMPTY:={{CLAI_PICKER_OPEN_ON_EMPTY}}}
 
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
@@ -506,6 +507,10 @@ _clai_tui_picker_open() {
         zle .up-line-or-history
         return
     fi
+    if [[ "$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$BUFFER" ]]; then
+        zle .up-line-or-history
+        return
+    fi
     if ! _clai_has_tui_picker; then
         zle .up-line-or-history
         return
@@ -730,6 +735,10 @@ _clai_picker_up() {
     fi
     # Not in picker — try TUI picker first, then inline picker
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        _ai_up_line_or_history
+        return
+    fi
+    if [[ "$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$BUFFER" ]]; then
         _ai_up_line_or_history
         return
     fi
