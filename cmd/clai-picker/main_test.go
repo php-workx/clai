@@ -496,11 +496,12 @@ func TestResolveTabs_NoSubstitutionWithEmptySession(t *testing.T) {
 		t.Fatalf("expected 1 tab, got %d", len(tabs))
 	}
 
-	// When session is empty, $CLAI_SESSION_ID should remain as-is.
+	// When session is empty, the placeholder should resolve to an empty value
+	// so session-scoped queries naturally fall back to global history.
 	if sid, ok := tabs[0].Args["session"]; !ok {
 		t.Error("expected 'session' key in Args")
-	} else if sid != "$CLAI_SESSION_ID" {
-		t.Errorf("expected literal '$CLAI_SESSION_ID' when session is empty, got %q", sid)
+	} else if sid != "" {
+		t.Errorf("expected empty session value when session is empty, got %q", sid)
 	}
 }
 

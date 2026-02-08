@@ -725,13 +725,37 @@ func TestFishScript_UpArrowApplicationModeBinding(t *testing.T) {
 	script := string(content)
 
 	required := []string{
-		`bind \e\[A _clai_up_arrow`,
-		`bind \eOA _clai_up_arrow`,
+		`for mode in default insert visual`,
+		`bind -M $mode \e\[A _clai_up_arrow`,
+		`bind -M $mode \eOA _clai_up_arrow`,
 	}
 
 	for _, binding := range required {
 		if !strings.Contains(script, binding) {
 			t.Errorf("fish script missing up-arrow binding %s", binding)
+		}
+	}
+}
+
+func TestFishScript_PickerControlBindings(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+	if err != nil {
+		t.Fatalf("Failed to read fish script: %v", err)
+	}
+	script := string(content)
+
+	required := []string{
+		`bind -M $mode \t _clai_suggest_tab`,
+		`bind -M $mode \e\[B _clai_picker_down`,
+		`bind -M $mode \eOB _clai_picker_down`,
+		`bind -M $mode \cxs _clai_history_scope_session`,
+		`bind -M $mode \cxd _clai_history_scope_cwd`,
+		`bind -M $mode \cxg _clai_history_scope_global`,
+	}
+
+	for _, binding := range required {
+		if !strings.Contains(script, binding) {
+			t.Errorf("fish script missing picker control binding %s", binding)
 		}
 	}
 }

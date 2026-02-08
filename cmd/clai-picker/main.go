@@ -30,12 +30,13 @@ var (
 // These match the expectations of shell scripts:
 //
 //	0 = selection made (use the result)
-//	1 = cancelled by user (keep original input)
-//	2 = fallback to native history (no TTY, error, etc.)
+//	1 = cancelled by user OR invalid usage
+//	2 = fallback to native history (no TTY, runtime error, etc.)
 const (
-	exitSuccess   = 0
-	exitCancelled = 1
-	exitFallback  = 2
+	exitSuccess      = 0
+	exitCancelled    = 1
+	exitInvalidUsage = 1
+	exitFallback     = 2
 )
 
 // maxQueryLen is the maximum length of a query string in bytes.
@@ -99,7 +100,7 @@ func run(args []string) int {
 	// Step 6: Parse subcommand and flags.
 	if len(args) == 0 {
 		printUsage()
-		return exitFallback
+		return exitInvalidUsage
 	}
 
 	switch args[0] {
@@ -114,13 +115,13 @@ func run(args []string) int {
 	default:
 		fmt.Fprintf(os.Stderr, "clai-picker: unknown command %q\n", args[0])
 		printUsage()
-		return exitFallback
+		return exitInvalidUsage
 	}
 
 	opts, err := parseHistoryFlags(args[1:])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, pickerErrFmt, err)
-		return exitFallback
+		return exitInvalidUsage
 	}
 
 	// Step 7: Load config.
@@ -299,7 +300,7 @@ func substituteTabArgs(srcTabs []config.TabDef, sessionID string) []config.TabDe
 		}
 		tabs[i].Args = make(map[string]string, len(t.Args))
 		for k, v := range t.Args {
-			if v == "$CLAI_SESSION_ID" && sessionID != "" {
+			if v == "$CLAI_SESSION_ID" {
 				v = sessionID
 			}
 			tabs[i].Args[k] = v

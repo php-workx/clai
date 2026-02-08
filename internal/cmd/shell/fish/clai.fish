@@ -76,7 +76,9 @@ function _ai_accept_suggestion
 end
 
 # Bind Alt+Enter to accept suggestion (Tab is used for completions in Fish)
-bind \e\r _ai_accept_suggestion
+for mode in default insert visual
+    bind -M $mode \e\r _ai_accept_suggestion
+end
 
 # Clear suggestion with Escape
 function _ai_clear_suggestion
@@ -93,7 +95,9 @@ function _clai_escape
         _ai_clear_suggestion
     end
 end
-bind \e _clai_escape
+for mode in default insert visual
+    bind -M $mode \e _clai_escape
+end
 
 # ============================================
 # Feature 2a: TUI Picker (clai-picker)
@@ -419,8 +423,16 @@ end
 # Alt/Option+H opens history picker (TUI when available, inline fallback).
 # \eh works when the terminal sends ESC for Alt. The literal ˙ covers
 # macOS Terminal.app/iTerm2 defaults where Option+H produces U+02D9.
-bind \eh _clai_history_up
-bind ˙ _clai_history_up
+for mode in default insert visual
+    bind -M $mode \eh _clai_history_up
+    bind -M $mode ˙ _clai_history_up
+    bind -M $mode \t _clai_suggest_tab
+    bind -M $mode \e\[B _clai_picker_down
+    bind -M $mode \eOB _clai_picker_down
+    bind -M $mode \cxs _clai_history_scope_session
+    bind -M $mode \cxd _clai_history_scope_cwd
+    bind -M $mode \cxg _clai_history_scope_global
+end
 
 # When up_arrow_opens_history is enabled, Up arrow opens history picker
 # (TUI when available, inline fallback). Otherwise shell defaults are used.
@@ -428,8 +440,10 @@ if test "$CLAI_UP_ARROW_HISTORY" = "true"
     function _clai_up_arrow
         _clai_history_up
     end
-    bind \e\[A _clai_up_arrow
-    bind \eOA _clai_up_arrow
+    for mode in default insert visual
+        bind -M $mode \e\[A _clai_up_arrow
+        bind -M $mode \eOA _clai_up_arrow
+    end
 end
 
 # ============================================

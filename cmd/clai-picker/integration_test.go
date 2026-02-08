@@ -113,6 +113,24 @@ func TestIntegration_BuildPickerBinary(t *testing.T) {
 			t.Error("expected some output with no args")
 		}
 	})
+
+	t.Run("invalid_flag", func(t *testing.T) {
+		cmd := exec.Command(binPath, "history", "--bad-flag")
+		output, err := cmd.CombinedOutput()
+		if err == nil {
+			t.Fatal("expected non-zero exit code for invalid flag")
+		}
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) {
+			t.Fatalf("expected *exec.ExitError, got %T: %v", err, err)
+		}
+		code := exitErr.ExitCode()
+		// Exit code 1 (invalid usage) if TTY available,
+		// exit code 2 (no terminal) if TTY not available.
+		if code != 1 && code != 2 {
+			t.Errorf("expected exit code 1 or 2, got %d\nOutput: %s", code, output)
+		}
+	})
 }
 
 // TestIntegration_GoBuildCompiles verifies `go build ./cmd/clai-picker` works
