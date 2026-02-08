@@ -3,6 +3,7 @@ package picker
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -530,7 +531,11 @@ func (m Model) viewTabBar() string {
 			parts = append(parts, inactiveTabStyle.Render(label))
 		}
 	}
-	return strings.Join(parts, " ")
+	bar := strings.Join(parts, " ")
+	if len(m.tabs) > 1 {
+		bar += dimStyle.Render("  " + tabSwitchHintLabel())
+	}
+	return bar
 }
 
 // viewContent renders the item list or a status message.
@@ -594,7 +599,7 @@ func (m Model) viewList() string {
 
 		line := base.Render(prefix) + renderItem(display, query, base, hl)
 		if i == m.selection {
-			line += dimStyle.Render("  Right: refine")
+			line += dimStyle.Render("  " + rightRefineHintLabel())
 		}
 		lines = append(lines, line)
 	}
@@ -670,4 +675,30 @@ func (m Model) viewQuery() string {
 		q += "  " + dimStyle.Render("Copied!")
 	}
 	return q
+}
+
+func rightRefineHintLabel() string {
+	if supportsUnicodeHints() {
+		return "→ refine"
+	}
+	return "-> refine"
+}
+
+func tabSwitchHintLabel() string {
+	if supportsUnicodeHints() {
+		return "⇥ Tab: switch scope"
+	}
+	return "[Tab] switch scope"
+}
+
+func supportsUnicodeHints() bool {
+	for _, key := range []string{"LC_ALL", "LC_CTYPE", "LANG"} {
+		value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+		if value == "" {
+			continue
+		}
+		return strings.Contains(value, "utf-8") || strings.Contains(value, "utf8")
+	}
+	// Default to unicode when locale is unspecified; modern terminals handle it.
+	return true
 }

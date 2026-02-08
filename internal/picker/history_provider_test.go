@@ -212,6 +212,42 @@ func TestHistoryProvider_ANSIStripping(t *testing.T) {
 	}
 }
 
+func TestHistoryProvider_FiltersDuplicateItemsAfterSanitization(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockClaiService{
+		items: []*pb.HistoryItem{
+			{Command: "git status", TimestampMs: 4000},
+			{Command: "\x1b[32mgit status\x1b[0m", TimestampMs: 3000},
+			{Command: "git log", TimestampMs: 2000},
+			{Command: "git log", TimestampMs: 1000},
+		},
+		atEnd: true,
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 11,
+		Limit:     50,
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if len(resp.Items) != 2 {
+		t.Fatalf("expected 2 deduplicated items, got %d", len(resp.Items))
+	}
+
+	if resp.Items[0] != "git status" {
+		t.Errorf("expected first item 'git status', got %q", resp.Items[0])
+	}
+
+	if resp.Items[1] != "git log" {
+		t.Errorf("expected second item 'git log', got %q", resp.Items[1])
+	}
+}
+
 func TestHistoryProvider_SessionScoping(t *testing.T) {
 	t.Parallel()
 

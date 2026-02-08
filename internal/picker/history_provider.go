@@ -3,6 +3,7 @@ package picker
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -115,8 +116,16 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 	}
 
 	items := make([]string, 0, len(grpcResp.Items))
+	seen := make(map[string]struct{}, len(grpcResp.Items))
 	for _, item := range grpcResp.Items {
-		cmd := ValidateUTF8(StripANSI(item.Command))
+		cmd := strings.TrimSpace(ValidateUTF8(StripANSI(item.Command)))
+		if cmd == "" {
+			continue
+		}
+		if _, exists := seen[cmd]; exists {
+			continue
+		}
+		seen[cmd] = struct{}{}
 		items = append(items, cmd)
 	}
 

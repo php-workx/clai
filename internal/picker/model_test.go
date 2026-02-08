@@ -548,6 +548,7 @@ func TestView_ShowsTabBar(t *testing.T) {
 	view := m.View()
 	assert.Contains(t, view, "Session")
 	assert.Contains(t, view, "Global")
+	assert.Contains(t, view, tabSwitchHintLabel())
 }
 
 func TestView_ShowsQueryLine(t *testing.T) {
@@ -987,14 +988,41 @@ func TestViewList_SelectedLineShowsRightRefineHint(t *testing.T) {
 	m = initAndLoad(t, m)
 
 	view := m.viewList()
-	assert.Contains(t, view, "Right: refine")
-	assert.Equal(t, 1, strings.Count(view, "Right: refine"))
+	assert.Contains(t, view, rightRefineHintLabel())
+	assert.Equal(t, 1, strings.Count(view, rightRefineHintLabel()))
 
 	// Move selection and ensure the hint is still shown exactly once.
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	m = result.(Model)
 	view = m.viewList()
-	assert.Equal(t, 1, strings.Count(view, "Right: refine"))
+	assert.Equal(t, 1, strings.Count(view, rightRefineHintLabel()))
+}
+
+func TestHintLabels_UTF8Locale(t *testing.T) {
+	t.Setenv("LC_ALL", "en_US.UTF-8")
+
+	assert.Equal(t, "→ refine", rightRefineHintLabel())
+	assert.Equal(t, "⇥ Tab: switch scope", tabSwitchHintLabel())
+}
+
+func TestHintLabels_ASCIILocaleFallback(t *testing.T) {
+	t.Setenv("LC_ALL", "C")
+
+	assert.Equal(t, "-> refine", rightRefineHintLabel())
+	assert.Equal(t, "[Tab] switch scope", tabSwitchHintLabel())
+}
+
+func TestViewTabBar_HidesTabHintForSingleTab(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	tabs := []config.TabDef{{ID: "session", Label: "Session"}}
+	m := NewModel(tabs, p)
+	m.width = 80
+	m.height = 24
+	m = initAndLoad(t, m)
+
+	bar := m.viewTabBar()
+	assert.NotContains(t, bar, "Tab: switch scope")
+	assert.NotContains(t, bar, "[Tab] switch scope")
 }
 
 func TestWithLayout(t *testing.T) {
