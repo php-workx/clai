@@ -113,7 +113,7 @@ func StartDaemonProcess() error {
 		logFile = nil
 	}
 
-	cmd := exec.Command(exe, "daemon", "run")
+	cmd := exec.Command(exe, "claude-daemon", "run")
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
@@ -128,6 +128,11 @@ func StartDaemonProcess() error {
 			logFile.Close()
 		}
 		return fmt.Errorf("failed to start daemon: %w", err)
+	}
+	if logFile != nil {
+		// Child inherited the descriptor; close parent's copy to avoid leaking fds
+		// across repeated start attempts.
+		logFile.Close()
 	}
 
 	// Write PID file

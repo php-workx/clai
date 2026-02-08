@@ -18,6 +18,7 @@ type Config struct {
 	AI          AIConfig          `yaml:"ai"`
 	Suggestions SuggestionsConfig `yaml:"suggestions"`
 	Privacy     PrivacyConfig     `yaml:"privacy"`
+	History     HistoryConfig     `yaml:"history"`
 }
 
 // DaemonConfig holds daemon-related settings.
@@ -47,7 +48,7 @@ type AIConfig struct {
 
 // SuggestionsConfig holds suggestion-related settings.
 type SuggestionsConfig struct {
-	Enabled         bool `yaml:"enabled"`           // Enable suggestion UX
+	Enabled         bool `yaml:"enabled"`           // Master toggle for shell integration (on/off)
 	MaxHistory      int  `yaml:"max_history"`       // Max history-based suggestions
 	MaxAI           int  `yaml:"max_ai"`            // Max AI-generated suggestions
 	ShowRiskWarning bool `yaml:"show_risk_warning"` // Highlight destructive commands
@@ -56,6 +57,24 @@ type SuggestionsConfig struct {
 // PrivacyConfig holds privacy-related settings.
 type PrivacyConfig struct {
 	SanitizeAICalls bool `yaml:"sanitize_ai_calls"` // Apply regex sanitization before AI calls
+}
+
+// TabDef defines a tab in the history picker.
+type TabDef struct {
+	ID       string            `yaml:"id"`
+	Label    string            `yaml:"label"`
+	Provider string            `yaml:"provider"`
+	Args     map[string]string `yaml:"args"`
+}
+
+// HistoryConfig holds history picker settings.
+type HistoryConfig struct {
+	PickerBackend       string   `yaml:"picker_backend"`         // builtin, fzf, or clai
+	PickerOpenOnEmpty   bool     `yaml:"picker_open_on_empty"`   // Open picker when search is empty
+	PickerPageSize      int      `yaml:"picker_page_size"`       // Number of items per page
+	PickerCaseSensitive bool     `yaml:"picker_case_sensitive"`  // Case-sensitive search
+	PickerTabs          []TabDef `yaml:"picker_tabs"`            // Tab definitions
+	UpArrowOpensHistory bool     `yaml:"up_arrow_opens_history"` // Up arrow opens TUI picker (default: false)
 }
 
 // DefaultConfig returns the default configuration.
@@ -88,6 +107,16 @@ func DefaultConfig() *Config {
 		},
 		Privacy: PrivacyConfig{
 			SanitizeAICalls: true,
+		},
+		History: HistoryConfig{
+			PickerBackend:       "builtin",
+			PickerOpenOnEmpty:   false,
+			PickerPageSize:      100,
+			PickerCaseSensitive: false,
+			PickerTabs: []TabDef{
+				{ID: "session", Label: "Session", Provider: "history", Args: map[string]string{"session": "$CLAI_SESSION_ID"}},
+				{ID: "global", Label: "Global", Provider: "history", Args: map[string]string{"global": "true"}},
+			},
 		},
 	}
 }
@@ -169,6 +198,8 @@ func (c *Config) Get(key string) (string, error) {
 		return c.getSuggestionsField(field)
 	case "privacy":
 		return c.getPrivacyField(field)
+	case "history":
+		return c.getHistoryField(field)
 	default:
 		return "", fmt.Errorf("unknown section: %s", section)
 	}
@@ -194,6 +225,8 @@ func (c *Config) Set(key, value string) error {
 		return c.setSuggestionsField(field, value)
 	case "privacy":
 		return c.setPrivacyField(field, value)
+	case "history":
+		return c.setHistoryField(field, value)
 	default:
 		return fmt.Errorf("unknown section: %s", section)
 	}
@@ -422,6 +455,66 @@ func (c *Config) setPrivacyField(field, value string) error {
 	return nil
 }
 
+func (c *Config) getHistoryField(field string) (string, error) {
+	switch field {
+	case "picker_backend":
+		return c.History.PickerBackend, nil
+	case "picker_open_on_empty":
+		return strconv.FormatBool(c.History.PickerOpenOnEmpty), nil
+	case "picker_page_size":
+		return strconv.Itoa(c.History.PickerPageSize), nil
+	case "picker_case_sensitive":
+		return strconv.FormatBool(c.History.PickerCaseSensitive), nil
+	case "up_arrow_opens_history":
+		return strconv.FormatBool(c.History.UpArrowOpensHistory), nil
+	default:
+		return "", fmt.Errorf("unknown field: history.%s", field)
+	}
+}
+
+func (c *Config) setHistoryField(field, value string) error {
+	switch field {
+	case "picker_backend":
+		if !isValidPickerBackend(value) {
+			return fmt.Errorf("invalid picker_backend: %s (must be builtin, fzf, or clai)", value)
+		}
+		c.History.PickerBackend = value
+	case "picker_open_on_empty":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for picker_open_on_empty: %w", err)
+		}
+		c.History.PickerOpenOnEmpty = v
+	case "picker_page_size":
+		v, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for picker_page_size: %w", err)
+		}
+		if v < 20 {
+			v = 20
+		}
+		if v > 500 {
+			v = 500
+		}
+		c.History.PickerPageSize = v
+	case "picker_case_sensitive":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for picker_case_sensitive: %w", err)
+		}
+		c.History.PickerCaseSensitive = v
+	case "up_arrow_opens_history":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for up_arrow_opens_history: %w", err)
+		}
+		c.History.UpArrowOpensHistory = v
+	default:
+		return fmt.Errorf("unknown field: history.%s", field)
+	}
+	return nil
+}
+
 // Validate validates the configuration.
 func (c *Config) Validate() error {
 	if c.Daemon.IdleTimeoutMins < 0 {
@@ -456,6 +549,18 @@ func (c *Config) Validate() error {
 		return errors.New("suggestions.max_ai must be >= 0")
 	}
 
+	// Clamp picker page size to [20, 500]
+	if c.History.PickerPageSize < 20 {
+		c.History.PickerPageSize = 20
+	}
+	if c.History.PickerPageSize > 500 {
+		c.History.PickerPageSize = 500
+	}
+
+	if !isValidPickerBackend(c.History.PickerBackend) {
+		return fmt.Errorf("history.picker_backend must be builtin, fzf, or clai (got: %s)", c.History.PickerBackend)
+	}
+
 	return nil
 }
 
@@ -477,6 +582,15 @@ func isValidProvider(provider string) bool {
 	}
 }
 
+func isValidPickerBackend(backend string) bool {
+	switch backend {
+	case "builtin", "fzf", "clai":
+		return true
+	default:
+		return false
+	}
+}
+
 // ListKeys returns user-facing configuration keys.
 // Internal settings (daemon, client, ai, privacy) are not exposed.
 func ListKeys() []string {
@@ -484,5 +598,10 @@ func ListKeys() []string {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
+		"history.picker_backend",
+		"history.picker_open_on_empty",
+		"history.picker_page_size",
+		"history.picker_case_sensitive",
+		"history.up_arrow_opens_history",
 	}
 }

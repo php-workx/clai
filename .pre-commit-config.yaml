@@ -1,6 +1,8 @@
 # Pre-commit hooks: https://pre-commit.com
 # Install: make install-dev
 
+exclude: ^\.agents/
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0

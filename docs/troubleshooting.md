@@ -2,13 +2,25 @@
 
 Common issues and solutions for clai.
 
-## Diagnostic Commands
+## Diagnostic Command
 
 ```bash
 clai status
-clai logs
-clai doctor
 ```
+
+## Hidden Diagnostics
+
+`clai doctor` and `clai logs` are still available but hidden from the default
+CLI help to keep the main command list focused.
+
+- `clai doctor`: Run integration checks for daemon, shell hooks, and binaries.
+  ```bash
+  clai doctor
+  ```
+- `clai logs`: Show daemon log output for debugging runtime issues.
+  ```bash
+  clai logs --tail 200
+  ```
 
 ## Common Issues
 
@@ -55,24 +67,6 @@ rm -f ~/.clai/clai.sock ~/.clai/clai.pid
 
 Then run any command to trigger `clai-shim` (or restart the shell).
 
-### AI Commands Fail
-
-**Symptoms:** `clai cmd` / `clai ask` errors.
-
-**Checks:**
-
-```bash
-which claude
-claude --version
-claude login
-```
-
-For faster `clai cmd`, start the Claude CLI daemon:
-
-```bash
-clai daemon start
-```
-
 ### History Database Issues
 
 **Symptoms:** `clai history` returns nothing or errors.
@@ -91,17 +85,11 @@ rm ~/.clai/state.db
 rm -f ~/.clai/clai.sock ~/.clai/clai.pid
 ```
 
-### Logs Are Missing
-
-`clai logs` reads `~/.clai/logs/daemon.log` (history daemon). If the file doesn’t exist,
-the daemon has not started yet.
-
 ## Getting Help
 
 Collect diagnostics:
 
 ```bash
 clai status
-clai doctor
 clai version
 ```

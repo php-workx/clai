@@ -21,14 +21,25 @@ Zsh shows a ghost‑text suggestion while typing.
 - **Right Arrow** accepts the full suggestion
 - **Alt+Right** accepts the next token
 
-## Suggestion & History Pickers
+## History Picker
 
-- **Tab**: open the suggestion picker
-- **Up Arrow**: open the history picker
+- **Alt+H** (or **Option+H** on macOS): open the history picker
 
-These are available across zsh/bash/fish (with shell‑specific behavior).
+The history picker is available across zsh/bash/fish and supports:
+- Fuzzy search filtering
+- Session vs Global scope switching (Tab key)
+- Arrow key navigation
 
-## Natural Language → Command
+### Long Command Handling
+
+Long commands are truncated in the middle with a visible `…` indicator (shown in
+orange). This keeps both the beginning and end of the command visible.
+
+**Important:** The truncation is display-only. When you:
+- Press **Enter**: The full, untruncated command is inserted into your prompt
+- Press **Ctrl+C**: The full, untruncated command is copied to your clipboard
+
+## Natural Language → Command (Coming Soon)
 
 Use `clai cmd` to turn plain English into a shell command:
 
@@ -36,13 +47,17 @@ Use `clai cmd` to turn plain English into a shell command:
 clai cmd "list files larger than 100MB"
 ```
 
-## Ask Claude
+> **Note:** This feature is not yet fully implemented.
+
+## Ask Claude (Coming Soon)
 
 Use `clai ask` for short, contextual terminal questions:
 
 ```bash
-clai ask "What’s the difference between grep and ripgrep?"
+clai ask "What's the difference between grep and ripgrep?"
 ```
+
+> **Note:** This feature is not yet fully implemented.
 
 ## Toggle Suggestions
 

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -16,36 +17,36 @@ var (
 
 var onCmd = &cobra.Command{
 	Use:     "on",
-	Short:   "Enable suggestions",
+	Short:   "Enable clai shell integration",
 	GroupID: groupCore,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return toggleSuggestions(true, onSessionOnly)
+		return toggleIntegration(true, onSessionOnly)
 	},
 }
 
 var offCmd = &cobra.Command{
 	Use:     "off",
-	Short:   "Disable suggestions",
+	Short:   "Disable clai shell integration",
 	GroupID: groupCore,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return toggleSuggestions(false, offSessionOnly)
+		return toggleIntegration(false, offSessionOnly)
 	},
 }
 
 func init() {
-	onCmd.Flags().BoolVar(&onSessionOnly, "session", false, "Enable suggestions for this session only")
-	offCmd.Flags().BoolVar(&offSessionOnly, "session", false, "Disable suggestions for this session only")
+	onCmd.Flags().BoolVar(&onSessionOnly, "session", false, "Enable for this session only")
+	offCmd.Flags().BoolVar(&offSessionOnly, "session", false, "Disable for this session only")
 }
 
-func toggleSuggestions(enable bool, sessionOnly bool) error {
+func toggleIntegration(enable bool, sessionOnly bool) error {
 	if sessionOnly {
 		if err := cache.SetSessionOff(!enable); err != nil {
 			return err
 		}
 		if enable {
-			fmt.Println("Session suggestions enabled")
+			fmt.Println("Session integrations enabled")
 		} else {
-			fmt.Println("Session suggestions disabled")
+			fmt.Println("Session integrations disabled")
 		}
 		return nil
 	}
@@ -58,10 +59,14 @@ func toggleSuggestions(enable bool, sessionOnly bool) error {
 	if err := cfg.Save(); err != nil {
 		return fmt.Errorf("failed to save config: %w", err)
 	}
+	// Also clear/set session flag so all disable sources are consistent.
+	if err := cache.SetSessionOff(!enable); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: failed to update session state: %v\n", err)
+	}
 	if enable {
-		fmt.Println("Suggestions enabled")
+		fmt.Println("Integrations enabled")
 	} else {
-		fmt.Println("Suggestions disabled")
+		fmt.Println("Integrations disabled")
 	}
 	return nil
 }

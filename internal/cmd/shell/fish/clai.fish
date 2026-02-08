@@ -27,6 +27,12 @@ end
 if not set -q CLAI_MENU_LIMIT
     set -gx CLAI_MENU_LIMIT 5
 end
+if not set -q CLAI_UP_ARROW_HISTORY
+    set -gx CLAI_UP_ARROW_HISTORY {{CLAI_UP_ARROW_HISTORY}}
+end
+if not set -q CLAI_PICKER_OPEN_ON_EMPTY
+    set -gx CLAI_PICKER_OPEN_ON_EMPTY {{CLAI_PICKER_OPEN_ON_EMPTY}}
+end
 
 # Ensure cache directory exists
 mkdir -p $CLAI_CACHE
@@ -70,7 +76,9 @@ function _ai_accept_suggestion
 end
 
 # Bind Alt+Enter to accept suggestion (Tab is used for completions in Fish)
-bind \e\r _ai_accept_suggestion
+for mode in default insert visual
+    bind -M $mode \e\r _ai_accept_suggestion
+end
 
 # Clear suggestion with Escape
 function _ai_clear_suggestion
@@ -87,10 +95,44 @@ function _clai_escape
         _ai_clear_suggestion
     end
 end
-bind \e _clai_escape
+for mode in default insert visual
+    bind -M $mode \e _clai_escape
+end
 
 # ============================================
-# Feature 2: Suggestion & History Pickers
+# Feature 2a: TUI Picker (clai-picker)
+# ============================================
+# If clai-picker is on PATH, Up arrow and Alt+H open the full TUI picker.
+# Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
+
+function _clai_has_tui_picker
+    type -q clai-picker
+end
+
+function _clai_tui_picker_open
+    if test "$CLAI_OFF" = "1"; or _clai_session_off
+        return 2
+    end
+    if not _clai_has_tui_picker
+        return 2
+    end
+    set -l result (clai-picker history --query=(commandline) --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    set -l exit_code $status
+    if test $exit_code -eq 0
+        commandline -r -- $result
+        commandline -f end-of-line
+        commandline -f repaint
+        return 0
+    else if test $exit_code -eq 2
+        return 2
+    end
+    # exit_code 1 = cancel, keep original buffer
+    commandline -f repaint
+    return 1
+end
+
+# ============================================
+# Feature 2b: Suggestion & History Pickers
 # ============================================
 
 set -g _CLAI_PICKER_ACTIVE false
@@ -175,7 +217,7 @@ function _clai_picker_render
     end
 
     # Build menu lines
-    set -l menu_lines "$header (↑↓, Enter, Esc):"
+    set -l menu_lines "$header (↑↓, Enter, Esc):" "────────────────────────────────"
     set -l i 1
     for item in $_CLAI_PICKER_ITEMS
         if test $i -eq $_CLAI_PICKER_INDEX
@@ -240,6 +282,20 @@ function _clai_suggest_tab
         commandline -f complete
         return
     end
+    # When history picker is active, Tab cycles scopes
+    if test "$_CLAI_PICKER_ACTIVE" = "true" -a "$_CLAI_PICKER_MODE" = "history"
+        switch $_CLAI_HISTORY_SCOPE
+            case session
+                set -g _CLAI_HISTORY_SCOPE global
+            case '*'
+                set -g _CLAI_HISTORY_SCOPE session
+        end
+        set -g _CLAI_PICKER_INDEX 1
+        if _clai_picker_load_history
+            _clai_picker_apply
+        end
+        return
+    end
     if test "$_CLAI_PICKER_ACTIVE" != "true" -o "$_CLAI_PICKER_MODE" != "suggest"
         set -g _CLAI_PICKER_ORIG_BUFFER (commandline)
         set -g _CLAI_PICKER_MODE suggest
@@ -260,6 +316,19 @@ function _clai_history_up
     if test "$CLAI_OFF" = "1"; or _clai_session_off
         commandline -f history-search-backward
         return
+    end
+    if test "$CLAI_PICKER_OPEN_ON_EMPTY" != "true"; and test -z (commandline); and test "$_CLAI_PICKER_ACTIVE" != "true"
+        commandline -f history-search-backward
+        return
+    end
+    # Try TUI picker first (when inline picker is not already active).
+    # Status 2 means "fallback to inline picker".
+    if test "$_CLAI_PICKER_ACTIVE" != "true"; and _clai_has_tui_picker
+        _clai_tui_picker_open
+        set -l tui_status $status
+        if test $tui_status -ne 2
+            return
+        end
     end
     if not _clai_config_enabled
         commandline -f history-search-backward
@@ -351,14 +420,31 @@ function _clai_history_scope_global
     end
 end
 
-# Bindings
-bind \t _clai_suggest_tab
-bind \e\[A _clai_history_up
-bind \e\[B _clai_picker_down
-# Escape is bound above via _clai_escape (unified handler)
-bind \cx\cs _clai_history_scope_session
-bind \cx\cd _clai_history_scope_cwd
-bind \cx\cg _clai_history_scope_global
+# Alt/Option+H opens history picker (TUI when available, inline fallback).
+# \eh works when the terminal sends ESC for Alt. The literal ˙ covers
+# macOS Terminal.app/iTerm2 defaults where Option+H produces U+02D9.
+for mode in default insert visual
+    bind -M $mode \eh _clai_history_up
+    bind -M $mode ˙ _clai_history_up
+    bind -M $mode \t _clai_suggest_tab
+    bind -M $mode \e\[B _clai_picker_down
+    bind -M $mode \eOB _clai_picker_down
+    bind -M $mode \cxs _clai_history_scope_session
+    bind -M $mode \cxd _clai_history_scope_cwd
+    bind -M $mode \cxg _clai_history_scope_global
+end
+
+# When up_arrow_opens_history is enabled, Up arrow opens history picker
+# (TUI when available, inline fallback). Otherwise shell defaults are used.
+if test "$CLAI_UP_ARROW_HISTORY" = "true"
+    function _clai_up_arrow
+        _clai_history_up
+    end
+    for mode in default insert visual
+        bind -M $mode \e\[A _clai_up_arrow
+        bind -M $mode \eOA _clai_up_arrow
+    end
+end
 
 # ============================================
 # Feature 3: Voice Mode
@@ -488,6 +574,77 @@ end
 set -gx CLAI_SESSION_ID "{{CLAI_SESSION_ID}}"
 
 # ============================================
+# Command Logging (for history daemon)
+# ============================================
+# Track command execution for session-aware history
+
+set -g _CLAI_COMMAND_ID ""
+set -g _CLAI_COMMAND_START_TIME ""
+
+# Log command start (runs before each command)
+function _clai_preexec --on-event fish_preexec
+    # Skip if clai is disabled
+    if test "$CLAI_OFF" = "1"; or _clai_session_off
+        return
+    end
+
+    # Skip if no session ID
+    if test -z "$CLAI_SESSION_ID"
+        return
+    end
+
+    set -l cmd $argv[1]
+
+    # Skip empty commands
+    if test -z "$cmd"
+        return
+    end
+
+    # Generate unique command ID
+    set -g _CLAI_COMMAND_ID "$CLAI_SESSION_ID-"(date +%s)"-"(random)
+    # Store start time in milliseconds. Use nanoseconds if available.
+    # On macOS/BSD, date +%s%N may output a literal trailing "N".
+    set -l _ns (command date +%s%N 2>/dev/null)
+    if string match -rq '^[0-9]+$' -- $_ns
+        set -g _CLAI_COMMAND_START_TIME (math $_ns / 1000000)
+    else
+        set -g _CLAI_COMMAND_START_TIME (math (command date +%s) \* 1000)
+    end
+
+    # Fire and forget - log command start to daemon
+    clai-shim log-start --session-id="$CLAI_SESSION_ID" --command-id="$_CLAI_COMMAND_ID" --cwd="$PWD" --command="$cmd" >/dev/null 2>&1 &
+    disown 2>/dev/null
+end
+
+# Log command end (runs after each command)
+function _clai_postexec --on-event fish_postexec
+    set -l exit_code $status
+
+    # Skip if no pending command
+    if test -z "$_CLAI_COMMAND_ID"
+        return
+    end
+
+    # Calculate end time in milliseconds. Use nanoseconds if available.
+    set -l end_time
+    set -l _ns (command date +%s%N 2>/dev/null)
+    if string match -rq '^[0-9]+$' -- $_ns
+        set end_time (math $_ns / 1000000)
+    else
+        set end_time (math (command date +%s) \* 1000)
+    end
+    set -l duration (math $end_time - $_CLAI_COMMAND_START_TIME)
+
+    # Fire and forget - log command end to daemon
+    clai-shim log-end --session-id="$CLAI_SESSION_ID" --command-id="$_CLAI_COMMAND_ID" --exit-code="$exit_code" --duration="$duration" >/dev/null 2>&1 &
+    disown 2>/dev/null
+
+    # Clear command tracking state
+    set -g _CLAI_COMMAND_ID ""
+    set -g _CLAI_COMMAND_START_TIME ""
+end
+
+# ============================================
 # Manual Commands
 # ============================================
 
@@ -567,18 +724,24 @@ function _clai_disable
     set -gx CLAI_OFF 1
 
     # Restore default keybindings
-    bind \t complete
-    bind \e\[A history-search-backward
-    bind \e\[B history-search-forward
-    bind \r execute
+    for mode in default insert visual
+        bind -M $mode \t complete
+        bind -M $mode \e\[A history-search-backward
+        bind -M $mode \eOA history-search-backward
+        bind -M $mode \e\[B history-search-forward
+        bind -M $mode \eOB history-search-forward
+        bind -M $mode \r execute
 
-    # Remove custom keybindings
-    bind \e ''
-    bind \e\r ''
+        # Remove custom keybindings
+        bind -M $mode \e ''
+        bind -M $mode \e\r ''
+        bind -M $mode \eh ''
+        bind -M $mode ˙ ''
+        bind -M $mode \cxs ''
+        bind -M $mode \cxd ''
+        bind -M $mode \cxg ''
+    end
     bind \cx\cv ''
-    bind \cx\cs ''
-    bind \cx\cd ''
-    bind \cx\cg ''
 
     # Restore native autosuggestions to their prior state
     if set -q _clai_prev_autosuggestion
@@ -610,10 +773,10 @@ end
 function clai --wraps=clai
     switch $argv[1]
         case off
-            command clai off --session
+            command clai $argv
             _clai_disable
         case on
-            command clai on --session
+            command clai $argv
             _clai_enable
         case '*'
             command clai $argv
@@ -625,6 +788,16 @@ end
 # ============================================
 
 if status is-interactive; and not set -q _CLAI_REINIT
+    # Register session with daemon (fire and forget)
+    # This notifies the daemon of the new shell session
+    clai-shim session-start --session-id="$CLAI_SESSION_ID" --cwd="$PWD" --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1 &
+    disown 2>/dev/null
+
+    # Import shell history on first init (fire and forget)
+    # This is idempotent: --if-not-exists skips if already imported
+    clai-shim import-history --shell="$CLAI_CURRENT_SHELL" --if-not-exists >/dev/null 2>&1 &
+    disown 2>/dev/null
+
     set -l short_id (string sub -l 8 -- $CLAI_SESSION_ID)
     set_color brblack
     echo "🤖 clai [$short_id] → suggest | Alt+↵ accept | ?\"describe task\""

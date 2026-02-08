@@ -2,7 +2,11 @@
 // It handles sessions, commands, and AI response caching.
 package storage
 
-import "context"
+import (
+	"context"
+
+	"github.com/runger/clai/internal/history"
+)
 
 // Store defines the interface for all storage operations.
 // The daemon is the single writer; clai-shim never opens the DB directly.
@@ -17,11 +21,16 @@ type Store interface {
 	CreateCommand(ctx context.Context, c *Command) error
 	UpdateCommandEnd(ctx context.Context, commandID string, exitCode int, endTime, duration int64) error
 	QueryCommands(ctx context.Context, q CommandQuery) ([]Command, error)
+	QueryHistoryCommands(ctx context.Context, q CommandQuery) ([]HistoryRow, error)
 
 	// AI Cache
 	GetCached(ctx context.Context, key string) (*CacheEntry, error)
 	SetCached(ctx context.Context, entry *CacheEntry) error
 	PruneExpiredCache(ctx context.Context) (int64, error)
+
+	// History Import
+	HasImportedHistory(ctx context.Context, shell string) (bool, error)
+	ImportHistory(ctx context.Context, entries []history.ImportEntry, shell string) (int, error)
 
 	// Lifecycle
 	Close() error
@@ -74,10 +83,18 @@ type CommandQuery struct {
 	ExcludeSessionID string  // Exclude this session (for global queries)
 	CWD              *string
 	Prefix           string
+	Substring        string // Substring match (case-insensitive via command_norm)
 	Limit            int
 	Offset           int  // Skip this many results (for pagination)
 	SuccessOnly      bool // Only return successful commands (exit code 0)
 	FailureOnly      bool // Only return failed commands (exit code != 0)
+	Deduplicate      bool // Group by command_norm, return most recent per unique command
+}
+
+// HistoryRow represents a deduplicated command history entry.
+type HistoryRow struct {
+	Command     string
+	TimestampMs int64
 }
 
 // CacheEntry represents a cached AI response.

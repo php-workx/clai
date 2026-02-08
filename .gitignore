@@ -1,5 +1,7 @@
-.agents
+.agents/tooling
+.agents/ao/sessions
 .idea
+.DS_Store
 firebase-debug.log
 bin/
 
@@ -10,3 +12,9 @@ bin/
 # Test coverage
 coverage.out
 coverage.html
+
+# Beads export state (machine-specific paths)
+.beads/export-state/*.json
+.scannerwork
+.sonarqube
+.sonarqube-autofix

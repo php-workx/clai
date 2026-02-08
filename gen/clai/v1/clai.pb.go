@@ -1028,6 +1028,314 @@ func (x *DiagnoseResponse) GetFixes() []*Suggestion {
 	return nil
 }
 
+type HistoryFetchRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // Optional: filter by session (UUID v4)
+	Query         string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`                          // Substring filter (provider-side)
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`                         // Page size
+	Offset        int32                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`                       // Pagination offset
+	Global        bool                   `protobuf:"varint,5,opt,name=global,proto3" json:"global,omitempty"`                       // True = all sessions
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryFetchRequest) Reset() {
+	*x = HistoryFetchRequest{}
+	mi := &file_clai_v1_clai_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryFetchRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryFetchRequest) ProtoMessage() {}
+
+func (x *HistoryFetchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryFetchRequest.ProtoReflect.Descriptor instead.
+func (*HistoryFetchRequest) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *HistoryFetchRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *HistoryFetchRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *HistoryFetchRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *HistoryFetchRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+func (x *HistoryFetchRequest) GetGlobal() bool {
+	if x != nil {
+		return x.Global
+	}
+	return false
+}
+
+type HistoryFetchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*HistoryItem         `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	AtEnd         bool                   `protobuf:"varint,2,opt,name=at_end,json=atEnd,proto3" json:"at_end,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryFetchResponse) Reset() {
+	*x = HistoryFetchResponse{}
+	mi := &file_clai_v1_clai_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryFetchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryFetchResponse) ProtoMessage() {}
+
+func (x *HistoryFetchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryFetchResponse.ProtoReflect.Descriptor instead.
+func (*HistoryFetchResponse) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *HistoryFetchResponse) GetItems() []*HistoryItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *HistoryFetchResponse) GetAtEnd() bool {
+	if x != nil {
+		return x.AtEnd
+	}
+	return false
+}
+
+type HistoryItem struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Command       string                 `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
+	TimestampMs   int64                  `protobuf:"varint,2,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryItem) Reset() {
+	*x = HistoryItem{}
+	mi := &file_clai_v1_clai_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryItem) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryItem) ProtoMessage() {}
+
+func (x *HistoryItem) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryItem.ProtoReflect.Descriptor instead.
+func (*HistoryItem) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *HistoryItem) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *HistoryItem) GetTimestampMs() int64 {
+	if x != nil {
+		return x.TimestampMs
+	}
+	return 0
+}
+
+type HistoryImportRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Shell         string                 `protobuf:"bytes,1,opt,name=shell,proto3" json:"shell,omitempty"`                                   // "bash", "zsh", "fish", or "auto"
+	HistoryPath   string                 `protobuf:"bytes,2,opt,name=history_path,json=historyPath,proto3" json:"history_path,omitempty"`    // Optional custom path (empty = default)
+	IfNotExists   bool                   `protobuf:"varint,3,opt,name=if_not_exists,json=ifNotExists,proto3" json:"if_not_exists,omitempty"` // Skip if already imported for this shell
+	Force         bool                   `protobuf:"varint,4,opt,name=force,proto3" json:"force,omitempty"`                                  // Replace existing import
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryImportRequest) Reset() {
+	*x = HistoryImportRequest{}
+	mi := &file_clai_v1_clai_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryImportRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryImportRequest) ProtoMessage() {}
+
+func (x *HistoryImportRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryImportRequest.ProtoReflect.Descriptor instead.
+func (*HistoryImportRequest) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *HistoryImportRequest) GetShell() string {
+	if x != nil {
+		return x.Shell
+	}
+	return ""
+}
+
+func (x *HistoryImportRequest) GetHistoryPath() string {
+	if x != nil {
+		return x.HistoryPath
+	}
+	return ""
+}
+
+func (x *HistoryImportRequest) GetIfNotExists() bool {
+	if x != nil {
+		return x.IfNotExists
+	}
+	return false
+}
+
+func (x *HistoryImportRequest) GetForce() bool {
+	if x != nil {
+		return x.Force
+	}
+	return false
+}
+
+type HistoryImportResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ImportedCount int32                  `protobuf:"varint,1,opt,name=imported_count,json=importedCount,proto3" json:"imported_count,omitempty"` // Number of entries imported
+	Skipped       bool                   `protobuf:"varint,2,opt,name=skipped,proto3" json:"skipped,omitempty"`                                  // True if skipped due to if_not_exists
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`                                       // Error message if failed
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HistoryImportResponse) Reset() {
+	*x = HistoryImportResponse{}
+	mi := &file_clai_v1_clai_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HistoryImportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HistoryImportResponse) ProtoMessage() {}
+
+func (x *HistoryImportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HistoryImportResponse.ProtoReflect.Descriptor instead.
+func (*HistoryImportResponse) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *HistoryImportResponse) GetImportedCount() int32 {
+	if x != nil {
+		return x.ImportedCount
+	}
+	return 0
+}
+
+func (x *HistoryImportResponse) GetSkipped() bool {
+	if x != nil {
+		return x.Skipped
+	}
+	return false
+}
+
+func (x *HistoryImportResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 type StatusResponse struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	Version        string                 `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
@@ -1040,7 +1348,7 @@ type StatusResponse struct {
 
 func (x *StatusResponse) Reset() {
 	*x = StatusResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[15]
+	mi := &file_clai_v1_clai_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1052,7 +1360,7 @@ func (x *StatusResponse) String() string {
 func (*StatusResponse) ProtoMessage() {}
 
 func (x *StatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[15]
+	mi := &file_clai_v1_clai_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1065,7 +1373,7 @@ func (x *StatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
 func (*StatusResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{15}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *StatusResponse) GetVersion() string {
@@ -1194,12 +1502,34 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\x03cwd\x18\x04 \x01(\tR\x03cwd\"_\n" +
 	"\x10DiagnoseResponse\x12 \n" +
 	"\vexplanation\x18\x01 \x01(\tR\vexplanation\x12)\n" +
-	"\x05fixes\x18\x02 \x03(\v2\x13.clai.v1.SuggestionR\x05fixes\"\xa3\x01\n" +
+	"\x05fixes\x18\x02 \x03(\v2\x13.clai.v1.SuggestionR\x05fixes\"\x90\x01\n" +
+	"\x13HistoryFetchRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x14\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06offset\x18\x04 \x01(\x05R\x06offset\x12\x16\n" +
+	"\x06global\x18\x05 \x01(\bR\x06global\"Y\n" +
+	"\x14HistoryFetchResponse\x12*\n" +
+	"\x05items\x18\x01 \x03(\v2\x14.clai.v1.HistoryItemR\x05items\x12\x15\n" +
+	"\x06at_end\x18\x02 \x01(\bR\x05atEnd\"J\n" +
+	"\vHistoryItem\x12\x18\n" +
+	"\acommand\x18\x01 \x01(\tR\acommand\x12!\n" +
+	"\ftimestamp_ms\x18\x02 \x01(\x03R\vtimestampMs\"\x89\x01\n" +
+	"\x14HistoryImportRequest\x12\x14\n" +
+	"\x05shell\x18\x01 \x01(\tR\x05shell\x12!\n" +
+	"\fhistory_path\x18\x02 \x01(\tR\vhistoryPath\x12\"\n" +
+	"\rif_not_exists\x18\x03 \x01(\bR\vifNotExists\x12\x14\n" +
+	"\x05force\x18\x04 \x01(\bR\x05force\"n\n" +
+	"\x15HistoryImportResponse\x12%\n" +
+	"\x0eimported_count\x18\x01 \x01(\x05R\rimportedCount\x12\x18\n" +
+	"\askipped\x18\x02 \x01(\bR\askipped\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\xa3\x01\n" +
 	"\x0eStatusResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12'\n" +
 	"\x0factive_sessions\x18\x02 \x01(\x05R\x0eactiveSessions\x12%\n" +
 	"\x0euptime_seconds\x18\x03 \x01(\x03R\ruptimeSeconds\x12'\n" +
-	"\x0fcommands_logged\x18\x04 \x01(\x03R\x0ecommandsLogged2\xe1\x04\n" +
+	"\x0fcommands_logged\x18\x04 \x01(\x03R\x0ecommandsLogged2\xfe\x05\n" +
 	"\vClaiService\x12:\n" +
 	"\fSessionStart\x12\x1c.clai.v1.SessionStartRequest\x1a\f.clai.v1.Ack\x126\n" +
 	"\n" +
@@ -1209,7 +1539,9 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\aSuggest\x12\x17.clai.v1.SuggestRequest\x1a\x18.clai.v1.SuggestResponse\x12N\n" +
 	"\rTextToCommand\x12\x1d.clai.v1.TextToCommandRequest\x1a\x1e.clai.v1.TextToCommandResponse\x12?\n" +
 	"\bNextStep\x12\x18.clai.v1.NextStepRequest\x1a\x19.clai.v1.NextStepResponse\x12?\n" +
-	"\bDiagnose\x12\x18.clai.v1.DiagnoseRequest\x1a\x19.clai.v1.DiagnoseResponse\x12\"\n" +
+	"\bDiagnose\x12\x18.clai.v1.DiagnoseRequest\x1a\x19.clai.v1.DiagnoseResponse\x12K\n" +
+	"\fFetchHistory\x12\x1c.clai.v1.HistoryFetchRequest\x1a\x1d.clai.v1.HistoryFetchResponse\x12N\n" +
+	"\rImportHistory\x12\x1d.clai.v1.HistoryImportRequest\x1a\x1e.clai.v1.HistoryImportResponse\x12\"\n" +
 	"\x04Ping\x12\f.clai.v1.Ack\x1a\f.clai.v1.Ack\x122\n" +
 	"\tGetStatus\x12\f.clai.v1.Ack\x1a\x17.clai.v1.StatusResponseB+Z)github.com/runger/clai/gen/clai/v1;claiv1b\x06proto3"
 
@@ -1225,7 +1557,7 @@ func file_clai_v1_clai_proto_rawDescGZIP() []byte {
 	return file_clai_v1_clai_proto_rawDescData
 }
 
-var file_clai_v1_clai_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_clai_v1_clai_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
 var file_clai_v1_clai_proto_goTypes = []any{
 	(*ClientInfo)(nil),            // 0: clai.v1.ClientInfo
 	(*Ack)(nil),                   // 1: clai.v1.Ack
@@ -1242,7 +1574,12 @@ var file_clai_v1_clai_proto_goTypes = []any{
 	(*NextStepResponse)(nil),      // 12: clai.v1.NextStepResponse
 	(*DiagnoseRequest)(nil),       // 13: clai.v1.DiagnoseRequest
 	(*DiagnoseResponse)(nil),      // 14: clai.v1.DiagnoseResponse
-	(*StatusResponse)(nil),        // 15: clai.v1.StatusResponse
+	(*HistoryFetchRequest)(nil),   // 15: clai.v1.HistoryFetchRequest
+	(*HistoryFetchResponse)(nil),  // 16: clai.v1.HistoryFetchResponse
+	(*HistoryItem)(nil),           // 17: clai.v1.HistoryItem
+	(*HistoryImportRequest)(nil),  // 18: clai.v1.HistoryImportRequest
+	(*HistoryImportResponse)(nil), // 19: clai.v1.HistoryImportResponse
+	(*StatusResponse)(nil),        // 20: clai.v1.StatusResponse
 }
 var file_clai_v1_clai_proto_depIdxs = []int32{
 	0,  // 0: clai.v1.SessionStartRequest.client:type_name -> clai.v1.ClientInfo
@@ -1250,31 +1587,36 @@ var file_clai_v1_clai_proto_depIdxs = []int32{
 	7,  // 2: clai.v1.TextToCommandResponse.suggestions:type_name -> clai.v1.Suggestion
 	7,  // 3: clai.v1.NextStepResponse.suggestions:type_name -> clai.v1.Suggestion
 	7,  // 4: clai.v1.DiagnoseResponse.fixes:type_name -> clai.v1.Suggestion
-	2,  // 5: clai.v1.ClaiService.SessionStart:input_type -> clai.v1.SessionStartRequest
-	3,  // 6: clai.v1.ClaiService.SessionEnd:input_type -> clai.v1.SessionEndRequest
-	4,  // 7: clai.v1.ClaiService.CommandStarted:input_type -> clai.v1.CommandStartRequest
-	5,  // 8: clai.v1.ClaiService.CommandEnded:input_type -> clai.v1.CommandEndRequest
-	6,  // 9: clai.v1.ClaiService.Suggest:input_type -> clai.v1.SuggestRequest
-	9,  // 10: clai.v1.ClaiService.TextToCommand:input_type -> clai.v1.TextToCommandRequest
-	11, // 11: clai.v1.ClaiService.NextStep:input_type -> clai.v1.NextStepRequest
-	13, // 12: clai.v1.ClaiService.Diagnose:input_type -> clai.v1.DiagnoseRequest
-	1,  // 13: clai.v1.ClaiService.Ping:input_type -> clai.v1.Ack
-	1,  // 14: clai.v1.ClaiService.GetStatus:input_type -> clai.v1.Ack
-	1,  // 15: clai.v1.ClaiService.SessionStart:output_type -> clai.v1.Ack
-	1,  // 16: clai.v1.ClaiService.SessionEnd:output_type -> clai.v1.Ack
-	1,  // 17: clai.v1.ClaiService.CommandStarted:output_type -> clai.v1.Ack
-	1,  // 18: clai.v1.ClaiService.CommandEnded:output_type -> clai.v1.Ack
-	8,  // 19: clai.v1.ClaiService.Suggest:output_type -> clai.v1.SuggestResponse
-	10, // 20: clai.v1.ClaiService.TextToCommand:output_type -> clai.v1.TextToCommandResponse
-	12, // 21: clai.v1.ClaiService.NextStep:output_type -> clai.v1.NextStepResponse
-	14, // 22: clai.v1.ClaiService.Diagnose:output_type -> clai.v1.DiagnoseResponse
-	1,  // 23: clai.v1.ClaiService.Ping:output_type -> clai.v1.Ack
-	15, // 24: clai.v1.ClaiService.GetStatus:output_type -> clai.v1.StatusResponse
-	15, // [15:25] is the sub-list for method output_type
-	5,  // [5:15] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	17, // 5: clai.v1.HistoryFetchResponse.items:type_name -> clai.v1.HistoryItem
+	2,  // 6: clai.v1.ClaiService.SessionStart:input_type -> clai.v1.SessionStartRequest
+	3,  // 7: clai.v1.ClaiService.SessionEnd:input_type -> clai.v1.SessionEndRequest
+	4,  // 8: clai.v1.ClaiService.CommandStarted:input_type -> clai.v1.CommandStartRequest
+	5,  // 9: clai.v1.ClaiService.CommandEnded:input_type -> clai.v1.CommandEndRequest
+	6,  // 10: clai.v1.ClaiService.Suggest:input_type -> clai.v1.SuggestRequest
+	9,  // 11: clai.v1.ClaiService.TextToCommand:input_type -> clai.v1.TextToCommandRequest
+	11, // 12: clai.v1.ClaiService.NextStep:input_type -> clai.v1.NextStepRequest
+	13, // 13: clai.v1.ClaiService.Diagnose:input_type -> clai.v1.DiagnoseRequest
+	15, // 14: clai.v1.ClaiService.FetchHistory:input_type -> clai.v1.HistoryFetchRequest
+	18, // 15: clai.v1.ClaiService.ImportHistory:input_type -> clai.v1.HistoryImportRequest
+	1,  // 16: clai.v1.ClaiService.Ping:input_type -> clai.v1.Ack
+	1,  // 17: clai.v1.ClaiService.GetStatus:input_type -> clai.v1.Ack
+	1,  // 18: clai.v1.ClaiService.SessionStart:output_type -> clai.v1.Ack
+	1,  // 19: clai.v1.ClaiService.SessionEnd:output_type -> clai.v1.Ack
+	1,  // 20: clai.v1.ClaiService.CommandStarted:output_type -> clai.v1.Ack
+	1,  // 21: clai.v1.ClaiService.CommandEnded:output_type -> clai.v1.Ack
+	8,  // 22: clai.v1.ClaiService.Suggest:output_type -> clai.v1.SuggestResponse
+	10, // 23: clai.v1.ClaiService.TextToCommand:output_type -> clai.v1.TextToCommandResponse
+	12, // 24: clai.v1.ClaiService.NextStep:output_type -> clai.v1.NextStepResponse
+	14, // 25: clai.v1.ClaiService.Diagnose:output_type -> clai.v1.DiagnoseResponse
+	16, // 26: clai.v1.ClaiService.FetchHistory:output_type -> clai.v1.HistoryFetchResponse
+	19, // 27: clai.v1.ClaiService.ImportHistory:output_type -> clai.v1.HistoryImportResponse
+	1,  // 28: clai.v1.ClaiService.Ping:output_type -> clai.v1.Ack
+	20, // 29: clai.v1.ClaiService.GetStatus:output_type -> clai.v1.StatusResponse
+	18, // [18:30] is the sub-list for method output_type
+	6,  // [6:18] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_clai_v1_clai_proto_init() }
@@ -1288,7 +1630,7 @@ func file_clai_v1_clai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_clai_v1_clai_proto_rawDesc), len(file_clai_v1_clai_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   21,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

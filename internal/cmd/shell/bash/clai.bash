@@ -19,6 +19,8 @@ export CLAI_CURRENT_SHELL=bash
 : ${CLAI_AUTO_EXTRACT:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
+: ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
+: ${CLAI_PICKER_OPEN_ON_EMPTY:={{CLAI_PICKER_OPEN_ON_EMPTY}}}
 
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
@@ -106,16 +108,65 @@ fi
 
 # Enable menu-complete cycling on Tab
 bind "set show-all-if-ambiguous on"
-bind '"\t": menu-complete'
+
+# Tab handler: cycle history scopes when picker is active, else menu-complete.
+# Uses same macro pattern as Enter: Tab → macro → bind-x handler → conditional follow-up.
+_clai_tab_handler() {
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        case "$_CLAI_HISTORY_SCOPE" in
+            session) _CLAI_HISTORY_SCOPE="global" ;;
+            *)       _CLAI_HISTORY_SCOPE="session" ;;
+        esac
+        _CLAI_PICKER_INDEX=0
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
+        # Swallow the follow-up so menu-complete doesn't fire
+        bind '"\C-x\C-t": ""'
+    else
+        # Let menu-complete fire via the follow-up key
+        bind '"\C-x\C-t": menu-complete'
+    fi
+}
+bind -x '"\C-x\C-i": _clai_tab_handler'
+bind '"\t": "\C-x\C-i\C-x\C-t"'
 
 # ============================================
-# Feature 1b: History Picker (Up Arrow)
+# Feature 1b-a: TUI Picker (clai-picker)
+# ============================================
+# If clai-picker is on PATH and bash supports bind -x, Up arrow and Alt+H
+# open the full TUI picker.
+# Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
+
+_clai_has_tui_picker() {
+    type -P clai-picker >/dev/null 2>&1
+}
+
+_clai_tui_picker_open() {
+    local query="${1-$READLINE_LINE}"
+    if ! _clai_has_tui_picker; then
+        return 2
+    fi
+    local result exit_code saved_line="$READLINE_LINE"
+    result=$(clai-picker history --query="$query" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    exit_code=$?
+    if [ $exit_code -eq 0 ]; then
+        READLINE_LINE="$result"
+        READLINE_POINT=${#READLINE_LINE}
+    elif [ $exit_code -eq 2 ]; then
+        # Fall back to native history search
+        return 2
+    fi
+    # exit_code 1 = cancel, keep original line
+}
+
+# ============================================
+# Feature 1b-b: History Picker (Up Arrow)
 # ============================================
 
 _CLAI_PICKER_ACTIVE=false
 _CLAI_PICKER_MODE=""
 _CLAI_PICKER_INDEX=0
 _CLAI_PICKER_ORIG_LINE=""
+_CLAI_PICKER_QUERY=""
 _CLAI_PICKER_ITEMS=()
 _CLAI_HISTORY_SCOPE="session"
 _CLAI_FALLBACK_ACTIVE=false
@@ -217,14 +268,18 @@ _clai_history_args() {
 }
 
 _clai_picker_load_history() {
+    local query="${1-$_CLAI_PICKER_QUERY}"
+    if [[ -z "$query" ]]; then
+        query="$READLINE_LINE"
+    fi
     local -a args raw
     local IFS=$'\n'
     args=($(_clai_history_args))
     unset IFS
     if ((BASH_VERSINFO[0] >= 4)); then
-        mapfile -t raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
+        mapfile -t raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$query" 2>/dev/null)
     else
-        _clai_read_lines raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
+        _clai_read_lines raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$query" 2>/dev/null)
     fi
     # Deduplicate preserving order
     if ((BASH_VERSINFO[0] >= 4)); then
@@ -247,8 +302,9 @@ _clai_picker_render() {
     fi
 
     local menu_text="$header (↑↓, Enter, Ctrl+G):"
+    menu_text+=$'\n'"────────────────────────────────"
     local i=0
-    local line_count=1
+    local line_count=2
     for item in "${_CLAI_PICKER_ITEMS[@]}"; do
         if [[ $i -eq $_CLAI_PICKER_INDEX ]]; then
             menu_text+=$'\n'" → $item"
@@ -287,6 +343,7 @@ _clai_picker_apply() {
 }
 
 _clai_history_up() {
+    local picker_query="$READLINE_LINE"
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
         if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
             _clai_picker_cancel
@@ -294,17 +351,31 @@ _clai_history_up() {
         _clai_fallback_history_up
         return 0
     fi
+    if [[ "$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$picker_query" && "$_CLAI_PICKER_ACTIVE" != "true" ]]; then
+        _clai_fallback_history_up
+        return 0
+    fi
+    # Try TUI picker first (when inline picker is not already active).
+    # exit code 2 means "fallback to inline picker".
+    if [[ "$_CLAI_PICKER_ACTIVE" != "true" ]] && _clai_has_tui_picker; then
+        _clai_tui_picker_open "$picker_query"
+        local tui_status=$?
+        if [[ $tui_status -ne 2 ]]; then
+            return 0
+        fi
+    fi
     if [[ "$_CLAI_FALLBACK_ACTIVE" == "true" ]]; then
         _clai_fallback_reset
     fi
     if [[ "$_CLAI_PICKER_ACTIVE" != "true" || "$_CLAI_PICKER_MODE" != "history" ]]; then
         _CLAI_PICKER_ORIG_LINE="$READLINE_LINE"
+        _CLAI_PICKER_QUERY="$picker_query"
         _CLAI_PICKER_MODE="history"
         _CLAI_PICKER_INDEX=0
         _CLAI_PICKER_ACTIVE=true
         # Install Enter macro so picker can intercept it
         bind '"\C-m": "\C-x\C-a\C-x\C-b"'
-        if ! _clai_picker_load_history; then
+        if ! _clai_picker_load_history "$_CLAI_PICKER_QUERY"; then
             _CLAI_PICKER_ACTIVE=false
             bind '"\C-m": accept-line'
             return 0
@@ -339,7 +410,9 @@ _clai_history_down() {
             _CLAI_PICKER_INDEX=$((${#_CLAI_PICKER_ITEMS[@]} - 1))
         fi
         _clai_picker_apply
+        return 0
     fi
+    _clai_fallback_history_down
 }
 
 _clai_picker_close() {
@@ -348,6 +421,7 @@ _clai_picker_close() {
     _CLAI_PICKER_MODE=""
     _CLAI_PICKER_ITEMS=()
     _CLAI_PICKER_INDEX=0
+    _CLAI_PICKER_QUERY=""
     # Restore normal Enter (remove macro that routes through bind -x)
     bind '"\C-m": accept-line'
 }
@@ -379,7 +453,7 @@ _clai_history_scope_session() {
     _CLAI_HISTORY_SCOPE="session"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
     fi
 }
 
@@ -387,7 +461,7 @@ _clai_history_scope_cwd() {
     _CLAI_HISTORY_SCOPE="cwd"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
     fi
 }
 
@@ -395,7 +469,7 @@ _clai_history_scope_global() {
     _CLAI_HISTORY_SCOPE="global"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
     fi
 }
 
@@ -406,14 +480,30 @@ _clai_history_scope_global() {
 # sequences — it fails with "cannot find keymap for command". Work around by
 # using a readline macro to translate arrow escapes to Ctrl-X prefixed
 # sequences, then bind those with -x.
-bind '"\e[A": "\C-x\C-p"'
-bind '"\e[B": "\C-x\C-n"'
-bind -x '"\C-x\C-p": _clai_history_up'
-bind -x '"\C-x\C-n": _clai_history_down'
-bind -x '"\C-g": _clai_picker_cancel'
-bind -x '"\C-xs": _clai_history_scope_session'
-bind -x '"\C-xd": _clai_history_scope_cwd'
-bind -x '"\C-xg": _clai_history_scope_global'
+# Alt/Option+H opens history picker (TUI when available, inline fallback).
+# '\eh' works when the terminal sends ESC for Alt (Linux, macOS with Meta key).
+# On macOS, Option+H produces ˙ (U+02D9). bash 3.2 cannot bind -x to multi-byte
+# chars, so we use a macro to translate it to a Ctrl sequence we can bind -x to.
+bind -x '"\eh": _clai_history_up'
+bind -x '"\C-x\C-h": _clai_history_up'
+bind '"˙": "\C-x\C-h"'
+
+# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
+# (with inline fallback). Otherwise shell defaults are used.
+if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
+    _clai_up_arrow() {
+        _clai_history_up
+    }
+    _clai_down_arrow() {
+        _clai_history_down
+    }
+    bind '"\e[A": "\C-x\C-p"'
+    bind '"\eOA": "\C-x\C-p"'
+    bind '"\e[B": "\C-x\C-n"'
+    bind '"\eOB": "\C-x\C-n"'
+    bind -x '"\C-x\C-p": _clai_up_arrow'
+    bind -x '"\C-x\C-n": _clai_down_arrow'
+fi
 
 # Enter: normally accept-line. When picker is open, _clai_history_up installs
 # a macro "\C-x\C-a\C-x\C-b" that routes through _clai_pre_accept to intercept.
@@ -456,11 +546,105 @@ clear-suggestion() {
 }
 
 # ============================================
-# Feature 2: Prompt Hook
+# Feature 2: Command Logging Hooks
 # ============================================
+# Log commands for session history (enables clai history)
+# Uses DEBUG trap for preexec (command start) and PROMPT_COMMAND for precmd (command end)
+#
+# Key challenge: Bash's DEBUG trap fires for EVERY command including those inside
+# functions and PROMPT_COMMAND. We detect user commands by checking BASH_COMMAND
+# against internal patterns and using FUNCNAME to detect function context.
 
-# Check result after each command
+# Command tracking state
+_CLAI_COMMAND_ID=""
+_CLAI_COMMAND_START_TIME=""
+_CLAI_LAST_COMMAND=""
+_CLAI_PENDING_LOG=false  # True when we have a command to log on completion
+
+# Log command start (called from DEBUG trap before command execution)
+_clai_log_command_start() {
+    local cmd="$1"
+
+    # Skip empty commands
+    [[ -z "$cmd" ]] && return 1
+
+    # Skip if we're inside a function (FUNCNAME has entries beyond main)
+    # FUNCNAME[0] is this function, FUNCNAME[1] is caller
+    # For top-level commands, FUNCNAME should be small
+    if [[ ${#FUNCNAME[@]} -gt 2 ]]; then
+        return 1
+    fi
+
+    # Skip internal clai functions and common shell patterns
+    case "$cmd" in
+        _ai_*|_clai_*|_AI_*|_CLAI_*) return 1 ;;
+        '['*|'[['*|'(('*) return 1 ;;  # Test expressions
+        local\ *|export\ *|return\ *|declare\ *|unset\ *|shift*|readonly\ *|typeset\ *|set\ *) return 1 ;;
+    esac
+
+    # Skip if already tracking a command
+    [[ "$_CLAI_PENDING_LOG" == "true" ]] && return 1
+
+    # Mark that we have a pending command to log
+    _CLAI_PENDING_LOG=true
+
+    # Generate unique command ID
+    _CLAI_COMMAND_ID="${CLAI_SESSION_ID}-$(date +%s)-${RANDOM}"
+    # Store start time in milliseconds. Use nanoseconds if available (GNU coreutils).
+    if date +%s%N >/dev/null 2>&1; then
+        _CLAI_COMMAND_START_TIME=$(($(date +%s%N) / 1000000))
+    else
+        _CLAI_COMMAND_START_TIME=$(($(date +%s) * 1000))
+    fi
+    _CLAI_LAST_COMMAND="$cmd"
+
+    # Fire and forget - log command start to daemon
+    (clai-shim log-start \
+        --session-id="$CLAI_SESSION_ID" \
+        --command-id="$_CLAI_COMMAND_ID" \
+        --cwd="$PWD" \
+        --command="$cmd" >/dev/null 2>&1 &)
+
+    return 0
+}
+
+# Log command end (called from PROMPT_COMMAND after command execution)
+_clai_log_command_end() {
+    local exit_code="$1"
+
+    # Only log if we have a pending command
+    [[ "$_CLAI_PENDING_LOG" != "true" ]] && return
+    [[ -z "$_CLAI_COMMAND_ID" ]] && return
+
+    # Calculate end time in milliseconds. Use nanoseconds if available (GNU coreutils).
+    local end_time
+    if date +%s%N >/dev/null 2>&1; then
+        end_time=$(($(date +%s%N) / 1000000))
+    else
+        end_time=$(($(date +%s) * 1000))
+    fi
+    local duration=$((end_time - _CLAI_COMMAND_START_TIME))
+
+    # Fire and forget - log command end to daemon
+    (clai-shim log-end \
+        --session-id="$CLAI_SESSION_ID" \
+        --command-id="$_CLAI_COMMAND_ID" \
+        --exit-code="$exit_code" \
+        --duration="$duration" >/dev/null 2>&1 &)
+
+    # Clear command tracking state
+    _CLAI_COMMAND_ID=""
+    _CLAI_COMMAND_START_TIME=""
+    _CLAI_PENDING_LOG=false
+}
+
+# Prompt command hook (runs after each command, before showing prompt)
 _ai_prompt_command() {
+    local last_exit=$?
+
+    # Log command completion (only if we ran a user command)
+    _clai_log_command_end "$last_exit"
+
     # Show any suggestions
     _ai_show_suggestion
 }
@@ -499,7 +683,7 @@ _ai_check_nl_prefix() {
     return 1  # Not a natural language command
 }
 
-# Hook into DEBUG trap to catch ? prefix before execution
+# Hook into DEBUG trap to catch ? prefix before execution and log commands
 # Note: extdebug must be enabled for the trap to block command execution
 _ai_debug_trap() {
     # Check for natural language prefix first
@@ -507,6 +691,10 @@ _ai_debug_trap() {
         # Prevent the original command from running (requires extdebug)
         return 1
     fi
+
+    # Log command start (for session history)
+    _clai_log_command_start "$BASH_COMMAND"
+
     return 0
 }
 
@@ -645,19 +833,26 @@ _clai_disable() {
     # Restore default keybindings
     bind '"\C-m": accept-line'
     bind '"\e[A": previous-history'
+    bind '"\eOA": previous-history'
     bind '"\e[B": next-history'
+    bind '"\eOB": next-history'
     bind '"\t": complete'
     bind "set show-all-if-ambiguous off"
 
     # Remove custom key bindings
     bind -r '\C-x\C-a'
     bind -r '\C-x\C-b'
+    bind -r '\C-x\C-i'
+    bind -r '\C-x\C-t'
     bind -r '\C-x\C-p'
     bind -r '\C-x\C-n'
     bind -r '\C-g'
     bind -r '\C-xs'
     bind -r '\C-xd'
     bind -r '\C-xg'
+    bind -r '\eh'
+    bind -r '\C-x\C-h'
+    bind -r '˙'
 
     # Remove completion handlers (default + per-command for bash <4)
     complete -r -D 2>/dev/null
@@ -696,11 +891,11 @@ _clai_enable() {
 clai() {
     case "$1" in
         off)
-            command clai off --session
+            command clai "$@"
             _clai_disable
             ;;
         on)
-            command clai on --session
+            command clai "$@"
             _clai_enable
             ;;
         *)
@@ -714,6 +909,19 @@ clai() {
 # ============================================
 
 if [[ $- == *i* && -z "$_CLAI_REINIT" ]]; then
+    # Register session with daemon (fire and forget)
+    # This notifies the daemon of the new shell session
+    (clai-shim session-start \
+        --session-id="$CLAI_SESSION_ID" \
+        --cwd="$PWD" \
+        --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1 &)
+
+    # Import shell history on first init (fire and forget)
+    # This is idempotent: --if-not-exists skips if already imported
+    (clai-shim import-history \
+        --shell="$CLAI_CURRENT_SHELL" \
+        --if-not-exists >/dev/null 2>&1 &)
+
     # Use printf for better portability across bash versions
     printf '\033[2m🤖 clai [%s] Tab complete | accept cmd | ?"describe task"\033[0m\n' "${CLAI_SESSION_ID:0:8}"
 fi

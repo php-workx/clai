@@ -2,10 +2,15 @@ package daemon
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"runtime"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	pb "github.com/runger/clai/gen/clai/v1"
+	"github.com/runger/clai/internal/history"
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/sanitize"
 	"github.com/runger/clai/internal/storage"
@@ -449,6 +454,169 @@ func (s *Server) GetStatus(ctx context.Context, req *pb.Ack) (*pb.StatusResponse
 		ActiveSessions: int32(s.sessionManager.ActiveCount()),
 		UptimeSeconds:  int64(uptime),
 		CommandsLogged: s.getCommandsLogged(),
+	}, nil
+}
+
+// ansiRegexp matches ANSI escape sequences for stripping from command text.
+var ansiRegexp = regexp.MustCompile(`\x1b(?:` +
+	`\[[0-9;?]*[ -/]*[@-~]` + // CSI sequences (incl. private modes)
+	`|` +
+	`\].*?(?:\x1b\\|\x07)` + // OSC sequences (ST or BEL terminated)
+	`|` +
+	`[()][A-B0-2]` + // Charset designation
+	`|` +
+	`[#()*+\-./][A-Za-z0-9]` + // Other two-byte escape sequences
+	`)`)
+
+// stripANSI removes ANSI escape sequences from a string.
+func stripANSI(s string) string {
+	return ansiRegexp.ReplaceAllString(s, "")
+}
+
+// FetchHistory handles the FetchHistory RPC.
+// It returns paginated, deduplicated command history with optional substring filtering.
+func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) (*pb.HistoryFetchResponse, error) {
+	s.touchActivity()
+
+	limit := int(req.Limit)
+	if limit <= 0 {
+		limit = 50
+	}
+
+	offset := int(req.Offset)
+	if offset < 0 {
+		offset = 0
+	}
+
+	q := storage.CommandQuery{
+		Limit:       limit + 1, // Fetch one extra to determine at_end
+		Offset:      offset,
+		Deduplicate: true,
+	}
+
+	// Apply substring filter (normalize to lowercase for command_norm matching)
+	if req.Query != "" {
+		q.Substring = strings.ToLower(req.Query)
+	}
+
+	// Apply session scoping
+	if !req.Global && req.SessionId != "" {
+		q.SessionID = &req.SessionId
+	}
+
+	rows, err := s.store.QueryHistoryCommands(ctx, q)
+	if err != nil {
+		s.logger.Warn("failed to query history",
+			"error", err,
+		)
+		return &pb.HistoryFetchResponse{}, nil
+	}
+
+	atEnd := len(rows) <= limit
+	if !atEnd {
+		rows = rows[:limit]
+	}
+
+	items := make([]*pb.HistoryItem, len(rows))
+	for i, row := range rows {
+		command := strings.ToValidUTF8(stripANSI(row.Command), string(utf8.RuneError))
+		items[i] = &pb.HistoryItem{
+			Command:     command,
+			TimestampMs: row.TimestampMs,
+		}
+	}
+
+	return &pb.HistoryFetchResponse{
+		Items: items,
+		AtEnd: atEnd,
+	}, nil
+}
+
+// ImportHistory handles the ImportHistory RPC.
+// It imports shell history entries from the specified shell's history file.
+// The operation runs synchronously (caller should invoke asynchronously if needed).
+func (s *Server) ImportHistory(ctx context.Context, req *pb.HistoryImportRequest) (*pb.HistoryImportResponse, error) {
+	s.touchActivity()
+
+	// Resolve shell type
+	shell := req.Shell
+	if shell == "" || shell == "auto" {
+		shell = history.DetectShell()
+	}
+	if shell == "" {
+		return &pb.HistoryImportResponse{
+			Error: "could not detect shell type",
+		}, nil
+	}
+
+	// Check if already imported (if_not_exists mode).
+	// force explicitly takes precedence when both are set.
+	if req.IfNotExists && !req.Force {
+		has, err := s.store.HasImportedHistory(ctx, shell)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check import status: %w", err)
+		}
+		if has {
+			s.logger.Debug("import skipped: already imported",
+				"shell", shell,
+			)
+			return &pb.HistoryImportResponse{
+				Skipped: true,
+			}, nil
+		}
+	}
+
+	// Import shell history
+	var entries []history.ImportEntry
+	var err error
+	switch shell {
+	case "bash":
+		entries, err = history.ImportBashHistory(req.HistoryPath)
+	case "zsh":
+		entries, err = history.ImportZshHistory(ctx, req.HistoryPath)
+	case "fish":
+		entries, err = history.ImportFishHistory(req.HistoryPath)
+	default:
+		return &pb.HistoryImportResponse{
+			Error: "unsupported shell: " + shell,
+		}, nil
+	}
+
+	if err != nil {
+		s.logger.Warn("failed to read shell history",
+			"shell", shell,
+			"path", req.HistoryPath,
+			"error", err,
+		)
+		return nil, fmt.Errorf("failed to read shell history: %w", err)
+	}
+
+	if len(entries) == 0 {
+		s.logger.Debug("no history entries to import",
+			"shell", shell,
+		)
+		return &pb.HistoryImportResponse{
+			ImportedCount: 0,
+		}, nil
+	}
+
+	// Import into database
+	count, err := s.store.ImportHistory(ctx, entries, shell)
+	if err != nil {
+		s.logger.Warn("failed to import history",
+			"shell", shell,
+			"error", err,
+		)
+		return nil, fmt.Errorf("failed to import history: %w", err)
+	}
+
+	s.logger.Info("imported shell history",
+		"shell", shell,
+		"count", count,
+	)
+
+	return &pb.HistoryImportResponse{
+		ImportedCount: int32(count),
 	}, nil
 }
 

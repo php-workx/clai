@@ -958,6 +958,442 @@ func TestSQLiteStore_QueryCommands_FailureOnly(t *testing.T) {
 	}
 }
 
+// ============================================================================
+// QueryCommands Substring tests
+// ============================================================================
+
+func TestSQLiteStore_QueryCommands_Substring(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	// Create session
+	session := &Session{
+		SessionID:       "substr-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Create commands
+	commands := []string{
+		"git status",
+		"git log --oneline",
+		"echo hello",
+		"docker build .",
+		"go build ./...",
+	}
+
+	for i, c := range commands {
+		cmd := &Command{
+			CommandID:     generateTestCommandID(300 + i),
+			SessionID:     "substr-session",
+			TsStartUnixMs: int64(1700000001000 + i),
+			CWD:           "/tmp",
+			Command:       c,
+			IsSuccess:     boolPtr(true),
+		}
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand() error = %v", err)
+		}
+	}
+
+	// Substring "build" should match "docker build ." and "go build ./..."
+	cmds, err := store.QueryCommands(ctx, CommandQuery{
+		Substring: "build",
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands() error = %v", err)
+	}
+
+	if len(cmds) != 2 {
+		t.Errorf("Got %d commands for substring 'build', want 2", len(cmds))
+	}
+
+	// Substring "log" should match "git log --oneline"
+	cmds2, err := store.QueryCommands(ctx, CommandQuery{
+		Substring: "log",
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands() error = %v", err)
+	}
+
+	if len(cmds2) != 1 {
+		t.Errorf("Got %d commands for substring 'log', want 1", len(cmds2))
+	}
+
+	// Substring with no matches
+	cmds3, err := store.QueryCommands(ctx, CommandQuery{
+		Substring: "nonexistent-xyz",
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands() error = %v", err)
+	}
+
+	if len(cmds3) != 0 {
+		t.Errorf("Got %d commands for non-matching substring, want 0", len(cmds3))
+	}
+}
+
+// ============================================================================
+// QueryHistoryCommands tests
+// ============================================================================
+
+func seedHistoryTestData(t *testing.T, store *SQLiteStore) {
+	t.Helper()
+	ctx := context.Background()
+
+	// Create sessions
+	for _, sid := range []string{"hist-sess-1", "hist-sess-2"} {
+		session := &Session{
+			SessionID:       sid,
+			StartedAtUnixMs: 1700000000000,
+			Shell:           "zsh",
+			OS:              "darwin",
+			InitialCWD:      "/tmp",
+		}
+		if err := store.CreateSession(ctx, session); err != nil {
+			t.Fatalf("CreateSession() error = %v", err)
+		}
+	}
+
+	// Commands: "git status" twice in sess-1, "git log" once in sess-1, "ls -la" in sess-2, "echo hello" in sess-2
+	commands := []*Command{
+		{
+			CommandID:     "hist-cmd-1",
+			SessionID:     "hist-sess-1",
+			TsStartUnixMs: 1000,
+			CWD:           "/tmp",
+			Command:       "git status",
+		},
+		{
+			CommandID:     "hist-cmd-2",
+			SessionID:     "hist-sess-1",
+			TsStartUnixMs: 2000,
+			CWD:           "/tmp",
+			Command:       "git log",
+		},
+		{
+			CommandID:     "hist-cmd-3",
+			SessionID:     "hist-sess-1",
+			TsStartUnixMs: 3000,
+			CWD:           "/tmp",
+			Command:       "git status",
+		},
+		{
+			CommandID:     "hist-cmd-4",
+			SessionID:     "hist-sess-2",
+			TsStartUnixMs: 4000,
+			CWD:           "/home",
+			Command:       "ls -la",
+		},
+		{
+			CommandID:     "hist-cmd-5",
+			SessionID:     "hist-sess-2",
+			TsStartUnixMs: 5000,
+			CWD:           "/home",
+			Command:       "echo hello world",
+		},
+	}
+
+	for _, cmd := range commands {
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand(%s) error = %v", cmd.CommandID, err)
+		}
+	}
+}
+
+func TestSQLiteStore_QueryHistoryCommands_Deduplication(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	seedHistoryTestData(t, store)
+	ctx := context.Background()
+
+	results, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		Limit: 100,
+	})
+	if err != nil {
+		t.Fatalf("QueryHistoryCommands() error = %v", err)
+	}
+
+	// 4 unique commands: echo hello world, ls -la, git status, git log
+	if len(results) != 4 {
+		t.Errorf("Got %d results, want 4 deduplicated", len(results))
+	}
+
+	// Results should be ordered by most recent timestamp descending
+	for i := 1; i < len(results); i++ {
+		if results[i].TimestampMs > results[i-1].TimestampMs {
+			t.Errorf("Not ordered DESC: index %d ts=%d > index %d ts=%d",
+				i, results[i].TimestampMs, i-1, results[i-1].TimestampMs)
+		}
+	}
+}
+
+func TestSQLiteStore_QueryHistoryCommands_KeepsMostRecent(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	seedHistoryTestData(t, store)
+	ctx := context.Background()
+
+	// "git status" appears at ts=1000 and ts=3000
+	results, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		Substring: "status",
+		Limit:     100,
+	})
+	if err != nil {
+		t.Fatalf("QueryHistoryCommands() error = %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Fatalf("Got %d results, want 1", len(results))
+	}
+
+	if results[0].TimestampMs != 3000 {
+		t.Errorf("TimestampMs = %d, want 3000 (most recent)", results[0].TimestampMs)
+	}
+}
+
+func TestSQLiteStore_QueryHistoryCommands_SessionScoped(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	seedHistoryTestData(t, store)
+	ctx := context.Background()
+
+	sessID := "hist-sess-1"
+	results, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		SessionID: &sessID,
+		Limit:     100,
+	})
+	if err != nil {
+		t.Fatalf("QueryHistoryCommands() error = %v", err)
+	}
+
+	// hist-sess-1 has: git status (deduped) + git log = 2
+	if len(results) != 2 {
+		t.Errorf("Got %d results, want 2", len(results))
+	}
+}
+
+func TestSQLiteStore_QueryHistoryCommands_SubstringFilter(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	seedHistoryTestData(t, store)
+	ctx := context.Background()
+
+	results, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		Substring: "echo",
+		Limit:     100,
+	})
+	if err != nil {
+		t.Fatalf("QueryHistoryCommands() error = %v", err)
+	}
+
+	if len(results) != 1 {
+		t.Errorf("Got %d results for 'echo', want 1", len(results))
+	}
+
+	if results[0].Command != "echo hello world" {
+		t.Errorf("Command = %q, want 'echo hello world'", results[0].Command)
+	}
+}
+
+func TestSQLiteStore_QueryHistoryCommands_Pagination(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	seedHistoryTestData(t, store)
+	ctx := context.Background()
+
+	// 4 unique commands total. Page 1: limit=2
+	page1, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		Limit:  2,
+		Offset: 0,
+	})
+	if err != nil {
+		t.Fatalf("Page 1 error: %v", err)
+	}
+	if len(page1) != 2 {
+		t.Errorf("Page 1: got %d, want 2", len(page1))
+	}
+
+	// Page 2: offset=2, limit=2
+	page2, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		Limit:  2,
+		Offset: 2,
+	})
+	if err != nil {
+		t.Fatalf("Page 2 error: %v", err)
+	}
+	if len(page2) != 2 {
+		t.Errorf("Page 2: got %d, want 2", len(page2))
+	}
+
+	// No overlap
+	page1Cmds := make(map[string]bool)
+	for _, r := range page1 {
+		page1Cmds[r.Command] = true
+	}
+	for _, r := range page2 {
+		if page1Cmds[r.Command] {
+			t.Errorf("Command %q appears on both pages", r.Command)
+		}
+	}
+
+	// Past end: offset=4
+	page3, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		Limit:  2,
+		Offset: 4,
+	})
+	if err != nil {
+		t.Fatalf("Page 3 error: %v", err)
+	}
+	if len(page3) != 0 {
+		t.Errorf("Page 3: got %d, want 0", len(page3))
+	}
+}
+
+func TestSQLiteStore_QueryHistoryCommands_EmptyResult(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	seedHistoryTestData(t, store)
+	ctx := context.Background()
+
+	results, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		Substring: "zzz-nonexistent",
+		Limit:     100,
+	})
+	if err != nil {
+		t.Fatalf("QueryHistoryCommands() error = %v", err)
+	}
+
+	if len(results) != 0 {
+		t.Errorf("Got %d results, want 0", len(results))
+	}
+}
+
+func TestSQLiteStore_QueryHistoryCommands_TimestampTieStillDedupes(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	session := &Session{
+		SessionID:       "tie-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// Same normalized command and identical timestamp.
+	for i, cmdText := range []string{"git status", "git   status"} {
+		cmd := &Command{
+			CommandID:     "tie-cmd-" + string(rune('a'+i)),
+			SessionID:     session.SessionID,
+			TsStartUnixMs: 1700000005000,
+			CWD:           "/tmp",
+			Command:       cmdText,
+			IsSuccess:     boolPtr(true),
+		}
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand() error = %v", err)
+		}
+	}
+
+	results, err := store.QueryHistoryCommands(ctx, CommandQuery{Limit: 100})
+	if err != nil {
+		t.Fatalf("QueryHistoryCommands() error = %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("got %d results, want 1 deduped result", len(results))
+	}
+}
+
+func TestSQLiteStore_QueryCommands_LikeEscaping(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	session := &Session{
+		SessionID:       "escape-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	commands := []string{"abc%def", "abcXdef", "foo_bar", "fooXbar"}
+	for i, c := range commands {
+		cmd := &Command{
+			CommandID:     "escape-cmd-" + string(rune('a'+i)),
+			SessionID:     session.SessionID,
+			TsStartUnixMs: int64(1700000001000 + i),
+			CWD:           "/tmp",
+			Command:       c,
+			IsSuccess:     boolPtr(true),
+		}
+		if err := store.CreateCommand(ctx, cmd); err != nil {
+			t.Fatalf("CreateCommand() error = %v", err)
+		}
+	}
+
+	prefixResults, err := store.QueryCommands(ctx, CommandQuery{
+		Prefix: "abc%def",
+		Limit:  100,
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands(prefix) error = %v", err)
+	}
+	if len(prefixResults) != 1 || prefixResults[0].Command != "abc%def" {
+		t.Fatalf("prefix escape mismatch: got %+v", prefixResults)
+	}
+
+	substringResults, err := store.QueryCommands(ctx, CommandQuery{
+		Substring: "foo_bar",
+		Limit:     100,
+	})
+	if err != nil {
+		t.Fatalf("QueryCommands(substring) error = %v", err)
+	}
+	if len(substringResults) != 1 || substringResults[0].Command != "foo_bar" {
+		t.Fatalf("substring escape mismatch: got %+v", substringResults)
+	}
+}
+
 func TestSQLiteStore_QueryCommands_StatusWithOtherFilters(t *testing.T) {
 	t.Parallel()
 

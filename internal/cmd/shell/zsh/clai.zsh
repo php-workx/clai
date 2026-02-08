@@ -21,6 +21,8 @@ export CLAI_CURRENT_SHELL=zsh
 : ${CLAI_AUTO_EXTRACT:=true}
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
+: ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
+: ${CLAI_PICKER_OPEN_ON_EMPTY:={{CLAI_PICKER_OPEN_ON_EMPTY}}}
 
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
@@ -121,7 +123,9 @@ _ai_update_suggestion() {
 _ai_self_insert() {
     _clai_dismiss_picker
     zle .self-insert
-    if [[ "$_AI_IN_PASTE" == "true" ]]; then
+    # During bracketed paste (or any queued bulk input), avoid running
+    # `clai suggest` per character. Recompute once when the queue drains.
+    if [[ "$_AI_IN_PASTE" == "true" ]] || [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
         return
     fi
     _ai_update_suggestion
@@ -134,6 +138,36 @@ zle -N self-insert _ai_self_insert
 _clai_dismiss_picker() {
     [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] && _clai_picker_close
 }
+
+# Clear inline ghost text state (without touching suggestion cache on disk).
+_ai_clear_ghost_text() {
+    _AI_CURRENT_SUGGESTION=""
+    POSTDISPLAY=""
+    region_highlight=()
+}
+
+# ZLE widget: Tab completion should dismiss ghost text first.
+_ai_expand_or_complete() {
+    _clai_dismiss_picker
+    _ai_clear_ghost_text
+    zle .expand-or-complete
+}
+zle -N expand-or-complete _ai_expand_or_complete
+
+# ZLE widget: History navigation should clear stale ghost text first.
+_ai_up_line_or_history() {
+    _clai_dismiss_picker
+    _ai_clear_ghost_text
+    zle .up-line-or-history
+}
+zle -N up-line-or-history _ai_up_line_or_history
+
+_ai_down_line_or_history() {
+    _clai_dismiss_picker
+    _ai_clear_ghost_text
+    zle .down-line-or-history
+}
+zle -N down-line-or-history _ai_down_line_or_history
 
 # ZLE widget: Update suggestion after backspace
 _ai_backward_delete_char() {
@@ -459,10 +493,48 @@ voice() {
 
 
 # ============================================
-# Feature 4: Suggestion + History Pickers
+# Feature 4a: TUI Picker (clai-picker)
+# ============================================
+# If clai-picker is on PATH, Up arrow and Alt+H open the full TUI picker.
+# Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
+
+_clai_has_tui_picker() {
+    command -v clai-picker >/dev/null 2>&1
+}
+
+_clai_tui_picker_open() {
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        zle .up-line-or-history
+        return
+    fi
+    if ! _clai_has_tui_picker; then
+        zle .up-line-or-history
+        return
+    fi
+    local result exit_code saved_buffer="$BUFFER"
+    result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    exit_code=$?
+    if [[ $exit_code -eq 0 ]]; then
+        # Clear ghost text before setting the new buffer.
+        _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
+        region_highlight=()
+        BUFFER="$result"
+        CURSOR=${#BUFFER}
+    elif [[ $exit_code -eq 2 ]]; then
+        zle .up-line-or-history
+        return
+    fi
+    # exit_code 1 = cancel, keep original buffer
+    zle redisplay
+}
+zle -N _clai_tui_picker_open
+
+# ============================================
+# Feature 4b: Suggestion + History Pickers
 # ============================================
 # - Tab opens suggestion picker
-# - Up arrow opens history picker
+# - Up arrow opens TUI picker (or inline history picker as fallback)
 # - Up/Down navigate while picker is open
 # - Enter accepts selection (insert only)
 # - Esc cancels and restores original buffer
@@ -543,18 +615,19 @@ _clai_picker_render() {
         header="History (${_CLAI_HISTORY_SCOPE})"
     fi
 
-    # Render items in reversed order: last array item at top, first at bottom.
-    # Index 0 is the closest/newest match and appears at the bottom of the menu.
+    menu_text+=$'\n'"────────────────────────────────"
+
+    # Render items in array order: index 0 (newest) at top, closest to input.
     local count=${#_CLAI_PICKER_ITEMS[@]}
-    local i=$((count - 1))
-    while [[ $i -ge 0 ]]; do
+    local i=0
+    while [[ $i -lt $count ]]; do
         local item="${_CLAI_PICKER_ITEMS[$i + 1]}"  # zsh 1-based
         if [[ $i -eq $_CLAI_PICKER_INDEX ]]; then
             menu_text+=$'\n'" → $item"
         else
             menu_text+=$'\n'"   $item"
         fi
-        ((i--))
+        ((i++))
     done
     POSTDISPLAY=""
     region_highlight=()
@@ -580,8 +653,7 @@ _clai_picker_open() {
 
     if ! _clai_picker_load 0; then
         _CLAI_PICKER_ACTIVE=false
-        zle -M "No ${mode} items"
-        return
+        return 1
     fi
     _clai_picker_render
 }
@@ -600,6 +672,9 @@ _clai_picker_cancel() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         BUFFER="$_CLAI_PICKER_ORIG_BUFFER"
         CURSOR=$_CLAI_PICKER_ORIG_CURSOR
+        _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
+        region_highlight=()
         _clai_picker_close
         _ai_update_suggestion
         zle redisplay
@@ -611,6 +686,10 @@ _clai_picker_accept() {
         local selected="${_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX + 1]}"
         BUFFER="$selected"
         CURSOR=${#BUFFER}
+        # Clear ghost text before closing picker and recalculating.
+        _AI_CURRENT_SUGGESTION=""
+        POSTDISPLAY=""
+        region_highlight=()
         _clai_picker_close
         _ai_update_suggestion
         zle redisplay
@@ -620,6 +699,7 @@ _clai_picker_accept() {
 }
 
 _clai_picker_up() {
+    _ai_clear_ghost_text
     # Fast path: if picker is already open, navigate without external commands
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
         local last_index=$((${#_CLAI_PICKER_ITEMS[@]} - 1))
@@ -649,9 +729,21 @@ _clai_picker_up() {
         # At end and at top: do nothing (no more items)
         return
     fi
-    # Not in picker - check config before opening (expensive, runs once)
-    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || ! _clai_config_enabled; then
-        zle .up-line-or-history
+    # Not in picker — try TUI picker first, then inline picker
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        _ai_up_line_or_history
+        return
+    fi
+    if [[ "$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$BUFFER" ]]; then
+        _ai_up_line_or_history
+        return
+    fi
+    if _clai_has_tui_picker; then
+        _clai_tui_picker_open
+        return
+    fi
+    if ! _clai_config_enabled; then
+        _ai_up_line_or_history
         return
     fi
     _clai_picker_open history
@@ -667,11 +759,23 @@ _clai_picker_down() {
         # At bottom (index 0): do nothing
         return
     fi
-    zle .down-line-or-history
+    _ai_down_line_or_history
 }
 
 _clai_picker_suggest() {
-    _clai_picker_open suggest || return
+    # When history picker is active, Tab cycles scopes instead of opening suggest
+    if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
+        case "$_CLAI_HISTORY_SCOPE" in
+            session) _CLAI_HISTORY_SCOPE="global" ;;
+            *)       _CLAI_HISTORY_SCOPE="session" ;;
+        esac
+        _CLAI_PICKER_INDEX=0
+        _CLAI_PICKER_PAGE=0
+        _CLAI_PICKER_AT_END=false
+        _clai_picker_load 0 && _clai_picker_render
+        return
+    fi
+    _clai_picker_open suggest || zle expand-or-complete
 }
 
 _clai_history_scope_session() {
@@ -728,18 +832,28 @@ zle -N _clai_history_scope_cwd
 zle -N _clai_history_scope_global
 zle -N send-break _clai_picker_break
 
-bindkey '^I' _clai_picker_suggest      # Tab
-bindkey '^[[A' _clai_picker_up         # Up arrow (CSI mode)
-bindkey '^[OA' _clai_picker_up         # Up arrow (application mode)
-bindkey '^[[B' _clai_picker_down       # Down arrow (CSI mode)
-bindkey '^[OB' _clai_picker_down       # Down arrow (application mode)
-bindkey '^M' _clai_picker_accept       # Enter
+# Bind inline picker controls.
+bindkey '^I' _clai_picker_suggest
+bindkey '^M' _clai_picker_accept
+bindkey '^[[B' _clai_picker_down
+bindkey '^[OB' _clai_picker_down
 bindkey '^Xs' _clai_history_scope_session
 bindkey '^Xd' _clai_history_scope_cwd
 bindkey '^Xg' _clai_history_scope_global
-# Note: bare '\e' binding removed — it intercepts arrow key sequences when
-# KEYTIMEOUT is low (common in oh-my-zsh, vi-mode configs). Picker cancel
-# is handled via send-break (Ctrl+C / Ctrl+G) instead.
+
+# Alt/Option+H opens TUI picker.
+# '\eh' works when the terminal sends ESC for Alt (Linux, or macOS with
+# "Use Option as Meta key" enabled). The literal '˙' covers macOS
+# Terminal.app and iTerm2 defaults where Option+H produces U+02D9.
+bindkey '\eh' _clai_tui_picker_open
+bindkey '˙' _clai_tui_picker_open
+
+# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
+# (with fallback to shell default). Otherwise shell defaults are used.
+if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
+    bindkey '^[[A' _clai_picker_up    # Up arrow (CSI mode)
+    bindkey '^[OA' _clai_picker_up    # Up arrow (application mode)
+fi
 
 # ============================================
 # Full Disable / Enable (clai off / clai on)
@@ -749,6 +863,9 @@ _clai_disable() {
     export CLAI_OFF=1
 
     # Restore default ZLE widgets (undo custom overrides)
+    zle -A .expand-or-complete expand-or-complete
+    zle -A .up-line-or-history up-line-or-history
+    zle -A .down-line-or-history down-line-or-history
     zle -A .self-insert self-insert
     zle -A .backward-delete-char backward-delete-char
     zle -A .backward-char backward-char
@@ -770,6 +887,8 @@ _clai_disable() {
     bindkey -r '^Xs'
     bindkey -r '^Xd'
     bindkey -r '^Xg'
+    bindkey -r '\eh'
+    bindkey -r '˙'
 
     # Restore zsh-autosuggestions
     _clai_zsh_autosuggest_restore
@@ -803,11 +922,11 @@ _clai_enable() {
 clai() {
     case "$1" in
         off)
-            command clai off --session
+            command clai "$@"
             _clai_disable
             ;;
         on)
-            command clai on --session
+            command clai "$@"
             _clai_enable
             ;;
         *)
@@ -860,6 +979,12 @@ if [[ -o interactive && -z "$_CLAI_REINIT" ]]; then
         --session-id="$CLAI_SESSION_ID" \
         --cwd="$PWD" \
         --shell=zsh >/dev/null 2>&1 &)
+
+    # Import shell history on first init (fire and forget)
+    # This is idempotent: --if-not-exists skips if already imported
+    (clai-shim import-history \
+        --shell="$CLAI_CURRENT_SHELL" \
+        --if-not-exists >/dev/null 2>&1 &)
 
     trap '_clai_cleanup' EXIT HUP
 

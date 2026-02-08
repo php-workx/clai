@@ -15,6 +15,11 @@ func TestConfigCmd_List(t *testing.T) {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
+		"history.picker_backend",
+		"history.picker_open_on_empty",
+		"history.picker_page_size",
+		"history.picker_case_sensitive",
+		"history.up_arrow_opens_history",
 	}
 
 	if len(keys) != len(expectedKeys) {

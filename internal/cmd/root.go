@@ -47,7 +47,8 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 
 	// Hidden commands (still functional but not shown in help)
-	rootCmd.AddCommand(daemonCmd)
+	rootCmd.AddCommand(daemonCmd)       // Go daemon (claid)
+	rootCmd.AddCommand(claudeDaemonCmd) // Claude CLI daemon
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(doctorCmd)
 }
