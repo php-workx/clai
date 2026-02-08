@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/history"
@@ -518,8 +519,9 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 
 	items := make([]*pb.HistoryItem, len(rows))
 	for i, row := range rows {
+		command := strings.ToValidUTF8(stripANSI(row.Command), string(utf8.RuneError))
 		items[i] = &pb.HistoryItem{
-			Command:     stripANSI(row.Command),
+			Command:     command,
 			TimestampMs: row.TimestampMs,
 		}
 	}

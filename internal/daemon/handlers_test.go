@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
+
+	"google.golang.org/protobuf/proto"
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/history"
@@ -2310,6 +2313,54 @@ func TestHandler_FetchHistory_ANSIStripping(t *testing.T) {
 	expected := "git status"
 	if resp.Items[0].Command != expected {
 		t.Errorf("expected ANSI-stripped command %q, got %q", expected, resp.Items[0].Command)
+	}
+}
+
+func TestHandler_FetchHistory_SanitizesInvalidUTF8ForProto(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	store.commands["cmd-invalid"] = &storage.Command{
+		CommandID:     "cmd-invalid",
+		SessionID:     "session-1",
+		Command:       string([]byte{'a', 's', 0xff, 's'}),
+		CommandNorm:   "ass",
+		TsStartUnixMs: 1000,
+		CWD:           "/tmp",
+	}
+
+	ranker := &mockRanker{}
+	server, err := NewServer(&ServerConfig{
+		Store:       store,
+		Ranker:      ranker,
+		IdleTimeout: 5 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.HistoryFetchRequest{
+		Global: true,
+		Query:  "ass",
+		Limit:  50,
+	}
+
+	resp, err := server.FetchHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+
+	if len(resp.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(resp.Items))
+	}
+
+	if !utf8.ValidString(resp.Items[0].Command) {
+		t.Fatalf("expected command to be valid UTF-8, got %q", resp.Items[0].Command)
+	}
+
+	if _, err := proto.Marshal(resp); err != nil {
+		t.Fatalf("expected protobuf marshal to succeed, got error: %v", err)
 	}
 }
 
