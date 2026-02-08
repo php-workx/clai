@@ -549,8 +549,9 @@ func (s *Server) ImportHistory(ctx context.Context, req *pb.HistoryImportRequest
 		}, nil
 	}
 
-	// Check if already imported (if_not_exists mode)
-	if req.IfNotExists {
+	// Check if already imported (if_not_exists mode).
+	// force explicitly takes precedence when both are set.
+	if req.IfNotExists && !req.Force {
 		has, err := s.store.HasImportedHistory(ctx, shell)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check import status: %w", err)
