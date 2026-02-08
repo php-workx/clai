@@ -592,7 +592,11 @@ func (m Model) viewList() string {
 			base, hl, prefix = normalStyle, matchStyle, "  "
 		}
 
-		lines = append(lines, base.Render(prefix)+renderItem(display, query, base, hl))
+		line := base.Render(prefix) + renderItem(display, query, base, hl)
+		if i == m.selection {
+			line += dimStyle.Render("  Right: refine")
+		}
+		lines = append(lines, line)
 	}
 
 	if m.layout == LayoutBottomUp {

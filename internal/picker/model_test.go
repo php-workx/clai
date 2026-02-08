@@ -981,6 +981,22 @@ func TestRightArrow_CopiesSelectedItemToFilterForRefinement(t *testing.T) {
 	assert.NotNil(t, cmd, "right arrow should schedule a debounced fetch")
 }
 
+func TestViewList_SelectedLineShowsRightRefineHint(t *testing.T) {
+	p := &mockProvider{items: []string{"git status", "git stash pop"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	view := m.viewList()
+	assert.Contains(t, view, "Right: refine")
+	assert.Equal(t, 1, strings.Count(view, "Right: refine"))
+
+	// Move selection and ensure the hint is still shown exactly once.
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = result.(Model)
+	view = m.viewList()
+	assert.Equal(t, 1, strings.Count(view, "Right: refine"))
+}
+
 func TestWithLayout(t *testing.T) {
 	p := &mockProvider{}
 	m := NewModel(defaultTabs(), p)
