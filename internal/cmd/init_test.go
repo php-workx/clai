@@ -760,6 +760,33 @@ func TestFishScript_PickerControlBindings(t *testing.T) {
 	}
 }
 
+func TestFishScript_DisableModeScopedCleanup(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+	if err != nil {
+		t.Fatalf("Failed to read fish script: %v", err)
+	}
+	script := string(content)
+
+	required := []string{
+		`function _clai_disable`,
+		`for mode in default insert visual`,
+		`bind -M $mode \t complete`,
+		`bind -M $mode \e\[B history-search-forward`,
+		`bind -M $mode \eOB history-search-forward`,
+		`bind -M $mode \e ''`,
+		`bind -M $mode \eh ''`,
+		`bind -M $mode \cxs ''`,
+		`bind -M $mode \cxd ''`,
+		`bind -M $mode \cxg ''`,
+	}
+
+	for _, pattern := range required {
+		if !strings.Contains(script, pattern) {
+			t.Errorf("fish script missing mode-scoped disable cleanup %s", pattern)
+		}
+	}
+}
+
 func TestFishScript_TUIPickerQuotesSingleValueArgs(t *testing.T) {
 	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
 	if err != nil {

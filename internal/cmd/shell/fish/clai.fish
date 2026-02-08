@@ -724,21 +724,24 @@ function _clai_disable
     set -gx CLAI_OFF 1
 
     # Restore default keybindings
-    bind \t complete
-    bind \e\[A history-search-backward
-    bind \eOA history-search-backward
-    bind \e\[B history-search-forward
-    bind \r execute
+    for mode in default insert visual
+        bind -M $mode \t complete
+        bind -M $mode \e\[A history-search-backward
+        bind -M $mode \eOA history-search-backward
+        bind -M $mode \e\[B history-search-forward
+        bind -M $mode \eOB history-search-forward
+        bind -M $mode \r execute
 
-    # Remove custom keybindings
-    bind \e ''
-    bind \e\r ''
-    bind \eh ''
-    bind ˙ ''
+        # Remove custom keybindings
+        bind -M $mode \e ''
+        bind -M $mode \e\r ''
+        bind -M $mode \eh ''
+        bind -M $mode ˙ ''
+        bind -M $mode \cxs ''
+        bind -M $mode \cxd ''
+        bind -M $mode \cxg ''
+    end
     bind \cx\cv ''
-    bind \cx\cs ''
-    bind \cx\cd ''
-    bind \cx\cg ''
 
     # Restore native autosuggestions to their prior state
     if set -q _clai_prev_autosuggestion
