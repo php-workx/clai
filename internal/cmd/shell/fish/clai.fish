@@ -109,9 +109,6 @@ function _clai_tui_picker_open
     if test "$CLAI_OFF" = "1"; or _clai_session_off
         return 2
     end
-    if test "$CLAI_PICKER_OPEN_ON_EMPTY" != "true"; and test -z (commandline)
-        return 2
-    end
     if not _clai_has_tui_picker
         return 2
     end

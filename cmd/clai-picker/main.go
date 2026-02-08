@@ -142,11 +142,6 @@ func run(args []string) int {
 		opts.tabs = strings.Join(tabIDs, ",")
 	}
 
-	// Respect runtime config for opening picker on empty query.
-	if opts.query == "" && !cfg.History.PickerOpenOnEmpty {
-		return exitFallback
-	}
-
 	// Step 8: Dispatch to backend.
 	return dispatch(cfg, opts)
 }

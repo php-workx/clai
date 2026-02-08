@@ -507,10 +507,6 @@ _clai_tui_picker_open() {
         zle .up-line-or-history
         return
     fi
-    if [[ "$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$BUFFER" ]]; then
-        zle .up-line-or-history
-        return
-    fi
     if ! _clai_has_tui_picker; then
         zle .up-line-or-history
         return
