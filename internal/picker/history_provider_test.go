@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,28 +24,60 @@ var testSocketCounter atomic.Uint64
 // mockClaiService implements the FetchHistory RPC for testing.
 type mockClaiService struct {
 	pb.UnimplementedClaiServiceServer
-	items    []*pb.HistoryItem
-	atEnd    bool
-	delay    time.Duration
-	lastReq  *pb.HistoryFetchRequest
-	failWith error
+	mu sync.Mutex
+
+	items     []*pb.HistoryItem
+	atEnd     bool
+	delay     time.Duration
+	lastReq   *pb.HistoryFetchRequest
+	allReqs   []*pb.HistoryFetchRequest
+	failWith  error
+	responses []*mockFetchResponse
+}
+
+type mockFetchResponse struct {
+	items []*pb.HistoryItem
+	atEnd bool
+	delay time.Duration
+	err   error
 }
 
 func (m *mockClaiService) FetchHistory(_ context.Context, req *pb.HistoryFetchRequest) (*pb.HistoryFetchResponse, error) {
+	m.mu.Lock()
 	m.lastReq = req
+	m.allReqs = append(m.allReqs, req)
+
+	callIndex := len(m.allReqs) - 1
+	var scripted *mockFetchResponse
+	if len(m.responses) > 0 {
+		if callIndex < len(m.responses) {
+			scripted = m.responses[callIndex]
+		} else {
+			scripted = m.responses[len(m.responses)-1]
+		}
+	}
+	m.mu.Unlock()
+
+	if scripted != nil {
+		if scripted.delay > 0 {
+			time.Sleep(scripted.delay)
+		}
+		if scripted.err != nil {
+			return nil, scripted.err
+		}
+		return &pb.HistoryFetchResponse{
+			Items: scripted.items,
+			AtEnd: scripted.atEnd,
+		}, nil
+	}
 
 	if m.delay > 0 {
 		time.Sleep(m.delay)
 	}
-
 	if m.failWith != nil {
 		return nil, m.failWith
 	}
-
-	return &pb.HistoryFetchResponse{
-		Items: m.items,
-		AtEnd: m.atEnd,
-	}, nil
+	return &pb.HistoryFetchResponse{Items: m.items, AtEnd: m.atEnd}, nil
 }
 
 // startMockServer starts a gRPC server on a temporary Unix socket and returns
@@ -248,6 +281,132 @@ func TestHistoryProvider_FiltersDuplicateItemsAfterSanitization(t *testing.T) {
 	}
 }
 
+func TestHistoryProvider_FiltersDuplicatesByNormalizedKey(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockClaiService{
+		items: []*pb.HistoryItem{
+			{Command: "Git   STATUS", TimestampMs: 4000},
+			{Command: "git status", TimestampMs: 3000},
+			{Command: "git status /tmp/a", TimestampMs: 2000},
+			{Command: "git status /tmp/b", TimestampMs: 1000},
+		},
+		atEnd: true,
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 12,
+		Limit:     50,
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if len(resp.Items) != 2 {
+		t.Fatalf("expected 2 deduplicated items, got %d", len(resp.Items))
+	}
+
+	if resp.Items[0] != "Git   STATUS" {
+		t.Errorf("expected to keep first seen display text, got %q", resp.Items[0])
+	}
+
+	if resp.Items[1] != "git status /tmp/a" {
+		t.Errorf("expected second normalized group winner, got %q", resp.Items[1])
+	}
+}
+
+func TestHistoryProvider_TopsUpWhenDisplayDedupeShrinksPage(t *testing.T) {
+	t.Parallel()
+
+	svc := &mockClaiService{
+		responses: []*mockFetchResponse{
+			{
+				items: []*pb.HistoryItem{
+					{Command: "git status", TimestampMs: 3000},
+					{Command: "\x1b[32mgit status\x1b[0m", TimestampMs: 2000},
+				},
+				atEnd: false,
+			},
+			{
+				items: []*pb.HistoryItem{
+					{Command: "git log", TimestampMs: 1000},
+				},
+				atEnd: true,
+			},
+		},
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 13,
+		Limit:     2,
+		Offset:    0,
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if len(resp.Items) != 2 {
+		t.Fatalf("expected top-up to fill 2 unique items, got %d", len(resp.Items))
+	}
+	if resp.Items[0] != "git status" || resp.Items[1] != "git log" {
+		t.Fatalf("unexpected items: %#v", resp.Items)
+	}
+	if !resp.AtEnd {
+		t.Error("expected AtEnd=true after top-up reached end")
+	}
+
+	if len(svc.allReqs) != 2 {
+		t.Fatalf("expected 2 RPC requests, got %d", len(svc.allReqs))
+	}
+	if svc.allReqs[0].Offset != 0 || svc.allReqs[0].Limit != 2 {
+		t.Fatalf("unexpected first request: offset=%d limit=%d", svc.allReqs[0].Offset, svc.allReqs[0].Limit)
+	}
+	if svc.allReqs[1].Offset != 2 || svc.allReqs[1].Limit != 1 {
+		t.Fatalf("unexpected top-up request: offset=%d limit=%d", svc.allReqs[1].Offset, svc.allReqs[1].Limit)
+	}
+}
+
+func TestHistoryProvider_TopUpStopsAfterMaxRounds(t *testing.T) {
+	t.Parallel()
+
+	// Every response collapses to the same display key and never reaches AtEnd.
+	responses := make([]*mockFetchResponse, 0, maxTopUpFetches+1)
+	for i := 0; i < maxTopUpFetches+1; i++ {
+		responses = append(responses, &mockFetchResponse{
+			items: []*pb.HistoryItem{
+				{Command: "git status", TimestampMs: int64(1000 - i)},
+			},
+			atEnd: false,
+		})
+	}
+	svc := &mockClaiService{responses: responses}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 14,
+		Limit:     2,
+		Offset:    0,
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if len(resp.Items) != 1 {
+		t.Fatalf("expected 1 unique item after capped top-up, got %d", len(resp.Items))
+	}
+	if resp.AtEnd {
+		t.Error("expected AtEnd=false when capped by max rounds")
+	}
+	if len(svc.allReqs) != maxTopUpFetches+1 {
+		t.Fatalf("expected %d RPC requests, got %d", maxTopUpFetches+1, len(svc.allReqs))
+	}
+}
+
 func TestHistoryProvider_SessionScoping(t *testing.T) {
 	t.Parallel()
 
@@ -402,7 +561,8 @@ func TestHistoryProvider_QueryAndPaginationMapping(t *testing.T) {
 
 	svc := &mockClaiService{
 		items: []*pb.HistoryItem{
-			{Command: "matched cmd", TimestampMs: 1000},
+			{Command: "matched cmd", TimestampMs: 1001},
+			{Command: "matched other", TimestampMs: 1000},
 		},
 		atEnd: false,
 	}
@@ -412,7 +572,7 @@ func TestHistoryProvider_QueryAndPaginationMapping(t *testing.T) {
 	resp, err := provider.Fetch(context.Background(), Request{
 		RequestID: 7,
 		Query:     "matched",
-		Limit:     25,
+		Limit:     2,
 		Offset:    10,
 	})
 	if err != nil {
@@ -424,8 +584,8 @@ func TestHistoryProvider_QueryAndPaginationMapping(t *testing.T) {
 		t.Errorf("expected query 'matched', got %q", svc.lastReq.Query)
 	}
 
-	if svc.lastReq.Limit != 25 {
-		t.Errorf("expected limit 25, got %d", svc.lastReq.Limit)
+	if svc.lastReq.Limit != 2 {
+		t.Errorf("expected limit 2, got %d", svc.lastReq.Limit)
 	}
 
 	if svc.lastReq.Offset != 10 {

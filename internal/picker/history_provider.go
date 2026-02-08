@@ -12,10 +12,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	pb "github.com/runger/clai/gen/clai/v1"
+	"github.com/runger/clai/internal/cmdutil"
 )
 
 // fetchTimeout is the maximum time allowed for a single Fetch call RPC.
 const fetchTimeout = 200 * time.Millisecond
+
+// maxTopUpFetches bounds additional RPCs when display-level dedupe shrinks
+// a page below the requested limit.
+const maxTopUpFetches = 3
 
 // HistoryProvider implements Provider using the daemon's FetchHistory gRPC RPC.
 // It maintains a persistent gRPC connection for reduced latency.
@@ -91,7 +96,7 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 		return Response{}, err
 	}
 
-	grpcReq := &pb.HistoryFetchRequest{
+	baseReq := &pb.HistoryFetchRequest{
 		Query:  req.Query,
 		Limit:  int32(req.Limit),
 		Offset: int32(req.Offset),
@@ -101,37 +106,75 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 	if req.Options != nil {
 		// Accept both "session_id" and "session" for the session filter.
 		if sid, ok := req.Options["session_id"]; ok {
-			grpcReq.SessionId = sid
+			baseReq.SessionId = sid
 		} else if sid, ok := req.Options["session"]; ok {
-			grpcReq.SessionId = sid
+			baseReq.SessionId = sid
 		}
 		if g, ok := req.Options["global"]; ok && g == "true" {
-			grpcReq.Global = true
+			baseReq.Global = true
 		}
 	}
 
-	grpcResp, err := client.FetchHistory(ctx, grpcReq)
-	if err != nil {
-		return Response{}, fmt.Errorf("history provider: rpc: %w", err)
-	}
+	targetUnique := int(baseReq.Limit)
+	nextOffset := int(baseReq.Offset)
+	limit := int(baseReq.Limit)
 
-	items := make([]string, 0, len(grpcResp.Items))
-	seen := make(map[string]struct{}, len(grpcResp.Items))
-	for _, item := range grpcResp.Items {
-		cmd := strings.TrimSpace(ValidateUTF8(StripANSI(item.Command)))
-		if cmd == "" {
-			continue
+	items := make([]string, 0, max(targetUnique, 16))
+	seen := make(map[string]struct{}, max(targetUnique, 16))
+	atEnd := false
+
+	for attempt := 0; ; attempt++ {
+		grpcReq := &pb.HistoryFetchRequest{
+			Query:     baseReq.Query,
+			Limit:     int32(limit),
+			Offset:    int32(nextOffset),
+			SessionId: baseReq.SessionId,
+			Global:    baseReq.Global,
 		}
-		if _, exists := seen[cmd]; exists {
-			continue
+
+		grpcResp, err := client.FetchHistory(ctx, grpcReq)
+		if err != nil {
+			return Response{}, fmt.Errorf("history provider: rpc: %w", err)
 		}
-		seen[cmd] = struct{}{}
-		items = append(items, cmd)
+
+		atEnd = grpcResp.AtEnd
+		fetched := len(grpcResp.Items)
+
+		for _, item := range grpcResp.Items {
+			cmd := strings.TrimSpace(ValidateUTF8(StripANSI(item.Command)))
+			if cmd == "" {
+				continue
+			}
+			key := cmdutil.NormalizeCommand(cmd)
+			if key == "" {
+				continue
+			}
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			items = append(items, cmd)
+		}
+
+		// When limit isn't set, preserve single-request semantics and rely on daemon defaults.
+		if targetUnique <= 0 {
+			break
+		}
+		if len(items) >= targetUnique {
+			items = items[:targetUnique]
+			break
+		}
+		if atEnd || fetched == 0 || attempt >= maxTopUpFetches {
+			break
+		}
+
+		nextOffset += fetched
+		limit = targetUnique - len(items)
 	}
 
 	return Response{
 		RequestID: req.RequestID,
 		Items:     items,
-		AtEnd:     grpcResp.AtEnd,
+		AtEnd:     atEnd,
 	}, nil
 }
