@@ -87,6 +87,8 @@ type Model struct {
 	width  int // Terminal width
 	height int // Terminal height
 
+	pageSize int // Requested fetch page size (0 = auto by listHeight)
+
 	// result holds the selected command after the user presses Enter.
 	result string
 
@@ -131,6 +133,13 @@ func (m Model) WithQuery(q string) Model {
 // WithLayout returns a copy of the Model with the given layout.
 func (m Model) WithLayout(l Layout) Model {
 	m.layout = l
+	return m
+}
+
+// WithPageSize returns a copy of the Model with the given fetch page size.
+// Values <= 0 keep the default behavior (auto-size to visible list height).
+func (m Model) WithPageSize(size int) Model {
+	m.pageSize = size
 	return m
 }
 
@@ -369,13 +378,18 @@ func (m *Model) startFetch() tea.Cmd {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancelFetch = cancel
 
+	limit := m.pageSize
+	if limit <= 0 {
+		limit = m.listHeight()
+	}
+
 	tab := m.currentTab()
 	req := Request{
 		RequestID: reqID,
 		Query:     m.textInput.Value(),
 		TabID:     tab.ID,
 		Options:   tab.Args,
-		Limit:     m.listHeight(),
+		Limit:     limit,
 		Offset:    m.offset,
 	}
 

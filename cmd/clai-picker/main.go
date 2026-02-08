@@ -331,6 +331,7 @@ func dispatchBuiltin(_ context.Context, cfg *config.Config, opts *pickerOpts) in
 	defer provider.Close()
 
 	model := picker.NewModel(tabs, provider).WithLayout(picker.LayoutBottomUp)
+	model = model.WithPageSize(opts.limit)
 	if opts.query != "" {
 		model = model.WithQuery(opts.query)
 	}
@@ -412,10 +413,7 @@ func runFzfBackend(ctx context.Context, cfg *config.Config, opts *pickerOpts) (s
 	tabs := withRuntimeTabOptions(resolveTabs(cfg, opts), cfg)
 
 	tabID, tabOpts := fzfTabContext(tabs)
-	limit := cfg.History.PickerPageSize
-	if limit <= 0 {
-		limit = 100
-	}
+	limit := opts.limit
 	allItems := fetchFzfItems(ctx, provider, opts, tabID, tabOpts, limit)
 	if len(allItems) == 0 {
 		return "", false, nil
