@@ -679,16 +679,16 @@ func (m Model) viewQuery() string {
 
 func rightRefineHintLabel() string {
 	if supportsUnicodeHints() {
-		return "→ refine"
+		return "→"
 	}
-	return "-> refine"
+	return "Right: refine"
 }
 
 func tabSwitchHintLabel() string {
 	if supportsUnicodeHints() {
-		return "⇥ Tab: switch scope"
+		return "⇥"
 	}
-	return "[Tab] switch scope"
+	return "Tab: switch scope"
 }
 
 func supportsUnicodeHints() bool {

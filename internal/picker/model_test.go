@@ -1001,15 +1001,15 @@ func TestViewList_SelectedLineShowsRightRefineHint(t *testing.T) {
 func TestHintLabels_UTF8Locale(t *testing.T) {
 	t.Setenv("LC_ALL", "en_US.UTF-8")
 
-	assert.Equal(t, "→ refine", rightRefineHintLabel())
-	assert.Equal(t, "⇥ Tab: switch scope", tabSwitchHintLabel())
+	assert.Equal(t, "→", rightRefineHintLabel())
+	assert.Equal(t, "⇥", tabSwitchHintLabel())
 }
 
 func TestHintLabels_ASCIILocaleFallback(t *testing.T) {
 	t.Setenv("LC_ALL", "C")
 
-	assert.Equal(t, "-> refine", rightRefineHintLabel())
-	assert.Equal(t, "[Tab] switch scope", tabSwitchHintLabel())
+	assert.Equal(t, "Right: refine", rightRefineHintLabel())
+	assert.Equal(t, "Tab: switch scope", tabSwitchHintLabel())
 }
 
 func TestViewTabBar_HidesTabHintForSingleTab(t *testing.T) {
@@ -1022,7 +1022,7 @@ func TestViewTabBar_HidesTabHintForSingleTab(t *testing.T) {
 
 	bar := m.viewTabBar()
 	assert.NotContains(t, bar, "Tab: switch scope")
-	assert.NotContains(t, bar, "[Tab] switch scope")
+	assert.NotContains(t, bar, "⇥")
 }
 
 func TestWithLayout(t *testing.T) {
