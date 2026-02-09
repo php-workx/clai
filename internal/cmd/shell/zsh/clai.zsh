@@ -22,6 +22,8 @@ export CLAI_CURRENT_SHELL=zsh
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
 : ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
+: ${CLAI_UP_ARROW_TRIGGER:={{CLAI_UP_ARROW_TRIGGER}}}
+: ${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:={{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}}
 
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
@@ -44,6 +46,7 @@ export CLAI_SESSION_ID="{{CLAI_SESSION_ID}}"
 _CLAI_COMMAND_ID=""
 _CLAI_COMMAND_START_TIME=""
 _CLAI_LAST_COMMAND=""
+_CLAI_LAST_UP_ARROW_MS=0
 
 # ============================================
 # Feature 1: Command Suggestion (History + AI)
@@ -85,6 +88,21 @@ _clai_zsh_autosuggest_restore() {
 # Session-level disable flag
 _clai_session_off() {
     [[ -f "$CLAI_CACHE/off" ]]
+}
+
+_clai_now_ms() {
+    zmodload zsh/datetime 2>/dev/null || true
+    if [[ -n "${EPOCHREALTIME:-}" ]]; then
+        printf '%d\n' $((EPOCHREALTIME * 1000))
+        return
+    fi
+    if (( $+commands[python3] )); then
+        python3 -c 'import time; print(int(time.time() * 1000))' 2>/dev/null && return
+    fi
+    if (( $+commands[perl] )); then
+        perl -MTime::HiRes=time -e 'print int(time()*1000)' 2>/dev/null && return
+    fi
+    printf '%d\n' $(( $(date +%s) * 1000 ))
 }
 
 # Update suggestion based on current buffer
@@ -823,9 +841,28 @@ bindkey '˙' _clai_tui_picker_open
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
     _clai_up_arrow() {
         if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+            _CLAI_LAST_UP_ARROW_MS=0
             zle .up-line-or-history
             return
         fi
+
+        if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
+            local now delta window
+            now=$(_clai_now_ms)
+            window=${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}
+            (( window < 50 )) && window=50
+            delta=$(( now - _CLAI_LAST_UP_ARROW_MS ))
+            _CLAI_LAST_UP_ARROW_MS=$now
+
+            if (( delta > 0 && delta <= window )) && _clai_has_tui_picker; then
+                _CLAI_LAST_UP_ARROW_MS=0
+                _clai_tui_picker_open
+                return
+            fi
+            zle .up-line-or-history
+            return
+        fi
+
         if _clai_has_tui_picker; then
             _clai_tui_picker_open
         else

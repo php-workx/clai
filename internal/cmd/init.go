@@ -79,6 +79,8 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Replace placeholders with actual values.
 	script := strings.ReplaceAll(string(content), "{{CLAI_SESSION_ID}}", sessionID)
 	script = strings.ReplaceAll(script, "{{CLAI_UP_ARROW_HISTORY}}", strconv.FormatBool(cfg.History.UpArrowOpensHistory))
+	script = strings.ReplaceAll(script, "{{CLAI_UP_ARROW_TRIGGER}}", cfg.History.UpArrowTrigger)
+	script = strings.ReplaceAll(script, "{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}", strconv.Itoa(cfg.History.UpArrowDoubleWindowMs))
 
 	fmt.Print(script)
 	return nil

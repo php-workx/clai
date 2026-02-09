@@ -82,6 +82,8 @@ func TestConfigGet(t *testing.T) {
 		{"history.picker_open_on_empty", "false"},
 		{"history.picker_page_size", "100"},
 		{"history.picker_case_sensitive", "false"},
+		{"history.up_arrow_trigger", "single"},
+		{"history.up_arrow_double_window_ms", "250"},
 	}
 
 	for _, tt := range tests {
@@ -144,6 +146,8 @@ func TestConfigSet(t *testing.T) {
 		{"history.picker_open_on_empty", "true", "true"},
 		{"history.picker_page_size", "50", "50"},
 		{"history.picker_case_sensitive", "true", "true"},
+		{"history.up_arrow_trigger", "double", "double"},
+		{"history.up_arrow_double_window_ms", "300", "300"},
 	}
 
 	for _, tt := range tests {
@@ -187,6 +191,8 @@ func TestConfigGetWithCustomValues(t *testing.T) {
 	cfg.Suggestions.MaxAI = 5
 	cfg.Suggestions.ShowRiskWarning = false
 	cfg.Privacy.SanitizeAICalls = false
+	cfg.History.UpArrowTrigger = "double"
+	cfg.History.UpArrowDoubleWindowMs = 275
 
 	tests := []struct {
 		key      string
@@ -209,6 +215,8 @@ func TestConfigGetWithCustomValues(t *testing.T) {
 		{"suggestions.max_ai", "5"},
 		{"suggestions.show_risk_warning", "false"},
 		{"privacy.sanitize_ai_calls", "false"},
+		{"history.up_arrow_trigger", "double"},
+		{"history.up_arrow_double_window_ms", "275"},
 	}
 
 	for _, tt := range tests {
@@ -336,6 +344,7 @@ func TestConfigSetInvalidValue(t *testing.T) {
 		{"privacy.sanitize_ai_calls", "maybe"},
 		{"history.picker_open_on_empty", "yes"},
 		{"history.picker_case_sensitive", "maybe"},
+		{"history.up_arrow_double_window_ms", "not_a_number"},
 		// Invalid log level
 		{"daemon.log_level", "trace"},
 		{"daemon.log_level", "DEBUG"},
@@ -352,6 +361,10 @@ func TestConfigSetInvalidValue(t *testing.T) {
 		// Invalid picker backend
 		{"history.picker_backend", "invalid"},
 		{"history.picker_backend", ""},
+		// Invalid up-arrow trigger
+		{"history.up_arrow_trigger", "off"},
+		{"history.up_arrow_trigger", "DOUBLE"},
+		{"history.up_arrow_trigger", ""},
 	}
 
 	for _, tt := range tests {
@@ -439,6 +452,11 @@ func TestConfigValidate(t *testing.T) {
 			name:    "empty_picker_backend",
 			modify:  func(c *Config) { c.History.PickerBackend = "" },
 			wantErr: "history.picker_backend",
+		},
+		{
+			name:    "invalid_up_arrow_trigger",
+			modify:  func(c *Config) { c.History.UpArrowTrigger = "invalid" },
+			wantErr: "history.up_arrow_trigger",
 		},
 		{
 			name: "zero_values_are_valid",
@@ -532,6 +550,63 @@ func TestSetPickerPageSizeClamping(t *testing.T) {
 	}
 }
 
+func TestValidateUpArrowDoubleWindowClamping(t *testing.T) {
+	tests := []struct {
+		name        string
+		windowMs    int
+		wantClamped int
+	}{
+		{"below_minimum", 1, 50},
+		{"at_minimum", 50, 50},
+		{"normal", 250, 250},
+		{"at_maximum", 1000, 1000},
+		{"above_maximum", 5000, 1000},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.History.UpArrowDoubleWindowMs = tt.windowMs
+			err := cfg.Validate()
+			if err != nil {
+				t.Fatalf("Validate() unexpected error: %v", err)
+			}
+			if cfg.History.UpArrowDoubleWindowMs != tt.wantClamped {
+				t.Errorf("UpArrowDoubleWindowMs = %d, want %d", cfg.History.UpArrowDoubleWindowMs, tt.wantClamped)
+			}
+		})
+	}
+}
+
+func TestSetUpArrowDoubleWindowClamping(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected string
+	}{
+		{"below_minimum", "1", "50"},
+		{"at_minimum", "50", "50"},
+		{"normal", "250", "250"},
+		{"at_maximum", "1000", "1000"},
+		{"above_maximum", "5000", "1000"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			err := cfg.Set("history.up_arrow_double_window_ms", tt.value)
+			if err != nil {
+				t.Errorf("Set up_arrow_double_window_ms=%q error: %v", tt.value, err)
+				return
+			}
+			got, _ := cfg.Get("history.up_arrow_double_window_ms")
+			if got != tt.expected {
+				t.Errorf("up_arrow_double_window_ms=%q: got %q, want %q", tt.value, got, tt.expected)
+			}
+		})
+	}
+}
+
 // ============================================================================
 // Validator helper tests
 // ============================================================================
@@ -580,6 +655,22 @@ func TestValidPickerBackends(t *testing.T) {
 	for _, backend := range invalidBackends {
 		if isValidPickerBackend(backend) {
 			t.Errorf("isValidPickerBackend(%q) = true, want false", backend)
+		}
+	}
+}
+
+func TestValidUpArrowTriggers(t *testing.T) {
+	validValues := []string{"single", "double"}
+	for _, v := range validValues {
+		if !isValidUpArrowTrigger(v) {
+			t.Errorf("isValidUpArrowTrigger(%q) = false, want true", v)
+		}
+	}
+
+	invalidValues := []string{"off", "SINGLE", "Double", ""}
+	for _, v := range invalidValues {
+		if isValidUpArrowTrigger(v) {
+			t.Errorf("isValidUpArrowTrigger(%q) = true, want false", v)
 		}
 	}
 }
@@ -754,10 +845,12 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 			SanitizeAICalls: false,
 		},
 		History: HistoryConfig{
-			PickerBackend:       "fzf",
-			PickerOpenOnEmpty:   true,
-			PickerPageSize:      50,
-			PickerCaseSensitive: true,
+			PickerBackend:         "fzf",
+			PickerOpenOnEmpty:     true,
+			PickerPageSize:        50,
+			PickerCaseSensitive:   true,
+			UpArrowTrigger:        "double",
+			UpArrowDoubleWindowMs: 300,
 			PickerTabs: []TabDef{
 				{ID: "session", Label: "Session", Provider: "history", Args: map[string]string{"session": "$CLAI_SESSION_ID"}},
 			},
@@ -849,6 +942,12 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if loaded.History.PickerCaseSensitive != true {
 		t.Errorf("History.PickerCaseSensitive: got %v, want true", loaded.History.PickerCaseSensitive)
 	}
+	if loaded.History.UpArrowTrigger != "double" {
+		t.Errorf("History.UpArrowTrigger: got %s, want double", loaded.History.UpArrowTrigger)
+	}
+	if loaded.History.UpArrowDoubleWindowMs != 300 {
+		t.Errorf("History.UpArrowDoubleWindowMs: got %d, want 300", loaded.History.UpArrowDoubleWindowMs)
+	}
 }
 
 // ============================================================================
@@ -872,6 +971,8 @@ func TestListKeys(t *testing.T) {
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
 		"history.picker_case_sensitive",
+		"history.up_arrow_trigger",
+		"history.up_arrow_double_window_ms",
 	}
 
 	if len(keys) != len(expectedKeys) {
@@ -908,14 +1009,16 @@ func TestListKeysAllSettable(t *testing.T) {
 	keys := ListKeys()
 
 	testValues := map[string]string{
-		"suggestions.enabled":           "false",
-		"suggestions.max_history":       "10",
-		"suggestions.show_risk_warning": "false",
-		"suggestions.scorer_version":    "v2",
-		"history.picker_backend":        "fzf",
-		"history.picker_open_on_empty":  "true",
-		"history.picker_page_size":      "50",
-		"history.picker_case_sensitive": "true",
+		"suggestions.enabled":               "false",
+		"suggestions.max_history":           "10",
+		"suggestions.show_risk_warning":     "false",
+		"suggestions.scorer_version":        "v2",
+		"history.picker_backend":            "fzf",
+		"history.picker_open_on_empty":      "true",
+		"history.picker_page_size":          "50",
+		"history.picker_case_sensitive":     "true",
+		"history.up_arrow_trigger":          "double",
+		"history.up_arrow_double_window_ms": "300",
 	}
 
 	for _, key := range keys {
@@ -952,6 +1055,12 @@ func TestDefaultHistoryConfig(t *testing.T) {
 	}
 	if cfg.History.PickerCaseSensitive {
 		t.Error("Expected picker_case_sensitive=false")
+	}
+	if cfg.History.UpArrowTrigger != "single" {
+		t.Errorf("Expected up_arrow_trigger=single, got %s", cfg.History.UpArrowTrigger)
+	}
+	if cfg.History.UpArrowDoubleWindowMs != 250 {
+		t.Errorf("Expected up_arrow_double_window_ms=250, got %d", cfg.History.UpArrowDoubleWindowMs)
 	}
 	if len(cfg.History.PickerTabs) != 2 {
 		t.Fatalf("Expected 2 default tabs, got %d", len(cfg.History.PickerTabs))

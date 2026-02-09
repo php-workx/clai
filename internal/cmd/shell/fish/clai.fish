@@ -30,6 +30,12 @@ end
 if not set -q CLAI_UP_ARROW_HISTORY
     set -gx CLAI_UP_ARROW_HISTORY {{CLAI_UP_ARROW_HISTORY}}
 end
+if not set -q CLAI_UP_ARROW_TRIGGER
+    set -gx CLAI_UP_ARROW_TRIGGER {{CLAI_UP_ARROW_TRIGGER}}
+end
+if not set -q CLAI_UP_ARROW_DOUBLE_WINDOW_MS
+    set -gx CLAI_UP_ARROW_DOUBLE_WINDOW_MS {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}
+end
 
 # Ensure cache directory exists
 mkdir -p $CLAI_CACHE
@@ -50,6 +56,18 @@ end
 
 function _clai_session_off
     test -f "$CLAI_CACHE/off"
+end
+
+function _clai_now_ms
+    if type -q python3
+        python3 -c 'import time; print(int(time.time() * 1000))' 2>/dev/null
+        return
+    end
+    if type -q perl
+        perl -MTime::HiRes=time -e 'print int(time()*1000)' 2>/dev/null
+        return
+    end
+    math (date +%s) \* 1000
 end
 
 # ============================================
@@ -142,6 +160,7 @@ set -g _CLAI_PICKER_INDEX 1
 set -g _CLAI_PICKER_ORIG_BUFFER ""
 set -g _CLAI_PICKER_ITEMS
 set -g _CLAI_HISTORY_SCOPE session
+set -g _CLAI_LAST_UP_ARROW_MS 0
 
 set -g _CLAI_SUGGESTIONS_ENABLED ""
 
@@ -424,9 +443,34 @@ bind ˙ _clai_tui_picker_open
 if test "$CLAI_UP_ARROW_HISTORY" = "true"
     function _clai_up_arrow
         if test "$CLAI_OFF" = "1"; or _clai_session_off
+            set -g _CLAI_LAST_UP_ARROW_MS 0
             commandline -f history-search-backward
             return
         end
+
+        if test "$CLAI_UP_ARROW_TRIGGER" = "double"
+            set -l now (_clai_now_ms)
+            set -l window $CLAI_UP_ARROW_DOUBLE_WINDOW_MS
+            if test -z "$window"
+                set window 250
+            end
+            if test $window -lt 50
+                set window 50
+            end
+            set -l delta (math "$now - $_CLAI_LAST_UP_ARROW_MS")
+            set -g _CLAI_LAST_UP_ARROW_MS $now
+
+            if test $delta -gt 0 -a $delta -le $window
+                if _clai_has_tui_picker
+                    set -g _CLAI_LAST_UP_ARROW_MS 0
+                    _clai_tui_picker_open
+                    return
+                end
+            end
+            commandline -f history-search-backward
+            return
+        end
+
         if _clai_has_tui_picker
             _clai_tui_picker_open
         else

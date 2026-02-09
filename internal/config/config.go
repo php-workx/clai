@@ -12,6 +12,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const minOneFallbackFmt = "must be >= 1, got %d; falling back to default %d"
+
 // Config represents the clai configuration.
 type Config struct {
 	Daemon      DaemonConfig      `yaml:"daemon"`
@@ -218,12 +220,14 @@ type TabDef struct {
 
 // HistoryConfig holds history picker settings.
 type HistoryConfig struct {
-	PickerBackend       string   `yaml:"picker_backend"`         // builtin, fzf, or clai
-	PickerOpenOnEmpty   bool     `yaml:"picker_open_on_empty"`   // Open picker when search is empty
-	PickerPageSize      int      `yaml:"picker_page_size"`       // Number of items per page
-	PickerCaseSensitive bool     `yaml:"picker_case_sensitive"`  // Case-sensitive search
-	PickerTabs          []TabDef `yaml:"picker_tabs"`            // Tab definitions
-	UpArrowOpensHistory bool     `yaml:"up_arrow_opens_history"` // Up arrow opens TUI picker (default: false)
+	PickerBackend         string   `yaml:"picker_backend"`            // builtin, fzf, or clai
+	PickerOpenOnEmpty     bool     `yaml:"picker_open_on_empty"`      // Open picker when search is empty
+	PickerPageSize        int      `yaml:"picker_page_size"`          // Number of items per page
+	PickerCaseSensitive   bool     `yaml:"picker_case_sensitive"`     // Case-sensitive search
+	PickerTabs            []TabDef `yaml:"picker_tabs"`               // Tab definitions
+	UpArrowOpensHistory   bool     `yaml:"up_arrow_opens_history"`    // Up arrow opens TUI picker (default: false)
+	UpArrowTrigger        string   `yaml:"up_arrow_trigger"`          // single or double
+	UpArrowDoubleWindowMs int      `yaml:"up_arrow_double_window_ms"` // detection window for double-up
 }
 
 // DefaultConfig returns the default configuration.
@@ -253,10 +257,12 @@ func DefaultConfig() *Config {
 			SanitizeAICalls: true,
 		},
 		History: HistoryConfig{
-			PickerBackend:       "builtin",
-			PickerOpenOnEmpty:   false,
-			PickerPageSize:      100,
-			PickerCaseSensitive: false,
+			PickerBackend:         "builtin",
+			PickerOpenOnEmpty:     false,
+			PickerPageSize:        100,
+			PickerCaseSensitive:   false,
+			UpArrowTrigger:        "single",
+			UpArrowDoubleWindowMs: 250,
 			PickerTabs: []TabDef{
 				{ID: "session", Label: "Session", Provider: "history", Args: map[string]string{"session": "$CLAI_SESSION_ID"}},
 				{ID: "global", Label: "Global", Provider: "history", Args: map[string]string{"global": "true"}},
@@ -778,6 +784,10 @@ func (c *Config) getHistoryField(field string) (string, error) {
 		return strconv.FormatBool(c.History.PickerCaseSensitive), nil
 	case "up_arrow_opens_history":
 		return strconv.FormatBool(c.History.UpArrowOpensHistory), nil
+	case "up_arrow_trigger":
+		return c.History.UpArrowTrigger, nil
+	case "up_arrow_double_window_ms":
+		return strconv.Itoa(c.History.UpArrowDoubleWindowMs), nil
 	default:
 		return "", fmt.Errorf("unknown field: history.%s", field)
 	}
@@ -820,6 +830,23 @@ func (c *Config) setHistoryField(field, value string) error {
 			return fmt.Errorf("invalid value for up_arrow_opens_history: %w", err)
 		}
 		c.History.UpArrowOpensHistory = v
+	case "up_arrow_trigger":
+		if !isValidUpArrowTrigger(value) {
+			return fmt.Errorf("invalid up_arrow_trigger: %s (must be single or double)", value)
+		}
+		c.History.UpArrowTrigger = value
+	case "up_arrow_double_window_ms":
+		v, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for up_arrow_double_window_ms: %w", err)
+		}
+		if v < 50 {
+			v = 50
+		}
+		if v > 1000 {
+			v = 1000
+		}
+		c.History.UpArrowDoubleWindowMs = v
 	default:
 		return fmt.Errorf("unknown field: history.%s", field)
 	}
@@ -874,6 +901,15 @@ func (c *Config) Validate() error {
 	if !isValidPickerBackend(c.History.PickerBackend) {
 		return fmt.Errorf("history.picker_backend must be builtin, fzf, or clai (got: %s)", c.History.PickerBackend)
 	}
+	if !isValidUpArrowTrigger(c.History.UpArrowTrigger) {
+		return fmt.Errorf("history.up_arrow_trigger must be single or double (got: %s)", c.History.UpArrowTrigger)
+	}
+	if c.History.UpArrowDoubleWindowMs < 50 {
+		c.History.UpArrowDoubleWindowMs = 50
+	}
+	if c.History.UpArrowDoubleWindowMs > 1000 {
+		c.History.UpArrowDoubleWindowMs = 1000
+	}
 
 	return nil
 }
@@ -899,6 +935,15 @@ func isValidProvider(provider string) bool {
 func isValidPickerBackend(backend string) bool {
 	switch backend {
 	case "builtin", "fzf", "clai":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidUpArrowTrigger(v string) bool {
+	switch v {
+	case "single", "double":
 		return true
 	default:
 		return false
@@ -940,6 +985,8 @@ func ListKeys() []string {
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
 		"history.picker_case_sensitive",
+		"history.up_arrow_trigger",
+		"history.up_arrow_double_window_ms",
 	}
 }
 
@@ -957,32 +1004,54 @@ func (s *SuggestionsConfig) ValidateAndFix() []ValidationWarning {
 	var warnings []ValidationWarning
 
 	warn := func(field, msg string) {
-		w := ValidationWarning{Field: field, Message: msg}
-		warnings = append(warnings, w)
+		warnings = append(warnings, ValidationWarning{Field: field, Message: msg})
 		log.Printf("WARN config: suggestions.%s: %s", field, msg)
 	}
 
-	// --- Timeouts (must be >= 1) ---
-	timeouts := []struct {
+	s.validateMinOneIntFields(warn, &defaults)
+	s.validateWeightFields(warn)
+	s.validateScalarFields(warn, &defaults)
+	s.validateEnumFields(warn, &defaults)
+
+	return warnings
+}
+
+// validateMinOneIntFields validates integer fields that must be >= 1, falling
+// back to their default values when invalid.
+func (s *SuggestionsConfig) validateMinOneIntFields(warn func(string, string), defaults *SuggestionsConfig) {
+	fields := []struct {
 		name string
 		val  *int
 		def  int
 	}{
+		// Timeouts
 		{"hard_timeout_ms", &s.HardTimeoutMs, defaults.HardTimeoutMs},
 		{"hook_connect_timeout_ms", &s.HookConnectTimeoutMs, defaults.HookConnectTimeoutMs},
 		{"hook_write_timeout_ms", &s.HookWriteTimeoutMs, defaults.HookWriteTimeoutMs},
 		{"ingest_sync_wait_ms", &s.IngestSyncWaitMs, defaults.IngestSyncWaitMs},
 		{"cache_ttl_ms", &s.CacheTTLMs, defaults.CacheTTLMs},
+		// Counts
+		{"max_results", &s.MaxResults, defaults.MaxResults},
+		{"ingest_queue_max_events", &s.IngestQueueMaxEvents, defaults.IngestQueueMaxEvents},
+		{"burst_events_threshold", &s.BurstEventsThreshold, defaults.BurstEventsThreshold},
+		// Byte sizes
+		{"cmd_raw_max_bytes", &s.CmdRawMaxBytes, defaults.CmdRawMaxBytes},
+		{"ingest_queue_max_bytes", &s.IngestQueueMaxBytes, defaults.IngestQueueMaxBytes},
+		{"cache_memory_budget_mb", &s.CacheMemoryBudgetMB, defaults.CacheMemoryBudgetMB},
+		// Online learning
+		{"online_learning_min_samples", &s.OnlineLearningMinSamples, defaults.OnlineLearningMinSamples},
 	}
-	for _, t := range timeouts {
-		if *t.val < 1 {
-			warn(t.name, fmt.Sprintf("must be >= 1, got %d; falling back to default %d", *t.val, t.def))
-			*t.val = t.def
+	for _, f := range fields {
+		if *f.val < 1 {
+			warn(f.name, fmt.Sprintf(minOneFallbackFmt, *f.val, f.def))
+			*f.val = f.def
 		}
 	}
+}
 
-	// --- Weights (clamp to [0.0, 1.0]) ---
-	weightFields := []struct {
+// validateWeightFields clamps weight values to [0.0, 1.0].
+func (s *SuggestionsConfig) validateWeightFields(warn func(string, string)) {
+	fields := []struct {
 		name string
 		val  *float64
 	}{
@@ -997,128 +1066,72 @@ func (s *SuggestionsConfig) ValidateAndFix() []ValidationWarning {
 		{"weights.project_type_affinity", &s.Weights.ProjectTypeAffinity},
 		{"weights.failure_recovery", &s.Weights.FailureRecovery},
 	}
-	for _, w := range weightFields {
-		if *w.val < 0.0 {
-			warn(w.name, fmt.Sprintf("must be >= 0.0, got %f; clamping to 0.0", *w.val))
-			*w.val = 0.0
+	for _, f := range fields {
+		if *f.val < 0.0 {
+			warn(f.name, fmt.Sprintf("must be >= 0.0, got %f; clamping to 0.0", *f.val))
+			*f.val = 0.0
 		}
-		if *w.val > 1.0 {
-			warn(w.name, fmt.Sprintf("must be <= 1.0, got %f; clamping to 1.0", *w.val))
-			*w.val = 1.0
+		if *f.val > 1.0 {
+			warn(f.name, fmt.Sprintf("must be <= 1.0, got %f; clamping to 1.0", *f.val))
+			*f.val = 1.0
 		}
 	}
+}
 
-	// --- Counts (must be >= 1) ---
-	counts := []struct {
-		name string
-		val  *int
-		def  int
-	}{
-		{"max_results", &s.MaxResults, defaults.MaxResults},
-		{"ingest_queue_max_events", &s.IngestQueueMaxEvents, defaults.IngestQueueMaxEvents},
-		{"burst_events_threshold", &s.BurstEventsThreshold, defaults.BurstEventsThreshold},
-	}
-	for _, c := range counts {
-		if *c.val < 1 {
-			warn(c.name, fmt.Sprintf("must be >= 1, got %d; falling back to default %d", *c.val, c.def))
-			*c.val = c.def
-		}
-	}
-
-	// --- Byte sizes (must be >= 1) ---
-	byteSizes := []struct {
-		name string
-		val  *int
-		def  int
-	}{
-		{"cmd_raw_max_bytes", &s.CmdRawMaxBytes, defaults.CmdRawMaxBytes},
-		{"ingest_queue_max_bytes", &s.IngestQueueMaxBytes, defaults.IngestQueueMaxBytes},
-		{"cache_memory_budget_mb", &s.CacheMemoryBudgetMB, defaults.CacheMemoryBudgetMB},
-	}
-	for _, b := range byteSizes {
-		if *b.val < 1 {
-			warn(b.name, fmt.Sprintf("must be >= 1, got %d; falling back to default %d", *b.val, b.def))
-			*b.val = b.def
-		}
-	}
-
-	// --- Retention days (>= 0; 0 = disable time pruning) ---
+// validateScalarFields validates individual numeric fields with custom ranges.
+func (s *SuggestionsConfig) validateScalarFields(warn func(string, string), defaults *SuggestionsConfig) {
 	if s.RetentionDays < 0 {
 		warn("retention_days", fmt.Sprintf("must be >= 0, got %d; falling back to default %d", s.RetentionDays, defaults.RetentionDays))
 		s.RetentionDays = defaults.RetentionDays
 	}
-
-	// --- Retention max events (>= 1000) ---
 	if s.RetentionMaxEvents < 1000 {
 		warn("retention_max_events", fmt.Sprintf("must be >= 1000, got %d; clamping to 1000", s.RetentionMaxEvents))
 		s.RetentionMaxEvents = 1000
 	}
-
-	// --- Online learning eta (0.0, 1.0] ---
 	if s.OnlineLearningEta <= 0.0 || s.OnlineLearningEta > 1.0 {
 		warn("online_learning_eta", fmt.Sprintf("must be in (0.0, 1.0], got %f; falling back to default %f", s.OnlineLearningEta, defaults.OnlineLearningEta))
 		s.OnlineLearningEta = defaults.OnlineLearningEta
 	}
-
-	// --- Online learning min samples (>= 1) ---
-	if s.OnlineLearningMinSamples < 1 {
-		warn("online_learning_min_samples", fmt.Sprintf("must be >= 1, got %d; falling back to default %d", s.OnlineLearningMinSamples, defaults.OnlineLearningMinSamples))
-		s.OnlineLearningMinSamples = defaults.OnlineLearningMinSamples
-	}
-
-	// --- Workflow min/max steps range ---
 	if s.WorkflowMinSteps > s.WorkflowMaxSteps {
 		warn("workflow_min_steps/workflow_max_steps", fmt.Sprintf("min (%d) > max (%d); falling back to defaults min=%d, max=%d",
 			s.WorkflowMinSteps, s.WorkflowMaxSteps, defaults.WorkflowMinSteps, defaults.WorkflowMaxSteps))
 		s.WorkflowMinSteps = defaults.WorkflowMinSteps
 		s.WorkflowMaxSteps = defaults.WorkflowMaxSteps
 	}
+	clampIntRange(warn, "pipeline_max_segments", &s.PipelineMaxSegments, 2, 32)
+	clampIntRange(warn, "directory_scope_max_depth", &s.DirectoryScopeMaxDepth, 1, 10)
+}
 
-	// --- Pipeline max segments (clamp to [2, 32]) ---
-	if s.PipelineMaxSegments < 2 {
-		warn("pipeline_max_segments", fmt.Sprintf("must be >= 2, got %d; clamping to 2", s.PipelineMaxSegments))
-		s.PipelineMaxSegments = 2
-	}
-	if s.PipelineMaxSegments > 32 {
-		warn("pipeline_max_segments", fmt.Sprintf("must be <= 32, got %d; clamping to 32", s.PipelineMaxSegments))
-		s.PipelineMaxSegments = 32
-	}
-
-	// --- Directory scope max depth (clamp to [1, 10]) ---
-	if s.DirectoryScopeMaxDepth < 1 {
-		warn("directory_scope_max_depth", fmt.Sprintf("must be >= 1, got %d; clamping to 1", s.DirectoryScopeMaxDepth))
-		s.DirectoryScopeMaxDepth = 1
-	}
-	if s.DirectoryScopeMaxDepth > 10 {
-		warn("directory_scope_max_depth", fmt.Sprintf("must be <= 10, got %d; clamping to 10", s.DirectoryScopeMaxDepth))
-		s.DirectoryScopeMaxDepth = 10
-	}
-
-	// --- Enum: incognito_mode ---
+// validateEnumFields validates string fields that must match a set of allowed values.
+func (s *SuggestionsConfig) validateEnumFields(warn func(string, string), defaults *SuggestionsConfig) {
 	if !isValidIncognitoMode(s.IncognitoMode) {
 		warn("incognito_mode", fmt.Sprintf("must be off, ephemeral, or no_send, got %q; falling back to default %q", s.IncognitoMode, defaults.IncognitoMode))
 		s.IncognitoMode = defaults.IncognitoMode
 	}
-
-	// --- Enum: shim_mode ---
 	if !isValidShimMode(s.ShimMode) {
 		warn("shim_mode", fmt.Sprintf("must be auto, persistent, or oneshot, got %q; falling back to auto", s.ShimMode))
 		s.ShimMode = "auto"
 	}
-
-	// --- Enum: scorer_version ---
 	if !isValidScorerVersion(s.ScorerVersion) {
 		warn("scorer_version", fmt.Sprintf("must be v1, v2, or blend, got %q; falling back to v1", s.ScorerVersion))
 		s.ScorerVersion = "v1"
 	}
-
-	// --- Enum: search_fts_tokenizer ---
 	if !isValidFTSTokenizer(s.SearchFTSTokenizer) {
 		warn("search_fts_tokenizer", fmt.Sprintf("must be trigram or unicode61, got %q; falling back to trigram", s.SearchFTSTokenizer))
 		s.SearchFTSTokenizer = "trigram"
 	}
+}
 
-	return warnings
+// clampIntRange clamps an integer field to [min, max], emitting a warning if adjusted.
+func clampIntRange(warn func(string, string), name string, val *int, min, max int) {
+	if *val < min {
+		warn(name, fmt.Sprintf("must be >= %d, got %d; clamping to %d", min, *val, min))
+		*val = min
+	}
+	if *val > max {
+		warn(name, fmt.Sprintf("must be <= %d, got %d; clamping to %d", max, *val, max))
+		*val = max
+	}
 }
 
 func isValidIncognitoMode(mode string) bool {

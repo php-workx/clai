@@ -20,6 +20,8 @@ export CLAI_CURRENT_SHELL=bash
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
 : ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
+: ${CLAI_UP_ARROW_TRIGGER:={{CLAI_UP_ARROW_TRIGGER}}}
+: ${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:={{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}}
 
 # Only initialize in interactive shells.
 # This avoids installing hooks in non-interactive contexts like `bash -c` or scripts.
@@ -40,6 +42,16 @@ _AI_LAST_OUTPUT="$CLAI_CACHE/last_output"
 # Session-level disable flag
 _clai_session_off() {
     [[ -f "$CLAI_CACHE/off" ]]
+}
+
+_clai_now_ms() {
+    if command -v python3 >/dev/null 2>&1; then
+        python3 -c 'import time; print(int(time.time() * 1000))' 2>/dev/null && return
+    fi
+    if command -v perl >/dev/null 2>&1; then
+        perl -MTime::HiRes=time -e 'print int(time()*1000)' 2>/dev/null && return
+    fi
+    printf '%d\n' "$(( $(date +%s) * 1000 ))"
 }
 
 # ============================================
@@ -176,6 +188,7 @@ _CLAI_FALLBACK_ACTIVE=false
 _CLAI_FALLBACK_INDEX=0
 _CLAI_FALLBACK_ORIG_LINE=""
 _CLAI_FALLBACK_ITEMS=()
+_CLAI_LAST_UP_ARROW_MS=0
 
 _clai_fallback_reset() {
     _CLAI_FALLBACK_ACTIVE=false
@@ -483,12 +496,43 @@ bind '"˙": "\C-x\C-h"'
 # (with fallback to shell default). Otherwise shell defaults are used.
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
     _clai_up_arrow() {
+        local mode now delta window
+
         if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+            _CLAI_LAST_UP_ARROW_MS=0
+            bind '"\C-x\C-q": previous-history'
             return 0
         fi
-        _clai_tui_picker_open
+
+        mode="${CLAI_UP_ARROW_TRIGGER:-single}"
+        if [[ "$mode" == "double" ]]; then
+            now=$(_clai_now_ms)
+            window="${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}"
+            if [[ "$window" -lt 50 ]]; then
+                window=50
+            fi
+            delta=$((now - _CLAI_LAST_UP_ARROW_MS))
+            _CLAI_LAST_UP_ARROW_MS=$now
+
+            if [[ "$delta" -gt 0 && "$delta" -le "$window" ]] && _clai_has_tui_picker; then
+                _CLAI_LAST_UP_ARROW_MS=0
+                bind '"\C-x\C-q": ""'
+                _clai_tui_picker_open
+                return 0
+            fi
+            bind '"\C-x\C-q": previous-history'
+            return 0
+        fi
+
+        if _clai_has_tui_picker; then
+            bind '"\C-x\C-q": ""'
+            _clai_tui_picker_open
+            return 0
+        fi
+        bind '"\C-x\C-q": previous-history'
+        return 0
     }
-    bind '"\e[A": "\C-x\C-p"'
+    bind '"\e[A": "\C-x\C-p\C-x\C-q"'
     bind -x '"\C-x\C-p": _clai_up_arrow'
 fi
 
@@ -833,6 +877,7 @@ _clai_disable() {
     bind -r '\C-x\C-i'
     bind -r '\C-x\C-t'
     bind -r '\C-x\C-p'
+    bind -r '\C-x\C-q'
     bind -r '\C-x\C-n'
     bind -r '\C-g'
     bind -r '\C-xs'

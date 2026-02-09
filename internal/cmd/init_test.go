@@ -522,8 +522,8 @@ func TestShellScripts_MacOSOptionH(t *testing.T) {
 	}
 }
 
-// TestShellScripts_UpArrowHistoryPlaceholder verifies that all shell scripts
-// contain the {{CLAI_UP_ARROW_HISTORY}} placeholder that init.go replaces.
+// TestShellScripts_UpArrowPlaceholders verifies that all shell scripts contain
+// the Up-arrow placeholders that init.go replaces.
 func TestShellScripts_UpArrowHistoryPlaceholder(t *testing.T) {
 	shells := []string{
 		"shell/zsh/clai.zsh",
@@ -542,8 +542,20 @@ func TestShellScripts_UpArrowHistoryPlaceholder(t *testing.T) {
 			if !strings.Contains(script, "{{CLAI_UP_ARROW_HISTORY}}") {
 				t.Errorf("%s missing {{CLAI_UP_ARROW_HISTORY}} placeholder", path)
 			}
+			if !strings.Contains(script, "{{CLAI_UP_ARROW_TRIGGER}}") {
+				t.Errorf("%s missing {{CLAI_UP_ARROW_TRIGGER}} placeholder", path)
+			}
+			if !strings.Contains(script, "{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}") {
+				t.Errorf("%s missing {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}} placeholder", path)
+			}
 			if !strings.Contains(script, "CLAI_UP_ARROW_HISTORY") {
 				t.Errorf("%s missing CLAI_UP_ARROW_HISTORY variable usage", path)
+			}
+			if !strings.Contains(script, "CLAI_UP_ARROW_TRIGGER") {
+				t.Errorf("%s missing CLAI_UP_ARROW_TRIGGER variable usage", path)
+			}
+			if !strings.Contains(script, "CLAI_UP_ARROW_DOUBLE_WINDOW_MS") {
+				t.Errorf("%s missing CLAI_UP_ARROW_DOUBLE_WINDOW_MS variable usage", path)
 			}
 		})
 	}
@@ -595,8 +607,8 @@ func TestBashScript_MacOSOptionHMacroTranslation(t *testing.T) {
 	}
 }
 
-// TestInitPlaceholderReplacement verifies that init.go replaces both
-// CLAI_SESSION_ID and CLAI_UP_ARROW_HISTORY placeholders.
+// TestInitPlaceholderReplacement verifies that init.go replaces all
+// shell placeholders used by init scripts.
 func TestInitPlaceholderReplacement(t *testing.T) {
 	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
 	if err != nil {
@@ -608,19 +620,39 @@ func TestInitPlaceholderReplacement(t *testing.T) {
 	if !strings.Contains(script, "{{CLAI_UP_ARROW_HISTORY}}") {
 		t.Fatal("zsh script missing {{CLAI_UP_ARROW_HISTORY}} placeholder")
 	}
+	if !strings.Contains(script, "{{CLAI_UP_ARROW_TRIGGER}}") {
+		t.Fatal("zsh script missing {{CLAI_UP_ARROW_TRIGGER}} placeholder")
+	}
+	if !strings.Contains(script, "{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}") {
+		t.Fatal("zsh script missing {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}} placeholder")
+	}
 
 	// Simulate the replacement that init.go performs.
 	replaced := strings.ReplaceAll(script, "{{CLAI_SESSION_ID}}", "test-session-id")
 	replaced = strings.ReplaceAll(replaced, "{{CLAI_UP_ARROW_HISTORY}}", "false")
+	replaced = strings.ReplaceAll(replaced, "{{CLAI_UP_ARROW_TRIGGER}}", "double")
+	replaced = strings.ReplaceAll(replaced, "{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}", "250")
 
 	if strings.Contains(replaced, "{{CLAI_UP_ARROW_HISTORY}}") {
 		t.Error("placeholder {{CLAI_UP_ARROW_HISTORY}} not replaced")
+	}
+	if strings.Contains(replaced, "{{CLAI_UP_ARROW_TRIGGER}}") {
+		t.Error("placeholder {{CLAI_UP_ARROW_TRIGGER}} not replaced")
+	}
+	if strings.Contains(replaced, "{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}") {
+		t.Error("placeholder {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}} not replaced")
 	}
 	if strings.Contains(replaced, "{{CLAI_SESSION_ID}}") {
 		t.Error("placeholder {{CLAI_SESSION_ID}} not replaced")
 	}
 	if !strings.Contains(replaced, "CLAI_UP_ARROW_HISTORY:=false") {
 		t.Error("expected CLAI_UP_ARROW_HISTORY:=false after replacement")
+	}
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_TRIGGER:=double") {
+		t.Error("expected CLAI_UP_ARROW_TRIGGER:=double after replacement")
+	}
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_DOUBLE_WINDOW_MS:=250") {
+		t.Error("expected CLAI_UP_ARROW_DOUBLE_WINDOW_MS:=250 after replacement")
 	}
 }
 
