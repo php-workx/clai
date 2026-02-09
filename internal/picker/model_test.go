@@ -428,6 +428,38 @@ func TestTabCycling(t *testing.T) {
 	assert.Equal(t, 0, m.activeTab)
 }
 
+func TestLeftRightRefine_SetsQueryToSelectedItem(t *testing.T) {
+	p := &mockProvider{items: []string{"first cmd", "second cmd"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	// Move selection to second item.
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = result.(Model)
+	require.Equal(t, 1, m.selection)
+
+	m.textInput.SetValue("sec")
+	m.offset = 10
+
+	// Left arrow should replace query with selected item and start debounce.
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	m = result.(Model)
+	assert.Equal(t, "second cmd", m.textInput.Value())
+	assert.Equal(t, 0, m.offset)
+	assert.NotNil(t, cmd)
+	assert.Greater(t, m.debounceID, uint64(0))
+
+	// Reset to a different query and use Right arrow too.
+	m.textInput.SetValue("foo")
+	oldDebounce := m.debounceID
+
+	result, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = result.(Model)
+	assert.Equal(t, "second cmd", m.textInput.Value())
+	assert.NotNil(t, cmd)
+	assert.Greater(t, m.debounceID, oldDebounce)
+}
+
 func TestTabResetsOffset(t *testing.T) {
 	p := &mockProvider{items: []string{"a"}, atEnd: true}
 	m := newTestModel(p)

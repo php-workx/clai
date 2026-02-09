@@ -3,6 +3,7 @@ package picker
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -202,63 +203,97 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case tea.KeyCtrlC:
-		if m.selection >= 0 && m.selection < len(m.items) {
-			return m, copyToClipboard(m.items[m.selection])
-		}
-		return m, nil
+		return m.handleCopy()
 
 	case tea.KeyEnter:
-		if m.selection >= 0 && m.selection < len(m.items) {
-			m.result = m.items[m.selection]
-		}
-		m.cancelInflight()
-		return m, tea.Quit
+		return m.handleSelect()
 
 	case tea.KeyUp:
-		if m.state == stateLoading {
-			return m, nil
-		}
-		if m.layout == LayoutBottomUp {
-			if m.selection < len(m.items)-1 {
-				m.selection++
-			}
-		} else {
-			if m.selection > 0 {
-				m.selection--
-			}
-		}
+		m.moveSelection(-1)
 		return m, nil
 
 	case tea.KeyDown:
-		if m.state == stateLoading {
-			return m, nil
-		}
-		if m.layout == LayoutBottomUp {
-			if m.selection > 0 {
-				m.selection--
-			}
-		} else {
-			if m.selection < len(m.items)-1 {
-				m.selection++
-			}
-		}
+		m.moveSelection(+1)
 		return m, nil
 
+	case tea.KeyLeft, tea.KeyRight:
+		return m.handleRefineKey()
+
 	case tea.KeyTab:
-		if len(m.tabs) > 1 {
-			m.activeTab = (m.activeTab + 1) % len(m.tabs)
-			m.offset = 0
-			return m, m.startFetch()
-		}
+		return m.handleTabSwitch()
+	}
+
+	return m.handleTextInput(msg)
+}
+
+// handleRefineKey replaces the query with the currently selected item and
+// triggers a debounced fetch. This enables a fast "select then refine" flow.
+func (m Model) handleRefineKey() (tea.Model, tea.Cmd) {
+	if m.selection < 0 || m.selection >= len(m.items) {
 		return m, nil
 	}
 
-	// Delegate all other keys (typing, backspace, etc.) to textinput.
+	query := ValidateUTF8(StripANSI(m.items[m.selection]))
+	if query == "" || m.textInput.Value() == query {
+		return m, nil
+	}
+
+	m.textInput.SetValue(query)
+	m.textInput.CursorEnd()
+	m.offset = 0
+	return m, m.startDebounce()
+}
+
+// handleCopy copies the selected item to the clipboard.
+func (m Model) handleCopy() (tea.Model, tea.Cmd) {
+	if m.selection >= 0 && m.selection < len(m.items) {
+		return m, copyToClipboard(m.items[m.selection])
+	}
+	return m, nil
+}
+
+// handleSelect accepts the current selection and quits.
+func (m Model) handleSelect() (tea.Model, tea.Cmd) {
+	if m.selection >= 0 && m.selection < len(m.items) {
+		m.result = m.items[m.selection]
+	}
+	m.cancelInflight()
+	return m, tea.Quit
+}
+
+// moveSelection moves the selection cursor by delta, respecting layout direction.
+// A negative delta means "up" visually; positive means "down" visually.
+func (m *Model) moveSelection(delta int) {
+	if m.state == stateLoading {
+		return
+	}
+	// In bottom-up layout, visual "up" increases the index.
+	if m.layout == LayoutBottomUp {
+		delta = -delta
+	}
+	next := m.selection + delta
+	if next >= 0 && next < len(m.items) {
+		m.selection = next
+	}
+}
+
+// handleTabSwitch cycles to the next tab if multiple tabs exist.
+func (m Model) handleTabSwitch() (tea.Model, tea.Cmd) {
+	if len(m.tabs) > 1 {
+		m.activeTab = (m.activeTab + 1) % len(m.tabs)
+		m.offset = 0
+		return m, m.startFetch()
+	}
+	return m, nil
+}
+
+// handleTextInput delegates to the text input widget and triggers a
+// debounced search if the query changed.
+func (m Model) handleTextInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	prevQuery := m.textInput.Value()
 	var cmd tea.Cmd
 	m.textInput, cmd = m.textInput.Update(msg)
 
-	// If the query changed, trigger a debounced search.
 	if m.textInput.Value() != prevQuery {
 		m.offset = 0
 		return m, tea.Batch(cmd, m.startDebounce())
@@ -486,7 +521,11 @@ func (m Model) viewTabBar() string {
 			parts = append(parts, inactiveTabStyle.Render(label))
 		}
 	}
-	return strings.Join(parts, " ")
+	bar := strings.Join(parts, " ")
+	if len(m.tabs) > 1 {
+		bar += dimStyle.Render("  " + tabSwitchHintLabel())
+	}
+	return bar
 }
 
 // viewContent renders the item list or a status message.
@@ -548,7 +587,11 @@ func (m Model) viewList() string {
 			base, hl, prefix = normalStyle, matchStyle, "  "
 		}
 
-		lines = append(lines, base.Render(prefix)+renderItem(display, query, base, hl))
+		line := base.Render(prefix) + renderItem(display, query, base, hl)
+		if i == m.selection {
+			line += dimStyle.Render("  " + refineHintLabel())
+		}
+		lines = append(lines, line)
 	}
 
 	if m.layout == LayoutBottomUp {
@@ -622,4 +665,30 @@ func (m Model) viewQuery() string {
 		q += "  " + dimStyle.Render("Copied!")
 	}
 	return q
+}
+
+func refineHintLabel() string {
+	if supportsUnicodeHints() {
+		return "←"
+	}
+	return "Left: refine"
+}
+
+func tabSwitchHintLabel() string {
+	if supportsUnicodeHints() {
+		return "⇥"
+	}
+	return "Tab: switch scope"
+}
+
+func supportsUnicodeHints() bool {
+	for _, key := range []string{"LC_ALL", "LC_CTYPE", "LANG"} {
+		value := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+		if value == "" {
+			continue
+		}
+		return strings.Contains(value, "utf-8") || strings.Contains(value, "utf8")
+	}
+	// Default to unicode when locale is unspecified; modern terminals handle it.
+	return true
 }
