@@ -965,7 +965,5 @@ if status is-interactive; and not set -q _CLAI_REINIT
     disown %1 2>/dev/null
 
     set -l short_id (string sub -l 8 -- $CLAI_SESSION_ID)
-    set_color brblack
-    echo "🤖 clai [$short_id] → suggest | Alt+↵ accept | ?\"describe task\""
-    set_color normal
+    echo "clai [$short_id] Alt+S suggestions | Alt+H history | ?\"describe task\""
 end

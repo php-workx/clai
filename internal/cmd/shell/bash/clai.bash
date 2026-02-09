@@ -562,6 +562,33 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
     bind -x '"\C-x\C-p": _clai_up_arrow_single'
     bind -x '"\C-x\C-u": _clai_up_arrow_double'
 
+    # Down arrow should reverse history cycling.
+    # Use the same macro pattern as Up: Down → macro → bind-x handler → conditional follow-up.
+    _clai_down_arrow_single() {
+        if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+            if [[ "$_CLAI_FALLBACK_ACTIVE" == "true" ]]; then
+                _clai_fallback_history_down
+                bind '"\C-x\C-w": ""'
+                return 0
+            fi
+            bind '"\C-x\C-w": next-history'
+            return 0
+        fi
+
+        if [[ "$_CLAI_FALLBACK_ACTIVE" == "true" ]]; then
+            _clai_fallback_history_down
+            bind '"\C-x\C-w": ""'
+            return 0
+        fi
+
+        bind '"\C-x\C-w": next-history'
+        return 0
+    }
+
+    bind -x '"\C-x\C-n": _clai_down_arrow_single'
+    bind '"\e[B": "\C-x\C-n\C-x\C-w"'
+    bind '"\eOB": "\C-x\C-n\C-x\C-w"'
+
     if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
         _clai_keyseq_timeout="${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}"
         if [[ ! "$_clai_keyseq_timeout" =~ ^[0-9]+$ ]]; then
@@ -919,6 +946,7 @@ _clai_disable() {
     bind '"\e[A": previous-history'
     bind '"\eOA": previous-history'
     bind '"\e[B": next-history'
+    bind '"\eOB": next-history'
     bind '"\t": complete'
     bind "set show-all-if-ambiguous off"
     bind -r '\e[A\e[A' 2>/dev/null
@@ -936,6 +964,7 @@ _clai_disable() {
     bind -r '\C-x\C-u'
     bind -r '\C-x\C-q'
     bind -r '\C-x\C-n'
+    bind -r '\C-x\C-w'
     bind -r '\C-g'
     bind -r '\C-xs'
     bind -r '\C-xd'
@@ -997,7 +1026,7 @@ clai() {
 
 if [[ $- == *i* && -z "$_CLAI_REINIT" ]]; then
     # Use printf for better portability across bash versions
-    printf '\033[2m🤖 clai [%s] Tab complete | accept cmd | ?"describe task"\033[0m\n' "${CLAI_SESSION_ID:0:8}"
+    printf 'clai [%s] Alt+S suggestions | Alt+H history | ?"describe task"\n' "${CLAI_SESSION_ID:0:8}"
 
     # Register session + import history (fire and forget).
     # Keep startup prompt snappy by printing the message before forking background work.

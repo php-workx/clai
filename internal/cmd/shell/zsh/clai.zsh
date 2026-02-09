@@ -1179,5 +1179,5 @@ if [[ -o interactive && -z "$_CLAI_REINIT" ]]; then
     trap '_clai_cleanup' EXIT HUP
 
     local short_id="${CLAI_SESSION_ID:0:8}"
-    echo -e "\033[2m🤖 clai [$short_id] Tab suggestions | ↑ history | → accept | ?\"describe task\"\033[0m"
+    echo "clai [$short_id] Alt+S suggestions | Alt+H history | ?\"describe task\""
 fi
