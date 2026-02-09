@@ -1,0 +1,693 @@
+# clai Phase 1 Implementation Formula
+# Based on tech_design.md Section 16: Parallel Implementation Streams
+#
+# This formula creates the complete implementation plan for clai Phase 1
+# with proper dependency ordering and wave-based parallelization.
+
+[metadata]
+name = "clai-phase1"
+version = "1.0"
+description = "Full Phase 1 implementation: Shell hooks + Thin client + Daemon + AI providers"
+created = "2026-01-29"
+source = "docs/tech_design.md"
+
+[epic]
+title = "clai Phase 1 Implementation"
+description = """
+Implement the complete clai Phase 1 architecture as specified in tech_design.md:
+- Shell Integration (zsh, bash, PowerShell hooks)
+- Thin Client Binary (clai-shim) for fire-and-forget shell communication
+- User-mode Daemon (clai-daemon) as central brain
+- SQLite storage with WAL mode
+- Provider adapters for AI (Anthropic, OpenAI, Google)
+- Suggestion ranking engine
+- gRPC/Protobuf IPC layer
+
+This follows the 7-stream parallel implementation plan from the tech spec.
+"""
+priority = 1
+type = "epic"
+
+# =============================================================================
+# WAVE 1: Foundation (No dependencies)
+# These can all be worked on in parallel
+# =============================================================================
+
+[[issues]]
+id = "stream-a-proto"
+title = "Stream A: Proto & gRPC Foundation"
+type = "feature"
+priority = 2
+description = """
+**Owner:** Agent A
+**Duration Estimate:** 2-3 days
+**Dependencies:** None
+
+## Deliverables
+- `proto/clai/v1/clai.proto` (from Section 4)
+- `gen/proto/clai/v1/*.pb.go` (generated)
+- `Makefile` with `proto` target
+
+## Key Implementation
+```protobuf
+// Messages: ClientInfo, Ack, SessionStartRequest, SessionEndRequest,
+// CommandStartRequest, CommandEndRequest, SuggestRequest, SuggestResponse,
+// TextToCommandRequest, TextToCommandResponse, NextStepRequest/Response,
+// DiagnoseRequest/Response, StatusResponse
+
+service ClaiService {
+  // Fire-and-Forget
+  rpc SessionStart(SessionStartRequest) returns (Ack);
+  rpc SessionEnd(SessionEndRequest) returns (Ack);
+  rpc CommandStarted(CommandStartRequest) returns (Ack);
+  rpc CommandEnded(CommandEndRequest) returns (Ack);
+
+  // Interactive
+  rpc Suggest(SuggestRequest) returns (SuggestResponse);
+  rpc TextToCommand(TextToCommandRequest) returns (TextToCommandResponse);
+  rpc NextStep(NextStepRequest) returns (NextStepResponse);
+  rpc Diagnose(DiagnoseRequest) returns (DiagnoseResponse);
+
+  // Ops
+  rpc Ping(Ack) returns (Ack);
+  rpc GetStatus(Ack) returns (StatusResponse);
+}
+```
+
+## Acceptance Criteria
+- [ ] `make proto` generates Go code without errors
+- [ ] Generated code compiles
+- [ ] Basic gRPC server/client can exchange `Ping` message
+- [ ] All serialization tests pass
+
+## Testing Requirements
+- TestProto_SessionStartRequest_Serialization
+- TestProto_CommandEndRequest_Serialization
+- TestProto_SuggestResponse_Serialization
+- TestGRPC_PingRoundTrip
+- TestGRPC_ConnectionRefused_Error
+"""
+wave = 1
+
+[[issues]]
+id = "stream-b-storage"
+title = "Stream B: Storage Layer (SQLite)"
+type = "feature"
+priority = 2
+description = """
+**Owner:** Agent B
+**Duration Estimate:** 3-4 days
+**Dependencies:** None
+
+## Deliverables
+- `internal/storage/db.go` - Connection, migrations
+- `internal/storage/sessions.go` - Session CRUD
+- `internal/storage/commands.go` - Command CRUD
+- `internal/storage/cache.go` - AI cache operations
+- `internal/storage/queries.go` - Raw SQL queries (embedded)
+
+## Schema (from Section 5.1)
+```sql
+CREATE TABLE IF NOT EXISTS sessions (
+  session_id TEXT PRIMARY KEY,
+  started_at_unix_ms INTEGER NOT NULL,
+  ended_at_unix_ms INTEGER,
+  shell TEXT NOT NULL,
+  os TEXT NOT NULL,
+  hostname TEXT,
+  username TEXT,
+  initial_cwd TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS commands (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  command_id TEXT NOT NULL UNIQUE,
+  session_id TEXT NOT NULL REFERENCES sessions(session_id),
+  ts_start_unix_ms INTEGER NOT NULL,
+  ts_end_unix_ms INTEGER,
+  duration_ms INTEGER,
+  cwd TEXT NOT NULL,
+  command TEXT NOT NULL,
+  command_norm TEXT NOT NULL,
+  command_hash TEXT NOT NULL,
+  exit_code INTEGER,
+  is_success INTEGER DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS ai_cache (
+  cache_key TEXT PRIMARY KEY,
+  response_json TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  created_at_unix_ms INTEGER NOT NULL,
+  expires_at_unix_ms INTEGER NOT NULL,
+  hit_count INTEGER DEFAULT 0
+);
+```
+
+## Acceptance Criteria
+- [ ] Implements `Store` interface (Section 15.3)
+- [ ] Creates schema on first run
+- [ ] All CRUD operations work
+- [ ] Unit tests for each operation (90% coverage)
+- [ ] WAL mode enabled
+- [ ] Concurrent writes safe
+
+## Testing Requirements (18.5)
+- TestStore_CreateSession_Success
+- TestStore_CreateSession_DuplicateID
+- TestStore_EndSession_Success/NotFound
+- TestStore_CreateCommand_Success/InvalidSessionID
+- TestStore_UpdateCommandEnd_Success/NotFound
+- TestStore_QueryCommands_BySession/ByCWD/ByPrefix/Limit
+- TestStore_GetCached_Hit/Miss/Expired
+- TestStore_SetCached_Success
+- TestStore_PruneExpiredCache_RemovesExpired
+- TestStore_Migration_CreatesSchema
+- TestStore_WALMode_Enabled
+- TestStore_ConcurrentWrites_Safe
+"""
+wave = 1
+
+[[issues]]
+id = "stream-f-providers"
+title = "Stream F: Provider Adapters (AI)"
+type = "feature"
+priority = 2
+description = """
+**Owner:** Agent F
+**Duration Estimate:** 4-5 days
+**Dependencies:** None (can mock daemon for testing)
+
+## Deliverables
+- `internal/provider/provider.go` - Interface definition
+- `internal/provider/registry.go` - Provider selection logic
+- `internal/provider/anthropic.go` - Claude CLI/API wrapper
+- `internal/provider/openai.go` - OpenAI CLI/API wrapper
+- `internal/provider/google.go` - Gemini CLI/API wrapper
+- `internal/provider/context.go` - AI context builder
+- `internal/sanitize/sanitizer.go` - Regex sanitization
+- `internal/sanitize/patterns.go` - Compiled regex patterns
+- `internal/sanitize/risk.go` - Destructive command detection
+
+## Provider Interface (Section 15.3)
+```go
+type Provider interface {
+    Name() string
+    Available() bool
+
+    TextToCommand(ctx context.Context, req *TextToCommandRequest) (*TextToCommandResponse, error)
+    NextStep(ctx context.Context, req *NextStepRequest) (*NextStepResponse, error)
+    Diagnose(ctx context.Context, req *DiagnoseRequest) (*DiagnoseResponse, error)
+}
+```
+
+## AI Context Construction (Section 8.2)
+```
+System: You are a command-line assistant. Generate shell commands.
+
+Context:
+- OS: {os}
+- Shell: {shell}
+- Working Directory: {cwd}
+
+Recent commands:
+1. {cmd1} (exit {code1})
+...
+
+User request: {prompt}
+```
+
+## Sanitization Rules (Section 3.2)
+- AWS Access Key: `AKIA[0-9A-Z]{16}`
+- AWS Secret Key: `(?i)(aws_secret_access_key|secret_access_key)\\s*[=:]\\s*\\S+`
+- JWT Tokens: `eyJ[A-Za-z0-9_-]+\\.eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+`
+- Slack Tokens: `xox[baprs]-[0-9a-zA-Z-]+`
+- PEM Blocks: `-----BEGIN [A-Z ]+-----[\\s\\S]+?-----END [A-Z ]+-----`
+- Generic Secrets: `(?i)(password|token|secret|api_key)\\s*[=:]\\s*\\S+`
+
+## Risk Tagging (Section 3.3)
+Patterns flagged as "destructive":
+- `rm -rf`, `rm -r`, `rmdir`
+- `DROP TABLE`, `DROP DATABASE`, `TRUNCATE`
+- `--force`, `--hard`, `-f`
+- `chmod 777`, `chmod -R`
+- `> /dev/sda`, `dd if=`
+
+## Acceptance Criteria
+- [ ] Implements `Provider` interface
+- [ ] CLI detection (`claude --version`, etc.)
+- [ ] Falls back to API if CLI unavailable
+- [ ] Constructs AI context (Section 8.2)
+- [ ] Sanitizes input before sending (Section 3.2)
+- [ ] Caches responses
+- [ ] 10-second timeout for AI calls
+- [ ] 80% test coverage
+
+## Testing Requirements (18.5)
+- TestProvider_Anthropic_Available_CLIFound/APIKeyOnly/Unavailable
+- TestProvider_Registry_AutoSelect
+- TestProvider_TextToCommand_Success/Timeout/ParsesResponse/SanitizesInput
+- TestProvider_TextToCommand_CacheHit/CacheMiss
+- TestContext_Builder_IncludesOS/Shell/RecentCmds/LimitsHistory
+- TestSanitizer_Sanitize (table-driven for all patterns)
+- TestSanitizer_IsDestructive (risk detection)
+"""
+wave = 1
+
+# =============================================================================
+# WAVE 2: Depends on Wave 1 foundations
+# =============================================================================
+
+[[issues]]
+id = "stream-c-shim"
+title = "Stream C: clai-shim (Thin Client Binary)"
+type = "feature"
+priority = 2
+depends_on = ["stream-a-proto"]
+description = """
+**Owner:** Agent C
+**Duration Estimate:** 3-4 days
+**Dependencies:** Stream A (proto)
+
+## Deliverables
+- `cmd/clai-shim/main.go` - Entry point
+- `cmd/clai-shim/commands/root.go` - Argument parsing
+- `cmd/clai-shim/commands/session.go` - session-start, session-end
+- `cmd/clai-shim/commands/log.go` - log-start, log-end
+- `cmd/clai-shim/commands/suggest.go` - suggest
+- `cmd/clai-shim/commands/textcmd.go` - text-to-command
+- `internal/ipc/client.go` - gRPC client wrapper
+- `internal/ipc/dial.go` - Socket connection logic
+- `internal/ipc/spawn.go` - Daemon spawning
+
+## Fire-and-Forget Contract (Section 2.1)
+- SessionStart/CommandStart/CommandEnd: Client does not wait for Ack
+- If socket connection fails (after 10ms timeout), drop event and exit silent/success
+- Suggest/TextToCommand: Block with 50ms timeout, return empty on timeout
+
+## Key Implementation
+```go
+// Fire-and-forget pattern
+func fireAndForget(ctx context.Context, client pb.ClaiServiceClient, req *pb.CommandStartRequest) {
+    ctx, cancel := context.WithTimeout(ctx, 10*time.Millisecond)
+    defer cancel()
+    _, _ = client.CommandStarted(ctx, req) // Ignore errors
+}
+```
+
+## Daemon Spawning (Section 2.3)
+1. Fork/exec `clai-daemon` in background (detached, no stdout/stderr)
+2. Write PID to `~/.clai/run/clai.pid`
+3. Return immediately (do not wait for daemon ready)
+4. Subsequent calls will retry socket connection
+
+## Acceptance Criteria
+- [ ] Parses all subcommands: session-start, session-end, log-start, log-end, suggest, text-to-command
+- [ ] Connects to daemon via Unix socket (`~/.clai/run/clai.sock`)
+- [ ] Spawns daemon if socket missing
+- [ ] Fire-and-forget for logging (no wait)
+- [ ] 50ms timeout for suggestions
+- [ ] Silent failure (exit 0) on all errors
+- [ ] < 10ms startup time
+
+## Testing Requirements (18.5)
+- TestShim_ParseSessionStart_AllFlags
+- TestShim_ParseLogStart_AllFlags
+- TestShim_ParseSuggest_AllFlags
+- TestShim_Dial_Success/Timeout/SocketNotFound
+- TestShim_SpawnDaemon_Success/AlreadyRunning
+- TestShim_LogStart_FireAndForget_NoBlock
+- TestShim_LogEnd_FireAndForget_NoBlock
+- TestShim_LogStart_DaemonDown_SilentExit
+- TestShim_Suggest_ReturnsResult/Timeout/DaemonDown_EmptyResult
+"""
+wave = 2
+
+[[issues]]
+id = "stream-g-ranking"
+title = "Stream G: Suggestion Ranking Engine"
+type = "feature"
+priority = 2
+depends_on = ["stream-b-storage"]
+description = """
+**Owner:** Agent G
+**Duration Estimate:** 2-3 days
+**Dependencies:** Stream B (storage)
+
+## Deliverables
+- `internal/suggest/ranker.go` - Scoring algorithm
+- `internal/suggest/sources.go` - Session/CWD/Global sources
+- `internal/suggest/normalize.go` - Command normalization
+
+## Scoring Formula (Section 7.1)
+```
+score = (source_weight * 0.4) + (recency_score * 0.3) + (success_score * 0.2) + (affinity_score * 0.1)
+```
+
+## Weights (Section 7.2)
+| Factor | Calculation |
+|--------|-------------|
+| Source Weight | session=1.0, cwd=0.7, global=0.4 |
+| Recency Score | `1.0 / (1 + log(hours_since_use + 1))` |
+| Success Score | `success_count / (success_count + failure_count)` |
+| Affinity Score | 1.0 if same tool prefix as last command, else 0.0 |
+
+## Query Strategy (Section 7.3)
+```sql
+SELECT
+  command,
+  source,
+  MAX(ts_start_unix_ms) as last_used,
+  SUM(CASE WHEN is_success = 1 THEN 1 ELSE 0 END) as success_count,
+  COUNT(*) as total_count
+FROM commands
+WHERE command_norm LIKE ? || '%'
+  AND session_id = ?
+GROUP BY command_hash
+ORDER BY last_used DESC
+LIMIT 20;
+```
+
+## Ranker Interface (Section 15.3)
+```go
+type Ranker interface {
+    Rank(ctx context.Context, req *RankRequest) ([]Suggestion, error)
+}
+
+type RankRequest struct {
+    SessionID   string
+    CWD         string
+    Prefix      string
+    LastCommand string
+    MaxResults  int
+}
+```
+
+## Acceptance Criteria
+- [ ] Implements scoring formula (Section 7.1)
+- [ ] Queries session, CWD, global scopes
+- [ ] Merges and deduplicates results
+- [ ] Returns top N suggestions
+- [ ] < 50ms latency for 10K command history
+- [ ] 85% test coverage
+
+## Testing Requirements (18.5)
+- TestRanker_Score_SessionWeightHighest
+- TestRanker_Score_RecencyDecay
+- TestRanker_Score_SuccessBias
+- TestRanker_Score_ToolAffinity
+- TestRanker_Query_SessionScope/CWDScope/GlobalScope
+- TestRanker_Query_MergesSources
+- TestRanker_Query_Deduplicates
+- TestNormalize_Lowercase/TrimWhitespace/RemovesArgs
+- TestRanker_Performance_10KCommands_Under50ms
+"""
+wave = 2
+
+# =============================================================================
+# WAVE 3: Core Daemon (depends on storage, proto, ranking)
+# =============================================================================
+
+[[issues]]
+id = "stream-d-daemon"
+title = "Stream D: clai-daemon (Core Server)"
+type = "feature"
+priority = 2
+depends_on = ["stream-a-proto", "stream-b-storage", "stream-g-ranking"]
+description = """
+**Owner:** Agent D
+**Duration Estimate:** 5-6 days
+**Dependencies:** Stream A (proto), Stream B (storage), Stream G (ranking)
+
+## Deliverables
+- `cmd/clai-daemon/main.go` (or integrated into `cmd/clai/`)
+- `internal/daemon/server.go` - gRPC server setup
+- `internal/daemon/lifecycle.go` - Start, stop, idle timeout
+- `internal/daemon/session_manager.go` - Session tracking
+- `internal/daemon/handlers/session.go` - SessionStart, SessionEnd
+- `internal/daemon/handlers/command.go` - CommandStarted, CommandEnded
+- `internal/daemon/handlers/suggest.go` - Suggest handler
+- `internal/daemon/handlers/textcmd.go` - TextToCommand handler
+- `internal/daemon/handlers/nextstep.go` - NextStep handler
+- `internal/daemon/handlers/diagnose.go` - Diagnose handler
+- `internal/daemon/handlers/ops.go` - Ping, GetStatus
+
+## IPC Transport (Section 2.2)
+- Protocol: gRPC (Protobuf)
+- Unix: `unix://~/.clai/run/clai.sock`
+- Windows: `npipe:////./pipe/clai_user_<uid>`
+
+## Lifecycle (Section 2.3)
+- Auto-exits after `daemon.idle_timeout_mins` (default: 20) with no active sessions
+- Graceful shutdown on SIGTERM
+- Cleans up socket and PID file on exit
+
+## Idle Timeout Watcher
+```go
+func (s *Server) watchIdle() {
+    ticker := time.NewTicker(1 * time.Minute)
+    for range ticker.C {
+        if s.sessionManager.ActiveCount() == 0 &&
+           time.Since(s.lastActivity) > s.idleTimeout {
+            s.Shutdown()
+            return
+        }
+    }
+}
+```
+
+## Acceptance Criteria
+- [ ] Listens on Unix socket `~/.clai/run/clai.sock`
+- [ ] Writes PID file `~/.clai/run/clai.pid`
+- [ ] Handles all gRPC methods (Section 4)
+- [ ] Auto-shutdown after idle timeout
+- [ ] Graceful shutdown on SIGTERM
+- [ ] Cleans up socket/PID on exit
+- [ ] Concurrent session support
+- [ ] 80% test coverage
+
+## Testing Requirements (18.5)
+- TestDaemon_Start_CreatesSocket/WritesPIDFile
+- TestDaemon_Stop_CleansUpSocket/CleansUpPIDFile
+- TestDaemon_IdleTimeout_Shutdown
+- TestDaemon_SIGTERM_GracefulShutdown
+- TestHandler_SessionStart_Success/Persists
+- TestHandler_SessionEnd_Success/UpdatesDB
+- TestHandler_CommandStarted_Success
+- TestHandler_CommandEnded_Success/CalculatesDuration
+- TestHandler_Suggest_ReturnsHistorySuggestions/AISuggestions/CombinesSources
+- TestDaemon_MultipleSessions_Concurrent
+- TestDaemon_MultipleCommands_SameSession
+"""
+wave = 3
+
+# =============================================================================
+# WAVE 4: CLI & Shell Hooks (depends on proto, storage, daemon)
+# =============================================================================
+
+[[issues]]
+id = "stream-e-cli"
+title = "Stream E: CLI Commands & Shell Hooks"
+type = "feature"
+priority = 2
+depends_on = ["stream-a-proto", "stream-b-storage"]
+description = """
+**Owner:** Agent E
+**Duration Estimate:** 4-5 days
+**Dependencies:** Stream A (proto), Stream B (storage)
+
+## Deliverables
+- `cmd/clai/main.go` - Entry point
+- `cmd/clai/commands/root.go` - Cobra root command
+- `cmd/clai/commands/install.go` - clai install
+- `cmd/clai/commands/uninstall.go` - clai uninstall
+- `cmd/clai/commands/status.go` - clai status
+- `cmd/clai/commands/doctor.go` - clai doctor
+- `cmd/clai/commands/logs.go` - clai logs
+- `cmd/clai/commands/config.go` - clai config
+- `cmd/clai/commands/ask.go` - clai ask
+- `cmd/clai/commands/history.go` - clai history
+- `cmd/clai/commands/update.go` - clai update
+- `cmd/clai/commands/daemon.go` - clai daemon start/stop
+- `internal/config/config.go` - TOML parsing, defaults
+- `internal/config/paths.go` - Platform-specific paths
+- `internal/config/validate.go` - Config validation
+- `hooks/clai.zsh` - zsh integration
+- `hooks/clai.bash` - bash integration
+- `hooks/clai.psm1` - PowerShell module
+
+## CLI Commands (Section 10)
+| Command | Description |
+|---------|-------------|
+| `clai install` | Add hooks to rc files |
+| `clai uninstall` | Remove hooks |
+| `clai status` | Show daemon status |
+| `clai doctor` | Diagnose issues |
+| `clai logs [-f]` | View daemon logs |
+| `clai config [key] [value]` | Get/set config |
+| `clai ask "prompt"` | Text-to-command |
+| `clai history [query]` | Search history |
+| `clai update` | Update binaries |
+| `clai daemon start/stop` | Manual daemon control |
+
+## Config Schema (Section 9.2)
+```toml
+[daemon]
+idle_timeout_mins = 20
+socket_path = "~/.clai/run/clai.sock"
+log_level = "info"
+log_file = "~/.clai/logs/daemon.log"
+
+[client]
+suggest_timeout_ms = 50
+connect_timeout_ms = 10
+fire_and_forget = true
+
+[ai]
+enabled = false
+provider = "auto"
+model = ""
+auto_diagnose = false
+cache_ttl_hours = 24
+
+[suggestions]
+max_history = 5
+max_ai = 3
+show_risk_warning = true
+
+[privacy]
+sanitize_ai_calls = true
+```
+
+## Acceptance Criteria
+- [ ] All commands from Section 10 implemented
+- [ ] `clai install` modifies rc files correctly
+- [ ] `clai doctor` checks all dependencies
+- [ ] `clai config` reads/writes TOML
+- [ ] `clai status` displays daemon info
+- [ ] `clai history` queries SQLite directly
+- [ ] Shell hooks from Section 6 included
+- [ ] 70% test coverage
+
+## Testing Requirements (18.5)
+- TestCLI_Install_Zsh_AppendsHook
+- TestCLI_Install_Bash_AppendsHook
+- TestCLI_Install_PowerShell_ImportsModule
+- TestCLI_Install_AlreadyInstalled_NoOp
+- TestCLI_Uninstall_RemovesHook
+- TestCLI_Config_Get_ExistingKey/MissingKey
+- TestCLI_Config_Set_UpdatesFile
+- TestCLI_Config_Validate_InvalidValue
+- TestCLI_Status_DaemonRunning/DaemonStopped
+- TestCLI_Doctor_AllChecksPass/MissingBinary/BrokenSocket
+"""
+wave = 4
+
+# =============================================================================
+# WAVE 5: Integration & E2E Testing
+# =============================================================================
+
+[[issues]]
+id = "integration-testing"
+title = "Integration Testing & Checkpoints"
+type = "task"
+priority = 2
+depends_on = ["stream-c-shim", "stream-d-daemon", "stream-e-cli", "stream-f-providers"]
+description = """
+**Duration Estimate:** 3-4 days
+**Dependencies:** All implementation streams complete
+
+## Integration Checkpoints (Section 17)
+
+| Checkpoint | Streams Required | Test |
+|------------|------------------|------|
+| **CP1: Basic IPC** | A | Ping works between shim and daemon |
+| **CP2: Session Flow** | A, B, C, D | Session start/end persists to SQLite |
+| **CP3: Command Logging** | A, B, C, D | Commands logged with exit codes |
+| **CP4: Suggestions** | A, B, C, D, G | History-based suggestions work |
+| **CP5: AI Integration** | All | Text-to-command with AI provider |
+| **CP6: Full CLI** | All | All `clai` commands work end-to-end |
+
+## Deliverables
+- `tests/integration/e2e_test.go`
+- `tests/integration/session_test.go`
+- `tests/integration/suggest_test.go`
+- `tests/integration/shell_hooks_test.go`
+
+## E2E Test Example (Section 18.6)
+```go
+func TestE2E_SessionLifecycle(t *testing.T) {
+    // Start daemon
+    // Session start via clai-shim
+    // Log commands
+    // Session end
+    // Verify in DB
+}
+
+func TestE2E_SuggestionsFlow(t *testing.T) {
+    // Log several commands
+    // Request suggestions
+    // Verify ranking
+}
+
+func TestE2E_ShellHook_Zsh(t *testing.T) {
+    // Spawn actual zsh with hook
+    // Run commands
+    // Verify logging
+}
+```
+
+## Shell Compatibility Matrix (Section 12.3)
+- zsh 5.8+ (macOS default, Linux)
+- bash 4.4+ (Linux default), bash 3.2 (macOS default)
+- PowerShell 7.x (cross-platform)
+
+## Acceptance Criteria
+- [ ] All 6 checkpoints pass
+- [ ] E2E tests for session lifecycle
+- [ ] E2E tests for suggestions flow
+- [ ] E2E tests for shell hooks (zsh, bash)
+- [ ] CI/CD pipeline runs integration tests
+"""
+wave = 5
+
+[[issues]]
+id = "documentation"
+title = "Documentation & README Updates"
+type = "task"
+priority = 3
+depends_on = ["integration-testing"]
+description = """
+**Duration Estimate:** 1-2 days
+**Dependencies:** Integration complete
+
+## Deliverables
+- Updated README.md with installation instructions
+- User guide for shell integration
+- Configuration reference
+- Troubleshooting guide
+
+## Documentation Sections
+1. Installation (per-platform)
+2. Quick Start
+3. Shell Integration (zsh, bash, PowerShell)
+4. Configuration Options
+5. AI Provider Setup
+6. Troubleshooting / FAQ
+
+## Acceptance Criteria
+- [ ] README covers installation for macOS, Linux, Windows
+- [ ] Shell integration documented for all 3 shells
+- [ ] Configuration options documented
+- [ ] AI provider setup guide included
+"""
+wave = 5
+
+# =============================================================================
+# Dependencies Summary
+# =============================================================================
+# Wave 1 (parallel): stream-a-proto, stream-b-storage, stream-f-providers
+# Wave 2 (parallel): stream-c-shim (needs A), stream-g-ranking (needs B)
+# Wave 3: stream-d-daemon (needs A, B, G)
+# Wave 4: stream-e-cli (needs A, B)
+# Wave 5: integration-testing, documentation (needs all)
