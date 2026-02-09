@@ -428,7 +428,7 @@ func TestTabCycling(t *testing.T) {
 	assert.Equal(t, 0, m.activeTab)
 }
 
-func TestLeftRightRefine_SetsQueryToSelectedItem(t *testing.T) {
+func TestRightRefine_SetsQueryToSelectedItem(t *testing.T) {
 	p := &mockProvider{items: []string{"first cmd", "second cmd"}, atEnd: true}
 	m := newTestModel(p)
 	m = initAndLoad(t, m)
@@ -441,23 +441,18 @@ func TestLeftRightRefine_SetsQueryToSelectedItem(t *testing.T) {
 	m.textInput.SetValue("sec")
 	m.offset = 10
 
-	// Left arrow should replace query with selected item and start debounce.
-	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	// Left arrow should not "refine" (it should be available for cursor motion).
+	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	m = result.(Model)
+	assert.Equal(t, "sec", m.textInput.Value())
+
+	// Right arrow should replace query with selected item and start debounce.
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRight})
 	m = result.(Model)
 	assert.Equal(t, "second cmd", m.textInput.Value())
 	assert.Equal(t, 0, m.offset)
 	assert.NotNil(t, cmd)
 	assert.Greater(t, m.debounceID, uint64(0))
-
-	// Reset to a different query and use Right arrow too.
-	m.textInput.SetValue("foo")
-	oldDebounce := m.debounceID
-
-	result, cmd = m.Update(tea.KeyMsg{Type: tea.KeyRight})
-	m = result.(Model)
-	assert.Equal(t, "second cmd", m.textInput.Value())
-	assert.NotNil(t, cmd)
-	assert.Greater(t, m.debounceID, oldDebounce)
 }
 
 func TestTabResetsOffset(t *testing.T) {
@@ -468,6 +463,38 @@ func TestTabResetsOffset(t *testing.T) {
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = result.(Model)
 	assert.Equal(t, 0, m.offset)
+}
+
+func TestHintLabels_UTF8Locale(t *testing.T) {
+	t.Setenv("LC_ALL", "en_US.UTF-8")
+	assert.Equal(t, "→", rightRefineHintLabel())
+	assert.Equal(t, "⇥", tabSwitchHintLabel())
+}
+
+func TestHintLabels_ASCIILocaleFallback(t *testing.T) {
+	t.Setenv("LC_ALL", "C")
+	assert.Equal(t, "Right: refine", rightRefineHintLabel())
+	assert.Equal(t, "Tab: switch scope", tabSwitchHintLabel())
+}
+
+func TestViewTabBar_HidesTabHintForSingleTab(t *testing.T) {
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	m := NewModel([]config.TabDef{{Label: "Global", Provider: "global"}}, p)
+	m = initAndLoad(t, m)
+
+	view := m.viewTabBar()
+	assert.NotContains(t, view, "⇥")
+	assert.NotContains(t, view, "Tab: switch scope")
+}
+
+func TestViewList_SelectedLineShowsRightRefineHint(t *testing.T) {
+	t.Setenv("LC_ALL", "en_US.UTF-8")
+	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	view := m.viewList()
+	assert.Contains(t, view, "→")
 }
 
 // --- Query / debounce tests ---

@@ -216,8 +216,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.moveSelection(+1)
 		return m, nil
 
-	case tea.KeyLeft, tea.KeyRight:
-		return m.handleRefineKey()
+	case tea.KeyRight:
+		return m.handleRightRefineKey()
 
 	case tea.KeyTab:
 		return m.handleTabSwitch()
@@ -226,9 +226,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.handleTextInput(msg)
 }
 
-// handleRefineKey replaces the query with the currently selected item and
+// handleRightRefineKey replaces the query with the currently selected item and
 // triggers a debounced fetch. This enables a fast "select then refine" flow.
-func (m Model) handleRefineKey() (tea.Model, tea.Cmd) {
+func (m Model) handleRightRefineKey() (tea.Model, tea.Cmd) {
 	if m.selection < 0 || m.selection >= len(m.items) {
 		return m, nil
 	}
@@ -589,7 +589,7 @@ func (m Model) viewList() string {
 
 		line := base.Render(prefix) + renderItem(display, query, base, hl)
 		if i == m.selection {
-			line += dimStyle.Render("  " + refineHintLabel())
+			line += dimStyle.Render("  " + rightRefineHintLabel())
 		}
 		lines = append(lines, line)
 	}
@@ -667,11 +667,11 @@ func (m Model) viewQuery() string {
 	return q
 }
 
-func refineHintLabel() string {
+func rightRefineHintLabel() string {
 	if supportsUnicodeHints() {
-		return "←"
+		return "→"
 	}
-	return "Left: refine"
+	return "Right: refine"
 }
 
 func tabSwitchHintLabel() string {
