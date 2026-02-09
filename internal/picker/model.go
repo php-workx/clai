@@ -569,7 +569,7 @@ func (m Model) viewTabBar() string {
 func (m Model) viewFooter() string {
 	parts := []string{
 		"Enter accept",
-		"Ctrl+U clear",
+		"Ctrl+U delete",
 		"Esc cancel",
 	}
 	if len(m.tabs) > 1 {
@@ -578,7 +578,7 @@ func (m Model) viewFooter() string {
 	if m.state == stateLoaded && len(m.items) > 0 {
 		parts = append(parts, rightRefineHintLabel())
 	}
-	return dimStyle.Render(strings.Join(parts, "  "))
+	return dimStyle.Render(strings.Join(parts, " · "))
 }
 
 // viewContent renders the item list or a status message.

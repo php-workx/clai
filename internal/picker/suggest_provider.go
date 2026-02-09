@@ -214,7 +214,7 @@ func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 	case "compact":
 		// Mode 2: command + source (+ risk)
 		if riskTag != "" {
-			return fmt.Sprintf("%s  · %s  %s", cmd, src, riskTag)
+			return fmt.Sprintf("%s  · %s  · %s", cmd, src, riskTag)
 		}
 		return fmt.Sprintf("%s  · %s", cmd, src)
 
@@ -231,9 +231,9 @@ func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 			confStr = fmt.Sprintf(" conf %.2f", s.Confidence)
 		}
 
-		meta := fmt.Sprintf("%s  · %s  %s%s", cmd, src, scoreStr, confStr)
+		meta := fmt.Sprintf("%s  · %s  · %s%s", cmd, src, scoreStr, confStr)
 		if risk != "" {
-			meta += "  risk " + risk
+			meta += "  · risk " + risk
 		}
 
 		// Prefer description; fall back to top reasons.
@@ -241,7 +241,7 @@ func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 		if desc == "" && len(s.Reasons) > 0 {
 			var parts []string
 			for i, r := range s.Reasons {
-				if i >= 2 {
+				if i >= 3 {
 					break
 				}
 				d := strings.TrimSpace(oneLine(r.Description))
@@ -262,7 +262,7 @@ func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 		}
 
 		if riskTag != "" {
-			meta += "  " + riskTag
+			meta += "  · " + riskTag
 		}
 
 		return meta

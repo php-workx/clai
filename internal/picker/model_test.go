@@ -520,7 +520,7 @@ func TestViewFooter_ShowsShortcuts(t *testing.T) {
 
 	footer := m.viewFooter()
 	assert.Contains(t, footer, "Enter accept")
-	assert.Contains(t, footer, "Ctrl+U clear")
+	assert.Contains(t, footer, "Ctrl+U delete")
 	assert.Contains(t, footer, "Esc cancel")
 }
 
