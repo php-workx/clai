@@ -188,16 +188,6 @@ func oneLine(s string) string {
 	return strings.TrimSpace(s)
 }
 
-func clampInt(v, lo, hi int) int {
-	if v < lo {
-		return lo
-	}
-	if v > hi {
-		return hi
-	}
-	return v
-}
-
 func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 	src := strings.TrimSpace(s.Source)
 	if src == "" {
