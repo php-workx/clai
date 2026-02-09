@@ -47,12 +47,6 @@ _clai_session_off() {
     [[ -f "$CLAI_CACHE/off" ]]
 }
 
-# ============================================
-# Feature 1: Enhanced Tab Completion
-# ============================================
-# Adds clai history suggestions to Tab completion menu
-# Our suggestions appear first, followed by defaults
-
 # Portable alternative to mapfile for Bash 3.2 (macOS default)
 # Usage: _clai_read_lines arrayname < <(command)
 _clai_read_lines() {
@@ -64,62 +58,16 @@ _clai_read_lines() {
     done
 }
 
+# Legacy completion hook (kept for compatibility with existing tests and older
+# integrations). This branch now keeps Tab completion native.
 _clai_completion() {
-    local cur="${COMP_WORDS[COMP_CWORD]}"
-
-    # Only enhance first word (command) completion
-    if [[ $COMP_CWORD -eq 0 && -n "$cur" ]]; then
-        local -a suggestions
-        if [[ "$CLAI_OFF" != "1" ]] && ! _clai_session_off; then
-            if ((BASH_VERSINFO[0] >= 4)); then
-                mapfile -t suggestions < <(clai suggest --format fzf --limit "$CLAI_MENU_LIMIT" "$cur" 2>/dev/null)
-            else
-                _clai_read_lines suggestions < <(clai suggest --format fzf --limit "$CLAI_MENU_LIMIT" "$cur" 2>/dev/null)
-            fi
-        fi
-
-        # Get default command completions
-        local -a defaults
-        if ((BASH_VERSINFO[0] >= 4)); then
-            mapfile -t defaults < <(compgen -c -- "$cur" 2>/dev/null | head -20)
-        else
-            _clai_read_lines defaults < <(compgen -c -- "$cur" 2>/dev/null | head -20)
-        fi
-
-        COMPREPLY=("${suggestions[@]}" "${defaults[@]}")
-
-        # Deduplicate while preserving order
-        if ((BASH_VERSINFO[0] >= 4)); then
-            mapfile -t COMPREPLY < <(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++')
-        else
-            local -a _deduped
-            _clai_read_lines _deduped < <(printf '%s\n' "${COMPREPLY[@]}" | awk '!seen[$0]++')
-            COMPREPLY=("${_deduped[@]}")
-        fi
-    else
-        # For arguments, use default file completion
-        if ((BASH_VERSINFO[0] >= 4)); then
-            mapfile -t COMPREPLY < <(compgen -f -- "$cur")
-        else
-            _clai_read_lines COMPREPLY < <(compgen -f -- "$cur")
-        fi
-    fi
+    return 0
 }
 
-# Register completion for common commands
-# Note: complete -D (default completion) requires bash 4.0+
-_CLAI_COMMANDS=(git npm yarn docker kubectl make go cargo python pip)
-if ((BASH_VERSINFO[0] >= 4)); then
-    complete -o bashdefault -o default -F _clai_completion -D
-else
-    # For compatibility with bash 3.2 (macOS default), register specific commands
-    complete -F _clai_completion "${_CLAI_COMMANDS[@]}"
-fi
-
-# Enable menu-complete cycling on Tab
+# Tab completion should remain native; suggestions are shown via Alt/Option+S.
 bind "set show-all-if-ambiguous on"
 
-# Tab handler: cycle history scopes when picker is active, else menu-complete.
+# Tab handler: cycle history scopes when picker is active, else native completion.
 # Uses same macro pattern as Enter: Tab → macro → bind-x handler → conditional follow-up.
 _clai_tab_handler() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
@@ -129,11 +77,11 @@ _clai_tab_handler() {
         esac
         _CLAI_PICKER_INDEX=0
         _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
-        # Swallow the follow-up so menu-complete doesn't fire
+        # Swallow the follow-up so completion doesn't fire
         bind '"\C-x\C-t": ""'
     else
-        # Let menu-complete fire via the follow-up key
-        bind '"\C-x\C-t": menu-complete'
+        # Let native completion fire via the follow-up key
+        bind '"\C-x\C-t": complete'
     fi
 }
 bind -x '"\C-x\C-i": _clai_tab_handler'
@@ -146,25 +94,96 @@ bind '"\t": "\C-x\C-i\C-x\C-t"'
 # open the full TUI picker.
 # Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
 
+_CLAI_NOTIFY_LAST_TS=0
+_clai_notify_throttled() {
+    local msg="$1"
+    local now
+    now=$(date +%s 2>/dev/null || echo 0)
+    if [[ -z "${_CLAI_NOTIFY_LAST_TS:-}" ]]; then
+        _CLAI_NOTIFY_LAST_TS=0
+    fi
+    if (( now - _CLAI_NOTIFY_LAST_TS >= 5 )); then
+        _CLAI_NOTIFY_LAST_TS=$now
+        printf '%s\n' "$msg" >&2
+    fi
+}
+
+_clai_picker_brief_error() {
+    local err="$1"
+    local lower="${err,,}"
+    if [[ "$lower" == *"rpc:"* || "$lower" == *"dial unix"* || "$lower" == *"no such file or directory"* || "$lower" == *"connection refused"* ]]; then
+        echo "clai: daemon unavailable"
+        return
+    fi
+    if [[ "$lower" == *"/dev/tty"* || "$lower" == *"requires a tty"* ]]; then
+        echo "clai: picker requires a TTY"
+        return
+    fi
+    echo "clai: picker failed"
+}
+
 _clai_has_tui_picker() {
     type -P clai-picker >/dev/null 2>&1
 }
 
 _clai_tui_picker_open() {
     if ! _clai_has_tui_picker; then
+        _clai_notify_throttled "clai: clai-picker not installed"
         return 2
     fi
-    local result exit_code
-    result=$(clai-picker history --query="$READLINE_LINE" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    local result exit_code tmp err
+    tmp=$(mktemp -t clai-picker.XXXXXX 2>/dev/null || mktemp /tmp/clai-picker.XXXXXX)
+    result=$(clai-picker history --query="$READLINE_LINE" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>"$tmp")
     exit_code=$?
+    err=""
+    if [[ -f "$tmp" ]]; then
+        err="$(cat "$tmp" 2>/dev/null)"
+        rm -f "$tmp"
+    fi
     if [ $exit_code -eq 0 ]; then
         READLINE_LINE="$result"
         READLINE_POINT=${#READLINE_LINE}
     elif [ $exit_code -eq 2 ]; then
+        [[ -n "$err" ]] && _clai_notify_throttled "$(_clai_picker_brief_error "$err")"
         # Fall back to native history search
         return 2
+    elif [[ -n "$err" ]]; then
+        _clai_notify_throttled "$(_clai_picker_brief_error "$err")"
     fi
     # exit_code 1 = cancel, keep original line
+}
+
+_clai_tui_suggest_picker_open() {
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        return 0
+    fi
+    if ! _clai_has_tui_picker; then
+        _clai_notify_throttled "clai: clai-picker not installed"
+        return 0
+    fi
+    local result exit_code tmp err
+    tmp=$(mktemp -t clai-picker.XXXXXX 2>/dev/null || mktemp /tmp/clai-picker.XXXXXX)
+    result=$(clai-picker suggest --query="$READLINE_LINE" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>"$tmp")
+    exit_code=$?
+    err=""
+    if [[ -f "$tmp" ]]; then
+        err="$(cat "$tmp" 2>/dev/null)"
+        rm -f "$tmp"
+    fi
+    if [ $exit_code -eq 0 ]; then
+        READLINE_LINE="$result"
+        READLINE_POINT=${#READLINE_LINE}
+        return 0
+    fi
+    # exit_code 1 = cancel, 2 = fallback/error => notify briefly
+    if [ $exit_code -ne 1 ]; then
+        if [[ -n "$err" ]]; then
+            _clai_notify_throttled "$(_clai_picker_brief_error "$err")"
+        else
+            _clai_notify_throttled "clai: suggestion picker unavailable"
+        fi
+    fi
+    return 0
 }
 
 # ============================================
@@ -491,6 +510,14 @@ _clai_history_scope_global() {
 bind -x '"\eh": _clai_tui_picker_open'
 bind -x '"\C-x\C-h": _clai_tui_picker_open'
 bind '"˙": "\C-x\C-h"'
+
+# Alt/Option+S opens the suggestions TUI picker.
+# '\es' works when the terminal sends ESC for Alt. On macOS, Option+S often
+# produces ß (U+00DF); bash 3.2 cannot bind -x to multi-byte chars, so we
+# translate it to a Ctrl sequence first.
+bind -x '"\es": _clai_tui_suggest_picker_open'
+bind -x '"\C-x\C-s": _clai_tui_suggest_picker_open'
+bind '"ß": "\C-x\C-s"'
 
 # When up_arrow_opens_history is enabled:
 # - trigger=single: Up opens TUI picker (fallback: native history)
@@ -916,12 +943,9 @@ _clai_disable() {
     bind -r '\eh'
     bind -r '\C-x\C-h'
     bind -r '˙'
-
-    # Remove completion handlers (default + per-command for bash <4)
-    complete -r -D 2>/dev/null
-    for _cmd in "${_CLAI_COMMANDS[@]}"; do
-        complete -r "$_cmd" 2>/dev/null
-    done
+    bind -r '\es' 2>/dev/null
+    bind -r '\C-x\C-s' 2>/dev/null
+    bind -r 'ß' 2>/dev/null
 
     # Strip _ai_prompt_command from PROMPT_COMMAND
     PROMPT_COMMAND="${PROMPT_COMMAND//_ai_prompt_command;/}"

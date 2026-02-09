@@ -119,6 +119,32 @@ end
 # If clai-picker is on PATH, Up arrow and Alt+H open the full TUI picker.
 # Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
 
+# Brief user feedback (throttled) when picker actions can't run.
+set -g _CLAI_NOTIFY_LAST_TS 0
+function _clai_notify_throttled --argument-names msg
+    set -l now (date +%s)
+    if test -z "$_CLAI_NOTIFY_LAST_TS"
+        set -g _CLAI_NOTIFY_LAST_TS 0
+    end
+    if test (math "$now - $_CLAI_NOTIFY_LAST_TS") -ge 5
+        set -g _CLAI_NOTIFY_LAST_TS $now
+        echo $msg 1>&2
+    end
+end
+
+function _clai_picker_brief_error --argument-names err
+    set -l lower (string lower -- $err)
+    if string match -q "*rpc:*" -- $lower; or string match -q "*dial unix*" -- $lower; or string match -q "*no such file or directory*" -- $lower; or string match -q "*connection refused*" -- $lower
+        echo "clai: daemon unavailable"
+        return
+    end
+    if string match -q "*/dev/tty*" -- $lower; or string match -q "*requires a tty*" -- $lower
+        echo "clai: picker requires a TTY"
+        return
+    end
+    echo "clai: picker failed"
+end
+
 function _clai_has_tui_picker
     type -q clai-picker
 end
@@ -129,19 +155,61 @@ function _clai_tui_picker_open
         return
     end
     if not _clai_has_tui_picker
+        _clai_notify_throttled "clai: clai-picker not installed"
         commandline -f history-search-backward
         return
     end
-    set -l result (clai-picker history --query=(commandline) --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    set -l tmp (mktemp -t clai-picker.XXXXXX 2>/dev/null; or mktemp /tmp/clai-picker.XXXXXX)
+    set -l result (clai-picker history --query=(commandline) --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>$tmp)
     set -l exit_code $status
+    set -l err ""
+    if test -f $tmp
+        set err (cat $tmp)
+        rm -f $tmp
+    end
     if test $exit_code -eq 0
         commandline -r -- $result
         commandline -f end-of-line
     else if test $exit_code -eq 2
+        if test -n "$err"
+            _clai_notify_throttled (_clai_picker_brief_error "$err")
+        end
         commandline -f history-search-backward
         return
+    else if test -n "$err"
+        _clai_notify_throttled (_clai_picker_brief_error "$err")
     end
     # exit_code 1 = cancel, keep original buffer
+    commandline -f repaint
+end
+
+function _clai_tui_suggest_picker_open
+    if test "$CLAI_OFF" = "1"; or _clai_session_off
+        return
+    end
+    if not _clai_has_tui_picker
+        _clai_notify_throttled "clai: clai-picker not installed"
+        commandline -f repaint
+        return
+    end
+    set -l tmp (mktemp -t clai-picker.XXXXXX 2>/dev/null; or mktemp /tmp/clai-picker.XXXXXX)
+    set -l result (clai-picker suggest --query=(commandline) --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>$tmp)
+    set -l exit_code $status
+    set -l err ""
+    if test -f $tmp
+        set err (cat $tmp)
+        rm -f $tmp
+    end
+    if test $exit_code -eq 0
+        commandline -r -- $result
+        commandline -f end-of-line
+    else if test $exit_code -ne 1
+        if test -n "$err"
+            _clai_notify_throttled (_clai_picker_brief_error "$err")
+        else
+            _clai_notify_throttled "clai: suggestion picker unavailable"
+        end
+    end
     commandline -f repaint
 end
 
@@ -287,7 +355,7 @@ function _clai_picker_cancel
     end
 end
 
-function _clai_suggest_tab
+function _clai_tab
     if test "$CLAI_OFF" = "1"; or _clai_session_off
         commandline -f complete
         return
@@ -310,20 +378,11 @@ function _clai_suggest_tab
         end
         return
     end
-    if test "$_CLAI_PICKER_ACTIVE" != "true" -o "$_CLAI_PICKER_MODE" != "suggest"
-        set -g _CLAI_PICKER_ORIG_BUFFER (commandline)
-        set -g _CLAI_PICKER_MODE suggest
-        set -g _CLAI_PICKER_INDEX 1
-        set -g _CLAI_PICKER_ACTIVE true
-        if not _clai_picker_load_suggest
-            _clai_picker_close
-            commandline -f complete
-            return
-        end
-        _clai_picker_apply
-        return
+    # Suggestions picker is a fullscreen TUI on Alt/Option+S; keep Tab native.
+    if test "$_CLAI_PICKER_ACTIVE" = "true" -a "$_CLAI_PICKER_MODE" = "suggest"
+        _clai_picker_cancel
     end
-    _clai_picker_next
+    commandline -f complete
 end
 
 function _clai_history_up
@@ -434,7 +493,7 @@ end
 
 # Picker keybindings (inline picker controls + scope switching).
 for mode in default insert visual
-    bind -M $mode \t _clai_suggest_tab
+    bind -M $mode \t _clai_tab
     bind -M $mode \e\[B _clai_picker_down
     bind -M $mode \eOB _clai_picker_down
     bind -M $mode \cxs _clai_history_scope_session
@@ -448,6 +507,12 @@ end
 for mode in default insert visual
     bind -M $mode \eh _clai_tui_picker_open
     bind -M $mode ˙ _clai_tui_picker_open
+end
+
+# Alt/Option+S opens the suggestions TUI picker.
+for mode in default insert visual
+    bind -M $mode \es _clai_tui_suggest_picker_open
+    bind -M $mode ß _clai_tui_suggest_picker_open
 end
 
 # When up_arrow_opens_history is enabled:

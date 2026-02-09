@@ -566,32 +566,102 @@ voice() {
 # If clai-picker is on PATH, Up arrow and Alt+H open the full TUI picker.
 # Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
 
+# Brief user feedback (throttled) when picker actions can't run.
+typeset -gi _CLAI_NOTIFY_LAST_TS=0
+_clai_notify_throttled() {
+    local msg="$1"
+    local now=${EPOCHSECONDS:-0}
+    if (( now - _CLAI_NOTIFY_LAST_TS >= 5 )); then
+        _CLAI_NOTIFY_LAST_TS=$now
+        zle -M "$msg"
+    fi
+}
+
+_clai_picker_brief_error() {
+    local err="$1"
+    local lower="${err:l}"
+    if [[ "$lower" == *"rpc:"* || "$lower" == *"dial unix"* || "$lower" == *"no such file or directory"* || "$lower" == *"connection refused"* ]]; then
+        echo "clai: daemon unavailable"
+        return
+    fi
+    if [[ "$lower" == *"/dev/tty"* || "$lower" == *"requires a tty"* ]]; then
+        echo "clai: picker requires a TTY"
+        return
+    fi
+    echo "clai: picker failed"
+}
+
 _clai_has_tui_picker() {
     command -v clai-picker >/dev/null 2>&1
 }
 
 _clai_tui_picker_open() {
     if ! _clai_has_tui_picker; then
+        _clai_notify_throttled "clai: clai-picker not installed"
         zle up-line-or-history
         return
     fi
-    local result exit_code saved_buffer="$BUFFER"
+    local result exit_code saved_buffer="$BUFFER" errfile errtxt
     _ai_clear_ghost_text
-    result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    errfile="$(mktemp -t clai-picker.XXXXXX 2>/dev/null || mktemp "/tmp/clai-picker.XXXXXX")"
+    result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>"$errfile")
     exit_code=$?
+    if [[ -f "$errfile" ]]; then
+        errtxt="$(<"$errfile")"
+        rm -f "$errfile"
+    fi
     if [[ $exit_code -eq 0 ]]; then
         # Clear ghost text before setting the new buffer.
         _ai_clear_ghost_text
         BUFFER="$result"
         CURSOR=${#BUFFER}
     elif [[ $exit_code -eq 2 ]]; then
+        [[ -n "$errtxt" ]] && _clai_notify_throttled "$(_clai_picker_brief_error "$errtxt")"
         zle up-line-or-history
         return
+    elif [[ -n "$errtxt" ]]; then
+        _clai_notify_throttled "$(_clai_picker_brief_error "$errtxt")"
     fi
     # exit_code 1 = cancel, keep original buffer
     zle redisplay
 }
 zle -N _clai_tui_picker_open
+
+_clai_tui_suggest_picker_open() {
+    if ! _clai_has_tui_picker; then
+        _clai_notify_throttled "clai: clai-picker not installed"
+        return
+    fi
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        return
+    fi
+    local result exit_code errfile errtxt
+    _ai_clear_ghost_text
+    errfile="$(mktemp -t clai-picker.XXXXXX 2>/dev/null || mktemp "/tmp/clai-picker.XXXXXX")"
+    result=$(clai-picker suggest --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>"$errfile")
+    exit_code=$?
+    if [[ -f "$errfile" ]]; then
+        errtxt="$(<"$errfile")"
+        rm -f "$errfile"
+    fi
+    if [[ $exit_code -eq 0 ]]; then
+        _ai_clear_ghost_text
+        BUFFER="$result"
+        CURSOR=${#BUFFER}
+        zle redisplay
+        return
+    fi
+    # exit_code 1 = cancel, 2 = fallback, anything else = error
+    if [[ $exit_code -ne 1 ]]; then
+        if [[ -n "$errtxt" ]]; then
+            _clai_notify_throttled "$(_clai_picker_brief_error "$errtxt")"
+        else
+            _clai_notify_throttled "clai: suggestion picker unavailable"
+        fi
+    fi
+    zle redisplay
+}
+zle -N _clai_tui_suggest_picker_open
 
 # ============================================
 # Feature 4b: Suggestion + History Pickers
@@ -907,6 +977,12 @@ zle -N send-break _clai_picker_break
 bindkey '\eh' _clai_tui_picker_open
 bindkey '˙' _clai_tui_picker_open
 
+# Alt/Option+S opens the suggestions TUI picker.
+# '\es' works when the terminal sends ESC for Alt. The literal 'ß' covers
+# common macOS defaults where Option+S produces U+00DF.
+bindkey '\es' _clai_tui_suggest_picker_open
+bindkey 'ß' _clai_tui_suggest_picker_open
+
 # When up_arrow_opens_history is enabled:
 # - trigger=single: Up opens TUI picker (fallback: native history)
 # - trigger=double: Up uses native history; Up+Up within window opens picker.
@@ -997,6 +1073,8 @@ _clai_disable() {
     bindkey -r '^Xg'
     bindkey -r '\eh'
     bindkey -r '˙'
+    bindkey -r '\es'
+    bindkey -r 'ß'
 
     if [[ -n "${_CLAI_ORIG_KEYTIMEOUT:-}" ]]; then
         KEYTIMEOUT="$_CLAI_ORIG_KEYTIMEOUT"

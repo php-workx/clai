@@ -135,7 +135,7 @@ func TestShellScripts_SuggestUsesPlainFormat(t *testing.T) {
 		{
 			path: "shell/bash/clai.bash",
 			markers: []string{
-				"clai suggest --format fzf --limit",
+				"clai-picker suggest --query=\"$READLINE_LINE\"",
 			},
 			notMatch: []string{
 				"clai suggest --limit",
