@@ -3,10 +3,13 @@ package ipc
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"time"
+
+	"golang.org/x/sys/execabs"
 )
 
 // PidPath returns the path to the daemon PID file
@@ -22,19 +25,35 @@ func LogPath() string {
 // DaemonBinaryName is the name of the daemon executable
 const DaemonBinaryName = "claid"
 
+var (
+	// Test seams for daemon spawn and socket probing behavior.
+	quickDialFn    = func() (io.Closer, error) { return QuickDial() }
+	socketExistsFn = SocketExists
+	socketPathFn   = SocketPath
+	removeFileFn   = os.Remove
+
+	// Retry transient socket dial failures before deleting an existing socket.
+	staleSocketDialAttempts = 3
+	staleSocketRetryDelay   = 25 * time.Millisecond
+)
+
 // EnsureDaemon ensures the daemon is running, spawning it if necessary.
 // Returns nil if daemon is available, error otherwise.
 func EnsureDaemon() error {
 	// Fast path: socket exists and is connectable
-	if SocketExists() {
-		conn, err := QuickDial()
+	if socketExistsFn() {
+		conn, err := quickDialFn()
 		if err == nil {
-			conn.Close()
+			if conn != nil {
+				_ = conn.Close()
+			}
 			return nil
 		}
 		// Socket exists but can't connect - might be stale
-		// Remove it and try to spawn
-		_ = os.Remove(SocketPath())
+		// Remove it only after retrying dial checks.
+		if err := removeStaleSocket(context.Background()); err != nil {
+			return err
+		}
 	}
 
 	// Try to spawn the daemon
@@ -59,7 +78,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 		return fmt.Errorf("failed to create run dir: %w", err)
 	}
 
-	if err := removeStaleSocket(); err != nil {
+	if err := removeStaleSocket(ctx); err != nil {
 		return err
 	}
 
@@ -78,7 +97,8 @@ func SpawnDaemonContext(ctx context.Context) error {
 	defer logFile.Close()
 
 	// Start daemon process
-	cmd := exec.Command(daemonPath)
+	// execabs prevents executing binaries resolved to relative paths.
+	cmd := execabs.Command(daemonPath)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
@@ -124,10 +144,12 @@ func SpawnAndWaitContext(ctx context.Context, timeout time.Duration) error {
 		case <-deadline.C:
 			return fmt.Errorf("daemon did not start within %v", timeout)
 		case <-ticker.C:
-			if SocketExists() {
-				conn, err := QuickDial()
+			if socketExistsFn() {
+				conn, err := quickDialFn()
 				if err == nil {
-					conn.Close()
+					if conn != nil {
+						_ = conn.Close()
+					}
 					return nil
 				}
 			}
@@ -139,8 +161,12 @@ func SpawnAndWaitContext(ctx context.Context, timeout time.Duration) error {
 func findDaemonBinary() (string, error) {
 	// Check CLAI_DAEMON_PATH environment variable
 	if path := os.Getenv("CLAI_DAEMON_PATH"); path != "" {
-		if _, err := os.Stat(path); err == nil {
-			return path, nil
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve CLAI_DAEMON_PATH: %w", err)
+		}
+		if _, err := os.Stat(absPath); err == nil {
+			return absPath, nil
 		}
 	}
 
@@ -155,6 +181,10 @@ func findDaemonBinary() (string, error) {
 
 	// Check PATH
 	if path, err := exec.LookPath(DaemonBinaryName); err == nil {
+		absPath, absErr := filepath.Abs(path)
+		if absErr == nil {
+			return absPath, nil
+		}
 		return path, nil
 	}
 
@@ -195,16 +225,36 @@ func IsDaemonRunning() bool {
 	return true
 }
 
-func removeStaleSocket() error {
-	if !SocketExists() {
+func removeStaleSocket(ctx context.Context) error {
+	if !socketExistsFn() {
 		return nil
 	}
-	conn, err := QuickDial()
-	if err == nil {
-		conn.Close()
-		return nil
+
+	// Retry dial a few times to avoid deleting an active socket after
+	// a transient connection failure.
+	for attempt := 0; attempt < staleSocketDialAttempts; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		conn, err := quickDialFn()
+		if err == nil {
+			if conn != nil {
+				_ = conn.Close()
+			}
+			return nil
+		}
+		if attempt < staleSocketDialAttempts-1 {
+			timer := time.NewTimer(staleSocketRetryDelay)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+			}
+		}
 	}
-	if err := os.Remove(SocketPath()); err != nil && !os.IsNotExist(err) {
+
+	if err := removeFileFn(socketPathFn()); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove stale socket: %w", err)
 	}
 	return nil

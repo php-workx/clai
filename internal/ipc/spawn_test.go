@@ -1,9 +1,16 @@
 package ipc
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestPidPath(t *testing.T) {
@@ -133,5 +140,228 @@ func TestSpawnDaemonMissingBinary(t *testing.T) {
 	err = SpawnDaemon()
 	if err == nil {
 		t.Error("SpawnDaemon() should fail when daemon binary not found")
+	}
+}
+
+func TestSpawnDaemonContextCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := SpawnDaemonContext(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("SpawnDaemonContext() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestSpawnAndWaitContextCanceledWhileWaiting(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "clai-spawn-cancel-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	daemonPath := filepath.Join(tmpDir, "claid-test")
+	if err := os.WriteFile(daemonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	oldSocket := os.Getenv("CLAI_SOCKET")
+	oldDaemonPath := os.Getenv("CLAI_DAEMON_PATH")
+	oldXDG := os.Getenv("XDG_RUNTIME_DIR")
+	oldHome := os.Getenv("HOME")
+	t.Cleanup(func() {
+		_ = os.Setenv("CLAI_SOCKET", oldSocket)
+		_ = os.Setenv("CLAI_DAEMON_PATH", oldDaemonPath)
+		_ = os.Setenv("XDG_RUNTIME_DIR", oldXDG)
+		_ = os.Setenv("HOME", oldHome)
+	})
+
+	_ = os.Setenv("CLAI_SOCKET", filepath.Join(tmpDir, "clai.sock"))
+	_ = os.Setenv("CLAI_DAEMON_PATH", daemonPath)
+	_ = os.Setenv("XDG_RUNTIME_DIR", tmpDir)
+	_ = os.Setenv("HOME", tmpDir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		time.Sleep(30 * time.Millisecond)
+		cancel()
+	}()
+
+	err = SpawnAndWaitContext(ctx, 2*time.Second)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("SpawnAndWaitContext() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestRemoveStaleSocketRetriesBeforeDelete(t *testing.T) {
+	oldQuickDial := quickDialFn
+	oldSocketExists := socketExistsFn
+	oldSocketPath := socketPathFn
+	oldRemove := removeFileFn
+	oldAttempts := staleSocketDialAttempts
+	oldDelay := staleSocketRetryDelay
+	t.Cleanup(func() {
+		quickDialFn = oldQuickDial
+		socketExistsFn = oldSocketExists
+		socketPathFn = oldSocketPath
+		removeFileFn = oldRemove
+		staleSocketDialAttempts = oldAttempts
+		staleSocketRetryDelay = oldDelay
+	})
+
+	socketExistsFn = func() bool { return true }
+	socketPathFn = func() string { return "/tmp/fake-clai.sock" }
+	staleSocketDialAttempts = 3
+	staleSocketRetryDelay = 0
+
+	dialAttempts := 0
+	quickDialFn = func() (io.Closer, error) {
+		dialAttempts++
+		if dialAttempts < 3 {
+			return nil, errors.New("transient dial failure")
+		}
+		return io.NopCloser(strings.NewReader("")), nil
+	}
+
+	removeCalls := 0
+	removeFileFn = func(path string) error {
+		removeCalls++
+		return nil
+	}
+
+	if err := removeStaleSocket(context.Background()); err != nil {
+		t.Fatalf("removeStaleSocket() error = %v", err)
+	}
+	if removeCalls != 0 {
+		t.Fatalf("removeStaleSocket() remove calls = %d, want 0", removeCalls)
+	}
+}
+
+func TestRemoveStaleSocketDeleteError(t *testing.T) {
+	oldQuickDial := quickDialFn
+	oldSocketExists := socketExistsFn
+	oldSocketPath := socketPathFn
+	oldRemove := removeFileFn
+	oldAttempts := staleSocketDialAttempts
+	oldDelay := staleSocketRetryDelay
+	t.Cleanup(func() {
+		quickDialFn = oldQuickDial
+		socketExistsFn = oldSocketExists
+		socketPathFn = oldSocketPath
+		removeFileFn = oldRemove
+		staleSocketDialAttempts = oldAttempts
+		staleSocketRetryDelay = oldDelay
+	})
+
+	socketExistsFn = func() bool { return true }
+	socketPathFn = func() string { return "/tmp/fake-clai.sock" }
+	staleSocketDialAttempts = 2
+	staleSocketRetryDelay = 0
+	quickDialFn = func() (io.Closer, error) {
+		return nil, errors.New("dial failed")
+	}
+	removeFileFn = func(path string) error {
+		return fmt.Errorf("permission denied")
+	}
+
+	err := removeStaleSocket(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "failed to remove stale socket") {
+		t.Fatalf("removeStaleSocket() error = %v, want wrapped delete error", err)
+	}
+}
+
+func TestRemoveStaleSocketHonorsCancellation(t *testing.T) {
+	oldQuickDial := quickDialFn
+	oldSocketExists := socketExistsFn
+	oldAttempts := staleSocketDialAttempts
+	oldDelay := staleSocketRetryDelay
+	t.Cleanup(func() {
+		quickDialFn = oldQuickDial
+		socketExistsFn = oldSocketExists
+		staleSocketDialAttempts = oldAttempts
+		staleSocketRetryDelay = oldDelay
+	})
+
+	socketExistsFn = func() bool { return true }
+	staleSocketDialAttempts = 3
+	staleSocketRetryDelay = 20 * time.Millisecond
+	quickDialFn = func() (io.Closer, error) {
+		return nil, errors.New("dial failed")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := removeStaleSocket(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("removeStaleSocket() error = %v, want context.Canceled", err)
+	}
+}
+
+func TestFindDaemonBinaryEnvPathIsAbsolute(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "clai-daemon-env-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	daemonPath := filepath.Join(tmpDir, "claid")
+	if err := os.WriteFile(daemonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	old := os.Getenv("CLAI_DAEMON_PATH")
+	defer os.Setenv("CLAI_DAEMON_PATH", old)
+	_ = os.Setenv("CLAI_DAEMON_PATH", daemonPath)
+
+	got, err := findDaemonBinary()
+	if err != nil {
+		t.Fatalf("findDaemonBinary() error = %v", err)
+	}
+	if !filepath.IsAbs(got) {
+		t.Fatalf("findDaemonBinary() = %q, want absolute path", got)
+	}
+}
+
+func TestSpawnDaemonWritesPIDFile(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "clai-spawn-pid-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	daemonPath := filepath.Join(tmpDir, "claid-test")
+	if err := os.WriteFile(daemonPath, []byte("#!/bin/sh\nsleep 1\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	oldDaemonPath := os.Getenv("CLAI_DAEMON_PATH")
+	oldXDG := os.Getenv("XDG_RUNTIME_DIR")
+	oldHome := os.Getenv("HOME")
+	t.Cleanup(func() {
+		_ = os.Setenv("CLAI_DAEMON_PATH", oldDaemonPath)
+		_ = os.Setenv("XDG_RUNTIME_DIR", oldXDG)
+		_ = os.Setenv("HOME", oldHome)
+	})
+
+	_ = os.Setenv("CLAI_DAEMON_PATH", daemonPath)
+	_ = os.Setenv("XDG_RUNTIME_DIR", tmpDir)
+	_ = os.Setenv("HOME", tmpDir)
+
+	if err := SpawnDaemon(); err != nil {
+		t.Fatalf("SpawnDaemon() error = %v", err)
+	}
+
+	pidData, err := os.ReadFile(PidPath())
+	if err != nil {
+		t.Fatalf("ReadFile(PidPath) error = %v", err)
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(pidData)))
+	if err != nil || pid <= 0 {
+		t.Fatalf("pid file content = %q, want positive integer", string(pidData))
+	}
+	proc, err := os.FindProcess(pid)
+	if err == nil && proc != nil {
+		_ = proc.Kill()
 	}
 }
