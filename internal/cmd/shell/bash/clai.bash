@@ -154,7 +154,7 @@ _clai_tui_picker_open() {
     if ! _clai_has_tui_picker; then
         return 2
     fi
-    local result exit_code saved_line="$READLINE_LINE"
+    local result exit_code
     result=$(clai-picker history --query="$READLINE_LINE" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
     exit_code=$?
     if [ $exit_code -eq 0 ]; then
