@@ -116,6 +116,64 @@ func TestRunInit_Fish(t *testing.T) {
 	}
 }
 
+func TestShellScripts_SuggestUsesPlainFormat(t *testing.T) {
+	tests := []struct {
+		path     string
+		markers  []string
+		notMatch []string
+	}{
+		{
+			path: "shell/zsh/clai.zsh",
+			markers: []string{
+				"clai suggest --format fzf --limit 1",
+				`clai suggest --format fzf --limit "$CLAI_MENU_LIMIT"`,
+			},
+			notMatch: []string{
+				"clai suggest \"$BUFFER\"",
+			},
+		},
+		{
+			path: "shell/bash/clai.bash",
+			markers: []string{
+				"clai suggest --format fzf --limit",
+			},
+			notMatch: []string{
+				"clai suggest --limit",
+			},
+		},
+		{
+			path: "shell/fish/clai.fish",
+			markers: []string{
+				"clai suggest --format fzf --limit 1",
+				"clai suggest --format fzf --limit $CLAI_MENU_LIMIT",
+			},
+			notMatch: []string{
+				"clai suggest \"$current\"",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(tt.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", tt.path, err)
+			}
+			script := string(content)
+			for _, m := range tt.markers {
+				if !strings.Contains(script, m) {
+					t.Errorf("%s missing marker %q", tt.path, m)
+				}
+			}
+			for _, bad := range tt.notMatch {
+				if strings.Contains(script, bad) {
+					t.Errorf("%s contains legacy pattern %q", tt.path, bad)
+				}
+			}
+		})
+	}
+}
+
 func TestRunInit_UnsupportedShell(t *testing.T) {
 	err := runInit(initCmd, []string{"powershell"})
 	if err == nil {

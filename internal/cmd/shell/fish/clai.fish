@@ -195,7 +195,7 @@ function _clai_picker_load_suggest
     set -l current (commandline)
     set -l items
     if test -n "$current"
-        set items (clai suggest --limit $CLAI_MENU_LIMIT "$current" 2>/dev/null | string split '\n')
+        set items (clai suggest --format fzf --limit $CLAI_MENU_LIMIT "$current" 2>/dev/null | string split '\n')
     else
         set items (clai history --session="$CLAI_SESSION_ID" --limit $CLAI_MENU_LIMIT 2>/dev/null | string split '\n')
     end
@@ -602,7 +602,7 @@ function fish_right_prompt
     set -l current (commandline)
     if test -n "$current"
         # Have input - get suggestion for prefix
-        set -l suggestion (clai suggest "$current" 2>/dev/null)
+        set -l suggestion (clai suggest --format fzf --limit 1 "$current" 2>/dev/null)
         if test -n "$suggestion" -a "$suggestion" != "$current"
             set_color brblack
             echo -n "($current → $suggestion)"

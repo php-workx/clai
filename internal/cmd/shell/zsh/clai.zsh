@@ -111,7 +111,7 @@ _ai_update_suggestion() {
 
     _clai_zsh_autosuggest_disable
     # Has content - clai handles daemon vs history fallback
-    suggestion=$(clai suggest "$BUFFER" 2>/dev/null)
+    suggestion=$(clai suggest --format fzf --limit 1 "$BUFFER" 2>/dev/null)
 
     if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" && "$suggestion" == "$BUFFER"* ]]; then
         _AI_CURRENT_SUGGESTION="$suggestion"
@@ -193,6 +193,23 @@ zle -N backward-delete-char _ai_backward_delete_char
 # ZLE widget: Update suggestion after cursor movement
 _ai_backward_char() {
     _clai_dismiss_picker
+    if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} && "$_AI_CURRENT_SUGGESTION" == "$BUFFER"* ]]; then
+        # Refine flow: pull the full suggestion into the buffer, then move left
+        # so the user can edit within the inserted suffix.
+        local accepted="$_AI_CURRENT_SUGGESTION"
+        BUFFER="$_AI_CURRENT_SUGGESTION"
+        CURSOR=${#BUFFER}
+        _AI_CURRENT_SUGGESTION=""
+        _AI_LAST_ACCEPTED="$accepted"
+        POSTDISPLAY=""
+        region_highlight=()
+        > "$_AI_SUGGEST_FILE"
+        (clai suggest-feedback --action=accepted --suggested="$accepted" >/dev/null 2>&1 &)
+        zle .backward-char
+        _ai_update_suggestion
+        return
+    fi
+
     zle .backward-char
     _ai_update_suggestion
 }
@@ -602,7 +619,7 @@ _clai_picker_load() {
     local -a items
     if [[ "$_CLAI_PICKER_MODE" == "suggest" ]]; then
         if [[ -n "$BUFFER" ]]; then
-            items=(${(f)"$(clai suggest --limit "$CLAI_MENU_LIMIT" "$BUFFER" 2>/dev/null)"})
+            items=(${(f)"$(clai suggest --format fzf --limit "$CLAI_MENU_LIMIT" "$BUFFER" 2>/dev/null)"})
         else
             # Intentional: with empty BUFFER, 'clai suggest' only returns the
             # single cached AI suggestion which isn't useful for a picker list.

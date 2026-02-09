@@ -72,9 +72,9 @@ _clai_completion() {
         local -a suggestions
         if [[ "$CLAI_OFF" != "1" ]] && ! _clai_session_off; then
             if ((BASH_VERSINFO[0] >= 4)); then
-                mapfile -t suggestions < <(clai suggest --limit "$CLAI_MENU_LIMIT" "$cur" 2>/dev/null)
+                mapfile -t suggestions < <(clai suggest --format fzf --limit "$CLAI_MENU_LIMIT" "$cur" 2>/dev/null)
             else
-                _clai_read_lines suggestions < <(clai suggest --limit "$CLAI_MENU_LIMIT" "$cur" 2>/dev/null)
+                _clai_read_lines suggestions < <(clai suggest --format fzf --limit "$CLAI_MENU_LIMIT" "$cur" 2>/dev/null)
             fi
         fi
 
