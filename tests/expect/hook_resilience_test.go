@@ -151,24 +151,44 @@ func TestBash_GitContextRefreshOnCD(t *testing.T) {
 	require.NoError(t, session.SendLine("echo PWD_B_DONE"))
 	_, err = session.ExpectTimeout("PWD_B_DONE", 3*time.Second)
 	require.NoError(t, err)
-	time.Sleep(300 * time.Millisecond)
 
-	lines := readShimLogLines(t, logPath)
-	contextCwds := make([]string, 0, 2)
-	for _, line := range lines {
-		if !strings.HasPrefix(line, "log-start\t") {
-			continue
+	getContextCwds := func() []string {
+		lines := readShimLogLines(t, logPath)
+		contextCwds := make([]string, 0, 2)
+		for _, line := range lines {
+			if !strings.HasPrefix(line, "log-start\t") {
+				continue
+			}
+			if !strings.Contains(line, "\t--command=echo PWD_") {
+				continue
+			}
+			cwd := shimArgValue(line, "--cwd=")
+			if cwd != "" {
+				contextCwds = append(contextCwds, cwd)
+			}
 		}
-		if !strings.Contains(line, "\t--command=echo PWD_") {
-			continue
-		}
-		cwd := shimArgValue(line, "--cwd=")
-		if cwd != "" {
-			contextCwds = append(contextCwds, cwd)
-		}
+		return contextCwds
 	}
 
-	require.GreaterOrEqual(t, len(contextCwds), 2, "expected command context in each repo after cd")
+	var contextCwds []string
+	require.Eventually(t, func() bool {
+		contextCwds = getContextCwds()
+		if len(contextCwds) < 2 {
+			return false
+		}
+		foundA := false
+		foundB := false
+		for _, cwd := range contextCwds {
+			if cwd == repoA {
+				foundA = true
+			}
+			if cwd == repoB {
+				foundB = true
+			}
+		}
+		return foundA && foundB
+	}, 3*time.Second, 50*time.Millisecond, "expected command context in each repo after cd; got %v", contextCwds)
+
 	assert.Contains(t, contextCwds, repoA)
 	assert.Contains(t, contextCwds, repoB)
 }
