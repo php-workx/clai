@@ -510,6 +510,35 @@ func TestZshScript_CustomHistoryPathsClearGhostText(t *testing.T) {
 	}
 }
 
+func TestZshScript_GhostTextInvariantHook(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	for _, required := range []string{
+		"_ai_sync_ghost_text()",
+		"_ai_zle_line_pre_redraw()",
+		"zle -N zle-line-pre-redraw _ai_zle_line_pre_redraw",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("zsh script missing ghost text invariant hook: %s", required)
+		}
+	}
+
+	body := extractFunctionBody(script, "_ai_sync_ghost_text")
+	if body == "" {
+		t.Fatal("_ai_sync_ghost_text() not found")
+	}
+	if !strings.Contains(body, `"$_AI_CURRENT_SUGGESTION" != "$BUFFER"*`) {
+		t.Error("_ai_sync_ghost_text() should clear when suggestion is not a prefix of BUFFER")
+	}
+	if !strings.Contains(body, "_ai_clear_ghost_text") {
+		t.Error("_ai_sync_ghost_text() should call _ai_clear_ghost_text on mismatch")
+	}
+}
+
 // TestZshScript_ForwardCharValidatesSuggestionPrefix verifies that the
 // right-arrow accept widget checks that _AI_CURRENT_SUGGESTION starts with
 // BUFFER before accepting. Without this check, a stale suggestion after

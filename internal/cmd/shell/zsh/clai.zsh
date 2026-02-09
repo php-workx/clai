@@ -159,6 +159,31 @@ _ai_clear_ghost_text() {
     region_highlight=()
 }
 
+# Safety net: clear stale ghost text if BUFFER/CURSOR changes via an unwrapped ZLE widget.
+_ai_sync_ghost_text() {
+    # If POSTDISPLAY is somehow set without a suggestion, clear it.
+    if [[ -z "$_AI_CURRENT_SUGGESTION" ]]; then
+        if [[ -n "$POSTDISPLAY" ]]; then
+            POSTDISPLAY=""
+            region_highlight=()
+        fi
+        return
+    fi
+
+    # Ghost text is only valid when suggestion is a prefix extension of BUFFER
+    # and the cursor is at EOL (otherwise POSTDISPLAY would appear in the wrong place).
+    if [[ -z "$BUFFER" ]] || [[ $CURSOR -ne ${#BUFFER} ]] || [[ "$_AI_CURRENT_SUGGESTION" != "$BUFFER"* ]]; then
+        _ai_clear_ghost_text
+    fi
+}
+
+_ai_zle_line_pre_redraw() {
+    # Don't interfere while the inline picker owns the UI.
+    [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] && return
+    _ai_sync_ghost_text
+}
+zle -N zle-line-pre-redraw _ai_zle_line_pre_redraw
+
 # ZLE widget: Tab completion should dismiss ghost text first.
 _ai_expand_or_complete() {
     _clai_dismiss_picker
