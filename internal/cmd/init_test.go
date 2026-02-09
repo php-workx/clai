@@ -588,6 +588,69 @@ func TestShellScripts_UpArrowConditionalBinding(t *testing.T) {
 	}
 }
 
+// TestShellScripts_DoubleUpSequenceSupport verifies shell scripts include
+// explicit double-Up key sequence bindings and timeout controls.
+func TestShellScripts_DoubleUpSequenceSupport(t *testing.T) {
+	tests := []struct {
+		path      string
+		sequences []string
+		timeouts  []string
+	}{
+		{
+			path: "shell/zsh/clai.zsh",
+			sequences: []string{
+				`bindkey '^[[A^[[A' _clai_up_arrow_double`,
+				`bindkey '^[OA^[OA' _clai_up_arrow_double`,
+			},
+			timeouts: []string{
+				"CLAI_UP_ARROW_DOUBLE_WINDOW_MS",
+				"KEYTIMEOUT",
+			},
+		},
+		{
+			path: "shell/bash/clai.bash",
+			sequences: []string{
+				`bind '"\e[A\e[A": "\C-x\C-u"'`,
+			},
+			timeouts: []string{
+				"CLAI_UP_ARROW_DOUBLE_WINDOW_MS",
+				"set keyseq-timeout",
+			},
+		},
+		{
+			path: "shell/fish/clai.fish",
+			sequences: []string{
+				`bind \e\[A\e\[A _clai_up_arrow_double`,
+			},
+			timeouts: []string{
+				"CLAI_UP_ARROW_DOUBLE_WINDOW_MS",
+				"fish_sequence_key_delay_ms",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(tt.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", tt.path, err)
+			}
+			script := string(content)
+
+			for _, seq := range tt.sequences {
+				if !strings.Contains(script, seq) {
+					t.Errorf("%s missing double-Up sequence binding %q", tt.path, seq)
+				}
+			}
+			for _, marker := range tt.timeouts {
+				if !strings.Contains(script, marker) {
+					t.Errorf("%s missing timeout support marker %q", tt.path, marker)
+				}
+			}
+		})
+	}
+}
+
 // TestBashScript_MacOSOptionHMacroTranslation verifies that bash uses a
 // readline macro to translate the macOS ˙ character to a Ctrl sequence,
 // since bash 3.2's bind -x cannot bind multi-byte UTF-8 characters.

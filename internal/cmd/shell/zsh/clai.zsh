@@ -46,7 +46,9 @@ export CLAI_SESSION_ID="{{CLAI_SESSION_ID}}"
 _CLAI_COMMAND_ID=""
 _CLAI_COMMAND_START_TIME=""
 _CLAI_LAST_COMMAND=""
-_CLAI_LAST_UP_ARROW_MS=0
+if [[ -z "${_CLAI_ORIG_KEYTIMEOUT:-}" ]]; then
+    _CLAI_ORIG_KEYTIMEOUT="${KEYTIMEOUT:-}"
+fi
 
 # ============================================
 # Feature 1: Command Suggestion (History + AI)
@@ -88,21 +90,6 @@ _clai_zsh_autosuggest_restore() {
 # Session-level disable flag
 _clai_session_off() {
     [[ -f "$CLAI_CACHE/off" ]]
-}
-
-_clai_now_ms() {
-    zmodload zsh/datetime 2>/dev/null || true
-    if [[ -n "${EPOCHREALTIME:-}" ]]; then
-        printf '%d\n' $((EPOCHREALTIME * 1000))
-        return
-    fi
-    if (( $+commands[python3] )); then
-        python3 -c 'import time; print(int(time.time() * 1000))' 2>/dev/null && return
-    fi
-    if (( $+commands[perl] )); then
-        perl -MTime::HiRes=time -e 'print int(time()*1000)' 2>/dev/null && return
-    fi
-    printf '%d\n' $(( $(date +%s) * 1000 ))
 }
 
 # Update suggestion based on current buffer
@@ -836,29 +823,17 @@ zle -N send-break _clai_picker_break
 bindkey '\eh' _clai_tui_picker_open
 bindkey '˙' _clai_tui_picker_open
 
-# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
-# (with fallback to shell default). Otherwise shell defaults are used.
+# When up_arrow_opens_history is enabled:
+# - trigger=single: Up opens TUI picker (fallback: native history)
+# - trigger=double: Up uses native history; Up+Up within window opens picker.
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
-    _clai_up_arrow() {
+    _clai_up_arrow_single() {
         if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-            _CLAI_LAST_UP_ARROW_MS=0
             zle .up-line-or-history
             return
         fi
 
         if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
-            local now delta window
-            now=$(_clai_now_ms)
-            window=${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}
-            (( window < 50 )) && window=50
-            delta=$(( now - _CLAI_LAST_UP_ARROW_MS ))
-            _CLAI_LAST_UP_ARROW_MS=$now
-
-            if (( delta > 0 && delta <= window )) && _clai_has_tui_picker; then
-                _CLAI_LAST_UP_ARROW_MS=0
-                _clai_tui_picker_open
-                return
-            fi
             zle .up-line-or-history
             return
         fi
@@ -869,9 +844,40 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
             zle .up-line-or-history
         fi
     }
-    zle -N _clai_up_arrow
-    bindkey '^[[A' _clai_up_arrow    # Up arrow (CSI mode)
-    bindkey '^[OA' _clai_up_arrow    # Up arrow (application mode)
+    _clai_up_arrow_double() {
+        if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+            zle .up-line-or-history
+            zle .up-line-or-history
+            return
+        fi
+        if _clai_has_tui_picker; then
+            _clai_tui_picker_open
+            return
+        fi
+        zle .up-line-or-history
+        zle .up-line-or-history
+    }
+
+    zle -N _clai_up_arrow_single
+    zle -N _clai_up_arrow_double
+    bindkey '^[[A' _clai_up_arrow_single    # Up arrow (CSI mode)
+    bindkey '^[OA' _clai_up_arrow_single    # Up arrow (application mode)
+
+    if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
+        typeset -g _clai_window_ms="${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}"
+        [[ "$_clai_window_ms" == <-> ]] || _clai_window_ms=250
+        (( _clai_window_ms < 50 )) && _clai_window_ms=50
+        (( _clai_window_ms > 1000 )) && _clai_window_ms=1000
+        typeset -gi _clai_keytimeout_cs
+        _clai_keytimeout_cs=$(( (_clai_window_ms + 9) / 10 ))
+        (( _clai_keytimeout_cs < 1 )) && _clai_keytimeout_cs=1
+        KEYTIMEOUT=$_clai_keytimeout_cs
+        bindkey '^[[A^[[A' _clai_up_arrow_double
+        bindkey '^[OA^[OA' _clai_up_arrow_double
+    else
+        bindkey -r '^[[A^[[A'
+        bindkey -r '^[OA^[OA'
+    fi
 fi
 
 # ============================================
@@ -896,6 +902,8 @@ _clai_disable() {
     bindkey '^M' accept-line
     bindkey '^[[A' up-line-or-history
     bindkey '^[OA' up-line-or-history
+    bindkey -r '^[[A^[[A'
+    bindkey -r '^[OA^[OA'
     bindkey '^[[B' down-line-or-history
     bindkey '^[OB' down-line-or-history
     bindkey '\e[1;3C' forward-word
@@ -905,6 +913,10 @@ _clai_disable() {
     bindkey -r '^Xg'
     bindkey -r '\eh'
     bindkey -r '˙'
+
+    if [[ -n "${_CLAI_ORIG_KEYTIMEOUT:-}" ]]; then
+        KEYTIMEOUT="$_CLAI_ORIG_KEYTIMEOUT"
+    fi
 
     # Restore zsh-autosuggestions
     _clai_zsh_autosuggest_restore

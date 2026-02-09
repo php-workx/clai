@@ -58,18 +58,6 @@ function _clai_session_off
     test -f "$CLAI_CACHE/off"
 end
 
-function _clai_now_ms
-    if type -q python3
-        python3 -c 'import time; print(int(time.time() * 1000))' 2>/dev/null
-        return
-    end
-    if type -q perl
-        perl -MTime::HiRes=time -e 'print int(time()*1000)' 2>/dev/null
-        return
-    end
-    math (date +%s) \* 1000
-end
-
 # ============================================
 # Feature 1: Command Suggestion
 # ============================================
@@ -160,7 +148,6 @@ set -g _CLAI_PICKER_INDEX 1
 set -g _CLAI_PICKER_ORIG_BUFFER ""
 set -g _CLAI_PICKER_ITEMS
 set -g _CLAI_HISTORY_SCOPE session
-set -g _CLAI_LAST_UP_ARROW_MS 0
 
 set -g _CLAI_SUGGESTIONS_ENABLED ""
 
@@ -438,35 +425,17 @@ end
 bind \eh _clai_tui_picker_open
 bind ˙ _clai_tui_picker_open
 
-# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
-# (with fallback to shell default). Otherwise shell defaults are used.
+# When up_arrow_opens_history is enabled:
+# - trigger=single: Up opens TUI picker (fallback: native history)
+# - trigger=double: Up uses native history; Up+Up within window opens picker.
 if test "$CLAI_UP_ARROW_HISTORY" = "true"
-    function _clai_up_arrow
+    function _clai_up_arrow_single
         if test "$CLAI_OFF" = "1"; or _clai_session_off
-            set -g _CLAI_LAST_UP_ARROW_MS 0
             commandline -f history-search-backward
             return
         end
 
         if test "$CLAI_UP_ARROW_TRIGGER" = "double"
-            set -l now (_clai_now_ms)
-            set -l window $CLAI_UP_ARROW_DOUBLE_WINDOW_MS
-            if test -z "$window"
-                set window 250
-            end
-            if test $window -lt 50
-                set window 50
-            end
-            set -l delta (math "$now - $_CLAI_LAST_UP_ARROW_MS")
-            set -g _CLAI_LAST_UP_ARROW_MS $now
-
-            if test $delta -gt 0 -a $delta -le $window
-                if _clai_has_tui_picker
-                    set -g _CLAI_LAST_UP_ARROW_MS 0
-                    _clai_tui_picker_open
-                    return
-                end
-            end
             commandline -f history-search-backward
             return
         end
@@ -477,7 +446,48 @@ if test "$CLAI_UP_ARROW_HISTORY" = "true"
             commandline -f history-search-backward
         end
     end
-    bind \e\[A _clai_up_arrow
+
+    function _clai_up_arrow_double
+        if test "$CLAI_OFF" = "1"; or _clai_session_off
+            commandline -f history-search-backward
+            commandline -f history-search-backward
+            return
+        end
+        if _clai_has_tui_picker
+            _clai_tui_picker_open
+            return
+        end
+        commandline -f history-search-backward
+        commandline -f history-search-backward
+    end
+
+    bind \e\[A _clai_up_arrow_single
+    bind \eOA _clai_up_arrow_single
+    if test "$CLAI_UP_ARROW_TRIGGER" = "double"
+        if not set -q _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS
+            if set -q fish_sequence_key_delay_ms
+                set -g _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS $fish_sequence_key_delay_ms
+            else
+                set -g _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS __clai_unset__
+            end
+        end
+        set -l window $CLAI_UP_ARROW_DOUBLE_WINDOW_MS
+        if not string match -qr '^[0-9]+$' -- "$window"
+            set window 250
+        end
+        if test $window -lt 50
+            set window 50
+        end
+        if test $window -gt 1000
+            set window 1000
+        end
+        set -g fish_sequence_key_delay_ms $window
+        bind \e\[A\e\[A _clai_up_arrow_double
+        bind \eOA\eOA _clai_up_arrow_double
+    else
+        bind -e \e\[A\e\[A 2>/dev/null
+        bind -e \eOA\eOA 2>/dev/null
+    end
 end
 
 # ============================================
@@ -763,8 +773,11 @@ function _clai_disable
     # Restore default keybindings
     bind \t complete
     bind \e\[A history-search-backward
+    bind \eOA history-search-backward
     bind \e\[B history-search-forward
     bind \r execute
+    bind -e \e\[A\e\[A 2>/dev/null
+    bind -e \eOA\eOA 2>/dev/null
 
     # Remove custom keybindings
     bind \e ''
@@ -775,6 +788,14 @@ function _clai_disable
     bind \cx\cs ''
     bind \cx\cd ''
     bind \cx\cg ''
+
+    if set -q _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS
+        if test "$_CLAI_ORIG_SEQUENCE_KEY_DELAY_MS" = "__clai_unset__"
+            set -ge fish_sequence_key_delay_ms
+        else
+            set -g fish_sequence_key_delay_ms $_CLAI_ORIG_SEQUENCE_KEY_DELAY_MS
+        end
+    end
 
     # Restore native autosuggestions to their prior state
     if set -q _clai_prev_autosuggestion

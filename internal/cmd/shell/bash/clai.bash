@@ -34,6 +34,9 @@ mkdir -p "$CLAI_CACHE"
 
 # Export for child processes
 export CLAI_CACHE
+if [[ -z "${_CLAI_ORIG_KEYSEQ_TIMEOUT:-}" ]]; then
+    _CLAI_ORIG_KEYSEQ_TIMEOUT=$(bind -v 2>/dev/null | awk '$1=="set" && $2=="keyseq-timeout" {print $3; exit}')
+fi
 
 # Files
 _AI_SUGGEST_FILE="$CLAI_CACHE/suggestion"
@@ -42,16 +45,6 @@ _AI_LAST_OUTPUT="$CLAI_CACHE/last_output"
 # Session-level disable flag
 _clai_session_off() {
     [[ -f "$CLAI_CACHE/off" ]]
-}
-
-_clai_now_ms() {
-    if command -v python3 >/dev/null 2>&1; then
-        python3 -c 'import time; print(int(time.time() * 1000))' 2>/dev/null && return
-    fi
-    if command -v perl >/dev/null 2>&1; then
-        perl -MTime::HiRes=time -e 'print int(time()*1000)' 2>/dev/null && return
-    fi
-    printf '%d\n' "$(( $(date +%s) * 1000 ))"
 }
 
 # ============================================
@@ -188,7 +181,6 @@ _CLAI_FALLBACK_ACTIVE=false
 _CLAI_FALLBACK_INDEX=0
 _CLAI_FALLBACK_ORIG_LINE=""
 _CLAI_FALLBACK_ITEMS=()
-_CLAI_LAST_UP_ARROW_MS=0
 
 _clai_fallback_reset() {
     _CLAI_FALLBACK_ACTIVE=false
@@ -492,34 +484,17 @@ bind -x '"\eh": _clai_tui_picker_open'
 bind -x '"\C-x\C-h": _clai_tui_picker_open'
 bind '"˙": "\C-x\C-h"'
 
-# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
-# (with fallback to shell default). Otherwise shell defaults are used.
+# When up_arrow_opens_history is enabled:
+# - trigger=single: Up opens TUI picker (fallback: native history)
+# - trigger=double: Up uses native history; Up+Up within window opens picker.
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
-    _clai_up_arrow() {
-        local mode now delta window
-
+    _clai_up_arrow_single() {
         if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-            _CLAI_LAST_UP_ARROW_MS=0
             bind '"\C-x\C-q": previous-history'
             return 0
         fi
 
-        mode="${CLAI_UP_ARROW_TRIGGER:-single}"
-        if [[ "$mode" == "double" ]]; then
-            now=$(_clai_now_ms)
-            window="${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}"
-            if [[ "$window" -lt 50 ]]; then
-                window=50
-            fi
-            delta=$((now - _CLAI_LAST_UP_ARROW_MS))
-            _CLAI_LAST_UP_ARROW_MS=$now
-
-            if [[ "$delta" -gt 0 && "$delta" -le "$window" ]] && _clai_has_tui_picker; then
-                _CLAI_LAST_UP_ARROW_MS=0
-                bind '"\C-x\C-q": ""'
-                _clai_tui_picker_open
-                return 0
-            fi
+        if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
             bind '"\C-x\C-q": previous-history'
             return 0
         fi
@@ -532,8 +507,48 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
         bind '"\C-x\C-q": previous-history'
         return 0
     }
-    bind '"\e[A": "\C-x\C-p\C-x\C-q"'
-    bind -x '"\C-x\C-p": _clai_up_arrow'
+
+    _clai_up_arrow_double() {
+        if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+            _clai_fallback_history_up
+            _clai_fallback_history_up
+            return 0
+        fi
+
+        if _clai_has_tui_picker; then
+            _clai_tui_picker_open
+            return 0
+        fi
+        _clai_fallback_history_up
+        _clai_fallback_history_up
+        return 0
+    }
+
+    bind -x '"\C-x\C-p": _clai_up_arrow_single'
+    bind -x '"\C-x\C-u": _clai_up_arrow_double'
+
+    if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
+        _clai_keyseq_timeout="${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}"
+        if [[ ! "$_clai_keyseq_timeout" =~ ^[0-9]+$ ]]; then
+            _clai_keyseq_timeout=250
+        fi
+        if [[ "$_clai_keyseq_timeout" -lt 50 ]]; then
+            _clai_keyseq_timeout=50
+        fi
+        if [[ "$_clai_keyseq_timeout" -gt 1000 ]]; then
+            _clai_keyseq_timeout=1000
+        fi
+        bind "set keyseq-timeout ${_clai_keyseq_timeout}"
+        bind '"\e[A": previous-history'
+        bind '"\eOA": previous-history'
+        bind '"\e[A\e[A": "\C-x\C-u"'
+        bind '"\eOA\eOA": "\C-x\C-u"'
+    else
+        bind -r '\e[A\e[A' 2>/dev/null
+        bind -r '\eOA\eOA' 2>/dev/null
+        bind '"\e[A": "\C-x\C-p\C-x\C-q"'
+        bind '"\eOA": "\C-x\C-p\C-x\C-q"'
+    fi
 fi
 
 # Show AI suggestion in prompt when available (for AI-generated suggestions)
@@ -867,9 +882,15 @@ _clai_disable() {
     # Restore default keybindings
     bind '"\C-m": accept-line'
     bind '"\e[A": previous-history'
+    bind '"\eOA": previous-history'
     bind '"\e[B": next-history'
     bind '"\t": complete'
     bind "set show-all-if-ambiguous off"
+    bind -r '\e[A\e[A' 2>/dev/null
+    bind -r '\eOA\eOA' 2>/dev/null
+    if [[ -n "$_CLAI_ORIG_KEYSEQ_TIMEOUT" ]]; then
+        bind "set keyseq-timeout ${_CLAI_ORIG_KEYSEQ_TIMEOUT}"
+    fi
 
     # Remove custom key bindings
     bind -r '\C-x\C-a'
@@ -877,6 +898,7 @@ _clai_disable() {
     bind -r '\C-x\C-i'
     bind -r '\C-x\C-t'
     bind -r '\C-x\C-p'
+    bind -r '\C-x\C-u'
     bind -r '\C-x\C-q'
     bind -r '\C-x\C-n'
     bind -r '\C-g'
