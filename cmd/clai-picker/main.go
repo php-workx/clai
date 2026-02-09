@@ -435,22 +435,7 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 }
 
 func dispatchSuggest(cfg *config.Config, opts *pickerOpts) int {
-	// Suggestions are always rendered using the builtin TUI.
-	tab := config.TabDef{
-		ID:       "suggestions",
-		Label:    "Suggestions",
-		Provider: "suggest",
-		Args: map[string]string{
-			"session_id": opts.session,
-			"cwd":        opts.cwd,
-		},
-	}
-
-	provider := picker.NewSuggestProvider(socketPath(cfg), cfg.Suggestions.PickerView)
-	model := picker.NewModel([]config.TabDef{tab}, provider).WithLayout(picker.LayoutTopDown)
-	if opts.query != "" {
-		model = model.WithQuery(opts.query)
-	}
+	model := newSuggestModel(cfg, opts)
 
 	code, result := runTUI(model)
 	if code != exitSuccess {
@@ -464,6 +449,28 @@ func dispatchSuggest(cfg *config.Config, opts *pickerOpts) int {
 		fmt.Fprintln(os.Stdout, result)
 	}
 	return exitSuccess
+}
+
+func newSuggestModel(cfg *config.Config, opts *pickerOpts) picker.Model {
+	// Suggestions are always rendered using the builtin TUI.
+	tab := config.TabDef{
+		ID:       "suggestions",
+		Label:    "Suggestions",
+		Provider: "suggest",
+		Args: map[string]string{
+			"session_id": opts.session,
+			"cwd":        opts.cwd,
+		},
+	}
+
+	provider := picker.NewSuggestProvider(socketPath(cfg), cfg.Suggestions.PickerView)
+
+	// Bottom-up layout: best suggestion appears closest to the input line.
+	model := picker.NewModel([]config.TabDef{tab}, provider).WithLayout(picker.LayoutBottomUp)
+	if opts.query != "" {
+		model = model.WithQuery(opts.query)
+	}
+	return model
 }
 
 // dispatchFzf checks for fzf on PATH and falls back to builtin if missing.

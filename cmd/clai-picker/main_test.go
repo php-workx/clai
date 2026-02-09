@@ -10,6 +10,7 @@ import (
 	"github.com/muesli/termenv"
 
 	"github.com/runger/clai/internal/config"
+	"github.com/runger/clai/internal/picker"
 )
 
 // --- Query sanitization tests ---
@@ -494,5 +495,19 @@ func TestResolveTabs_DoesNotModifyOriginalConfig(t *testing.T) {
 			}
 			break
 		}
+	}
+}
+
+func TestNewSuggestModel_UsesBottomUpLayout(t *testing.T) {
+	cfg := config.DefaultConfig()
+	opts := &pickerOpts{
+		session: "sess-123",
+		cwd:     "/tmp",
+		query:   "git st",
+	}
+
+	m := newSuggestModel(cfg, opts)
+	if m.Layout() != picker.LayoutBottomUp {
+		t.Fatalf("expected LayoutBottomUp, got %v", m.Layout())
 	}
 }

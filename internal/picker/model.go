@@ -134,6 +134,11 @@ func (m Model) WithLayout(l Layout) Model {
 	return m
 }
 
+// Layout returns the current layout mode (top-down or bottom-up).
+func (m Model) Layout() Layout {
+	return m.layout
+}
+
 // Result returns the selected command string, or "" if cancelled.
 func (m Model) Result() string {
 	return m.result
