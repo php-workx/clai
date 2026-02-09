@@ -282,9 +282,10 @@ _clai_picker_load_history() {
         query="$READLINE_LINE"
     fi
     local -a args raw
-    local IFS=$'\n'
-    args=($(_clai_history_args))
-    unset IFS
+    local _arg
+    while IFS= read -r _arg; do
+        [[ -n "$_arg" ]] && args+=("$_arg")
+    done < <(_clai_history_args)
     if ((BASH_VERSINFO[0] >= 4)); then
         mapfile -t raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$query" 2>/dev/null)
     else
