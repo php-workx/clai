@@ -1731,3 +1731,204 @@ fn test_pty_signal_handling() {
         output.err()
     );
 }
+
+// ============================================================================
+// OSC 133 Shell Integration (ai-terminal-1mv)
+// ============================================================================
+
+/// Helper: spawn a shell with clai-wrap injection, run commands to trigger a full
+/// OSC 133 cycle, and return ALL accumulated raw output.
+///
+/// Strategy: send commands with sleeps between them to ensure each command
+/// executes fully (including OSC 133 transitions), then read all output
+/// at once. This avoids issues with ZLE autocompletion matching markers early.
+#[cfg(unix)]
+fn collect_osc133_output(shell_path: &Path) -> Option<String> {
+    let (master, mut child) = spawn_clai_wrap_shell_path(shell_path)?;
+
+    let mut reader = master.try_clone_reader().expect("reader");
+    let mut writer = master.take_writer().expect("writer");
+
+    // Wait for clai-wrap to start and enter raw mode + shell to display first prompt.
+    // Zsh with user configs (oh-my-zsh, p10k) can take 2+ seconds.
+    std::thread::sleep(Duration::from_millis(3000));
+
+    // Send warmup command and wait for it to complete
+    writer
+        .write_all(b"echo __warmup_done__\n")
+        .expect("write warmup");
+    writer.flush().expect("flush warmup");
+    std::thread::sleep(Duration::from_millis(1000));
+
+    // Send test command and wait for execution + next prompt
+    writer
+        .write_all(b"echo __osc133_test_cmd__\n")
+        .expect("write test");
+    writer.flush().expect("flush test");
+    std::thread::sleep(Duration::from_millis(1000));
+
+    // Send final marker command — we'll read until this appears in output.
+    // Use a unique final marker that's unlikely in ZLE history.
+    writer
+        .write_all(b"echo xQ9_OSC133_FINAL_7kR\n")
+        .expect("write final");
+    writer.flush().expect("flush final");
+
+    // Read all accumulated output until the final marker
+    let output = read_until_marker(
+        &mut *reader,
+        "xQ9_OSC133_FINAL_7kR",
+        Duration::from_secs(15),
+    )
+    .unwrap_or_default();
+
+    writer.write_all(b"exit\n").expect("exit");
+    writer.flush().expect("flush exit");
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(5));
+
+    Some(output)
+}
+
+/// Check that output contains an OSC 133 sequence with the given letter.
+/// Matches `ESC ] 133;X` followed by optional parameters and BEL or ST.
+/// Some shells emit `133;C;` (with trailing semicolon) or `133;D;N`.
+#[cfg(unix)]
+fn has_osc133(output: &str, letter: char) -> bool {
+    let pattern = format!("\x1b]133;{letter}");
+    output.contains(&pattern)
+}
+
+/// Verify that bash injection produces all four OSC 133 sequences.
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_osc133_bash_emits_all_sequences() {
+    let bash = PathBuf::from("/bin/bash");
+    if !bash.exists() {
+        eprintln!("Skipping: /bin/bash not found");
+        return;
+    }
+
+    let output = match collect_osc133_output(&bash) {
+        Some(o) => o,
+        None => {
+            eprintln!("Skipping: failed to spawn clai-wrap with bash");
+            return;
+        }
+    };
+
+    assert!(has_osc133(&output, 'A'), "bash should emit OSC 133;A (prompt start)");
+    assert!(has_osc133(&output, 'B'), "bash should emit OSC 133;B (input start)");
+    assert!(has_osc133(&output, 'C'), "bash should emit OSC 133;C (output start)");
+    assert!(has_osc133(&output, 'D'), "bash should emit OSC 133;D (finished)");
+}
+
+/// Verify that zsh injection produces all four OSC 133 sequences.
+/// Note: zsh with ZLE (especially with user plugins like oh-my-zsh/p10k) requires
+/// longer delays because ZLE processes input character-by-character and redraws
+/// the prompt for each character, which can match markers prematurely.
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_osc133_zsh_emits_all_sequences() {
+    let zsh = PathBuf::from("/bin/zsh");
+    if !zsh.exists() {
+        eprintln!("Skipping: /bin/zsh not found");
+        return;
+    }
+
+    // Zsh-specific: use separate spawn to allow longer init time
+    let Some((master, mut child)) = spawn_clai_wrap_shell_path(&zsh) else {
+        eprintln!("Skipping: failed to spawn clai-wrap with zsh");
+        return;
+    };
+
+    let mut reader = master.try_clone_reader().expect("reader");
+    let mut writer = master.take_writer().expect("writer");
+
+    // Zsh with plugins can take 3+ seconds to initialize
+    std::thread::sleep(Duration::from_millis(4000));
+
+    // Send commands with generous sleeps between each to allow full execution.
+    // Zsh's ZLE shows autosuggestions that can match markers prematurely,
+    // so we give enough time for each command to fully execute before the next.
+    writer.write_all(b"echo __zsh_warmup__\n").expect("write");
+    writer.flush().expect("flush");
+    std::thread::sleep(Duration::from_millis(2000));
+
+    writer.write_all(b"echo __zsh_test__\n").expect("write");
+    writer.flush().expect("flush");
+    std::thread::sleep(Duration::from_millis(2000));
+
+    writer
+        .write_all(b"echo xR7_ZSH_FINAL_mK3\n")
+        .expect("write");
+    writer.flush().expect("flush");
+
+    let output =
+        read_until_marker(&mut *reader, "xR7_ZSH_FINAL_mK3", Duration::from_secs(15))
+            .unwrap_or_default();
+
+    writer.write_all(b"exit\n").expect("exit");
+    writer.flush().expect("flush exit");
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(5));
+
+    assert!(has_osc133(&output, 'A'), "zsh should emit OSC 133;A (prompt start)");
+    assert!(has_osc133(&output, 'B'), "zsh should emit OSC 133;B (input start)");
+    assert!(has_osc133(&output, 'C'), "zsh should emit OSC 133;C (output start)");
+    assert!(has_osc133(&output, 'D'), "zsh should emit OSC 133;D (finished)");
+}
+
+/// Verify that fish injection produces all four OSC 133 sequences.
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_osc133_fish_emits_all_sequences() {
+    let fish_paths = [
+        PathBuf::from("/opt/homebrew/bin/fish"),
+        PathBuf::from("/usr/local/bin/fish"),
+        PathBuf::from("/usr/bin/fish"),
+        PathBuf::from("/bin/fish"),
+    ];
+
+    let Some(fish_path) = fish_paths.iter().find(|p| p.exists()) else {
+        eprintln!("Skipping: fish not found");
+        return;
+    };
+
+    let output = match collect_osc133_output(fish_path) {
+        Some(o) => o,
+        None => {
+            eprintln!("Skipping: failed to spawn clai-wrap with fish");
+            return;
+        }
+    };
+
+    assert!(has_osc133(&output, 'A'), "fish should emit OSC 133;A (prompt start)");
+    assert!(has_osc133(&output, 'B'), "fish should emit OSC 133;B (input start)");
+    assert!(has_osc133(&output, 'C'), "fish should emit OSC 133;C (output start)");
+    assert!(has_osc133(&output, 'D'), "fish should emit OSC 133;D (finished)");
+}
+
+/// Document /bin/sh injection behavior — on macOS /bin/sh is bash so injection occurs,
+/// on Linux /bin/sh is often dash which gets no injection.
+#[test]
+#[cfg(unix)]
+fn test_clai_wrap_osc133_sh_passthrough_behavior() {
+    let sh = PathBuf::from("/bin/sh");
+    if !sh.exists() {
+        eprintln!("Skipping: /bin/sh not found");
+        return;
+    }
+
+    let output = match collect_osc133_output(&sh) {
+        Some(o) => o,
+        None => {
+            eprintln!("Skipping: failed to spawn clai-wrap with sh");
+            return;
+        }
+    };
+
+    if has_osc133(&output, 'A') {
+        eprintln!("/bin/sh resolved to a shell with injection (likely bash on macOS)");
+    } else {
+        eprintln!("/bin/sh has no OSC 133 injection (passthrough mode)");
+    }
+}
