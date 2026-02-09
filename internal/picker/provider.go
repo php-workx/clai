@@ -13,9 +13,9 @@ type Item struct {
 
 func (it Item) displayText() string {
 	if it.Display != "" {
-		return it.Display
+		return PrettyEscapeLiterals(it.Display)
 	}
-	return it.Value
+	return PrettyEscapeLiterals(it.Value)
 }
 
 // Provider is the interface for data sources that supply items to the picker.

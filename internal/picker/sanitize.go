@@ -49,6 +49,30 @@ func ValidateUTF8(s string) string {
 	return b.String()
 }
 
+// PrettyEscapeLiterals replaces common *literal* escape-sequence spellings in
+// shell commands (like "\033[" or "\x1b[") with a more readable token.
+//
+// This is intended for display-only rendering in pickers; it must not be used
+// on strings that will be executed.
+func PrettyEscapeLiterals(s string) string {
+	if s == "" {
+		return s
+	}
+	// Common ANSI escape spellings found in shell commands, including printf.
+	// Note: these are *literal* backslashes, not actual ESC bytes.
+	r := strings.NewReplacer(
+		"\\033[", "<ESC>[",
+		"\\033]", "<ESC>]",
+		"\\x1b[", "<ESC>[",
+		"\\x1B[", "<ESC>[",
+		"\\x1b]", "<ESC>]",
+		"\\x1B]", "<ESC>]",
+		"\\e[", "<ESC>[",
+		"\\e]", "<ESC>]",
+	)
+	return r.Replace(s)
+}
+
 // MiddleTruncate truncates a string in the middle with an ellipsis character
 // if its display width exceeds maxWidth. It is display-width-aware, correctly
 // handling CJK characters and emoji that occupy two columns.
