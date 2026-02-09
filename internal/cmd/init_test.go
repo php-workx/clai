@@ -465,6 +465,51 @@ func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
 	}
 }
 
+// TestZshScript_CustomHistoryPathsClearGhostText verifies that clai's
+// custom Up-arrow paths (TUI picker, inline picker, single/double trigger)
+// do not bypass the wrapped up-line-or-history widget. Bypassing the wrapper
+// leaves stale POSTDISPLAY ghost text visible after history navigation.
+func TestZshScript_CustomHistoryPathsClearGhostText(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	// These functions historically called `zle .up-line-or-history` directly,
+	// which bypasses _ai_up_line_or_history (and its ghost-text clearing).
+	for _, fn := range []string{
+		"_clai_tui_picker_open",
+		"_clai_picker_up",
+		"_clai_up_arrow_single",
+		"_clai_up_arrow_double",
+	} {
+		body := extractFunctionBody(script, fn)
+		if body == "" {
+			t.Fatalf("%s() not found", fn)
+		}
+		if strings.Contains(body, "zle .up-line-or-history") {
+			t.Errorf("%s() should not call zle .up-line-or-history directly; use zle up-line-or-history", fn)
+		}
+	}
+
+	downBody := extractFunctionBody(script, "_clai_picker_down")
+	if downBody == "" {
+		t.Fatal("_clai_picker_down() not found")
+	}
+	if strings.Contains(downBody, "zle .down-line-or-history") {
+		t.Error("_clai_picker_down() should not call zle .down-line-or-history directly; use zle down-line-or-history")
+	}
+
+	breakBody := extractFunctionBody(script, "_clai_picker_break")
+	if breakBody == "" {
+		t.Fatal("_clai_picker_break() not found")
+	}
+	if !strings.Contains(breakBody, "_ai_clear_ghost_text") {
+		t.Error("_clai_picker_break() should clear ghost text before delegating to send-break")
+	}
+}
+
 // TestZshScript_ForwardCharValidatesSuggestionPrefix verifies that the
 // right-arrow accept widget checks that _AI_CURRENT_SUGGESTION starts with
 // BUFFER before accepting. Without this check, a stale suggestion after

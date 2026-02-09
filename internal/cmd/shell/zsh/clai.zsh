@@ -547,21 +547,20 @@ _clai_has_tui_picker() {
 
 _clai_tui_picker_open() {
     if ! _clai_has_tui_picker; then
-        zle .up-line-or-history
+        zle up-line-or-history
         return
     fi
     local result exit_code saved_buffer="$BUFFER"
+    _ai_clear_ghost_text
     result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
     exit_code=$?
     if [[ $exit_code -eq 0 ]]; then
         # Clear ghost text before setting the new buffer.
-        _AI_CURRENT_SUGGESTION=""
-        POSTDISPLAY=""
-        region_highlight=()
+        _ai_clear_ghost_text
         BUFFER="$result"
         CURSOR=${#BUFFER}
     elif [[ $exit_code -eq 2 ]]; then
-        zle .up-line-or-history
+        zle up-line-or-history
         return
     fi
     # exit_code 1 = cancel, keep original buffer
@@ -772,7 +771,7 @@ _clai_picker_up() {
     fi
     # Not in picker — try TUI picker first, then inline picker
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-        zle .up-line-or-history
+        zle up-line-or-history
         return
     fi
     if _clai_has_tui_picker; then
@@ -780,7 +779,7 @@ _clai_picker_up() {
         return
     fi
     if ! _clai_config_enabled; then
-        zle .up-line-or-history
+        zle up-line-or-history
         return
     fi
     _clai_picker_open history
@@ -802,7 +801,7 @@ _clai_picker_down() {
         # At bottom (index 0): do nothing
         return
     fi
-    zle .down-line-or-history
+    zle down-line-or-history
 }
 
 _clai_picker_suggest() {
@@ -863,6 +862,7 @@ _clai_picker_break() {
         _clai_picker_cancel
         return
     fi
+    _ai_clear_ghost_text
     zle .send-break
 }
 
@@ -888,33 +888,33 @@ bindkey '˙' _clai_tui_picker_open
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
     _clai_up_arrow_single() {
         if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-            zle .up-line-or-history
+            zle up-line-or-history
             return
         fi
 
         if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
-            zle .up-line-or-history
+            zle up-line-or-history
             return
         fi
 
         if _clai_has_tui_picker; then
             _clai_tui_picker_open
         else
-            zle .up-line-or-history
+            zle up-line-or-history
         fi
     }
     _clai_up_arrow_double() {
         if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-            zle .up-line-or-history
-            zle .up-line-or-history
+            zle up-line-or-history
+            zle up-line-or-history
             return
         fi
         if _clai_has_tui_picker; then
             _clai_tui_picker_open
             return
         fi
-        zle .up-line-or-history
-        zle .up-line-or-history
+        zle up-line-or-history
+        zle up-line-or-history
     }
 
     zle -N _clai_up_arrow_single
