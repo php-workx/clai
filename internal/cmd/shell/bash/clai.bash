@@ -128,7 +128,7 @@ _clai_tab_handler() {
             *)       _CLAI_HISTORY_SCOPE="session" ;;
         esac
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
         # Swallow the follow-up so menu-complete doesn't fire
         bind '"\C-x\C-t": ""'
     else
@@ -175,6 +175,7 @@ _CLAI_PICKER_ACTIVE=false
 _CLAI_PICKER_MODE=""
 _CLAI_PICKER_INDEX=0
 _CLAI_PICKER_ORIG_LINE=""
+_CLAI_PICKER_QUERY=""
 _CLAI_PICKER_ITEMS=()
 _CLAI_HISTORY_SCOPE="session"
 _CLAI_FALLBACK_ACTIVE=false
@@ -276,14 +277,18 @@ _clai_history_args() {
 }
 
 _clai_picker_load_history() {
+    local query="${1-$_CLAI_PICKER_QUERY}"
+    if [[ -z "$query" ]]; then
+        query="$READLINE_LINE"
+    fi
     local -a args raw
     local IFS=$'\n'
     args=($(_clai_history_args))
     unset IFS
     if ((BASH_VERSINFO[0] >= 4)); then
-        mapfile -t raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
+        mapfile -t raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$query" 2>/dev/null)
     else
-        _clai_read_lines raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$READLINE_LINE" 2>/dev/null)
+        _clai_read_lines raw < <(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" "$query" 2>/dev/null)
     fi
     # Deduplicate preserving order
     if ((BASH_VERSINFO[0] >= 4)); then
@@ -364,12 +369,13 @@ _clai_history_up() {
     fi
     if [[ "$_CLAI_PICKER_ACTIVE" != "true" || "$_CLAI_PICKER_MODE" != "history" ]]; then
         _CLAI_PICKER_ORIG_LINE="$READLINE_LINE"
+        _CLAI_PICKER_QUERY="$READLINE_LINE"
         _CLAI_PICKER_MODE="history"
         _CLAI_PICKER_INDEX=0
         _CLAI_PICKER_ACTIVE=true
         # Install Enter macro so picker can intercept it
         bind '"\C-m": "\C-x\C-a\C-x\C-b"'
-        if ! _clai_picker_load_history; then
+        if ! _clai_picker_load_history "$_CLAI_PICKER_QUERY"; then
             _CLAI_PICKER_ACTIVE=false
             bind '"\C-m": accept-line'
             return 0
@@ -413,6 +419,7 @@ _clai_picker_close() {
     _CLAI_PICKER_MODE=""
     _CLAI_PICKER_ITEMS=()
     _CLAI_PICKER_INDEX=0
+    _CLAI_PICKER_QUERY=""
     # Restore normal Enter (remove macro that routes through bind -x)
     bind '"\C-m": accept-line'
 }
@@ -449,7 +456,7 @@ _clai_history_scope_session() {
     _CLAI_HISTORY_SCOPE="session"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
     fi
 }
 
@@ -457,7 +464,7 @@ _clai_history_scope_cwd() {
     _CLAI_HISTORY_SCOPE="cwd"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
     fi
 }
 
@@ -465,7 +472,7 @@ _clai_history_scope_global() {
     _CLAI_HISTORY_SCOPE="global"
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" && "$_CLAI_PICKER_MODE" == "history" ]]; then
         _CLAI_PICKER_INDEX=0
-        _clai_picker_load_history && _clai_picker_apply
+        _clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply
     fi
 }
 
@@ -964,19 +971,20 @@ clai() {
 # ============================================
 
 if [[ $- == *i* && -z "$_CLAI_REINIT" ]]; then
-    # Register session with daemon (fire and forget)
-    # This notifies the daemon of the new shell session
-    (clai-shim session-start \
-        --session-id="$CLAI_SESSION_ID" \
-        --cwd="$PWD" \
-        --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1 &)
-
-    # Import shell history on first init (fire and forget)
-    # This is idempotent: --if-not-exists skips if already imported
-    (clai-shim import-history \
-        --shell="$CLAI_CURRENT_SHELL" \
-        --if-not-exists >/dev/null 2>&1 &)
-
     # Use printf for better portability across bash versions
     printf '\033[2m🤖 clai [%s] Tab complete | accept cmd | ?"describe task"\033[0m\n' "${CLAI_SESSION_ID:0:8}"
+
+    # Register session + import history (fire and forget).
+    # Keep startup prompt snappy by printing the message before forking background work.
+    (
+        clai-shim session-start \
+            --session-id="$CLAI_SESSION_ID" \
+            --cwd="$PWD" \
+            --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1
+
+        # Idempotent: --if-not-exists skips if already imported
+        clai-shim import-history \
+            --shell="$CLAI_CURRENT_SHELL" \
+            --if-not-exists >/dev/null 2>&1
+    ) &
 fi

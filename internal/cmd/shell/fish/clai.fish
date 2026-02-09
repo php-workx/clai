@@ -82,7 +82,9 @@ function _ai_accept_suggestion
 end
 
 # Bind Alt+Enter to accept suggestion (Tab is used for completions in Fish)
-bind \e\r _ai_accept_suggestion
+for mode in default insert visual
+    bind -M $mode \e\r _ai_accept_suggestion
+end
 
 # Clear suggestion with Escape (dismiss feedback)
 function _ai_clear_suggestion
@@ -107,7 +109,9 @@ function _clai_escape
         _ai_clear_suggestion
     end
 end
-bind \e _clai_escape
+for mode in default insert visual
+    bind -M $mode \e _clai_escape
+end
 
 # ============================================
 # Feature 2a: TUI Picker (clai-picker)
@@ -120,18 +124,21 @@ function _clai_has_tui_picker
 end
 
 function _clai_tui_picker_open
-    if not _clai_has_tui_picker
-        commandline -f up-line
+    if test "$CLAI_OFF" = "1"; or _clai_session_off
+        commandline -f history-search-backward
         return
     end
-    set -l saved_buffer (commandline)
-    set -l result (clai-picker history --query=(commandline) --session=$CLAI_SESSION_ID --cwd=$PWD 2>/dev/null)
+    if not _clai_has_tui_picker
+        commandline -f history-search-backward
+        return
+    end
+    set -l result (clai-picker history --query=(commandline) --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
     set -l exit_code $status
     if test $exit_code -eq 0
         commandline -r -- $result
         commandline -f end-of-line
     else if test $exit_code -eq 2
-        commandline -f up-line
+        commandline -f history-search-backward
         return
     end
     # exit_code 1 = cancel, keep original buffer
@@ -419,11 +426,23 @@ function _clai_history_scope_global
     end
 end
 
+# Picker keybindings (inline picker controls + scope switching).
+for mode in default insert visual
+    bind -M $mode \t _clai_suggest_tab
+    bind -M $mode \e\[B _clai_picker_down
+    bind -M $mode \eOB _clai_picker_down
+    bind -M $mode \cxs _clai_history_scope_session
+    bind -M $mode \cxd _clai_history_scope_cwd
+    bind -M $mode \cxg _clai_history_scope_global
+end
+
 # Alt/Option+H opens TUI picker.
 # \eh works when the terminal sends ESC for Alt. The literal ˙ covers
 # macOS Terminal.app/iTerm2 defaults where Option+H produces U+02D9.
-bind \eh _clai_tui_picker_open
-bind ˙ _clai_tui_picker_open
+for mode in default insert visual
+    bind -M $mode \eh _clai_tui_picker_open
+    bind -M $mode ˙ _clai_tui_picker_open
+end
 
 # When up_arrow_opens_history is enabled:
 # - trigger=single: Up opens TUI picker (fallback: native history)
@@ -461,8 +480,10 @@ if test "$CLAI_UP_ARROW_HISTORY" = "true"
         commandline -f history-search-backward
     end
 
-    bind \e\[A _clai_up_arrow_single
-    bind \eOA _clai_up_arrow_single
+    for mode in default insert visual
+        bind -M $mode \e\[A _clai_up_arrow_single
+        bind -M $mode \eOA _clai_up_arrow_single
+    end
     if test "$CLAI_UP_ARROW_TRIGGER" = "double"
         if not set -q _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS
             if set -q fish_sequence_key_delay_ms
@@ -482,11 +503,22 @@ if test "$CLAI_UP_ARROW_HISTORY" = "true"
             set window 1000
         end
         set -g fish_sequence_key_delay_ms $window
+
+        # Keep an explicit default-mode binding (no -M) so the generated script
+        # works even if users don't have mode bindings, and so init tests can
+        # validate the presence of the sequence binding.
         bind \e\[A\e\[A _clai_up_arrow_double
         bind \eOA\eOA _clai_up_arrow_double
+
+        for mode in default insert visual
+            bind -M $mode \e\[A\e\[A _clai_up_arrow_double
+            bind -M $mode \eOA\eOA _clai_up_arrow_double
+        end
     else
-        bind -e \e\[A\e\[A 2>/dev/null
-        bind -e \eOA\eOA 2>/dev/null
+        for mode in default insert visual
+            bind -M $mode -e \e\[A\e\[A 2>/dev/null
+            bind -M $mode -e \eOA\eOA 2>/dev/null
+        end
     end
 end
 
@@ -652,9 +684,11 @@ function _clai_preexec --on-event fish_preexec
 
     # Generate unique command ID
     set -g _CLAI_COMMAND_ID "$CLAI_SESSION_ID-"(date +%s)"-"(random)
-    # Store start time in milliseconds. Use nanoseconds if available (GNU coreutils).
-    if command date +%s%N >/dev/null 2>&1
-        set -g _CLAI_COMMAND_START_TIME (math (command date +%s%N) / 1000000)
+    # Store start time in milliseconds. Use nanoseconds if available.
+    # On macOS/BSD, date +%s%N may output a literal trailing "N".
+    set -l _ns (command date +%s%N 2>/dev/null)
+    if string match -rq '^[0-9]+$' -- $_ns
+        set -g _CLAI_COMMAND_START_TIME (math $_ns / 1000000)
     else
         set -g _CLAI_COMMAND_START_TIME (math (command date +%s) \* 1000)
     end
@@ -675,8 +709,9 @@ function _clai_postexec --on-event fish_postexec
 
     # Calculate end time in milliseconds. Use nanoseconds if available (GNU coreutils).
     set -l end_time
-    if command date +%s%N >/dev/null 2>&1
-        set end_time (math (command date +%s%N) / 1000000)
+    set -l _ns (command date +%s%N 2>/dev/null)
+    if string match -rq '^[0-9]+$' -- $_ns
+        set end_time (math $_ns / 1000000)
     else
         set end_time (math (command date +%s) \* 1000)
     end
@@ -771,23 +806,29 @@ function _clai_disable
     set -gx CLAI_OFF 1
 
     # Restore default keybindings
-    bind \t complete
-    bind \e\[A history-search-backward
-    bind \eOA history-search-backward
-    bind \e\[B history-search-forward
-    bind \r execute
-    bind -e \e\[A\e\[A 2>/dev/null
-    bind -e \eOA\eOA 2>/dev/null
+    for mode in default insert visual
+        bind -M $mode \t complete
+        bind -M $mode \e\[A history-search-backward
+        bind -M $mode \eOA history-search-backward
+        bind -M $mode \e\[B history-search-forward
+        bind -M $mode \eOB history-search-forward
+        bind -M $mode \r execute
 
-    # Remove custom keybindings
-    bind \e ''
-    bind \e\r ''
-    bind \eh ''
-    bind ˙ ''
-    bind \cx\cv ''
-    bind \cx\cs ''
-    bind \cx\cd ''
-    bind \cx\cg ''
+        bind -M $mode -e \e\[A\e\[A 2>/dev/null
+        bind -M $mode -e \eOA\eOA 2>/dev/null
+
+        # Remove custom keybindings
+        bind -M $mode \e ''
+        bind -M $mode \e\r ''
+        bind -M $mode \eh ''
+        bind -M $mode ˙ ''
+        bind -M $mode \cx\cv ''
+        bind -M $mode \cxs ''
+        bind -M $mode \cxd ''
+        bind -M $mode \cxg ''
+        bind -M $mode \e\[B ''
+        bind -M $mode \eOB ''
+    end
 
     if set -q _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS
         if test "$_CLAI_ORIG_SEQUENCE_KEY_DELAY_MS" = "__clai_unset__"

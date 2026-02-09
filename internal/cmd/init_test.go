@@ -325,6 +325,58 @@ func TestZshScript_EditingWidgetsDismissPicker(t *testing.T) {
 	}
 }
 
+// TestZshScript_SelfInsertSkipsSuggestForQueuedInput verifies that zsh does
+// not call clai suggest for each queued character during paste-like input.
+func TestZshScript_SelfInsertSkipsSuggestForQueuedInput(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	body := extractFunctionBody(script, "_ai_self_insert")
+	if body == "" {
+		t.Fatal("_ai_self_insert() not found")
+	}
+
+	if !strings.Contains(body, "KEYS_QUEUED_COUNT") {
+		t.Error("_ai_self_insert should guard on KEYS_QUEUED_COUNT to avoid per-char suggest during paste")
+	}
+	if !strings.Contains(body, `_AI_IN_PASTE`) {
+		t.Error("_ai_self_insert should preserve _AI_IN_PASTE guard")
+	}
+}
+
+// TestZshScript_DefaultCompletionAndHistoryClearGhostText verifies that
+// default Tab completion and history navigation clear ghost text state first.
+func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	for _, fn := range []string{"_ai_expand_or_complete", "_ai_up_line_or_history", "_ai_down_line_or_history"} {
+		body := extractFunctionBody(script, fn)
+		if body == "" {
+			t.Fatalf("%s() not found", fn)
+		}
+		if !strings.Contains(body, "_ai_clear_ghost_text") {
+			t.Errorf("%s() should call _ai_clear_ghost_text before delegating", fn)
+		}
+	}
+
+	for _, bind := range []string{
+		"zle -N expand-or-complete _ai_expand_or_complete",
+		"zle -N up-line-or-history _ai_up_line_or_history",
+		"zle -N down-line-or-history _ai_down_line_or_history",
+	} {
+		if !strings.Contains(script, bind) {
+			t.Errorf("missing zle binding: %s", bind)
+		}
+	}
+}
+
 // TestZshScript_ForwardCharValidatesSuggestionPrefix verifies that the
 // right-arrow accept widget checks that _AI_CURRENT_SUGGESTION starts with
 // BUFFER before accepting. Without this check, a stale suggestion after
@@ -381,6 +433,48 @@ func TestBashScript_NoDirectBindXEscapeSequences(t *testing.T) {
 		if badPattern.MatchString(line) {
 			t.Errorf("line %d: bind -x with escape sequence breaks bash 3.2: %s", i+1, trimmed)
 		}
+	}
+}
+
+func TestBashScript_HistoryPickerUsesPromptQuery(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
+	if err != nil {
+		t.Fatalf("Failed to read bash script: %v", err)
+	}
+	script := string(content)
+
+	if !strings.Contains(script, "_CLAI_PICKER_QUERY=") {
+		t.Fatal("bash script missing _CLAI_PICKER_QUERY state")
+	}
+	upBody := extractFunctionBody(script, "_clai_history_up")
+	if upBody == "" {
+		t.Fatal("_clai_history_up() not found")
+	}
+	if !strings.Contains(upBody, `_CLAI_PICKER_QUERY="$READLINE_LINE"`) {
+		t.Error("_clai_history_up should snapshot READLINE_LINE into _CLAI_PICKER_QUERY when opening picker")
+	}
+
+	loadBody := extractFunctionBody(script, "_clai_picker_load_history")
+	if loadBody == "" {
+		t.Fatal("_clai_picker_load_history() not found")
+	}
+	if !strings.Contains(loadBody, "_CLAI_PICKER_QUERY") {
+		t.Error("_clai_picker_load_history should use _CLAI_PICKER_QUERY so navigating selection doesn't change query")
+	}
+}
+
+func TestFishScript_DateNanosecondsGuardIsNumeric(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+	if err != nil {
+		t.Fatalf("Failed to read fish script: %v", err)
+	}
+	script := string(content)
+
+	if !strings.Contains(script, "date +%s%N") {
+		t.Fatalf("fish script missing date +%s usage for millisecond timing", "%s%N")
+	}
+	if !strings.Contains(script, "string match -rq '^[0-9]+$'") {
+		t.Fatalf("fish script missing numeric guard for date +%s output", "%s%N")
 	}
 }
 

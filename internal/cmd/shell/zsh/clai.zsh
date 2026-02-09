@@ -132,7 +132,9 @@ _ai_update_suggestion() {
 _ai_self_insert() {
     _clai_dismiss_picker
     zle .self-insert
-    if [[ "$_AI_IN_PASTE" == "true" ]]; then
+    # During bracketed paste (or any queued bulk input), avoid running
+    # `clai suggest` per character. Recompute once when the queue drains.
+    if [[ "$_AI_IN_PASTE" == "true" ]] || [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
         return
     fi
     _ai_update_suggestion
@@ -145,6 +147,40 @@ zle -N self-insert _ai_self_insert
 _clai_dismiss_picker() {
     [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] && _clai_picker_close
 }
+
+# Clear inline ghost text state (without touching suggestion cache on disk).
+_ai_clear_ghost_text() {
+    if [[ -n "$_AI_CURRENT_SUGGESTION" ]]; then
+        # Record dismissed feedback (fire and forget)
+        (clai suggest-feedback --action=dismissed --suggested="$_AI_CURRENT_SUGGESTION" >/dev/null 2>&1 &)
+    fi
+    _AI_CURRENT_SUGGESTION=""
+    POSTDISPLAY=""
+    region_highlight=()
+}
+
+# ZLE widget: Tab completion should dismiss ghost text first.
+_ai_expand_or_complete() {
+    _clai_dismiss_picker
+    _ai_clear_ghost_text
+    zle .expand-or-complete
+}
+zle -N expand-or-complete _ai_expand_or_complete
+
+# ZLE widget: History navigation should clear stale ghost text first.
+_ai_up_line_or_history() {
+    _clai_dismiss_picker
+    _ai_clear_ghost_text
+    zle .up-line-or-history
+}
+zle -N up-line-or-history _ai_up_line_or_history
+
+_ai_down_line_or_history() {
+    _clai_dismiss_picker
+    _ai_clear_ghost_text
+    zle .down-line-or-history
+}
+zle -N down-line-or-history _ai_down_line_or_history
 
 # ZLE widget: Update suggestion after backspace
 _ai_backward_delete_char() {
