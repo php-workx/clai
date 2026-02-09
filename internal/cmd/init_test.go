@@ -174,6 +174,36 @@ func TestShellScripts_SuggestUsesPlainFormat(t *testing.T) {
 	}
 }
 
+func TestShellScripts_HistoryPickerDownRestoresOriginal(t *testing.T) {
+	{
+		content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+		if err != nil {
+			t.Fatalf("Failed to read zsh script: %v", err)
+		}
+		body := extractFunctionBody(string(content), "_clai_picker_down")
+		if body == "" {
+			t.Fatal("_clai_picker_down() not found in zsh script")
+		}
+		if !strings.Contains(body, "_clai_picker_cancel") {
+			t.Error("zsh _clai_picker_down should call _clai_picker_cancel at the newest item to match native history UX")
+		}
+	}
+
+	{
+		content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+		if err != nil {
+			t.Fatalf("Failed to read fish script: %v", err)
+		}
+		body := extractFishFunctionBody(string(content), "_clai_picker_down")
+		if body == "" {
+			t.Fatal("function _clai_picker_down not found in fish script")
+		}
+		if !strings.Contains(body, "_clai_picker_cancel") {
+			t.Error("fish _clai_picker_down should call _clai_picker_cancel at the newest item to match native history UX")
+		}
+	}
+}
+
 func TestRunInit_UnsupportedShell(t *testing.T) {
 	err := runInit(initCmd, []string{"powershell"})
 	if err == nil {
@@ -633,6 +663,22 @@ func extractFunctionBody(script, funcName string) string {
 	rest := script[start:]
 	// Find next function definition as boundary
 	nextFunc := regexp.MustCompile(`\n[a-zA-Z_][a-zA-Z0-9_]*\(\)\s*\{`)
+	if loc := nextFunc.FindStringIndex(rest[1:]); loc != nil {
+		return rest[:loc[0]+1]
+	}
+	return rest
+}
+
+// extractFishFunctionBody returns the text from a top-level fish function
+// definition (\"function <name>\") up to the next top-level fish function.
+// Returns empty string if the function is not found.
+func extractFishFunctionBody(script, funcName string) string {
+	start := strings.Index(script, "function "+funcName)
+	if start == -1 {
+		return ""
+	}
+	rest := script[start:]
+	nextFunc := regexp.MustCompile(`\nfunction\s+[a-zA-Z_][a-zA-Z0-9_]*\b`)
 	if loc := nextFunc.FindStringIndex(rest[1:]); loc != nil {
 		return rest[:loc[0]+1]
 	}

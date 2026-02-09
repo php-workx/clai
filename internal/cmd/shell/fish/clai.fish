@@ -363,6 +363,12 @@ end
 function _clai_picker_down
     if test "$_CLAI_PICKER_ACTIVE" = "true"
         if test "$_CLAI_PICKER_MODE" = "history"
+            # Match native history UX: when the newest item is selected, Down
+            # should return to the original buffer instead of wrapping.
+            if test $_CLAI_PICKER_INDEX -le 1
+                _clai_picker_cancel
+                return
+            end
             _clai_picker_prev
         else
             _clai_picker_next

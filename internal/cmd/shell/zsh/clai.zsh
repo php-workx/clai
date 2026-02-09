@@ -788,6 +788,12 @@ _clai_picker_up() {
 
 _clai_picker_down() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        if [[ "$_CLAI_PICKER_MODE" == "history" && $_CLAI_PICKER_INDEX -le 0 ]]; then
+            # Match native history UX: at the newest item, Down should return to
+            # the original buffer (not stay stuck at the bottom of the picker).
+            _clai_picker_cancel
+            return
+        fi
         if [[ $_CLAI_PICKER_INDEX -gt 0 ]]; then
             # Move down in the visual list (toward newer items)
             ((_CLAI_PICKER_INDEX--))
