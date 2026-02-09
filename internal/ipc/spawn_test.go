@@ -292,7 +292,7 @@ func TestRemoveStaleSocketDeleteError(t *testing.T) {
 	staleSocketDialAttempts = 2
 	staleSocketRetryDelay = 0
 	quickDialFn = func() (io.Closer, error) {
-		return nil, errors.New("dial failed")
+		return nil, errors.New("connection refused")
 	}
 	removeFileFn = func(path string) error {
 		return fmt.Errorf("permission denied")
@@ -301,6 +301,46 @@ func TestRemoveStaleSocketDeleteError(t *testing.T) {
 	err := removeStaleSocket(context.Background())
 	if err == nil || !strings.Contains(err.Error(), "failed to remove stale socket") {
 		t.Fatalf("removeStaleSocket() error = %v, want wrapped delete error", err)
+	}
+}
+
+func TestRemoveStaleSocketDoesNotDeleteForUnknownDialError(t *testing.T) {
+	oldQuickDial := quickDialFn
+	oldSocketExists := socketExistsFn
+	oldSocketPath := socketPathFn
+	oldRemove := removeFileFn
+	oldAttempts := staleSocketDialAttempts
+	oldDelay := staleSocketRetryDelay
+	t.Cleanup(func() {
+		quickDialFn = oldQuickDial
+		socketExistsFn = oldSocketExists
+		socketPathFn = oldSocketPath
+		removeFileFn = oldRemove
+		staleSocketDialAttempts = oldAttempts
+		staleSocketRetryDelay = oldDelay
+	})
+
+	socketExistsFn = func() bool { return true }
+	socketPathFn = func() string { return "/tmp/fake-clai.sock" }
+	staleSocketDialAttempts = 2
+	staleSocketRetryDelay = 0
+	quickDialFn = func() (io.Closer, error) {
+		// Something that's not clearly stale: we should not delete the socket.
+		return nil, errors.New("permission denied")
+	}
+
+	removeCalls := 0
+	removeFileFn = func(path string) error {
+		removeCalls++
+		return nil
+	}
+
+	err := removeStaleSocket(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "socket exists but dial failed") {
+		t.Fatalf("removeStaleSocket() error = %v, want non-stale dial error", err)
+	}
+	if removeCalls != 0 {
+		t.Fatalf("removeStaleSocket() remove calls = %d, want 0", removeCalls)
 	}
 }
 

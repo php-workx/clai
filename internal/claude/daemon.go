@@ -158,6 +158,7 @@ func StartDaemonProcess() error {
 
 func newDaemonStartCommand(exe string) *exec.Cmd {
 	// execabs prevents launching a relative-path executable unexpectedly.
+	// nosemgrep: go.lang.security.audit.os-exec.os-exec
 	return execabs.Command(exe, daemonSubcommand, daemonRunSubcommand)
 }
 

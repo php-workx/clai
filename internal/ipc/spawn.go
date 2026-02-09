@@ -2,11 +2,14 @@ package ipc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/execabs"
@@ -103,6 +106,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 
 	// Start daemon process
 	// execabs prevents executing binaries resolved to relative paths.
+	// nosemgrep: go.lang.security.audit.os-exec.os-exec
 	cmd := execabs.Command(daemonPath)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
@@ -237,6 +241,7 @@ func removeStaleSocket(ctx context.Context) error {
 
 	// Retry dial a few times to avoid deleting an active socket after
 	// a transient connection failure.
+	var lastDialErr error
 	for attempt := 0; attempt < staleSocketDialAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -248,6 +253,7 @@ func removeStaleSocket(ctx context.Context) error {
 			}
 			return nil
 		}
+		lastDialErr = err
 		if attempt < staleSocketDialAttempts-1 {
 			timer := time.NewTimer(staleSocketRetryDelay)
 			select {
@@ -259,8 +265,53 @@ func removeStaleSocket(ctx context.Context) error {
 		}
 	}
 
+	// The socket disappeared between our earlier existence check and dialing.
+	if errors.Is(lastDialErr, syscall.ENOENT) {
+		return nil
+	}
+
+	// Don't delete the socket for arbitrary dial failures (permissions, resource
+	// exhaustion, deadline exceeded, etc.). Deletion is only safe when the error
+	// strongly suggests an orphaned unix socket file.
+	if !isLikelyStaleSocketDialError(lastDialErr) {
+		return fmt.Errorf("socket exists but dial failed: %w", lastDialErr)
+	}
+
+	// Re-check existence to avoid deleting a socket created by a concurrently
+	// starting daemon after our dial attempts.
+	if !socketExistsFn() {
+		return nil
+	}
+
 	if err := removeFileFn(socketPathFn()); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove stale socket: %w", err)
 	}
 	return nil
+}
+
+func isLikelyStaleSocketDialError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Best-effort structured matching first. gRPC dial errors often wrap net
+	// syscall errors; errors.Is will walk the unwrap chain.
+	if errors.Is(err, syscall.ECONNREFUSED) {
+		return true
+	}
+
+	// Fallback to matching common unix socket dial strings when errors are
+	// stringly-typed / not unwrap-friendly.
+	msg := strings.ToLower(err.Error())
+	if strings.Contains(msg, "connection refused") {
+		return true
+	}
+
+	// If the socket path exists check raced with deletion, this can show up as
+	// an unstructured "no such file or directory" message.
+	if strings.Contains(msg, "no such file or directory") {
+		return true
+	}
+
+	return false
 }
