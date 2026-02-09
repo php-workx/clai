@@ -205,6 +205,16 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case tea.KeyCtrlC:
 		return m.handleCopy()
 
+	case tea.KeyCtrlU:
+		// Clear the query and refresh results immediately.
+		if m.textInput.Value() == "" {
+			return m, nil
+		}
+		m.textInput.SetValue("")
+		m.textInput.CursorEnd()
+		m.offset = 0
+		return m, m.startFetch()
+
 	case tea.KeyEnter:
 		return m.handleSelect()
 
@@ -440,8 +450,8 @@ func (m Model) currentTab() config.TabDef {
 // header and footer).
 func (m Model) listHeight() int {
 	// 1 row for tab bar, 1 row for query line, 1 row for newlines between sections,
-	// 2 rows for top+bottom padding.
-	chrome := 5
+	// 1 row for footer hints, 2 rows for top+bottom padding.
+	chrome := 6
 	if m.layout == LayoutBottomUp {
 		chrome++ // +1 for separator line between items and query
 	}
@@ -474,6 +484,7 @@ var (
 	truncStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
 	errorStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	dimStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	hintStyle          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("245"))
 )
 
 // Horizontal padding applied to the entire view for breathing room.
@@ -496,6 +507,10 @@ func (m Model) View() string {
 		b.WriteString(dimStyle.Render(strings.Repeat("─", m.contentWidth())))
 		b.WriteRune('\n')
 	}
+
+	// Footer hints (always above the query).
+	b.WriteString(m.viewFooter())
+	b.WriteRune('\n')
 
 	// Query line
 	b.WriteString(m.viewQuery())
@@ -523,9 +538,24 @@ func (m Model) viewTabBar() string {
 	}
 	bar := strings.Join(parts, " ")
 	if len(m.tabs) > 1 {
-		bar += dimStyle.Render("  " + tabSwitchHintLabel())
+		bar += hintStyle.Render("  " + tabSwitchHintLabel())
 	}
 	return bar
+}
+
+func (m Model) viewFooter() string {
+	parts := []string{
+		"Enter accept",
+		"Ctrl+U clear",
+		"Esc cancel",
+	}
+	if len(m.tabs) > 1 {
+		parts = append(parts, tabSwitchHintLabel())
+	}
+	if m.state == stateLoaded && len(m.items) > 0 {
+		parts = append(parts, rightRefineHintLabel())
+	}
+	return dimStyle.Render(strings.Join(parts, "  "))
 }
 
 // viewContent renders the item list or a status message.
@@ -575,8 +605,27 @@ func (m Model) viewList() string {
 	for i := 0; i < n; i++ {
 		display := m.items[i].displayText()
 		cw := m.contentWidth()
-		if cw > 4 {
-			display = MiddleTruncate(StripANSI(display), cw-4)
+		display = StripANSI(display)
+
+		// Reserve width so appended hints do not cause wrapping.
+		reserved := 2 // prefix: "> " or "  "
+		if i == m.selection {
+			reserved += lipgloss.Width("  " + rightRefineHintLabel())
+		}
+
+		maxDisplayWidth := cw - reserved
+		if maxDisplayWidth < 0 {
+			maxDisplayWidth = 0
+		}
+
+		// If truncation is needed, account for renderItem styling which expands
+		// the ellipsis to " … " (adds 2 columns).
+		if lipgloss.Width(display) > maxDisplayWidth {
+			truncateWidth := maxDisplayWidth - 2
+			if truncateWidth < 0 {
+				truncateWidth = 0
+			}
+			display = MiddleTruncate(display, truncateWidth)
 		}
 
 		var base, hl lipgloss.Style
@@ -589,7 +638,7 @@ func (m Model) viewList() string {
 
 		line := base.Render(prefix) + renderItem(display, query, base, hl)
 		if i == m.selection {
-			line += dimStyle.Render("  " + rightRefineHintLabel())
+			line += hintStyle.Render("  " + rightRefineHintLabel())
 		}
 		lines = append(lines, line)
 	}
@@ -669,16 +718,16 @@ func (m Model) viewQuery() string {
 
 func rightRefineHintLabel() string {
 	if supportsUnicodeHints() {
-		return "→"
+		return "→ use and refine"
 	}
-	return "Right: refine"
+	return "Right: use and refine"
 }
 
 func tabSwitchHintLabel() string {
 	if supportsUnicodeHints() {
-		return "⇥"
+		return "⇥ switch context"
 	}
-	return "Tab: switch scope"
+	return "Tab: switch context"
 }
 
 func supportsUnicodeHints() bool {

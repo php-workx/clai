@@ -483,14 +483,14 @@ func TestTabResetsOffset(t *testing.T) {
 
 func TestHintLabels_UTF8Locale(t *testing.T) {
 	t.Setenv("LC_ALL", "en_US.UTF-8")
-	assert.Equal(t, "→", rightRefineHintLabel())
-	assert.Equal(t, "⇥", tabSwitchHintLabel())
+	assert.Equal(t, "→ use and refine", rightRefineHintLabel())
+	assert.Equal(t, "⇥ switch context", tabSwitchHintLabel())
 }
 
 func TestHintLabels_ASCIILocaleFallback(t *testing.T) {
 	t.Setenv("LC_ALL", "C")
-	assert.Equal(t, "Right: refine", rightRefineHintLabel())
-	assert.Equal(t, "Tab: switch scope", tabSwitchHintLabel())
+	assert.Equal(t, "Right: use and refine", rightRefineHintLabel())
+	assert.Equal(t, "Tab: switch context", tabSwitchHintLabel())
 }
 
 func TestViewTabBar_HidesTabHintForSingleTab(t *testing.T) {
@@ -500,7 +500,7 @@ func TestViewTabBar_HidesTabHintForSingleTab(t *testing.T) {
 
 	view := m.viewTabBar()
 	assert.NotContains(t, view, "⇥")
-	assert.NotContains(t, view, "Tab: switch scope")
+	assert.NotContains(t, view, "Tab: switch context")
 }
 
 func TestViewList_SelectedLineShowsRightRefineHint(t *testing.T) {
@@ -510,7 +510,18 @@ func TestViewList_SelectedLineShowsRightRefineHint(t *testing.T) {
 	m = initAndLoad(t, m)
 
 	view := m.viewList()
-	assert.Contains(t, view, "→")
+	assert.Contains(t, view, "→ use and refine")
+}
+
+func TestViewFooter_ShowsShortcuts(t *testing.T) {
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	footer := m.viewFooter()
+	assert.Contains(t, footer, "Enter accept")
+	assert.Contains(t, footer, "Ctrl+U clear")
+	assert.Contains(t, footer, "Esc cancel")
 }
 
 // --- Query / debounce tests ---
@@ -526,6 +537,18 @@ func TestTyping_AppendsToQuery(t *testing.T) {
 	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
 	m = result.(Model)
 	assert.Equal(t, "ls", m.textInput.Value())
+}
+
+func TestCtrlU_ClearsQueryAndFetches(t *testing.T) {
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	m.textInput.SetValue("abc")
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
+	m = result.(Model)
+	assert.Equal(t, "", m.textInput.Value())
+	assert.NotNil(t, cmd)
 }
 
 func TestBackspace_RemovesFromQuery(t *testing.T) {
