@@ -965,5 +965,28 @@ if status is-interactive; and not set -q _CLAI_REINIT
     disown %1 2>/dev/null
 
     set -l short_id (string sub -l 8 -- $CLAI_SESSION_ID)
-    echo "clai [$short_id] Alt+S suggestions | Alt+H history | ?\"describe task\""
+    set -l locale ""
+    if set -q LC_ALL
+        set locale $LC_ALL
+    else if set -q LC_CTYPE
+        set locale $LC_CTYPE
+    else if set -q LANG
+        set locale $LANG
+    end
+
+    set -l supports_utf8 1
+    set -l lower (string lower -- (string trim -- $locale))
+    if test -n "$lower"
+        if string match -q "*utf-8*" -- $lower; or string match -q "*utf8*" -- $lower
+            set supports_utf8 1
+        else
+            set supports_utf8 0
+        end
+    end
+
+    if test "$supports_utf8" -eq 1
+        printf '\e[2m🤖 clai [%s] Alt+S suggestions | Alt+H history | ?"describe task"\e[0m\n' "$short_id"
+    else
+        echo "clai [$short_id] Alt+S suggestions | Alt+H history | ?\"describe task\""
+    end
 end

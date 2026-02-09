@@ -108,9 +108,24 @@ _clai_notify_throttled() {
     fi
 }
 
+_clai_supports_utf8() {
+    # Prefer locale variables in order. If none are set, assume UTF-8.
+    local value
+    for value in "${LC_ALL:-}" "${LC_CTYPE:-}" "${LANG:-}"; do
+        if [[ -n "$value" ]]; then
+            if [[ "$value" == *"UTF-8"* || "$value" == *"utf-8"* || "$value" == *"UTF8"* || "$value" == *"utf8"* ]]; then
+                return 0
+            fi
+            return 1
+        fi
+    done
+    return 0
+}
+
 _clai_picker_brief_error() {
     local err="$1"
-    local lower="${err,,}"
+    local lower
+    lower="$(printf '%s' "$err" | tr '[:upper:]' '[:lower:]')"
     if [[ "$lower" == *"rpc:"* || "$lower" == *"dial unix"* || "$lower" == *"no such file or directory"* || "$lower" == *"connection refused"* ]]; then
         echo "clai: daemon unavailable"
         return
@@ -1025,8 +1040,13 @@ clai() {
 # ============================================
 
 if [[ $- == *i* && -z "$_CLAI_REINIT" ]]; then
-    # Use printf for better portability across bash versions
-    printf 'clai [%s] Alt+S suggestions | Alt+H history | ?"describe task"\n' "${CLAI_SESSION_ID:0:8}"
+    # Use printf for better portability across bash versions.
+    # Keep emoji + dim styling when UTF-8 is supported.
+    if _clai_supports_utf8; then
+        printf '\033[2m🤖 clai [%s] Alt+S suggestions | Alt+H history | ?"describe task"\033[0m\n' "${CLAI_SESSION_ID:0:8}"
+    else
+        printf 'clai [%s] Alt+S suggestions | Alt+H history | ?"describe task"\n' "${CLAI_SESSION_ID:0:8}"
+    fi
 
     # Register session + import history (fire and forget).
     # Keep startup prompt snappy by printing the message before forking background work.

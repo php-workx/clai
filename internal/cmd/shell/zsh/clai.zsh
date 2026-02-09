@@ -577,6 +577,21 @@ _clai_notify_throttled() {
     fi
 }
 
+_clai_supports_utf8() {
+    # Prefer locale variables in order. If none are set, assume UTF-8.
+    local value
+    for value in "$LC_ALL" "$LC_CTYPE" "$LANG"; do
+        if [[ -n "$value" ]]; then
+            value="${value:l}"
+            if [[ "$value" == *"utf-8"* || "$value" == *"utf8"* ]]; then
+                return 0
+            fi
+            return 1
+        fi
+    done
+    return 0
+}
+
 _clai_picker_brief_error() {
     local err="$1"
     local lower="${err:l}"
@@ -1179,5 +1194,9 @@ if [[ -o interactive && -z "$_CLAI_REINIT" ]]; then
     trap '_clai_cleanup' EXIT HUP
 
     local short_id="${CLAI_SESSION_ID:0:8}"
-    echo "clai [$short_id] Alt+S suggestions | Alt+H history | ?\"describe task\""
+    if _clai_supports_utf8; then
+        printf '\033[2m🤖 clai [%s] Alt+S suggestions | Alt+H history | ?"describe task"\033[0m\n' "$short_id"
+    else
+        echo "clai [$short_id] Alt+S suggestions | Alt+H history | ?\"describe task\""
+    fi
 fi
