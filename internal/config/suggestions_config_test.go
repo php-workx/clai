@@ -18,6 +18,7 @@ func TestDefaultSuggestionsConfig_Core(t *testing.T) {
 	assertInt(t, "MaxResults", s.MaxResults, 5)
 	assertInt(t, "CacheTTLMs", s.CacheTTLMs, 30000)
 	assertInt(t, "HardTimeoutMs", s.HardTimeoutMs, 150)
+	assertStr(t, "PickerView", s.PickerView, "detailed")
 }
 
 func TestDefaultSuggestionsConfig_HookTransport(t *testing.T) {

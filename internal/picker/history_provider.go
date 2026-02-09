@@ -126,10 +126,10 @@ func (p *HistoryProvider) fetchWithContext(ctx context.Context, req Request) (Re
 		return Response{}, fmt.Errorf("history provider: rpc: %w", err)
 	}
 
-	items := make([]string, 0, len(grpcResp.Items))
+	items := make([]Item, 0, len(grpcResp.Items))
 	for _, item := range grpcResp.Items {
 		cmd := ValidateUTF8(StripANSI(item.Command))
-		items = append(items, cmd)
+		items = append(items, Item{Value: cmd, Display: cmd})
 	}
 
 	return Response{

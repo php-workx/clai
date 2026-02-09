@@ -45,7 +45,7 @@ const (
 // fetchDoneMsg is sent when an async Provider.Fetch completes.
 type fetchDoneMsg struct {
 	requestID uint64
-	items     []string
+	items     []Item
 	atEnd     bool
 	err       error
 }
@@ -74,7 +74,7 @@ type Model struct {
 	state     pickerState
 	tabs      []config.TabDef
 	activeTab int
-	items     []string
+	items     []Item
 	selection int // Index into items; -1 when empty
 	textInput textinput.Model
 	offset    int  // Pagination offset
@@ -233,7 +233,7 @@ func (m Model) handleRightRefineKey() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	query := ValidateUTF8(StripANSI(m.items[m.selection]))
+	query := ValidateUTF8(StripANSI(m.items[m.selection].Value))
 	if query == "" || m.textInput.Value() == query {
 		return m, nil
 	}
@@ -247,7 +247,7 @@ func (m Model) handleRightRefineKey() (tea.Model, tea.Cmd) {
 // handleCopy copies the selected item to the clipboard.
 func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 	if m.selection >= 0 && m.selection < len(m.items) {
-		return m, copyToClipboard(m.items[m.selection])
+		return m, copyToClipboard(m.items[m.selection].Value)
 	}
 	return m, nil
 }
@@ -255,7 +255,7 @@ func (m Model) handleCopy() (tea.Model, tea.Cmd) {
 // handleSelect accepts the current selection and quits.
 func (m Model) handleSelect() (tea.Model, tea.Cmd) {
 	if m.selection >= 0 && m.selection < len(m.items) {
-		m.result = m.items[m.selection]
+		m.result = m.items[m.selection].Value
 	}
 	m.cancelInflight()
 	return m, tea.Quit
@@ -573,7 +573,7 @@ func (m Model) viewList() string {
 	query := m.textInput.Value()
 	lines := make([]string, 0, n)
 	for i := 0; i < n; i++ {
-		display := m.items[i]
+		display := m.items[i].displayText()
 		cw := m.contentWidth()
 		if cw > 4 {
 			display = MiddleTruncate(StripANSI(display), cw-4)

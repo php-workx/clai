@@ -52,6 +52,14 @@ func main() {
 	os.Exit(run(os.Args[1:]))
 }
 
+type subcommand string
+
+const (
+	cmdHistory subcommand = "history"
+	cmdSuggest subcommand = "suggest"
+	cmdUnknown subcommand = "unknown"
+)
+
 // run is the main entry point, returning an exit code.
 // It is separated from main() to enable testing.
 func run(args []string) int {
@@ -96,9 +104,12 @@ func run(args []string) int {
 		return exitFallback
 	}
 
+	var cmd subcommand
 	switch args[0] {
 	case "history":
-		// continue below
+		cmd = cmdHistory
+	case "suggest":
+		cmd = cmdSuggest
 	case "--help", "-h":
 		printUsage()
 		return exitSuccess
@@ -111,9 +122,21 @@ func run(args []string) int {
 		return exitFallback
 	}
 
-	opts, err := parseHistoryFlags(args[1:])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+	var (
+		opts     *pickerOpts
+		parseErr error
+	)
+	switch cmd {
+	case cmdHistory:
+		opts, parseErr = parseHistoryFlags(args[1:])
+	case cmdSuggest:
+		opts, parseErr = parseSuggestFlags(args[1:])
+	default:
+		cmd = cmdUnknown
+		parseErr = fmt.Errorf("unknown command %q", args[0])
+	}
+	if parseErr != nil {
+		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", parseErr)
 		return exitFallback
 	}
 
@@ -125,19 +148,34 @@ func run(args []string) int {
 	}
 
 	// Apply config defaults for flags that weren't explicitly set.
-	if opts.limit == 0 {
-		opts.limit = cfg.History.PickerPageSize
-	}
-	if opts.tabs == "" {
-		tabIDs := make([]string, len(cfg.History.PickerTabs))
-		for i, t := range cfg.History.PickerTabs {
-			tabIDs[i] = t.ID
+	switch cmd {
+	case cmdHistory:
+		if opts.limit == 0 {
+			opts.limit = cfg.History.PickerPageSize
 		}
-		opts.tabs = strings.Join(tabIDs, ",")
+		if opts.tabs == "" {
+			tabIDs := make([]string, len(cfg.History.PickerTabs))
+			for i, t := range cfg.History.PickerTabs {
+				tabIDs[i] = t.ID
+			}
+			opts.tabs = strings.Join(tabIDs, ",")
+		}
+	case cmdSuggest:
+		if opts.limit == 0 {
+			opts.limit = cfg.Suggestions.MaxResults
+		}
 	}
 
 	// Step 8: Dispatch to backend.
-	return dispatch(cfg, opts)
+	switch cmd {
+	case cmdHistory:
+		return dispatchHistory(cfg, opts)
+	case cmdSuggest:
+		return dispatchSuggest(cfg, opts)
+	default:
+		printUsage()
+		return exitFallback
+	}
 }
 
 // parseHistoryFlags parses flags for the "history" subcommand.
@@ -188,6 +226,46 @@ func parseHistoryFlags(args []string) (*pickerOpts, error) {
 	return opts, nil
 }
 
+// parseSuggestFlags parses flags for the "suggest" subcommand.
+func parseSuggestFlags(args []string) (*pickerOpts, error) {
+	fs := flag.NewFlagSet("suggest", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+
+	opts := &pickerOpts{}
+	fs.IntVar(&opts.limit, "limit", 0, "max results to request (positive integer)")
+	fs.StringVar(&opts.query, "query", "", "initial buffer/query (max 4096 bytes)")
+	fs.StringVar(&opts.session, "session", "", "session ID")
+	fs.StringVar(&opts.cwd, "cwd", "", "working directory")
+	fs.StringVar(&opts.output, "output", "", "output format (only \"plain\" accepted)")
+
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: clai-picker suggest [flags]\n\nFlags:\n")
+		fs.PrintDefaults()
+	}
+
+	if err := fs.Parse(args); err != nil {
+		return nil, err
+	}
+	if fs.NArg() > 0 {
+		return nil, fmt.Errorf("unexpected argument: %s", fs.Arg(0))
+	}
+
+	if opts.limit < 0 {
+		return nil, fmt.Errorf("--limit must be a positive integer")
+	}
+	if opts.output != "" && opts.output != "plain" {
+		return nil, fmt.Errorf("--output must be \"plain\" (got %q)", opts.output)
+	}
+
+	sanitized, err := sanitizeQuery(opts.query)
+	if err != nil {
+		return nil, fmt.Errorf("--query: %w", err)
+	}
+	opts.query = sanitized
+
+	return opts, nil
+}
+
 // sanitizeQuery strips control characters and validates the query string.
 func sanitizeQuery(q string) (string, error) {
 	if q == "" {
@@ -218,8 +296,7 @@ func sanitizeQuery(q string) (string, error) {
 	return result, nil
 }
 
-// dispatch routes to the appropriate backend.
-func dispatch(cfg *config.Config, opts *pickerOpts) int {
+func dispatchHistory(cfg *config.Config, opts *pickerOpts) int {
 	backend := cfg.History.PickerBackend
 	if backend == "" {
 		backend = "builtin"
@@ -294,21 +371,11 @@ func socketPath(cfg *config.Config) string {
 	return config.DefaultPaths().SocketFile()
 }
 
-// dispatchBuiltin runs the built-in Bubble Tea TUI.
-func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
-	tabs := resolveTabs(cfg, opts)
-	provider := picker.NewHistoryProvider(socketPath(cfg))
-
-	model := picker.NewModel(tabs, provider).WithLayout(picker.LayoutBottomUp)
-	if opts.query != "" {
-		model = model.WithQuery(opts.query)
-	}
-
+func runTUI(model picker.Model) (int, string) {
 	// Open /dev/tty for TUI input/output since stdin/stdout are used for data.
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: cannot open /dev/tty: %v\n", err)
-		return exitFallback
+		return exitFallback, fmt.Sprintf("clai-picker: cannot open /dev/tty: %v", err)
 	}
 	defer tty.Close()
 
@@ -327,24 +394,75 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 
 	finalModel, err := p.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: TUI error: %v\n", err)
-		return exitFallback
+		return exitFallback, fmt.Sprintf("clai-picker: TUI error: %v", err)
 	}
 
 	m, ok := finalModel.(picker.Model)
 	if !ok {
-		fmt.Fprintln(os.Stderr, "clai-picker: unexpected model type")
-		return exitFallback
+		return exitFallback, "clai-picker: unexpected model type"
 	}
 
 	if m.IsCancelled() {
-		return exitCancelled
+		return exitCancelled, ""
 	}
 
-	if result := m.Result(); result != "" {
+	return exitSuccess, m.Result()
+}
+
+// dispatchBuiltin runs the built-in Bubble Tea TUI for history.
+func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
+	tabs := resolveTabs(cfg, opts)
+	provider := picker.NewHistoryProvider(socketPath(cfg))
+
+	model := picker.NewModel(tabs, provider).WithLayout(picker.LayoutBottomUp)
+	if opts.query != "" {
+		model = model.WithQuery(opts.query)
+	}
+
+	code, result := runTUI(model)
+	if code != exitSuccess {
+		if code == exitFallback && result != "" {
+			fmt.Fprintln(os.Stderr, result)
+		}
+		return code
+	}
+
+	if result != "" {
 		fmt.Fprintln(os.Stdout, result)
 	}
 
+	return exitSuccess
+}
+
+func dispatchSuggest(cfg *config.Config, opts *pickerOpts) int {
+	// Suggestions are always rendered using the builtin TUI.
+	tab := config.TabDef{
+		ID:       "suggestions",
+		Label:    "Suggestions",
+		Provider: "suggest",
+		Args: map[string]string{
+			"session_id": opts.session,
+			"cwd":        opts.cwd,
+		},
+	}
+
+	provider := picker.NewSuggestProvider(socketPath(cfg), cfg.Suggestions.PickerView)
+	model := picker.NewModel([]config.TabDef{tab}, provider).WithLayout(picker.LayoutTopDown)
+	if opts.query != "" {
+		model = model.WithQuery(opts.query)
+	}
+
+	code, result := runTUI(model)
+	if code != exitSuccess {
+		if code == exitFallback && result != "" {
+			fmt.Fprintln(os.Stderr, result)
+		}
+		return code
+	}
+
+	if result != "" {
+		fmt.Fprintln(os.Stdout, result)
+	}
 	return exitSuccess
 }
 
@@ -404,7 +522,9 @@ func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
 			debugLog("fzf backend: fetch error: %v", err)
 			break
 		}
-		allItems = append(allItems, resp.Items...)
+		for _, it := range resp.Items {
+			allItems = append(allItems, it.Value)
+		}
 		if resp.AtEnd || len(resp.Items) == 0 {
 			break
 		}
@@ -446,6 +566,7 @@ func printUsage() {
 
 Commands:
   history    Browse and search shell history
+  suggest    Browse and search smart suggestions
 
 Flags:
   --help     Show this help message

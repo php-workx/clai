@@ -50,7 +50,7 @@ func (m *mockClaiService) FetchHistory(_ context.Context, req *pb.HistoryFetchRe
 // startMockServer starts a gRPC server on a temporary Unix socket and returns
 // the socket path. Uses /tmp directly with short names to stay within the
 // macOS 104-character Unix socket path limit.
-func startMockServer(t *testing.T, svc *mockClaiService) string {
+func startMockServer(t *testing.T, svc pb.ClaiServiceServer) string {
 	t.Helper()
 
 	id := testSocketCounter.Add(1)
@@ -59,7 +59,7 @@ func startMockServer(t *testing.T, svc *mockClaiService) string {
 	return socketPath
 }
 
-func startMockServerOnPath(t *testing.T, svc *mockClaiService, socketPath string) {
+func startMockServerOnPath(t *testing.T, svc pb.ClaiServiceServer, socketPath string) {
 	t.Helper()
 
 	_ = os.Remove(socketPath)
@@ -113,8 +113,8 @@ func TestHistoryProvider_BasicFetch(t *testing.T) {
 		t.Fatalf("expected 3 items, got %d", len(resp.Items))
 	}
 
-	if resp.Items[0] != "git status" {
-		t.Errorf("expected first item 'git status', got %q", resp.Items[0])
+	if resp.Items[0].Value != "git status" {
+		t.Errorf("expected first item 'git status', got %q", resp.Items[0].Value)
 	}
 
 	if !resp.AtEnd {
@@ -208,12 +208,12 @@ func TestHistoryProvider_ANSIStripping(t *testing.T) {
 		t.Fatalf("expected 2 items, got %d", len(resp.Items))
 	}
 
-	if resp.Items[0] != "git status" {
-		t.Errorf("expected stripped 'git status', got %q", resp.Items[0])
+	if resp.Items[0].Value != "git status" {
+		t.Errorf("expected stripped 'git status', got %q", resp.Items[0].Value)
 	}
 
-	if resp.Items[1] != "error command" {
-		t.Errorf("expected stripped 'error command', got %q", resp.Items[1])
+	if resp.Items[1].Value != "error command" {
+		t.Errorf("expected stripped 'error command', got %q", resp.Items[1].Value)
 	}
 }
 
@@ -469,7 +469,7 @@ func TestHistoryProvider_RecoversWhenDefaultSocketAppears(t *testing.T) {
 	if !recoveryCalled {
 		t.Fatal("expected daemon recovery to be attempted")
 	}
-	if len(resp.Items) != 1 || resp.Items[0] != "git status" {
+	if len(resp.Items) != 1 || resp.Items[0].Value != "git status" {
 		t.Fatalf("unexpected items after recovery: %+v", resp.Items)
 	}
 }
@@ -538,11 +538,11 @@ func TestHistoryProvider_UTF8WithMultibyteChars(t *testing.T) {
 	}
 
 	// ANSI should be stripped but multi-byte UTF-8 preserved
-	if resp.Items[0] != "echo '日本語'" {
-		t.Errorf("expected \"echo '日本語'\", got %q", resp.Items[0])
+	if resp.Items[0].Value != "echo '日本語'" {
+		t.Errorf("expected \"echo '日本語'\", got %q", resp.Items[0].Value)
 	}
 
-	if resp.Items[1] != "echo '\u00e9\u00e8\u00ea'" {
-		t.Errorf("expected \"echo 'éèê'\", got %q", resp.Items[1])
+	if resp.Items[1].Value != "echo '\u00e9\u00e8\u00ea'" {
+		t.Errorf("expected \"echo 'éèê'\", got %q", resp.Items[1].Value)
 	}
 }

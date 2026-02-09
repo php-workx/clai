@@ -76,6 +76,9 @@ type SuggestionsConfig struct {
 	CacheTTLMs    int  `yaml:"cache_ttl_ms"`    // Cache time-to-live in ms
 	HardTimeoutMs int  `yaml:"hard_timeout_ms"` // Hard timeout for suggestion generation in ms
 
+	// --- UI ---
+	PickerView string `yaml:"picker_view"` // compact|detailed (suggestion picker list rendering)
+
 	// --- Hook/transport ---
 	HookConnectTimeoutMs  int    `yaml:"hook_connect_timeout_ms"` // Socket connect timeout in ms
 	HookWriteTimeoutMs    int    `yaml:"hook_write_timeout_ms"`   // Socket write timeout in ms
@@ -285,6 +288,9 @@ func DefaultSuggestionsConfig() SuggestionsConfig {
 		MaxResults:    5,
 		CacheTTLMs:    30000,
 		HardTimeoutMs: 150,
+
+		// UI
+		PickerView: "detailed",
 
 		// Hook/transport
 		HookConnectTimeoutMs:  15,
@@ -701,6 +707,8 @@ func (c *Config) getSuggestionsField(field string) (string, error) {
 		return strconv.FormatBool(c.Suggestions.ShowRiskWarning), nil
 	case "scorer_version":
 		return c.Suggestions.ScorerVersion, nil
+	case "picker_view":
+		return c.Suggestions.PickerView, nil
 	default:
 		return "", fmt.Errorf("unknown field: suggestions.%s", field)
 	}
@@ -743,6 +751,11 @@ func (c *Config) setSuggestionsField(field, value string) error {
 			return fmt.Errorf("invalid scorer_version: %s (must be v1, v2, or blend)", value)
 		}
 		c.Suggestions.ScorerVersion = value
+	case "picker_view":
+		if !isValidSuggestionsPickerView(value) {
+			return fmt.Errorf("invalid picker_view: %s (must be compact or detailed)", value)
+		}
+		c.Suggestions.PickerView = value
 	default:
 		return fmt.Errorf("unknown field: suggestions.%s", field)
 	}
@@ -981,6 +994,7 @@ func ListKeys() []string {
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
 		"suggestions.scorer_version",
+		"suggestions.picker_view",
 		"history.picker_backend",
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
@@ -1120,6 +1134,10 @@ func (s *SuggestionsConfig) validateEnumFields(warn func(string, string), defaul
 		warn("search_fts_tokenizer", fmt.Sprintf("must be trigram or unicode61, got %q; falling back to trigram", s.SearchFTSTokenizer))
 		s.SearchFTSTokenizer = "trigram"
 	}
+	if !isValidSuggestionsPickerView(s.PickerView) {
+		warn("picker_view", fmt.Sprintf("must be compact or detailed, got %q; falling back to %q", s.PickerView, defaults.PickerView))
+		s.PickerView = defaults.PickerView
+	}
 }
 
 // clampIntRange clamps an integer field to [min, max], emitting a warning if adjusted.
@@ -1164,6 +1182,15 @@ func isValidFTSTokenizer(tokenizer string) bool {
 func isValidScorerVersion(version string) bool {
 	switch version {
 	case "v1", "v2", "blend":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidSuggestionsPickerView(v string) bool {
+	switch v {
+	case "compact", "detailed":
 		return true
 	default:
 		return false

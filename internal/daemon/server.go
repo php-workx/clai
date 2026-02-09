@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/config"
@@ -255,7 +256,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Create gRPC server
-	s.grpcServer = grpc.NewServer()
+	s.grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(s.accessLogUnaryInterceptor()))
 	pb.RegisterClaiServiceServer(s.grpcServer, s)
 
 	// Write PID file
@@ -311,6 +312,23 @@ func (s *Server) Start(ctx context.Context) error {
 		return nil
 	case err := <-errChan:
 		return err
+	}
+}
+
+func (s *Server) accessLogUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		start := time.Now()
+		resp, err := handler(ctx, req)
+
+		// "Web server"-style access log line, but structured. Do not log request bodies
+		// (buffers/commands) here.
+		s.logger.Info("rpc",
+			"method", info.FullMethod,
+			"code", status.Code(err).String(),
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
+
+		return resp, err
 	}
 }
 
