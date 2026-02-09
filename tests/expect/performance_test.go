@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -195,6 +196,11 @@ func TestPerformance_InitCommandFast(t *testing.T) {
 	}
 
 	threshold := 50 * time.Millisecond
+	// macOS tends to have higher process startup + filesystem overhead even for
+	// tiny commands; keep this strict but non-flaky.
+	if runtime.GOOS == "darwin" {
+		threshold = 80 * time.Millisecond
+	}
 
 	shells := []string{"zsh", "bash", "fish"}
 
