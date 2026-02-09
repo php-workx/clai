@@ -33,7 +33,7 @@ func TestLogPath(t *testing.T) {
 		t.Fatalf("UserHomeDir() error = %v", err)
 	}
 	// Must match where daemon log file goes
-	expected := filepath.Join(home, ".clai", "clai.log")
+	expected := filepath.Join(home, ".clai", "logs", "daemon.log")
 
 	path := LogPath()
 	if path != expected {

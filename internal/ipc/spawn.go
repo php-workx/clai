@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"golang.org/x/sys/execabs"
+
+	"github.com/runger/clai/internal/config"
 )
 
 // PidPath returns the path to the daemon PID file
@@ -19,7 +21,7 @@ func PidPath() string {
 
 // LogPath returns the path to the daemon log file
 func LogPath() string {
-	return filepath.Join(RunDir(), "clai.log")
+	return config.DefaultPaths().LogFile()
 }
 
 // DaemonBinaryName is the name of the daemon executable
@@ -76,6 +78,9 @@ func SpawnDaemonContext(ctx context.Context) error {
 	// Ensure run directory exists
 	if err := os.MkdirAll(RunDir(), 0755); err != nil {
 		return fmt.Errorf("failed to create run dir: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(LogPath()), 0755); err != nil {
+		return fmt.Errorf("failed to create log dir: %w", err)
 	}
 
 	if err := removeStaleSocket(ctx); err != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -41,10 +42,10 @@ func init() {
 
 func runLogs(cmd *cobra.Command, args []string) error {
 	paths := config.DefaultPaths()
-	logFile := paths.LogFile()
+	logFile, found := resolveLogFile(paths)
 
 	// Check if log file exists
-	if _, err := os.Stat(logFile); os.IsNotExist(err) {
+	if !found {
 		fmt.Printf("No log file found at: %s\n", logFile)
 		fmt.Println("The daemon may not have been started yet.")
 		return nil
@@ -55,6 +56,19 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	}
 
 	return tailLogs(logFile, logsLines)
+}
+
+func resolveLogFile(paths *config.Paths) (string, bool) {
+	primary := paths.LogFile()
+	if _, err := os.Stat(primary); err == nil {
+		return primary, true
+	}
+
+	legacy := filepath.Join(paths.BaseDir, "clai.log")
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy, true
+	}
+	return primary, false
 }
 
 func tailLogs(filename string, n int) error {
