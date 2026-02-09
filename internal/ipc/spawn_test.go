@@ -193,6 +193,40 @@ func TestSpawnAndWaitContextCanceledWhileWaiting(t *testing.T) {
 	}
 }
 
+func TestSpawnAndWaitContextTimeout(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "clai-spawn-timeout-*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	daemonPath := filepath.Join(tmpDir, "claid-test")
+	if err := os.WriteFile(daemonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	oldSocket := os.Getenv("CLAI_SOCKET")
+	oldDaemonPath := os.Getenv("CLAI_DAEMON_PATH")
+	oldXDG := os.Getenv("XDG_RUNTIME_DIR")
+	oldHome := os.Getenv("HOME")
+	t.Cleanup(func() {
+		_ = os.Setenv("CLAI_SOCKET", oldSocket)
+		_ = os.Setenv("CLAI_DAEMON_PATH", oldDaemonPath)
+		_ = os.Setenv("XDG_RUNTIME_DIR", oldXDG)
+		_ = os.Setenv("HOME", oldHome)
+	})
+
+	_ = os.Setenv("CLAI_SOCKET", filepath.Join(tmpDir, "clai.sock"))
+	_ = os.Setenv("CLAI_DAEMON_PATH", daemonPath)
+	_ = os.Setenv("XDG_RUNTIME_DIR", tmpDir)
+	_ = os.Setenv("HOME", tmpDir)
+
+	err = SpawnAndWaitContext(context.Background(), 40*time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "did not start within") {
+		t.Fatalf("SpawnAndWaitContext() error = %v, want timeout error", err)
+	}
+}
+
 func TestRemoveStaleSocketRetriesBeforeDelete(t *testing.T) {
 	oldQuickDial := quickDialFn
 	oldSocketExists := socketExistsFn
