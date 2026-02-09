@@ -55,7 +55,14 @@ func startMockServer(t *testing.T, svc *mockClaiService) string {
 
 	id := testSocketCounter.Add(1)
 	socketPath := fmt.Sprintf("/tmp/clai-hp-test-%d-%d.sock", os.Getpid(), id)
+	startMockServerOnPath(t, svc, socketPath)
+	return socketPath
+}
 
+func startMockServerOnPath(t *testing.T, svc *mockClaiService, socketPath string) {
+	t.Helper()
+
+	_ = os.Remove(socketPath)
 	lis, err := net.Listen("unix", socketPath)
 	if err != nil {
 		t.Fatalf("failed to listen: %v", err)
@@ -72,8 +79,6 @@ func startMockServer(t *testing.T, svc *mockClaiService) string {
 		srv.GracefulStop()
 		os.Remove(socketPath)
 	})
-
-	return socketPath
 }
 
 func TestHistoryProvider_BasicFetch(t *testing.T) {
@@ -431,6 +436,41 @@ func TestHistoryProvider_DialFailure(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error on dial failure, got nil")
+	}
+}
+
+func TestHistoryProvider_RecoversWhenDefaultSocketAppears(t *testing.T) {
+	id := testSocketCounter.Add(1)
+	socketPath := fmt.Sprintf("/tmp/clai-hp-recover-%d-%d.sock", os.Getpid(), id)
+	t.Setenv("CLAI_SOCKET", socketPath)
+
+	svc := &mockClaiService{
+		items: []*pb.HistoryItem{
+			{Command: "git status", TimestampMs: 1000},
+		},
+		atEnd: true,
+	}
+	provider := NewHistoryProvider(socketPath)
+
+	recoveryCalled := false
+	provider.ensureDaemon = func() error {
+		recoveryCalled = true
+		startMockServerOnPath(t, svc, socketPath)
+		return nil
+	}
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 99,
+		Limit:     10,
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed after recovery: %v", err)
+	}
+	if !recoveryCalled {
+		t.Fatal("expected daemon recovery to be attempted")
+	}
+	if len(resp.Items) != 1 || resp.Items[0] != "git status" {
+		t.Fatalf("unexpected items after recovery: %+v", resp.Items)
 	}
 }
 
