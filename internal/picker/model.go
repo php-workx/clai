@@ -331,7 +331,25 @@ func (m Model) handleFetchDone(msg fetchDoneMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	m.items = msg.items
+	items := msg.items
+	// Always apply a local substring filter. This keeps behavior consistent
+	// across providers (history + suggestions) and allows matching anywhere
+	// within the command text.
+	if q := strings.TrimSpace(m.textInput.Value()); q != "" {
+		qLower := strings.ToLower(q)
+		filtered := make([]Item, 0, len(items))
+		for _, it := range items {
+			// Filter against the raw command value (the thing we'd insert),
+			// not the decorated display text.
+			val := strings.ToLower(StripANSI(it.Value))
+			if strings.Contains(val, qLower) {
+				filtered = append(filtered, it)
+			}
+		}
+		items = filtered
+	}
+
+	m.items = items
 	m.atEnd = msg.atEnd
 
 	if len(m.items) == 0 {

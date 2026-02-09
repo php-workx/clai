@@ -77,8 +77,11 @@ func TestSuggestProvider_BasicFetch_Detailed(t *testing.T) {
 	if svc.lastReq.Cwd != "/repo" {
 		t.Fatalf("expected cwd to be passed, got %q", svc.lastReq.Cwd)
 	}
-	if svc.lastReq.Buffer != "g" {
-		t.Fatalf("expected buffer to be passed, got %q", svc.lastReq.Buffer)
+	if svc.lastReq.Buffer != "" {
+		t.Fatalf("expected buffer to be empty (picker filters locally), got %q", svc.lastReq.Buffer)
+	}
+	if svc.lastReq.CursorPos != 0 {
+		t.Fatalf("expected cursor_pos=0, got %d", svc.lastReq.CursorPos)
 	}
 }
 

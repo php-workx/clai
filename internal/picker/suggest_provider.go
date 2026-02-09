@@ -27,6 +27,12 @@ type SuggestProvider struct {
 	view       string
 	// ensureDaemon is injected for testing; defaults to ipc.EnsureDaemon.
 	ensureDaemon func() error
+
+	// cacheKey is "session_id\ncwd". Suggest picker results do not depend on the
+	// filter query; we fetch a broad set once and let the picker do local
+	// substring filtering.
+	cacheKey string
+	cache    []Item
 }
 
 // Compile-time check that SuggestProvider implements Provider.
@@ -45,10 +51,36 @@ func NewSuggestProvider(socketPath, view string) *SuggestProvider {
 	}
 }
 
+func suggestContextKey(req Request) (sid, cwd, key string) {
+	if req.Options != nil {
+		// Accept both "session_id" and "session" for the session filter.
+		if v, ok := req.Options["session_id"]; ok {
+			sid = v
+		} else if v, ok := req.Options["session"]; ok {
+			sid = v
+		}
+		if v, ok := req.Options["cwd"]; ok {
+			cwd = v
+		}
+	}
+	return sid, cwd, sid + "\n" + cwd
+}
+
 // Fetch calls the daemon's Suggest RPC and returns sanitized results.
 func (p *SuggestProvider) Fetch(ctx context.Context, req Request) (Response, error) {
+	_, _, key := suggestContextKey(req)
+	if key == p.cacheKey && p.cache != nil {
+		return Response{
+			RequestID: req.RequestID,
+			Items:     p.cache,
+			AtEnd:     true,
+		}, nil
+	}
+
 	resp, err := p.fetchWithTimeout(ctx, req, suggestFetchTimeout)
 	if err == nil {
+		p.cacheKey = key
+		p.cache = resp.Items
 		return resp, nil
 	}
 
@@ -103,25 +135,15 @@ func (p *SuggestProvider) fetchWithContext(ctx context.Context, req Request) (Re
 
 	client := pb.NewClaiServiceClient(conn)
 
-	var sid, cwd string
-	if req.Options != nil {
-		// Accept both "session_id" and "session" for the session filter.
-		if v, ok := req.Options["session_id"]; ok {
-			sid = v
-		} else if v, ok := req.Options["session"]; ok {
-			sid = v
-		}
-		if v, ok := req.Options["cwd"]; ok {
-			cwd = v
-		}
-	}
+	sid, cwd, _ := suggestContextKey(req)
 
-	max := clampInt(req.Limit, 1, 200)
+	// Fetch a broad set so the picker can do local substring filtering.
+	max := 200
 	grpcReq := &pb.SuggestRequest{
 		SessionId:            sid,
 		Cwd:                  cwd,
-		Buffer:               req.Query,
-		CursorPos:            int32(len(req.Query)),
+		Buffer:               "",
+		CursorPos:            0,
 		IncludeAi:            false,
 		MaxResults:           int32(max),
 		IncludeLowConfidence: true, // picker is explicit; show more options
