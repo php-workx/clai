@@ -322,12 +322,9 @@ func (m *Miner) buildNonContiguousFrom(
 	}
 
 	for next := lastIdx + 1; next <= maxNext; next++ {
-		// Skip if it would be contiguous AND same template (already counted above).
-		if next == lastIdx+1 && len(indices) >= m.cfg.MinSteps {
-			// Contiguous extensions of already-counted patterns are fine for
-			// building longer sequences; they won't create duplicates because
-			// the key includes all template IDs.
-		}
+		// Contiguous extensions of already-counted patterns are fine for building
+		// longer sequences; they won't create duplicates because the key includes
+		// all template IDs.
 		m.buildNonContiguousFrom(entries, next, append(indices, next), counts)
 	}
 }
