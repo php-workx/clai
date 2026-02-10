@@ -33,26 +33,20 @@ type HistoryProvider struct {
 	// ensureDaemon is injected for testing; defaults to ipc.EnsureDaemon.
 	ensureDaemon func() error
 
-	// probeCache memoizes session size probes for the lifetime of a picker run,
-	// avoiding extra RPCs on every keystroke/page.
-	probeMu    sync.Mutex
-	probeCache map[string]sessionProbe
+	// state tracks per-(session,query) paging progress so the Session tab can
+	// seamlessly continue into global history once the session segment ends.
+	stateMu sync.Mutex
+	state   map[string]*sessionQueryState
 }
 
-type sessionProbe struct {
-	// count is the number of session items returned by the probe (capped at probeLimit).
-	count int
-	// atEnd indicates whether the daemon reports there are no more session items beyond count.
-	atEnd bool
-	// cmds holds the probed session commands (sanitized) for deduping global fallback items.
-	cmds []string
+type sessionQueryState struct {
+	// total is the total number of session items for this query once we've reached
+	// the end (atEnd=true). Until then, it is -1.
+	total int
+	// seen is the set of session commands observed so far for this (session,query),
+	// used to dedupe global fallback items.
+	seen map[string]struct{}
 }
-
-const (
-	// probeLimit matches the UX rule: for sessions with fewer than 100 commands,
-	// we treat the Session tab as "session + global fallback".
-	probeLimit = 100
-)
 
 // Compile-time check that HistoryProvider implements Provider.
 var _ Provider = (*HistoryProvider)(nil)
@@ -62,7 +56,7 @@ func NewHistoryProvider(socketPath string) *HistoryProvider {
 	return &HistoryProvider{
 		socketPath:   socketPath,
 		ensureDaemon: ipc.EnsureDaemon,
-		probeCache:   make(map[string]sessionProbe),
+		state:        make(map[string]*sessionQueryState),
 	}
 }
 
@@ -140,125 +134,73 @@ func (p *HistoryProvider) fetchWithClient(ctx context.Context, client pb.ClaiSer
 		}, nil
 	}
 
-	probe, err := p.getSessionProbe(ctx, client, sessionID)
-	if err != nil {
-		return Response{}, err
+	state := p.getSessionQueryState(sessionID, req.Query)
+
+	// If we already know the session segment is exhausted for this query and the
+	// request offset is in the global region, serve from global directly.
+	if state.total >= 0 && req.Offset >= state.total {
+		globalOffset := req.Offset - state.total
+		dedupe := p.sessionSeenSnapshot(state)
+		return p.fetchCompositeGlobalPage(ctx, client, req, dedupe, globalOffset, state.total == 0)
 	}
 
-	// Only fall through to global when the overall session has fewer than 100 commands.
-	// This keeps the Session tab focused for longer-running sessions.
-	sessionUnderThreshold := probe.atEnd && probe.count < probeLimit
-	if !sessionUnderThreshold {
-		items, atEnd, fetchErr := p.fetchHistoryItems(ctx, client, sessionID, false, req.Query, req.Limit, req.Offset)
-		if fetchErr != nil {
-			return Response{}, fetchErr
-		}
-		return Response{
-			RequestID: req.RequestID,
-			Items:     items,
-			AtEnd:     atEnd,
-		}, nil
-	}
-
-	// If the session is completely empty, show global history directly.
-	if probe.count == 0 {
-		items, atEnd, fetchErr := p.fetchHistoryItems(ctx, client, "", true, req.Query, req.Limit, req.Offset)
-		if fetchErr != nil {
-			return Response{}, fetchErr
-		}
-		return Response{
-			RequestID: req.RequestID,
-			Items:     items,
-			AtEnd:     atEnd,
-		}, nil
-	}
-
-	// Composite mode: Session results first, then global fallback (deduped).
-	sessionAll, _, fetchErr := p.fetchHistoryItems(ctx, client, sessionID, false, req.Query, probeLimit, 0)
+	// Otherwise, fetch the session page first.
+	sessionPage, sessionAtEnd, fetchErr := p.fetchHistoryItems(ctx, client, sessionID, false, req.Query, req.Limit, req.Offset)
 	if fetchErr != nil {
 		return Response{}, fetchErr
 	}
-	sessionAll = dedupeItems(sessionAll, nil)
+	sessionPage = dedupeItems(sessionPage, nil)
 
-	sessionCount := len(sessionAll)
-	var out []Item
+	p.stateMu.Lock()
+	for _, it := range sessionPage {
+		state.seen[it.Value] = struct{}{}
+	}
+	if sessionAtEnd {
+		state.total = req.Offset + len(sessionPage)
+	}
+	total := state.total
+	p.stateMu.Unlock()
+	dedupe := p.sessionSeenSnapshot(state)
 
-	// 1) Slice session segment.
-	if req.Offset < sessionCount {
-		end := req.Offset + req.Limit
-		if end > sessionCount {
-			end = sessionCount
+	// If session is completely empty, show global directly (no [G] prefix).
+	if sessionAtEnd && total == 0 && req.Offset == 0 {
+		items, atEnd, gerr := p.fetchHistoryItems(ctx, client, "", true, req.Query, req.Limit, req.Offset)
+		if gerr != nil {
+			return Response{}, gerr
 		}
-		out = append(out, sessionAll[req.Offset:end]...)
+		return Response{RequestID: req.RequestID, Items: items, AtEnd: atEnd}, nil
 	}
 
-	// 2) Slice global segment after session segment.
-	remaining := req.Limit - len(out)
-	if remaining < 0 {
-		remaining = 0
+	// If there are more session results, return the session page only.
+	if !sessionAtEnd {
+		return Response{RequestID: req.RequestID, Items: sessionPage, AtEnd: false}, nil
 	}
 
-	// Compute offset into the global filtered list.
-	globalOffset := 0
-	if req.Offset >= sessionCount {
-		globalOffset = req.Offset - sessionCount
-	}
-
-	if remaining == 0 {
-		// If we're still within session results, we definitely aren't at the end.
-		// If we ended exactly at the session boundary, only mark atEnd=true if
-		// there are no global items after deduping the session commands.
-		if req.Offset+req.Limit < sessionCount {
-			return Response{RequestID: req.RequestID, Items: out, AtEnd: false}, nil
-		}
-
-		sessionCmdSet := make(map[string]struct{}, len(probe.cmds))
-		for _, c := range probe.cmds {
-			sessionCmdSet[c] = struct{}{}
-		}
-		globalFiltered, globalAtEnd, moreErr := p.fetchGlobalFiltered(ctx, client, req.Query, 1, sessionCmdSet)
-		if moreErr != nil {
-			return Response{}, moreErr
+	// We're at the end of the session segment. If the page isn't full, fill the
+	// remainder with deduped global items.
+	remaining := req.Limit - len(sessionPage)
+	if remaining <= 0 {
+		// End-of-session at a page boundary: allow paging into global unless
+		// there are no global items after dedupe.
+		globalFiltered, globalAtEnd, gerr := p.fetchGlobalFiltered(ctx, client, req.Query, 1, dedupe)
+		if gerr != nil {
+			return Response{}, gerr
 		}
 		atEnd := globalAtEnd && len(globalFiltered) == 0
-		return Response{RequestID: req.RequestID, Items: out, AtEnd: atEnd}, nil
+		return Response{RequestID: req.RequestID, Items: sessionPage, AtEnd: atEnd}, nil
 	}
 
-	sessionCmdSet := make(map[string]struct{}, len(probe.cmds))
-	for _, c := range probe.cmds {
-		sessionCmdSet[c] = struct{}{}
+	// Global offset for this page is the portion of the offset that spills past
+	// the session segment.
+	globalOffset := 0
+	if total >= 0 && req.Offset > total {
+		globalOffset = req.Offset - total
 	}
-
-	// We fetch enough to determine if there's one more item beyond this page
-	// so AtEnd is meaningful for paging UX.
-	want := globalOffset + remaining + 1
-	globalFiltered, globalAtEnd, gerr := p.fetchGlobalFiltered(ctx, client, req.Query, want, sessionCmdSet)
+	out, atEnd, gerr := p.fetchCompositeGlobalRemainder(ctx, client, req, dedupe, globalOffset, remaining)
 	if gerr != nil {
 		return Response{}, gerr
 	}
-
-	// Apply the slice for this page.
-	if globalOffset < len(globalFiltered) {
-		gend := globalOffset + remaining
-		if gend > len(globalFiltered) {
-			gend = len(globalFiltered)
-		}
-		page := globalFiltered[globalOffset:gend]
-		for i := range page {
-			// Display-only prefix; Value remains the raw command.
-			page[i].Display = "[G] " + page[i].Value
-		}
-		out = append(out, page...)
-	}
-
-	// Determine whether there are more items after this page.
-	atEnd := false
-	if req.Offset+req.Limit < sessionCount {
-		atEnd = false
-	} else if globalAtEnd && len(globalFiltered) <= globalOffset+remaining {
-		atEnd = true
-	}
-
+	out = append(sessionPage, out...)
 	return Response{RequestID: req.RequestID, Items: out, AtEnd: atEnd}, nil
 }
 
@@ -278,46 +220,29 @@ func extractHistoryScope(opts map[string]string) (sessionID string, global bool)
 	return sessionID, global
 }
 
-func (p *HistoryProvider) getSessionProbe(ctx context.Context, client pb.ClaiServiceClient, sessionID string) (sessionProbe, error) {
-	p.probeMu.Lock()
-	if v, ok := p.probeCache[sessionID]; ok {
-		p.probeMu.Unlock()
-		return v, nil
+func (p *HistoryProvider) getSessionQueryState(sessionID, query string) *sessionQueryState {
+	key := sessionID + "\n" + query
+	p.stateMu.Lock()
+	defer p.stateMu.Unlock()
+	if st, ok := p.state[key]; ok {
+		return st
 	}
-	p.probeMu.Unlock()
-
-	// Probe without query to estimate overall session size (bounded to probeLimit).
-	grpcResp, err := client.FetchHistory(ctx, &pb.HistoryFetchRequest{
-		SessionId: sessionID,
-		Query:     "",
-		Limit:     probeLimit,
-		Offset:    0,
-		Global:    false,
-	})
-	if err != nil {
-		return sessionProbe{}, fmt.Errorf("history provider: rpc: %w", err)
+	st := &sessionQueryState{
+		total: -1,
+		seen:  make(map[string]struct{}, 128),
 	}
+	p.state[key] = st
+	return st
+}
 
-	cmds := make([]string, 0, len(grpcResp.Items))
-	for _, item := range grpcResp.Items {
-		cmd := ValidateUTF8(StripANSI(item.Command))
-		if cmd == "" {
-			continue
-		}
-		cmds = append(cmds, cmd)
+func (p *HistoryProvider) sessionSeenSnapshot(st *sessionQueryState) map[string]struct{} {
+	p.stateMu.Lock()
+	defer p.stateMu.Unlock()
+	out := make(map[string]struct{}, len(st.seen))
+	for k := range st.seen {
+		out[k] = struct{}{}
 	}
-
-	out := sessionProbe{
-		count: len(cmds),
-		atEnd: grpcResp.AtEnd,
-		cmds:  cmds,
-	}
-
-	p.probeMu.Lock()
-	p.probeCache[sessionID] = out
-	p.probeMu.Unlock()
-
-	return out, nil
+	return out
 }
 
 func (p *HistoryProvider) fetchHistoryItems(
@@ -351,6 +276,80 @@ func (p *HistoryProvider) fetchHistoryItems(
 		items = append(items, Item{Value: cmd, Display: cmd})
 	}
 	return items, grpcResp.AtEnd, nil
+}
+
+func (p *HistoryProvider) fetchCompositeGlobalPage(
+	ctx context.Context,
+	client pb.ClaiServiceClient,
+	req Request,
+	dedupe map[string]struct{},
+	globalOffset int,
+	direct bool,
+) (Response, error) {
+	if direct {
+		items, atEnd, err := p.fetchHistoryItems(ctx, client, "", true, req.Query, req.Limit, globalOffset)
+		if err != nil {
+			return Response{}, err
+		}
+		return Response{RequestID: req.RequestID, Items: items, AtEnd: atEnd}, nil
+	}
+
+	want := globalOffset + req.Limit + 1
+	globalFiltered, globalAtEnd, err := p.fetchGlobalFiltered(ctx, client, req.Query, want, dedupe)
+	if err != nil {
+		return Response{}, err
+	}
+
+	out := make([]Item, 0, req.Limit)
+	if globalOffset < len(globalFiltered) {
+		end := globalOffset + req.Limit
+		if end > len(globalFiltered) {
+			end = len(globalFiltered)
+		}
+		page := globalFiltered[globalOffset:end]
+		for i := range page {
+			page[i].Display = "[G] " + page[i].Value
+		}
+		out = append(out, page...)
+	}
+
+	atEnd := globalAtEnd && len(globalFiltered) <= globalOffset+req.Limit
+	return Response{RequestID: req.RequestID, Items: out, AtEnd: atEnd}, nil
+}
+
+func (p *HistoryProvider) fetchCompositeGlobalRemainder(
+	ctx context.Context,
+	client pb.ClaiServiceClient,
+	req Request,
+	dedupe map[string]struct{},
+	globalOffset int,
+	remaining int,
+) ([]Item, bool, error) {
+	if remaining <= 0 {
+		return nil, false, nil
+	}
+
+	want := globalOffset + remaining + 1
+	globalFiltered, globalAtEnd, err := p.fetchGlobalFiltered(ctx, client, req.Query, want, dedupe)
+	if err != nil {
+		return nil, false, err
+	}
+
+	var out []Item
+	if globalOffset < len(globalFiltered) {
+		end := globalOffset + remaining
+		if end > len(globalFiltered) {
+			end = len(globalFiltered)
+		}
+		page := globalFiltered[globalOffset:end]
+		for i := range page {
+			page[i].Display = "[G] " + page[i].Value
+		}
+		out = append(out, page...)
+	}
+
+	atEnd := globalAtEnd && len(globalFiltered) <= globalOffset+remaining
+	return out, atEnd, nil
 }
 
 func (p *HistoryProvider) fetchGlobalFiltered(

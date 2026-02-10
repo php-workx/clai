@@ -584,8 +584,22 @@ func TestHistoryProvider_CompositePaginationOffsetCrossesBoundary(t *testing.T) 
 	socketPath := startMockServer(t, svc)
 	provider := NewHistoryProvider(socketPath)
 
-	resp, err := provider.Fetch(context.Background(), Request{
+	// Prime state with the first page so session commands are deduped from global.
+	_, err := provider.Fetch(context.Background(), Request{
 		RequestID: 1,
+		Query:     "",
+		Limit:     2,
+		Offset:    0,
+		Options: map[string]string{
+			"session_id": "sid",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch page 0 failed: %v", err)
+	}
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 2,
 		Query:     "",
 		Limit:     2,
 		Offset:    2, // skip the 2 session items
@@ -653,6 +667,76 @@ func TestHistoryProvider_SessionAtOrAbove100_DoesNotFallThrough(t *testing.T) {
 		if r.Global {
 			t.Fatalf("expected no Global=true RPC when session is >= 100; saw %+v", r)
 		}
+	}
+}
+
+func TestHistoryProvider_LongSession_FallsThroughAfterSessionEnd(t *testing.T) {
+	t.Parallel()
+
+	// 120 session items; page size 100 means page 0 is session-only, page 1 should
+	// contain the remaining 20 session items and then global fallback.
+	session := make([]string, 0, 120)
+	for i := 0; i < 120; i++ {
+		session = append(session, fmt.Sprintf("s%03d", i))
+	}
+	// Global includes some session commands plus extra.
+	global := []string{"s119", "s050", "g1", "g2", "g3", "g4", "g5", "g6"}
+
+	svc := &routedHistoryService{
+		session: session,
+		global:  global,
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	// Prime state with the first page.
+	_, err := provider.Fetch(context.Background(), Request{
+		RequestID: 1,
+		Query:     "",
+		Limit:     100,
+		Offset:    0,
+		Options: map[string]string{
+			"session_id": "sid",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch page 0 failed: %v", err)
+	}
+
+	// Fetch the second page: should include session tail + global fallback.
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 2,
+		Query:     "",
+		Limit:     100,
+		Offset:    100,
+		Options: map[string]string{
+			"session_id": "sid",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch page 1 failed: %v", err)
+	}
+
+	// First 20 items are session.
+	if len(resp.Items) == 0 {
+		t.Fatalf("expected items, got 0")
+	}
+	if resp.Items[0].Display != "s100" {
+		t.Fatalf("expected first item s100, got %+v", resp.Items[0])
+	}
+
+	// Global portion is prefixed and must not include session commands.
+	foundGlobal := false
+	for _, it := range resp.Items {
+		if strings.HasPrefix(it.Display, "[G] ") {
+			foundGlobal = true
+			if strings.HasPrefix(it.Value, "s") {
+				t.Fatalf("expected global fallback to be deduped vs session; got %+v", it)
+			}
+		}
+	}
+	if !foundGlobal {
+		t.Fatalf("expected at least one global fallback item on page 1")
 	}
 }
 
