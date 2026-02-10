@@ -70,11 +70,11 @@ func runInit(cmd *cobra.Command, args []string) error {
 		sessionID = uuid.New().String()
 	}
 
-	// Load config to inject settings into the shell script.
-	cfg, _ := config.Load() // Ignore errors; defaults are fine.
-	if cfg == nil {
-		cfg = config.DefaultConfig()
-	}
+	// Init must be extremely fast; avoid disk I/O (config file read) here.
+	// Users can override via env vars before sourcing, and other commands read
+	// config normally.
+	cfg := config.DefaultConfig()
+	cfg.ApplyEnvOverrides()
 
 	// Replace placeholders with actual values.
 	// Use a single-pass replacer to avoid repeated full-script copies (helps keep init fast).
