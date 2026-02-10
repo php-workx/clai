@@ -362,6 +362,12 @@ func TestZshScript_ApplicationModeArrowBindings(t *testing.T) {
 
 	output := string(content)
 
+	// Ensure we actively bind arrows in both emacs and viins, rather than relying
+	// on user defaults (some setups ship without down-arrow history bindings).
+	if !strings.Contains(output, `for _clai_km in emacs viins`) {
+		t.Fatalf("zsh script missing emacs/viins keymap loop for arrow bindings")
+	}
+
 	requiredBindings := []string{
 		"^[[A", // Up arrow CSI mode
 		"^[OA", // Up arrow application mode
@@ -372,6 +378,18 @@ func TestZshScript_ApplicationModeArrowBindings(t *testing.T) {
 	for _, binding := range requiredBindings {
 		if !strings.Contains(output, binding) {
 			t.Errorf("zsh script missing arrow key binding %q", binding)
+		}
+	}
+
+	// Concrete expectations for history navigation.
+	for _, must := range []string{
+		`bindkey -M "$_clai_km" '^[[A' up-line-or-history`,
+		`bindkey -M "$_clai_km" '^[[B' down-line-or-history`,
+		`bindkey -M "$_clai_km" '^[OA' up-line-or-history`,
+		`bindkey -M "$_clai_km" '^[OB' down-line-or-history`,
+	} {
+		if !strings.Contains(output, must) {
+			t.Errorf("zsh script missing expected binding snippet: %s", must)
 		}
 	}
 }
@@ -934,9 +952,17 @@ func TestShellScripts_DoubleUpSequenceSupport(t *testing.T) {
 			script := string(content)
 
 			for _, seq := range tt.sequences {
-				if !strings.Contains(script, seq) {
-					t.Errorf("%s missing double-Up sequence binding %q", tt.path, seq)
+				if strings.Contains(script, seq) {
+					continue
 				}
+				// zsh may bind in specific keymaps (emacs/viins) using -M.
+				if tt.path == "shell/zsh/clai.zsh" {
+					alt := strings.Replace(seq, "bindkey ", `bindkey -M "$_clai_km" `, 1)
+					if strings.Contains(script, alt) {
+						continue
+					}
+				}
+				t.Errorf("%s missing double-Up sequence binding %q", tt.path, seq)
 			}
 			for _, marker := range tt.timeouts {
 				if !strings.Contains(script, marker) {

@@ -1074,8 +1074,13 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
 
     zle -N _clai_up_arrow_single
     zle -N _clai_up_arrow_double
-    bindkey '^[[A' _clai_up_arrow_single    # Up arrow (CSI mode)
-    bindkey '^[OA' _clai_up_arrow_single    # Up arrow (application mode)
+    for _clai_km in emacs viins; do
+        bindkey -M "$_clai_km" '^[[A' _clai_up_arrow_single    # Up arrow (CSI mode)
+        bindkey -M "$_clai_km" '^[OA' _clai_up_arrow_single    # Up arrow (application mode)
+        # Ensure Down arrow still performs native history navigation in both keymaps.
+        bindkey -M "$_clai_km" '^[[B' down-line-or-history
+        bindkey -M "$_clai_km" '^[OB' down-line-or-history
+    done
 
     if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
         typeset -g _clai_window_ms="${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}"
@@ -1086,12 +1091,27 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
         _clai_keytimeout_cs=$(( (_clai_window_ms + 9) / 10 ))
         (( _clai_keytimeout_cs < 1 )) && _clai_keytimeout_cs=1
         KEYTIMEOUT=$_clai_keytimeout_cs
-        bindkey '^[[A^[[A' _clai_up_arrow_double
-        bindkey '^[OA^[OA' _clai_up_arrow_double
+        for _clai_km in emacs viins; do
+            bindkey -M "$_clai_km" '^[[A^[[A' _clai_up_arrow_double
+            bindkey -M "$_clai_km" '^[OA^[OA' _clai_up_arrow_double
+        done
     else
-        bindkey -r '^[[A^[[A'
-        bindkey -r '^[OA^[OA'
+        for _clai_km in emacs viins; do
+            bindkey -M "$_clai_km" -r '^[[A^[[A'
+            bindkey -M "$_clai_km" -r '^[OA^[OA'
+        done
     fi
+fi
+
+# Ensure arrow keys work in both emacs and viins keymaps even when
+# CLAI_UP_ARROW_HISTORY is disabled (some environments ship without defaults).
+if [[ "$CLAI_UP_ARROW_HISTORY" != "true" ]]; then
+    for _clai_km in emacs viins; do
+        bindkey -M "$_clai_km" '^[[A' up-line-or-history
+        bindkey -M "$_clai_km" '^[OA' up-line-or-history
+        bindkey -M "$_clai_km" '^[[B' down-line-or-history
+        bindkey -M "$_clai_km" '^[OB' down-line-or-history
+    done
 fi
 
 # ============================================
@@ -1112,15 +1132,17 @@ _clai_disable() {
     zle -A .send-break send-break
 
     # Restore default keybindings
-    bindkey '^I' expand-or-complete
-    bindkey '^M' accept-line
-    bindkey '^[[A' up-line-or-history
-    bindkey '^[OA' up-line-or-history
-    bindkey -r '^[[A^[[A'
-    bindkey -r '^[OA^[OA'
-    bindkey '^[[B' down-line-or-history
-    bindkey '^[OB' down-line-or-history
-    bindkey '\e[1;3C' forward-word
+    for _clai_km in emacs viins; do
+        bindkey -M "$_clai_km" '^I' expand-or-complete
+        bindkey -M "$_clai_km" '^M' accept-line
+        bindkey -M "$_clai_km" '^[[A' up-line-or-history
+        bindkey -M "$_clai_km" '^[OA' up-line-or-history
+        bindkey -M "$_clai_km" -r '^[[A^[[A'
+        bindkey -M "$_clai_km" -r '^[OA^[OA'
+        bindkey -M "$_clai_km" '^[[B' down-line-or-history
+        bindkey -M "$_clai_km" '^[OB' down-line-or-history
+        bindkey -M "$_clai_km" '\e[1;3C' forward-word
+    done
     bindkey -r '^X^V'
     bindkey -r '^Xs'
     bindkey -r '^Xd'
