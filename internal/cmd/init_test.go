@@ -362,10 +362,10 @@ func TestZshScript_ApplicationModeArrowBindings(t *testing.T) {
 
 	output := string(content)
 
-	// Ensure we actively bind arrows in both emacs and viins, rather than relying
+	// Ensure we actively bind arrows in emacs/viins/main, rather than relying
 	// on user defaults (some setups ship without down-arrow history bindings).
-	if !strings.Contains(output, `for _clai_km in emacs viins`) {
-		t.Fatalf("zsh script missing emacs/viins keymap loop for arrow bindings")
+	if !strings.Contains(output, `for _clai_km in emacs viins main`) {
+		t.Fatalf("zsh script missing emacs/viins/main keymap loop for arrow bindings")
 	}
 
 	requiredBindings := []string{

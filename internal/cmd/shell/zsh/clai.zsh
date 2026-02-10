@@ -1074,7 +1074,7 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
 
     zle -N _clai_up_arrow_single
     zle -N _clai_up_arrow_double
-    for _clai_km in emacs viins; do
+    for _clai_km in emacs viins main; do
         bindkey -M "$_clai_km" '^[[A' _clai_up_arrow_single    # Up arrow (CSI mode)
         bindkey -M "$_clai_km" '^[OA' _clai_up_arrow_single    # Up arrow (application mode)
         # Ensure Down arrow still performs native history navigation in both keymaps.
@@ -1091,12 +1091,12 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
         _clai_keytimeout_cs=$(( (_clai_window_ms + 9) / 10 ))
         (( _clai_keytimeout_cs < 1 )) && _clai_keytimeout_cs=1
         KEYTIMEOUT=$_clai_keytimeout_cs
-        for _clai_km in emacs viins; do
+        for _clai_km in emacs viins main; do
             bindkey -M "$_clai_km" '^[[A^[[A' _clai_up_arrow_double
             bindkey -M "$_clai_km" '^[OA^[OA' _clai_up_arrow_double
         done
     else
-        for _clai_km in emacs viins; do
+        for _clai_km in emacs viins main; do
             bindkey -M "$_clai_km" -r '^[[A^[[A'
             bindkey -M "$_clai_km" -r '^[OA^[OA'
         done
@@ -1106,7 +1106,7 @@ fi
 # Ensure arrow keys work in both emacs and viins keymaps even when
 # CLAI_UP_ARROW_HISTORY is disabled (some environments ship without defaults).
 if [[ "$CLAI_UP_ARROW_HISTORY" != "true" ]]; then
-    for _clai_km in emacs viins; do
+    for _clai_km in emacs viins main; do
         bindkey -M "$_clai_km" '^[[A' up-line-or-history
         bindkey -M "$_clai_km" '^[OA' up-line-or-history
         bindkey -M "$_clai_km" '^[[B' down-line-or-history
@@ -1132,7 +1132,7 @@ _clai_disable() {
     zle -A .send-break send-break
 
     # Restore default keybindings
-    for _clai_km in emacs viins; do
+    for _clai_km in emacs viins main; do
         bindkey -M "$_clai_km" '^I' expand-or-complete
         bindkey -M "$_clai_km" '^M' accept-line
         bindkey -M "$_clai_km" '^[[A' up-line-or-history
