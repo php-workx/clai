@@ -141,6 +141,18 @@ _ai_self_insert() {
 }
 zle -N self-insert _ai_self_insert
 
+# ZLE widget: Space is often bound to magic-space (history expansion), not self-insert.
+# Wrap it so suggestions remain ghost-rendered and up-to-date after inserting a space.
+_ai_magic_space() {
+    _clai_dismiss_picker
+    zle .magic-space
+    if [[ "$_AI_IN_PASTE" == "true" ]] || [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
+        return
+    fi
+    _ai_update_suggestion
+}
+zle -N magic-space _ai_magic_space
+
 # Dismiss picker if active (called by editing/movement widgets).
 # Uses _clai_picker_close (defined in picker section) via forward reference;
 # safe because widgets are only invoked after full script is sourced.
@@ -159,7 +171,7 @@ _ai_clear_ghost_text() {
     region_highlight=()
 }
 
-# Safety net: clear stale ghost text if BUFFER/CURSOR changes via an unwrapped ZLE widget.
+# Safety net: keep ghost text consistent if BUFFER/CURSOR changes via an unwrapped ZLE widget.
 _ai_sync_ghost_text() {
     # If POSTDISPLAY is somehow set without a suggestion, clear it.
     if [[ -z "$_AI_CURRENT_SUGGESTION" ]]; then
@@ -174,7 +186,19 @@ _ai_sync_ghost_text() {
     # and the cursor is at EOL (otherwise POSTDISPLAY would appear in the wrong place).
     if [[ -z "$BUFFER" ]] || [[ $CURSOR -ne ${#BUFFER} ]] || [[ "$_AI_CURRENT_SUGGESTION" != "$BUFFER"* ]]; then
         _ai_clear_ghost_text
+        return
     fi
+
+    # BUFFER still matches the current suggestion; recompute POSTDISPLAY and highlight
+    # based on the new BUFFER length (e.g., space inserts via magic-space).
+    local ghost="${_AI_CURRENT_SUGGESTION:${#BUFFER}}"
+    if [[ -z "$ghost" ]]; then
+        POSTDISPLAY=""
+        region_highlight=()
+        return
+    fi
+    POSTDISPLAY="${ghost}"
+    region_highlight=("${#BUFFER} $((${#BUFFER} + ${#ghost})) fg=242")
 }
 
 _ai_zle_line_pre_redraw() {

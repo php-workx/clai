@@ -1,6 +1,8 @@
 package expect
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -190,6 +192,51 @@ func TestZsh_RightArrowAcceptsSuggestion(t *testing.T) {
 
 	// The buffer should now contain the full suggestion
 	// Clear for cleanup
+	session.SendKey(KeyCtrlC)
+}
+
+func TestZsh_GhostTextPersistsAfterSpace(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "zsh")
+	SkipIfClaiMissing(t)
+
+	tmp := t.TempDir()
+	claiHome := filepath.Join(tmp, "clai-home")
+	histFile := filepath.Join(tmp, ".zsh_history")
+
+	// Deterministic history used by clai suggest history fallback and by clai-shim
+	// import-history on session start.
+	histContent := `: 1706000001:0;echo hello
+: 1706000002:0;echo world
+`
+	require.NoError(t, os.WriteFile(histFile, []byte(histContent), 0644))
+
+	session, err := NewSession("zsh",
+		WithTimeout(10*time.Second),
+		WithEnv("CLAI_HOME="+claiHome),
+		WithEnv("HISTFILE="+histFile),
+		WithClaiInit(),
+	)
+	require.NoError(t, err, "failed to create zsh session")
+	defer session.Close()
+
+	// Wait for loaded message
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
+	require.NoError(t, err)
+
+	// Type a prefix; the ghost should show the remainder in the ghost color (ANSI 256 fg=242).
+	require.NoError(t, session.Send("echo"))
+	_, err = session.ExpectTimeout("echo\x1b[38;5;242m world", 3*time.Second)
+	require.NoError(t, err)
+
+	// Insert a space; the ghost should remain colored, but without the leading space now.
+	require.NoError(t, session.Send(" "))
+	_, err = session.ExpectTimeout("echo \x1b[38;5;242mworld", 3*time.Second)
+	require.NoError(t, err)
+
 	session.SendKey(KeyCtrlC)
 }
 
