@@ -691,7 +691,19 @@ func (m Model) viewList() string {
 			}
 		}
 
-		line := base.Render(prefix) + renderItem(display, query, base, hl)
+		// Render "command" portion in normal/selected style, and dim the metadata
+		// portion (the " · source · score ..." suffix) as ghosttext.
+		cmdPart := display
+		metaPart := ""
+		if idx := strings.Index(display, "  · "); idx >= 0 {
+			cmdPart = display[:idx]
+			metaPart = display[idx:]
+		}
+
+		line := base.Render(prefix) + renderItem(cmdPart, query, base, hl)
+		if metaPart != "" {
+			line += dimStyle.Render(metaPart)
+		}
 		if i == m.selection {
 			line += hintStyle.Render("  " + rightRefineHintLabel())
 		}

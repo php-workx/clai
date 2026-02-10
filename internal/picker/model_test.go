@@ -513,6 +513,20 @@ func TestViewList_SelectedLineShowsRightRefineHint(t *testing.T) {
 	assert.Contains(t, view, "→ use and refine")
 }
 
+func TestViewList_DimsSuggestionMetadataAsGhosttext(t *testing.T) {
+	p := &mockProvider{items: []Item{{
+		Value:   "make test-all",
+		Display: "make test-all  · global  · score 0.49  · last 2h ago",
+	}}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	view := m.viewList()
+
+	// Metadata suffix should be rendered using dimStyle (ghosttext-like).
+	assert.Contains(t, view, dimStyle.Render("  · global  · score 0.49  · last 2h ago"))
+}
+
 func TestViewFooter_ShowsShortcuts(t *testing.T) {
 	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
