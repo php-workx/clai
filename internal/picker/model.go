@@ -629,6 +629,7 @@ func (m Model) viewList() string {
 		display := m.items[i].displayText()
 		cw := m.contentWidth()
 		display = StripANSI(display)
+		isGlobalFallback := strings.HasPrefix(display, "[G] ")
 
 		// Reserve width so appended hints do not cause wrapping.
 		reserved := 2 // prefix: "> " or "  "
@@ -656,7 +657,12 @@ func (m Model) viewList() string {
 		if i == m.selection {
 			base, hl, prefix = selectedStyle, matchSelectedStyle, "> "
 		} else {
-			base, hl, prefix = normalStyle, matchStyle, "  "
+			if isGlobalFallback {
+				// Ghosttext-like global fallback in Session tab.
+				base, hl, prefix = dimStyle, matchStyle, "  "
+			} else {
+				base, hl, prefix = normalStyle, matchStyle, "  "
+			}
 		}
 
 		line := base.Render(prefix) + renderItem(display, query, base, hl)

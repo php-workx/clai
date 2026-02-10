@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -27,11 +28,13 @@ type mockClaiService struct {
 	atEnd    bool
 	delay    time.Duration
 	lastReq  *pb.HistoryFetchRequest
+	reqs     []*pb.HistoryFetchRequest
 	failWith error
 }
 
 func (m *mockClaiService) FetchHistory(_ context.Context, req *pb.HistoryFetchRequest) (*pb.HistoryFetchResponse, error) {
 	m.lastReq = req
+	m.reqs = append(m.reqs, req)
 
 	if m.delay > 0 {
 		time.Sleep(m.delay)
@@ -240,12 +243,15 @@ func TestHistoryProvider_SessionScoping(t *testing.T) {
 		t.Fatalf("Fetch failed: %v", err)
 	}
 
-	if svc.lastReq.SessionId != "test-session-abc" {
-		t.Errorf("expected session_id 'test-session-abc', got %q", svc.lastReq.SessionId)
+	found := false
+	for _, r := range svc.reqs {
+		if r.SessionId == "test-session-abc" && !r.Global {
+			found = true
+			break
+		}
 	}
-
-	if svc.lastReq.Global {
-		t.Error("expected Global=false when session_id is set")
+	if !found {
+		t.Fatalf("expected at least one RPC with SessionId=%q and Global=false; got %d calls", "test-session-abc", len(svc.reqs))
 	}
 }
 
@@ -274,8 +280,15 @@ func TestHistoryProvider_SessionKeyFallback(t *testing.T) {
 		t.Fatalf("Fetch failed: %v", err)
 	}
 
-	if svc.lastReq.SessionId != "short-key-session" {
-		t.Errorf("expected session_id 'short-key-session' from 'session' key, got %q", svc.lastReq.SessionId)
+	found := false
+	for _, r := range svc.reqs {
+		if r.SessionId == "short-key-session" && !r.Global {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected at least one RPC with SessionId=%q from 'session' key; got %d calls", "short-key-session", len(svc.reqs))
 	}
 }
 
@@ -304,8 +317,15 @@ func TestHistoryProvider_SessionIDTakesPrecedence(t *testing.T) {
 		t.Fatalf("Fetch failed: %v", err)
 	}
 
-	if svc.lastReq.SessionId != "primary-id" {
-		t.Errorf("expected session_id 'primary-id' to take precedence, got %q", svc.lastReq.SessionId)
+	found := false
+	for _, r := range svc.reqs {
+		if r.SessionId == "primary-id" && !r.Global {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("expected at least one RPC with SessionId=%q to take precedence; got %d calls", "primary-id", len(svc.reqs))
 	}
 }
 
@@ -421,6 +441,218 @@ func TestHistoryProvider_RPCFailure(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error on RPC failure, got nil")
+	}
+}
+
+type routedHistoryService struct {
+	pb.UnimplementedClaiServiceServer
+
+	session []string
+	global  []string
+	reqs    []*pb.HistoryFetchRequest
+}
+
+func (s *routedHistoryService) FetchHistory(_ context.Context, req *pb.HistoryFetchRequest) (*pb.HistoryFetchResponse, error) {
+	s.reqs = append(s.reqs, req)
+
+	src := s.session
+	if req.Global {
+		src = s.global
+	}
+
+	// Simulate substring filtering (daemon does provider-side filtering).
+	if q := strings.ToLower(req.Query); q != "" {
+		filtered := make([]string, 0, len(src))
+		for _, cmd := range src {
+			if strings.Contains(strings.ToLower(cmd), q) {
+				filtered = append(filtered, cmd)
+			}
+		}
+		src = filtered
+	}
+
+	offset := int(req.Offset)
+	limit := int(req.Limit)
+	if offset < 0 {
+		offset = 0
+	}
+	if limit < 0 {
+		limit = 0
+	}
+	if offset > len(src) {
+		offset = len(src)
+	}
+	end := offset + limit
+	if end > len(src) {
+		end = len(src)
+	}
+
+	items := make([]*pb.HistoryItem, 0, end-offset)
+	for _, cmd := range src[offset:end] {
+		items = append(items, &pb.HistoryItem{Command: cmd})
+	}
+	atEnd := end >= len(src)
+	return &pb.HistoryFetchResponse{Items: items, AtEnd: atEnd}, nil
+}
+
+func TestHistoryProvider_SessionUnder100_FallsThroughToGlobal(t *testing.T) {
+	t.Parallel()
+
+	svc := &routedHistoryService{
+		session: []string{"make test", "git status"},
+		global:  []string{"git status", "git log", "ls -la"},
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 1,
+		Query:     "",
+		Limit:     10,
+		Offset:    0,
+		Options: map[string]string{
+			"session_id": "sid",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if got := len(resp.Items); got != 4 {
+		t.Fatalf("expected 4 items (2 session + 2 global), got %d", got)
+	}
+
+	// Session items first (no prefix).
+	if resp.Items[0].Value != "make test" || resp.Items[0].Display != "make test" {
+		t.Fatalf("unexpected first item: %+v", resp.Items[0])
+	}
+	if resp.Items[1].Value != "git status" || resp.Items[1].Display != "git status" {
+		t.Fatalf("unexpected second item: %+v", resp.Items[1])
+	}
+
+	// Global items deduped and prefixed in display only.
+	if resp.Items[2].Value != "git log" || resp.Items[2].Display != "[G] git log" {
+		t.Fatalf("unexpected third item: %+v", resp.Items[2])
+	}
+	if resp.Items[3].Value != "ls -la" || resp.Items[3].Display != "[G] ls -la" {
+		t.Fatalf("unexpected fourth item: %+v", resp.Items[3])
+	}
+
+	if !resp.AtEnd {
+		t.Fatalf("expected AtEnd=true (no more global items), got false")
+	}
+}
+
+func TestHistoryProvider_SessionEmpty_ShowsGlobalDirectly(t *testing.T) {
+	t.Parallel()
+
+	svc := &routedHistoryService{
+		session: nil,
+		global:  []string{"git status", "git log"},
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 1,
+		Query:     "",
+		Limit:     10,
+		Offset:    0,
+		Options: map[string]string{
+			"session_id": "sid",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if got := len(resp.Items); got != 2 {
+		t.Fatalf("expected 2 items, got %d", got)
+	}
+	if resp.Items[0].Display != "git status" || resp.Items[1].Display != "git log" {
+		t.Fatalf("expected direct global display without prefix, got: %+v", resp.Items)
+	}
+}
+
+func TestHistoryProvider_CompositePaginationOffsetCrossesBoundary(t *testing.T) {
+	t.Parallel()
+
+	svc := &routedHistoryService{
+		session: []string{"s1", "s2"},
+		global:  []string{"s2", "g1", "g2", "g3"},
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 1,
+		Query:     "",
+		Limit:     2,
+		Offset:    2, // skip the 2 session items
+		Options: map[string]string{
+			"session_id": "sid",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if got := len(resp.Items); got != 2 {
+		t.Fatalf("expected 2 items, got %d", got)
+	}
+	if resp.Items[0].Value != "g1" || resp.Items[0].Display != "[G] g1" {
+		t.Fatalf("unexpected first item: %+v", resp.Items[0])
+	}
+	if resp.Items[1].Value != "g2" || resp.Items[1].Display != "[G] g2" {
+		t.Fatalf("unexpected second item: %+v", resp.Items[1])
+	}
+	if resp.AtEnd {
+		t.Fatalf("expected AtEnd=false (g3 remains), got true")
+	}
+}
+
+func TestHistoryProvider_SessionAtOrAbove100_DoesNotFallThrough(t *testing.T) {
+	t.Parallel()
+
+	// 120 session items to ensure probe sees 100 with atEnd=false.
+	session := make([]string, 0, 120)
+	for i := 0; i < 120; i++ {
+		session = append(session, fmt.Sprintf("s%03d", i))
+	}
+	svc := &routedHistoryService{
+		session: session,
+		global:  []string{"g1", "g2"},
+	}
+	socketPath := startMockServer(t, svc)
+	provider := NewHistoryProvider(socketPath)
+
+	resp, err := provider.Fetch(context.Background(), Request{
+		RequestID: 1,
+		Query:     "",
+		Limit:     10,
+		Offset:    0,
+		Options: map[string]string{
+			"session_id": "sid",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Fetch failed: %v", err)
+	}
+
+	if got := len(resp.Items); got != 10 {
+		t.Fatalf("expected 10 session items, got %d", got)
+	}
+	for _, it := range resp.Items {
+		if strings.HasPrefix(it.Display, "[G] ") {
+			t.Fatalf("unexpected global fallback item in long-running session: %+v", it)
+		}
+	}
+
+	// Ensure no RPC was made with Global=true.
+	for _, r := range svc.reqs {
+		if r.Global {
+			t.Fatalf("expected no Global=true RPC when session is >= 100; saw %+v", r)
+		}
 	}
 }
 
