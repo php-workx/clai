@@ -435,6 +435,107 @@ func TestHandler_Suggest_ReturnsHistorySuggestions(t *testing.T) {
 	}
 }
 
+func TestHandler_Suggest_V1IncludesWhyDetailsWhenAvailable(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+
+	now := time.Now().UnixMilli()
+	lastSeen := now - (2 * time.Hour).Milliseconds()
+
+	ranker := &mockRanker{
+		suggestions: []suggest.Suggestion{
+			{
+				Text:           "make install",
+				Source:         "global",
+				Score:          0.77,
+				CmdNorm:        "make install",
+				LastSeenUnixMs: lastSeen,
+				SuccessCount:   11,
+				FailureCount:   1,
+				Reasons: []suggest.Reason{
+					{Type: "source", Contribution: 0.16},
+					{Type: "recency", Contribution: 0.21},
+					{Type: "success", Contribution: 0.18},
+				},
+			},
+		},
+	}
+
+	registry := provider.NewRegistry()
+	server, err := NewServer(&ServerConfig{
+		Store:       store,
+		Ranker:      ranker,
+		Registry:    registry,
+		IdleTimeout: 5 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.SuggestRequest{
+		SessionId:  "test-session",
+		Cwd:        "/tmp",
+		Buffer:     "make",
+		MaxResults: 5,
+	}
+
+	resp, err := server.Suggest(ctx, req)
+	if err != nil {
+		t.Fatalf("Suggest failed: %v", err)
+	}
+	if len(resp.Suggestions) != 1 {
+		t.Fatalf("expected 1 suggestion, got %d", len(resp.Suggestions))
+	}
+
+	got := resp.Suggestions[0]
+	if got.CmdNorm == "" {
+		t.Errorf("expected cmd_norm to be set")
+	}
+	if got.Description == "" {
+		t.Errorf("expected description to be set")
+	}
+	if len(got.Reasons) == 0 {
+		t.Fatalf("expected reasons to be set")
+	}
+
+	// Ensure hints are present (recency/frequency/success), and causality tags are present.
+	var hasRecencyHint, hasFreqHint, hasSuccessHint, hasSourceTag bool
+	for _, r := range got.Reasons {
+		switch strings.TrimSpace(r.Type) {
+		case "recency":
+			if strings.Contains(r.Description, "last 2h") {
+				hasRecencyHint = true
+			}
+		case "frequency":
+			if r.Description == "freq 12" {
+				hasFreqHint = true
+			}
+		case "success":
+			if strings.Contains(r.Description, "success 91%") {
+				hasSuccessHint = true
+			}
+		case "source":
+			if r.Contribution != 0 {
+				hasSourceTag = true
+			}
+		}
+	}
+	if !hasRecencyHint {
+		t.Errorf("expected recency hint (last 2h)")
+	}
+	if !hasFreqHint {
+		t.Errorf("expected frequency hint (freq 12)")
+	}
+	if !hasSuccessHint {
+		t.Errorf("expected success hint (success 91%%)")
+	}
+	if !hasSourceTag {
+		t.Errorf("expected scoring tag contribution for source")
+	}
+}
+
 func TestHandler_TextToCommand_Success(t *testing.T) {
 	t.Parallel()
 

@@ -305,18 +305,20 @@ func formatSuggestionDetails(s *pb.Suggestion) []string {
 	for _, r := range s.Reasons {
 		typ := strings.TrimSpace(r.Type)
 		desc := strings.TrimSpace(oneLine(r.Description))
+		if typ == "" {
+			continue
+		}
+
+		// Always treat non-zero contribution reasons as causality tags, even if
+		// the type is also used for "info hints" (e.g. v1 recency).
+		if r.Contribution != 0 {
+			causality = append(causality, fmt.Sprintf("%s %.2f", typ, r.Contribution))
+		}
+
 		switch typ {
-		case "recency", "frequency", "transition_count":
+		case "recency", "frequency", "transition_count", "success":
 			if desc != "" {
 				parts = append(parts, desc)
-			}
-		default:
-			if typ == "" {
-				continue
-			}
-			// Only include high-signal scoring tags (those with non-zero contributions).
-			if r.Contribution != 0 {
-				causality = append(causality, fmt.Sprintf("%s %.2f", typ, r.Contribution))
 			}
 		}
 	}

@@ -257,6 +257,8 @@ func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.Sugge
 
 // suggestV1 generates suggestions using the V1 ranker (history-based).
 func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResults int) *pb.SuggestResponse {
+	nowMs := time.Now().UnixMilli()
+
 	// Get the last command from the session for affinity scoring
 	lastCommand := ""
 	sessionID := req.SessionId
@@ -293,12 +295,73 @@ func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResul
 		if sanitize.IsDestructive(sug.Text) {
 			risk = riskDestructive
 		}
+
+		// Best-effort enriched reasons for explainability and richer UI.
+		pbReasons := make([]*pb.SuggestionReason, 0, len(sug.Reasons)+4)
+		for _, r := range sug.Reasons {
+			typ := strings.TrimSpace(r.Type)
+			if typ == "" {
+				continue
+			}
+			pbReasons = append(pbReasons, &pb.SuggestionReason{
+				Type:         typ,
+				Description:  r.Description,
+				Contribution: float32(r.Contribution),
+			})
+		}
+
+		// Add simple recency/frequency hints. These are not strictly score features,
+		// but they help users understand why something was suggested.
+		if sug.LastSeenUnixMs > 0 {
+			pbReasons = append(pbReasons, &pb.SuggestionReason{
+				Type:        "recency",
+				Description: fmt.Sprintf("last %s", formatAgo(nowMs-sug.LastSeenUnixMs)),
+			})
+		}
+		totalRuns := sug.SuccessCount + sug.FailureCount
+		if totalRuns > 0 {
+			pbReasons = append(pbReasons, &pb.SuggestionReason{
+				Type:        "frequency",
+				Description: fmt.Sprintf("freq %d", totalRuns),
+			})
+			successPct := int((float64(sug.SuccessCount) / float64(totalRuns)) * 100.0)
+			pbReasons = append(pbReasons, &pb.SuggestionReason{
+				Type:        "success",
+				Description: fmt.Sprintf("success %d%% (%d/%d)", successPct, sug.SuccessCount, totalRuns),
+			})
+		}
+
+		// Prefer a short, stable "why" description for the UI.
+		desc := strings.TrimSpace(sug.Description)
+		if desc == "" {
+			var whyParts []string
+			if sug.LastSeenUnixMs > 0 {
+				whyParts = append(whyParts, fmt.Sprintf("last %s", formatAgo(nowMs-sug.LastSeenUnixMs)))
+			}
+			if totalRuns > 0 {
+				whyParts = append(whyParts, fmt.Sprintf("freq %d", totalRuns))
+				successPct := int((float64(sug.SuccessCount) / float64(totalRuns)) * 100.0)
+				whyParts = append(whyParts, fmt.Sprintf("success %d%%", successPct))
+			}
+			if len(whyParts) > 0 {
+				desc = strings.Join(whyParts, "; ")
+			}
+		}
+
+		cmdNorm := strings.TrimSpace(sug.CmdNorm)
+		if cmdNorm == "" {
+			cmdNorm = suggest.NormalizeCommand(sug.Text)
+		}
+
 		pbSuggestions[i] = &pb.Suggestion{
 			Text:        sug.Text,
-			Description: sug.Description,
+			Description: desc,
 			Source:      sug.Source,
 			Score:       sug.Score,
 			Risk:        risk,
+			CmdNorm:     cmdNorm,
+			Confidence:  0, // V1 ranker does not compute a separate confidence score.
+			Reasons:     pbReasons,
 		}
 	}
 
