@@ -413,6 +413,26 @@ func TestZshScript_EditingWidgetsDismissPicker(t *testing.T) {
 	}
 }
 
+func TestZshScript_BackwardCharDoesNotAcceptSuggestion(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	body := extractFunctionBody(script, "_ai_backward_char")
+	if body == "" {
+		t.Fatal("_ai_backward_char() not found")
+	}
+
+	if strings.Contains(body, "--action=accepted") {
+		t.Fatal("_ai_backward_char() should not accept suggestions (no accepted feedback)")
+	}
+	if !strings.Contains(body, "_ai_clear_ghost_text") {
+		t.Fatal("_ai_backward_char() should clear ghost text before moving cursor")
+	}
+}
+
 // TestZshScript_SelfInsertSkipsSuggestForQueuedInput verifies that zsh does
 // not call clai suggest for each queued character during paste-like input.
 func TestZshScript_SelfInsertSkipsSuggestForQueuedInput(t *testing.T) {

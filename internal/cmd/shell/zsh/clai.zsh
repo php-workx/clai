@@ -269,23 +269,9 @@ zle -N backward-delete-char _ai_backward_delete_char
 # ZLE widget: Update suggestion after cursor movement
 _ai_backward_char() {
     _clai_dismiss_picker
-    if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} && "$_AI_CURRENT_SUGGESTION" == "$BUFFER"* ]]; then
-        # Refine flow: pull the full suggestion into the buffer, then move left
-        # so the user can edit within the inserted suffix.
-        local accepted="$_AI_CURRENT_SUGGESTION"
-        BUFFER="$_AI_CURRENT_SUGGESTION"
-        CURSOR=${#BUFFER}
-        _AI_CURRENT_SUGGESTION=""
-        _AI_LAST_ACCEPTED="$accepted"
-        POSTDISPLAY=""
-        _ai_remove_ghost_highlight
-        > "$_AI_SUGGEST_FILE"
-        (clai suggest-feedback --action=accepted --suggested="$accepted" >/dev/null 2>&1 &)
-        zle .backward-char
-        _ai_update_suggestion
-        return
-    fi
-
+    # Left-arrow should never "accept" a suggestion. Clear ghost text so cursor
+    # movement doesn't feel like it jumps behind POSTDISPLAY.
+    _ai_clear_ghost_text
     zle .backward-char
     _ai_update_suggestion
 }
