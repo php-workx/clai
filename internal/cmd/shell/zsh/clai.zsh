@@ -63,6 +63,7 @@ fi
 _AI_CURRENT_SUGGESTION=""
 _AI_LAST_ACCEPTED=""
 _AI_IN_PASTE=false
+_AI_GHOST_HIGHLIGHT=""
 
 # Disable zsh-autosuggestions when clai is active
 _CLAI_ZSH_AUTOSUGGEST_PRESENT=false
@@ -92,6 +93,22 @@ _clai_session_off() {
     [[ -f "$CLAI_CACHE/off" ]]
 }
 
+_ai_remove_ghost_highlight() {
+    if [[ -z "$_AI_GHOST_HIGHLIGHT" ]]; then
+        return
+    fi
+    local kept=()
+    local h
+    for h in "${region_highlight[@]}"; do
+        if [[ "$h" == "$_AI_GHOST_HIGHLIGHT" ]]; then
+            continue
+        fi
+        kept+=("$h")
+    done
+    region_highlight=("${kept[@]}")
+    _AI_GHOST_HIGHLIGHT=""
+}
+
 # Update suggestion based on current buffer
 _ai_update_suggestion() {
     local suggestion=""
@@ -105,7 +122,7 @@ _ai_update_suggestion() {
         fi
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         return
     fi
 
@@ -117,12 +134,15 @@ _ai_update_suggestion() {
         _AI_CURRENT_SUGGESTION="$suggestion"
         local ghost="${suggestion:${#BUFFER}}"
         POSTDISPLAY="${ghost}"
-        # region_highlight colors POSTDISPLAY; positions past ${#BUFFER} target it
-        region_highlight=("${#BUFFER} $((${#BUFFER} + ${#ghost})) fg=242")
+        # region_highlight colors POSTDISPLAY; positions past ${#BUFFER} target it.
+        # Preserve any existing region_highlight from other plugins (e.g. zsh-syntax-highlighting).
+        _ai_remove_ghost_highlight
+        _AI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#ghost})) fg=242"
+        region_highlight+=("$_AI_GHOST_HIGHLIGHT")
     else
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
     fi
 
     [[ -n "$WIDGET" ]] && zle reset-prompt
@@ -168,7 +188,7 @@ _ai_clear_ghost_text() {
     fi
     _AI_CURRENT_SUGGESTION=""
     POSTDISPLAY=""
-    region_highlight=()
+    _ai_remove_ghost_highlight
 }
 
 # Safety net: keep ghost text consistent if BUFFER/CURSOR changes via an unwrapped ZLE widget.
@@ -177,7 +197,7 @@ _ai_sync_ghost_text() {
     if [[ -z "$_AI_CURRENT_SUGGESTION" ]]; then
         if [[ -n "$POSTDISPLAY" ]]; then
             POSTDISPLAY=""
-            region_highlight=()
+            _ai_remove_ghost_highlight
         fi
         return
     fi
@@ -194,11 +214,13 @@ _ai_sync_ghost_text() {
     local ghost="${_AI_CURRENT_SUGGESTION:${#BUFFER}}"
     if [[ -z "$ghost" ]]; then
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         return
     fi
     POSTDISPLAY="${ghost}"
-    region_highlight=("${#BUFFER} $((${#BUFFER} + ${#ghost})) fg=242")
+    _ai_remove_ghost_highlight
+    _AI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#ghost})) fg=242"
+    region_highlight+=("$_AI_GHOST_HIGHLIGHT")
 }
 
 _ai_zle_line_pre_redraw() {
@@ -206,7 +228,12 @@ _ai_zle_line_pre_redraw() {
     [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] && return
     _ai_sync_ghost_text
 }
-zle -N zle-line-pre-redraw _ai_zle_line_pre_redraw
+autoload -U add-zle-hook-widget 2>/dev/null
+if (( ${+functions[add-zle-hook-widget]} )); then
+    add-zle-hook-widget zle-line-pre-redraw _ai_zle_line_pre_redraw
+else
+    zle -N zle-line-pre-redraw _ai_zle_line_pre_redraw
+fi
 
 # ZLE widget: Tab completion should dismiss ghost text first.
 _ai_expand_or_complete() {
@@ -251,7 +278,7 @@ _ai_backward_char() {
         _AI_CURRENT_SUGGESTION=""
         _AI_LAST_ACCEPTED="$accepted"
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         > "$_AI_SUGGEST_FILE"
         (clai suggest-feedback --action=accepted --suggested="$accepted" >/dev/null 2>&1 &)
         zle .backward-char
@@ -298,7 +325,7 @@ _ai_forward_char() {
         _AI_CURRENT_SUGGESTION=""
         _AI_LAST_ACCEPTED="$accepted"
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         # Clear AI suggestion file if we used it
         > "$_AI_SUGGEST_FILE"
         # Record accepted feedback (fire and forget)
@@ -308,7 +335,7 @@ _ai_forward_char() {
         # Normal forward char (or stale suggestion - ignore it)
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         zle .forward-char
     fi
 }
@@ -426,8 +453,9 @@ _ai_voice_accept_line() {
     fi
     _AI_LAST_ACCEPTED=""
     _AI_CURRENT_SUGGESTION=""
+    _AI_GHOST_HIGHLIGHT=""
     POSTDISPLAY=""
-    region_highlight=()
+    _ai_remove_ghost_highlight
     zle accept-line
 }
 zle -N _ai_voice_accept_line
@@ -453,6 +481,7 @@ _ai_preexec() {
     # Store start time in milliseconds (macOS date doesn't support %N)
     _CLAI_COMMAND_START_TIME=$(($(date +%s) * 1000))
     _CLAI_LAST_COMMAND="$1"
+    export CLAI_LAST_COMMAND="$_CLAI_LAST_COMMAND"
 
     # Fire and forget - log command start to daemon
     (clai-shim log-start \
@@ -805,7 +834,7 @@ _clai_picker_render() {
         ((i++))
     done
     POSTDISPLAY=""
-    region_highlight=()
+    _ai_remove_ghost_highlight
     zle -M "$header (↑↓, Enter, Ctrl+C):$menu_text"
 }
 
@@ -849,7 +878,7 @@ _clai_picker_cancel() {
         CURSOR=$_CLAI_PICKER_ORIG_CURSOR
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         _clai_picker_close
         _ai_update_suggestion
         zle redisplay
@@ -864,7 +893,7 @@ _clai_picker_accept() {
         # Clear ghost text before closing picker and recalculating.
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         _clai_picker_close
         _ai_update_suggestion
         zle redisplay
@@ -1128,7 +1157,7 @@ _clai_disable() {
 
     # Clear ghost text
     POSTDISPLAY=""
-    region_highlight=()
+    _ai_remove_ghost_highlight
 
     # Restore native history command
     unfunction history 2>/dev/null

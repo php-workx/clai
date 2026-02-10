@@ -520,11 +520,15 @@ func TestZshScript_GhostTextInvariantHook(t *testing.T) {
 	for _, required := range []string{
 		"_ai_sync_ghost_text()",
 		"_ai_zle_line_pre_redraw()",
-		"zle -N zle-line-pre-redraw _ai_zle_line_pre_redraw",
 	} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("zsh script missing ghost text invariant hook: %s", required)
 		}
+	}
+	hasLegacy := strings.Contains(script, "zle -N zle-line-pre-redraw _ai_zle_line_pre_redraw")
+	hasHook := strings.Contains(script, "add-zle-hook-widget zle-line-pre-redraw _ai_zle_line_pre_redraw")
+	if !hasLegacy && !hasHook {
+		t.Fatalf("zsh script missing ghost text invariant hook registration")
 	}
 
 	body := extractFunctionBody(script, "_ai_sync_ghost_text")
@@ -665,7 +669,7 @@ func TestZshScript_AcceptLineClearsGhostText(t *testing.T) {
 	body := rest[:end]
 
 	// The normal accept-line path must clear ghost text state
-	for _, required := range []string{`POSTDISPLAY=""`, "region_highlight=()"} {
+	for _, required := range []string{`POSTDISPLAY=""`, "_ai_remove_ghost_highlight"} {
 		if !strings.Contains(body, required) {
 			t.Errorf("_ai_voice_accept_line() missing %q before accept-line; "+
 				"ghost text will persist after Enter", required)

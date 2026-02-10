@@ -764,6 +764,9 @@ function _clai_preexec --on-event fish_preexec
         set -g _CLAI_COMMAND_START_TIME (math (command date +%s) \* 1000)
     end
 
+    # Export last command for child processes (used to suppress suggesting it again).
+    set -gx CLAI_LAST_COMMAND "$cmd"
+
     # Fire and forget - log command start to daemon
     clai-shim log-start --session-id="$CLAI_SESSION_ID" --command-id="$_CLAI_COMMAND_ID" --cwd="$PWD" --command="$cmd" >/dev/null 2>&1 &
     disown %1 2>/dev/null

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/runger/clai/internal/ipc"
 	"github.com/runger/clai/internal/sanitize"
 	"github.com/runger/clai/internal/suggestions/explain"
+	"github.com/runger/clai/internal/suggestions/normalize"
 	"github.com/runger/clai/internal/suggestions/timing"
 )
 
@@ -69,6 +71,15 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 		prefix = args[0]
 	}
 
+	// Best-effort suppression: never suggest the exact last executed command.
+	// This is defense-in-depth for cases where the daemon is down (history fallback),
+	// session tracking is unavailable, or the AI cache repeats the last command.
+	lastCmd := strings.TrimSpace(os.Getenv("CLAI_LAST_COMMAND"))
+	lastCmdNorm := ""
+	if lastCmd != "" {
+		lastCmdNorm = strings.TrimSpace(normalize.NormalizeSimple(lastCmd))
+	}
+
 	// Determine output format (--json flag for backwards compat)
 	format := suggestFormat
 	if suggestJSON && format == "text" {
@@ -98,6 +109,9 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 	// Empty prefix - return cached AI suggestion
 	if prefix == "" {
 		suggestion, _ := cache.ReadSuggestion()
+		if suggestion != "" && shouldSuppressLastCmd(suggestion, lastCmd, lastCmdNorm) {
+			suggestion = ""
+		}
 		if format == "json" {
 			if suggestion == "" {
 				return writeSuggestJSON(nil, hint)
@@ -124,8 +138,39 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 		suggestions = getSuggestionsFromHistory(prefix, suggestLimit)
 	}
 
+	// Defense-in-depth: suppress the last command regardless of source.
+	if len(suggestions) > 0 && lastCmd != "" {
+		suggestions = filterSuppressedSuggestions(suggestions, lastCmd, lastCmdNorm)
+	}
+
 	// Output based on format
 	return outputSuggestions(suggestions, format, hint)
+}
+
+func shouldSuppressLastCmd(suggestion, lastCmd, lastCmdNorm string) bool {
+	if strings.TrimSpace(suggestion) == "" || strings.TrimSpace(lastCmd) == "" {
+		return false
+	}
+	sNorm := strings.TrimSpace(normalize.NormalizeSimple(suggestion))
+	// Prefer normalized comparison when we have it; fall back to raw equality.
+	if lastCmdNorm != "" && sNorm != "" {
+		return sNorm == lastCmdNorm
+	}
+	return strings.TrimSpace(suggestion) == strings.TrimSpace(lastCmd)
+}
+
+func filterSuppressedSuggestions(suggestions []suggestOutput, lastCmd, lastCmdNorm string) []suggestOutput {
+	out := suggestions[:0]
+	for _, s := range suggestions {
+		if shouldSuppressLastCmd(s.Text, lastCmd, lastCmdNorm) {
+			continue
+		}
+		out = append(out, s)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // outputSuggestions formats and outputs suggestions based on format type.

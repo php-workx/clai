@@ -723,6 +723,7 @@ _clai_log_command_start() {
         _CLAI_COMMAND_START_TIME=$(($(date +%s) * 1000))
     fi
     _CLAI_LAST_COMMAND="$cmd"
+    export CLAI_LAST_COMMAND="$_CLAI_LAST_COMMAND"
 
     # Fire and forget - log command start to daemon
     (clai-shim log-start \
