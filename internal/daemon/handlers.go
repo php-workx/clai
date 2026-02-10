@@ -315,7 +315,7 @@ func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResul
 		if sug.LastSeenUnixMs > 0 {
 			pbReasons = append(pbReasons, &pb.SuggestionReason{
 				Type:        "recency",
-				Description: fmt.Sprintf("last %s", formatAgo(nowMs-sug.LastSeenUnixMs)),
+				Description: fmt.Sprintf("last %s ago", formatAgo(nowMs-sug.LastSeenUnixMs)),
 			})
 		}
 		totalRuns := sug.SuccessCount + sug.FailureCount
@@ -336,7 +336,7 @@ func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResul
 		if desc == "" {
 			var whyParts []string
 			if sug.LastSeenUnixMs > 0 {
-				whyParts = append(whyParts, fmt.Sprintf("last %s", formatAgo(nowMs-sug.LastSeenUnixMs)))
+				whyParts = append(whyParts, fmt.Sprintf("last %s ago", formatAgo(nowMs-sug.LastSeenUnixMs)))
 			}
 			if totalRuns > 0 {
 				whyParts = append(whyParts, fmt.Sprintf("freq %d", totalRuns))

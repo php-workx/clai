@@ -150,7 +150,7 @@ func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd
 		if sugLast := sug.LastSeenMs(); sugLast > 0 {
 			pbReasons = append(pbReasons, &pb.SuggestionReason{
 				Type:        "recency",
-				Description: fmt.Sprintf("last %s", formatAgo(nowMs-sugLast)),
+				Description: fmt.Sprintf("last %s ago", formatAgo(nowMs-sugLast)),
 			})
 		}
 		if fs := sug.MaxFreqScore(); fs > 0 {

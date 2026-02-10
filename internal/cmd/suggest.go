@@ -190,6 +190,9 @@ func formatGhostMeta(s suggestOutput) string {
 	if s.CwdMatch {
 		meta += "  · cwd"
 	}
+	if strings.TrimSpace(s.Recency) != "" {
+		meta += "  · " + strings.TrimSpace(s.Recency)
+	}
 	risk := strings.TrimSpace(strings.ToLower(s.Risk))
 	if risk == "destructive" {
 		meta += "  · [!] destructive"
@@ -240,6 +243,7 @@ type suggestOutput struct {
 	Description string           `json:"description"`
 	Risk        string           `json:"risk"`
 	CwdMatch    bool             `json:"cwd_match,omitempty"`
+	Recency     string           `json:"recency,omitempty"`
 	Reasons     []explain.Reason `json:"reasons,omitempty"`
 }
 
@@ -329,10 +333,16 @@ func getSuggestionsFromDaemon(prefix string, limit int) []suggestOutput {
 	results := make([]suggestOutput, len(daemonSuggestions))
 	for i, s := range daemonSuggestions {
 		cwdMatch := false
+		recency := ""
 		for _, r := range s.Reasons {
 			switch strings.TrimSpace(r.Type) {
 			case suggest2.ReasonDirTransition, suggest2.ReasonDirFrequency:
 				cwdMatch = true
+			case "recency":
+				// Always capture recency for ghost meta; keep the list line compact.
+				if recency == "" {
+					recency = strings.TrimSpace(r.Description)
+				}
 			}
 		}
 		if strings.TrimSpace(s.Source) == "cwd" {
@@ -346,6 +356,7 @@ func getSuggestionsFromDaemon(prefix string, limit int) []suggestOutput {
 			Description: s.Description,
 			Risk:        s.Risk,
 			CwdMatch:    cwdMatch,
+			Recency:     recency,
 		}
 
 		// Convert daemon-provided reasons to explain.Reason when enabled.

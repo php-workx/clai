@@ -505,7 +505,7 @@ func TestHandler_Suggest_V1IncludesWhyDetailsWhenAvailable(t *testing.T) {
 	for _, r := range got.Reasons {
 		switch strings.TrimSpace(r.Type) {
 		case "recency":
-			if strings.Contains(r.Description, "last 2h") {
+			if strings.Contains(r.Description, "last 2h ago") {
 				hasRecencyHint = true
 			}
 		case "frequency":
@@ -523,7 +523,7 @@ func TestHandler_Suggest_V1IncludesWhyDetailsWhenAvailable(t *testing.T) {
 		}
 	}
 	if !hasRecencyHint {
-		t.Errorf("expected recency hint (last 2h)")
+		t.Errorf("expected recency hint (last 2h ago)")
 	}
 	if !hasFreqHint {
 		t.Errorf("expected frequency hint (freq 12)")

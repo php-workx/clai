@@ -247,29 +247,17 @@ func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 			meta += "  · [!] destructive"
 		}
 
-		// Prefer description; fall back to top reasons.
-		desc := strings.TrimSpace(oneLine(s.Description))
-		if desc == "" && len(s.Reasons) > 0 {
-			var parts []string
-			for i, r := range s.Reasons {
-				if i >= 3 {
-					break
-				}
-				d := strings.TrimSpace(oneLine(r.Description))
-				if d == "" {
-					d = strings.TrimSpace(r.Type)
-				}
-				if d != "" {
-					parts = append(parts, d)
-				}
+		// Keep list rows compact: only show recency hint (if available).
+		// Richer details belong in the details panel under the list.
+		for _, r := range s.Reasons {
+			if strings.TrimSpace(r.Type) != "recency" {
+				continue
 			}
-			if len(parts) > 0 {
-				desc = strings.Join(parts, "; ")
+			desc := strings.TrimSpace(oneLine(r.Description))
+			if desc != "" {
+				meta += "  · " + desc
+				break
 			}
-		}
-
-		if desc != "" {
-			meta += "  — " + desc
 		}
 
 		return meta
