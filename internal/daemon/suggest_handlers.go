@@ -169,6 +169,21 @@ func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd
 		desc := ""
 		if len(why) > 0 {
 			desc = why[0].Description
+		} else {
+			// Fallback narrative "why" when no weighted explain reasons exist.
+			// Keep it non-numeric; numeric hints are shown elsewhere in the UI.
+			displayCmd := prevCmd
+			if len(displayCmd) > 40 {
+				displayCmd = displayCmd[:37] + "..."
+			}
+			switch {
+			case prevCmd != "" && sug.MaxTransitionCount() > 0:
+				desc = fmt.Sprintf("Often run after '%s'.", displayCmd)
+			case sug.MaxFreqScore() > 0:
+				desc = "Frequently used command."
+			case sug.LastSeenMs() > 0:
+				desc = "Used recently."
+			}
 		}
 
 		pbSuggestions[i] = &pb.Suggestion{

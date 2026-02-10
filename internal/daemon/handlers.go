@@ -26,6 +26,58 @@ const (
 	riskDestructive = "destructive"
 )
 
+func v1WhyNarrative(sug suggest.Suggestion, lastCmd string) string {
+	// Prefer explaining something the user cannot infer from the numbers above.
+	// Avoid embedding numeric values here; those are rendered as structured hints.
+
+	cmdTool := suggest.GetToolPrefix(sug.Text)
+	lastTool := suggest.GetToolPrefix(lastCmd)
+	if cmdTool != "" && lastTool != "" && cmdTool == lastTool {
+		return fmt.Sprintf("Same tool as your last command (%s).", cmdTool)
+	}
+
+	src := strings.TrimSpace(strings.ToLower(sug.Source))
+	base := ""
+	switch src {
+	case "session":
+		base = "From this session's history."
+	case "cwd":
+		base = "Often used in this directory."
+	case "global":
+		base = "From your global history."
+	}
+
+	total := sug.SuccessCount + sug.FailureCount
+	if total >= 3 {
+		rate := float64(sug.SuccessCount) / float64(total)
+		reliability := ""
+		switch {
+		case rate >= 0.90:
+			reliability = "It has been reliable."
+		case rate >= 0.60:
+			reliability = "It usually works."
+		}
+
+		if reliability != "" {
+			if base == "" {
+				base = reliability
+			} else {
+				base = base + " " + reliability
+			}
+		}
+	}
+
+	if base != "" {
+		return base
+	}
+
+	// Last-resort fallback: keep it short and non-numeric.
+	if sug.LastSeenUnixMs > 0 {
+		return "Used recently."
+	}
+	return ""
+}
+
 // SessionStart handles the SessionStart RPC.
 // It creates a new session in the database and registers it with the session manager.
 func (s *Server) SessionStart(ctx context.Context, req *pb.SessionStartRequest) (*pb.Ack, error) {
@@ -331,21 +383,10 @@ func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResul
 			})
 		}
 
-		// Prefer a short, stable "why" description for the UI.
+		// Prefer a short narrative "why" (avoid repeating the numeric hints above).
 		desc := strings.TrimSpace(sug.Description)
 		if desc == "" {
-			var whyParts []string
-			if sug.LastSeenUnixMs > 0 {
-				whyParts = append(whyParts, fmt.Sprintf("last %s ago", formatAgo(nowMs-sug.LastSeenUnixMs)))
-			}
-			if totalRuns > 0 {
-				whyParts = append(whyParts, fmt.Sprintf("freq %d", totalRuns))
-				successPct := int((float64(sug.SuccessCount) / float64(totalRuns)) * 100.0)
-				whyParts = append(whyParts, fmt.Sprintf("success %d%%", successPct))
-			}
-			if len(whyParts) > 0 {
-				desc = strings.Join(whyParts, "; ")
-			}
+			desc = v1WhyNarrative(sug, lastCommand)
 		}
 
 		cmdNorm := strings.TrimSpace(sug.CmdNorm)

@@ -397,7 +397,7 @@ func DefaultSuggestionsConfig() SuggestionsConfig {
 		DirectoryScopeMaxDepth:  3,
 
 		// Scorer version
-		ScorerVersion: "v1",
+		ScorerVersion: "blend",
 
 		// Explainability
 		ExplainEnabled:         true,

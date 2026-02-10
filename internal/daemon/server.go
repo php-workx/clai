@@ -197,7 +197,12 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 	// Determine scorer version with fallback logic
 	scorerVersion := cfg.ScorerVersion
 	if scorerVersion == "" {
-		scorerVersion = "v1"
+		// Default to blend when V2 is available; otherwise stay on V1.
+		if v2scorer != nil {
+			scorerVersion = "blend"
+		} else {
+			scorerVersion = "v1"
+		}
 	}
 	if (scorerVersion == "v2" || scorerVersion == "blend") && v2scorer == nil {
 		logger.Warn("scorer_version requires V2 scorer but V2 is unavailable; falling back to v1",

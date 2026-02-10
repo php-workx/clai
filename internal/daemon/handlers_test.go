@@ -496,6 +496,10 @@ func TestHandler_Suggest_V1IncludesWhyDetailsWhenAvailable(t *testing.T) {
 	if got.Description == "" {
 		t.Errorf("expected description to be set")
 	}
+	lowDesc := strings.ToLower(got.Description)
+	if strings.Contains(lowDesc, "last ") || strings.Contains(lowDesc, "freq") || strings.Contains(lowDesc, "success") {
+		t.Errorf("expected narrative description without numeric hints, got %q", got.Description)
+	}
 	if len(got.Reasons) == 0 {
 		t.Fatalf("expected reasons to be set")
 	}

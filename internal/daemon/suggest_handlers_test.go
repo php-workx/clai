@@ -14,9 +14,9 @@ import (
 // Feature flag tests (4 tests)
 // ============================================================================
 
-// TestScorerVersion_DefaultsToV1 verifies that a server with no explicit
-// scorer version defaults to "v1".
-func TestScorerVersion_DefaultsToV1(t *testing.T) {
+// TestScorerVersion_DefaultsToV1WhenV2Unavailable verifies that a server with
+// no explicit scorer version defaults to "v1" when V2 is unavailable.
+func TestScorerVersion_DefaultsToV1WhenV2Unavailable(t *testing.T) {
 	t.Parallel()
 	store := newMockStore()
 	server, err := NewServer(&ServerConfig{Store: store})
@@ -25,6 +25,39 @@ func TestScorerVersion_DefaultsToV1(t *testing.T) {
 	}
 	if server.scorerVersion != "v1" {
 		t.Errorf("expected scorerVersion='v1', got %q", server.scorerVersion)
+	}
+}
+
+// TestScorerVersion_DefaultsToBlendWhenV2Available verifies that a server with
+// no explicit scorer version defaults to "blend" when V2 is available.
+func TestScorerVersion_DefaultsToBlendWhenV2Available(t *testing.T) {
+	t.Parallel()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+	if server.scorerVersion != "blend" {
+		t.Errorf("expected scorerVersion='blend', got %q", server.scorerVersion)
+	}
+	if server.v2Scorer == nil {
+		t.Error("v2Scorer should be initialized when V2DB is provided")
 	}
 }
 
