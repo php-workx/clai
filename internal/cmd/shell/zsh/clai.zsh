@@ -64,6 +64,7 @@ _AI_CURRENT_SUGGESTION=""
 _AI_LAST_ACCEPTED=""
 _AI_IN_PASTE=false
 _AI_GHOST_HIGHLIGHT=""
+_AI_GHOST_META=""
 
 # Disable zsh-autosuggestions when clai is active
 _CLAI_ZSH_AUTOSUGGEST_PRESENT=false
@@ -112,6 +113,7 @@ _ai_remove_ghost_highlight() {
 # Update suggestion based on current buffer
 _ai_update_suggestion() {
     local suggestion=""
+    local meta=""
 
     # Hide ghost text when disabled, picker active, buffer empty, or cursor not at EOL
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] || [[ -z "$BUFFER" ]] || [[ $CURSOR -ne ${#BUFFER} ]]; then
@@ -121,6 +123,7 @@ _ai_update_suggestion() {
             (clai suggest-feedback --action=dismissed --suggested="$_AI_CURRENT_SUGGESTION" >/dev/null 2>&1 &)
         fi
         _AI_CURRENT_SUGGESTION=""
+        _AI_GHOST_META=""
         POSTDISPLAY=""
         _ai_remove_ghost_highlight
         return
@@ -128,19 +131,30 @@ _ai_update_suggestion() {
 
     _clai_zsh_autosuggest_disable
     # Has content - clai handles daemon vs history fallback
-    suggestion=$(clai suggest --format fzf --limit 1 "$BUFFER" 2>/dev/null)
+    local out=""
+    out=$(clai suggest --format ghost --limit 1 "$BUFFER" 2>/dev/null)
+    suggestion="${out%%$'\t'*}"
+    if [[ "$out" == *$'\t'* ]]; then
+        meta="${out#*$'\t'}"
+    fi
 
     if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" && "$suggestion" == "$BUFFER"* ]]; then
         _AI_CURRENT_SUGGESTION="$suggestion"
+        _AI_GHOST_META="$meta"
         local ghost="${suggestion:${#BUFFER}}"
-        POSTDISPLAY="${ghost}"
+        local display="${ghost}"
+        if [[ -n "$meta" ]]; then
+            display="${ghost}  ${meta}"
+        fi
+        POSTDISPLAY="${display}"
         # region_highlight colors POSTDISPLAY; positions past ${#BUFFER} target it.
         # Preserve any existing region_highlight from other plugins (e.g. zsh-syntax-highlighting).
         _ai_remove_ghost_highlight
-        _AI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#ghost})) fg=242"
+        _AI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#display})) fg=242"
         region_highlight+=("$_AI_GHOST_HIGHLIGHT")
     else
         _AI_CURRENT_SUGGESTION=""
+        _AI_GHOST_META=""
         POSTDISPLAY=""
         _ai_remove_ghost_highlight
     fi
@@ -187,6 +201,7 @@ _ai_clear_ghost_text() {
         (clai suggest-feedback --action=dismissed --suggested="$_AI_CURRENT_SUGGESTION" >/dev/null 2>&1 &)
     fi
     _AI_CURRENT_SUGGESTION=""
+    _AI_GHOST_META=""
     POSTDISPLAY=""
     _ai_remove_ghost_highlight
 }
@@ -217,9 +232,13 @@ _ai_sync_ghost_text() {
         _ai_remove_ghost_highlight
         return
     fi
-    POSTDISPLAY="${ghost}"
+    local display="${ghost}"
+    if [[ -n "$_AI_GHOST_META" ]]; then
+        display="${ghost}  ${_AI_GHOST_META}"
+    fi
+    POSTDISPLAY="${display}"
     _ai_remove_ghost_highlight
-    _AI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#ghost})) fg=242"
+    _AI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#display})) fg=242"
     region_highlight+=("$_AI_GHOST_HIGHLIGHT")
 }
 
@@ -309,6 +328,7 @@ _ai_forward_char() {
         BUFFER="$_AI_CURRENT_SUGGESTION"
         CURSOR=${#BUFFER}
         _AI_CURRENT_SUGGESTION=""
+        _AI_GHOST_META=""
         _AI_LAST_ACCEPTED="$accepted"
         POSTDISPLAY=""
         _ai_remove_ghost_highlight
@@ -320,6 +340,7 @@ _ai_forward_char() {
     else
         # Normal forward char (or stale suggestion - ignore it)
         _AI_CURRENT_SUGGESTION=""
+        _AI_GHOST_META=""
         POSTDISPLAY=""
         _ai_remove_ghost_highlight
         zle .forward-char

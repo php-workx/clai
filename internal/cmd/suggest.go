@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"sync"
@@ -58,7 +59,7 @@ Examples:
 func init() {
 	suggestCmd.Flags().IntVarP(&suggestLimit, "limit", "n", 1, "maximum number of suggestions to return")
 	suggestCmd.Flags().BoolVar(&suggestJSON, "json", false, "output suggestions as JSON (deprecated: use --format=json)")
-	suggestCmd.Flags().StringVar(&suggestFormat, "format", "text", "output format: text, json, or fzf")
+	suggestCmd.Flags().StringVar(&suggestFormat, "format", "text", "output format: text, json, fzf, or ghost")
 	suggestCmd.Flags().StringVar(&colorMode, "color", "auto", "color output: auto, always, or never")
 	suggestCmd.Flags().BoolVar(&suggestExplain, "explain", false, "include reasons explaining why each suggestion was ranked")
 }
@@ -173,6 +174,25 @@ func filterSuppressedSuggestions(suggestions []suggestOutput, lastCmd, lastCmdNo
 	return out
 }
 
+func formatGhostMeta(s suggestOutput) string {
+	src := strings.TrimSpace(s.Source)
+	if src == "" {
+		src = "unknown"
+	}
+
+	score := s.Score
+	if math.IsNaN(score) || math.IsInf(score, 0) {
+		score = 0
+	}
+
+	meta := fmt.Sprintf("· %s  · score %.2f", src, score)
+	risk := strings.TrimSpace(strings.ToLower(s.Risk))
+	if risk != "" {
+		meta += "  · risk " + risk
+	}
+	return meta
+}
+
 // outputSuggestions formats and outputs suggestions based on format type.
 func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.TimingHint) error {
 	switch format {
@@ -182,6 +202,14 @@ func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.
 		// fzf format: plain commands, one per line (for piping to fzf)
 		for _, s := range suggestions {
 			fmt.Println(s.Text)
+		}
+	case "ghost":
+		// ghost format: one suggestion per line as "command<TAB>meta".
+		// This is used for inline ghost text in shells where accepting the
+		// suggestion must insert only the command text, but the UI can display
+		// additional metadata.
+		for _, s := range suggestions {
+			fmt.Printf("%s\t%s\n", s.Text, formatGhostMeta(s))
 		}
 	case "text":
 		// text format: numbered list with metadata

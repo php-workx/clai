@@ -125,7 +125,7 @@ func TestShellScripts_SuggestUsesPlainFormat(t *testing.T) {
 		{
 			path: "shell/zsh/clai.zsh",
 			markers: []string{
-				"clai suggest --format fzf --limit 1",
+				"clai suggest --format ghost --limit 1",
 				`clai suggest --format fzf --limit "$CLAI_MENU_LIMIT"`,
 			},
 			notMatch: []string{

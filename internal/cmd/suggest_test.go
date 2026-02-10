@@ -143,3 +143,26 @@ func TestRunSuggest_HistoryFallback_NoDaemon(t *testing.T) {
 		t.Fatalf("expected history fallback suggestion, got empty output")
 	}
 }
+
+func TestOutputSuggestions_GhostFormat(t *testing.T) {
+	out := captureStdout(t, func() {
+		suggestions := []suggestOutput{
+			{Text: "make install", Source: "global", Score: 0.47},
+			{Text: "rm -rf /", Source: "global", Score: 0.99, Risk: "destructive"},
+		}
+		if err := outputSuggestions(suggestions, "ghost", nil); err != nil {
+			t.Fatalf("outputSuggestions error: %v", err)
+		}
+	})
+
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %q", len(lines), out)
+	}
+	if lines[0] != "make install\t· global  · score 0.47" {
+		t.Fatalf("unexpected ghost line 1: %q", lines[0])
+	}
+	if lines[1] != "rm -rf /\t· global  · score 0.99  · risk destructive" {
+		t.Fatalf("unexpected ghost line 2: %q", lines[1])
+	}
+}
