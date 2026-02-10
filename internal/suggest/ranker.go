@@ -78,6 +78,14 @@ func (r *DefaultRanker) Rank(ctx context.Context, req *RankRequest) ([]Suggestio
 	}
 
 	candidates := aggregateCandidates(results)
+	// Never suggest the exact last command again; users can re-run via shell history.
+	// This prevents the common "next suggestion == last command" annoyance.
+	if req.LastCommand != "" {
+		lastNorm := NormalizeCommand(req.LastCommand)
+		if lastNorm != "" {
+			delete(candidates, DeduplicateKey(lastNorm))
+		}
+	}
 	suggestions := scoreCandidates(candidates, time.Now(), GetToolPrefix(req.LastCommand))
 	return limitResults(suggestions, maxResults), nil
 }

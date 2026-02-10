@@ -15,6 +15,7 @@ import (
 
 	"github.com/runger/clai/internal/suggestions/discovery"
 	"github.com/runger/clai/internal/suggestions/dismissal"
+	"github.com/runger/clai/internal/suggestions/normalize"
 	"github.com/runger/clai/internal/suggestions/recovery"
 	"github.com/runger/clai/internal/suggestions/score"
 	"github.com/runger/clai/internal/suggestions/workflow"
@@ -441,6 +442,19 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 	// Apply prefix filtering
 	if suggestCtx.Prefix != "" {
 		candidates = s.filterByPrefix(candidates, suggestCtx.Prefix)
+	}
+
+	// Never suggest the exact last command again.
+	// This is particularly important when prefix is empty (i.e., "what next?"),
+	// where the most recent command often wins frequency/recency scoring.
+	if suggestCtx.LastCmd != "" {
+		delete(candidates, suggestCtx.LastCmd)
+
+		// Defense-in-depth: callers sometimes pass raw cmd text instead of normalized.
+		// Suppress both representations if they differ.
+		if norm := strings.TrimSpace(normalize.NormalizeSimple(suggestCtx.LastCmd)); norm != "" && norm != suggestCtx.LastCmd {
+			delete(candidates, norm)
+		}
 	}
 
 	// Convert to sorted slice

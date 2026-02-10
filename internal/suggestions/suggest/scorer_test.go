@@ -141,6 +141,51 @@ func createTestDB(t testing.TB) *sql.DB {
 	return db
 }
 
+func TestScorer_Suggest_DoesNotSuggestLastCommand(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDB(t)
+
+	freqStore, err := score.NewFrequencyStore(db, score.DefaultFrequencyOptions())
+	require.NoError(t, err)
+	defer freqStore.Close()
+
+	ctx := context.Background()
+	nowMs := int64(1000000)
+
+	// Make the last command the strongest frequency candidate so it would
+	// otherwise show up at the top.
+	for i := 0; i < 20; i++ {
+		require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "make install", nowMs))
+	}
+	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "make build", nowMs))
+
+	cfg := DefaultScorerConfig()
+	cfg.TopK = MaxTopK
+
+	scorer, err := NewScorer(ScorerDependencies{
+		DB:        db,
+		FreqStore: freqStore,
+	}, cfg)
+	require.NoError(t, err)
+
+	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+		LastCmd: "make install",
+		NowMs:   nowMs,
+	})
+	require.NoError(t, err)
+	require.NotEmpty(t, suggestions)
+
+	foundBuild := false
+	for _, s := range suggestions {
+		assert.NotEqual(t, "make install", s.Command, "should not suggest last command")
+		if s.Command == "make build" {
+			foundBuild = true
+		}
+	}
+	assert.True(t, foundBuild, "expected at least one non-last candidate to remain")
+}
+
 func TestScorer_NewScorer(t *testing.T) {
 	t.Parallel()
 

@@ -5,6 +5,7 @@ import (
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/sanitize"
+	"github.com/runger/clai/internal/suggestions/normalize"
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
@@ -104,7 +105,8 @@ func (s *Server) buildV2SuggestContext(req *pb.SuggestRequest) suggest2.SuggestC
 
 	// Try to get the last command from session for transition scoring
 	if info, ok := s.sessionManager.Get(req.SessionId); ok {
-		suggestCtx.LastCmd = info.LastCmdRaw
+		// V2 scorer expects normalized command strings.
+		suggestCtx.LastCmd = normalize.NormalizeSimple(info.LastCmdRaw)
 		suggestCtx.RepoKey = info.LastGitRepo
 	}
 
