@@ -178,7 +178,6 @@ func TestPerformance_FishIntegrationOverhead(t *testing.T) {
 // TestPerformance_InitCommandFast verifies clai init command completes quickly.
 // This is critical because `eval "$(clai init zsh)"` runs synchronously in shell startup.
 func TestPerformance_InitCommandFast(t *testing.T) {
-	t.Parallel()
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
