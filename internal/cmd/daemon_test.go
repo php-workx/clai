@@ -23,6 +23,11 @@ func TestDaemonStartCmd_AlreadyRunning(t *testing.T) {
 	if err := os.WriteFile(pidPath, []byte(fmt.Sprintf("%d\n", os.Getpid())), 0644); err != nil {
 		t.Fatalf("WriteFile pid error: %v", err)
 	}
+	// Start now treats "running but no socket" as unhealthy, so ensure a socket
+	// path exists for the already-running case.
+	if err := os.WriteFile(paths.SocketFile(), []byte("socket"), 0600); err != nil {
+		t.Fatalf("WriteFile socket error: %v", err)
+	}
 
 	output := captureStdout(t, func() {
 		if err := daemonStartCmd.RunE(daemonStartCmd, nil); err != nil {

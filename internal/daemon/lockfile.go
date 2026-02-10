@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -25,6 +26,44 @@ func NewLockFile(path string) *LockFile {
 // LockFilePath returns the default lock file path for the given base directory.
 func LockFilePath(baseDir string) string {
 	return filepath.Join(baseDir, "clai.lock")
+}
+
+// ReadHeldPID returns the PID recorded in lockPath if (and only if) the file lock
+// is currently held by another process. If the lock is not held (or the file does
+// not exist), held will be false.
+//
+// This is used to recover when the PID file is stale/missing but a daemon is
+// still running and holding the lock.
+func ReadHeldPID(lockPath string) (pid int, held bool, err error) {
+	f, err := os.OpenFile(lockPath, os.O_RDWR, 0)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return 0, false, nil
+		}
+		return 0, false, fmt.Errorf("open lock file: %w", err)
+	}
+	defer f.Close()
+
+	// If we can acquire the lock, it is not held.
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil {
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		return 0, false, nil
+	} else if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN) {
+		// Lock is held by another process. Read PID for diagnostics and control.
+		if _, err := f.Seek(0, 0); err != nil {
+			return 0, true, nil
+		}
+		buf := make([]byte, 32)
+		n, rerr := f.Read(buf)
+		if rerr != nil || n == 0 {
+			return 0, true, nil
+		}
+		pidStr := strings.TrimSpace(string(buf[:n]))
+		pid, _ := strconv.Atoi(pidStr)
+		return pid, true, nil
+	} else {
+		return 0, false, fmt.Errorf("flock: %w", err)
+	}
 }
 
 // Acquire attempts to acquire an exclusive non-blocking lock.

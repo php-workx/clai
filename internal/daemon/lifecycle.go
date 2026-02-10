@@ -127,18 +127,34 @@ func IsRunning() bool {
 func IsRunningWithPaths(paths *config.Paths) bool {
 	pid, err := ReadPID(paths.PIDFile())
 	if err != nil {
-		return false
+		// PID file missing/stale; fall through to lock-based detection.
+		pid = 0
 	}
 
 	// Check if process exists
-	process, err := os.FindProcess(pid)
-	if err != nil {
+	if pid > 0 {
+		process, err := os.FindProcess(pid)
+		if err == nil {
+			// On Unix, FindProcess always succeeds. Send signal 0 to check if alive.
+			if process.Signal(syscall.Signal(0)) == nil {
+				return true
+			}
+		}
+	}
+
+	// If the PID file is wrong, fall back to the held lock PID. This handles
+	// cases where the daemon is alive but the PID file was overwritten by a
+	// failed spawn attempt.
+	lockPID, held, err := ReadHeldPID(LockFilePath(paths.BaseDir))
+	if err != nil || !held || lockPID <= 0 {
 		return false
 	}
 
-	// On Unix, FindProcess always succeeds. Send signal 0 to check if alive.
-	err = process.Signal(syscall.Signal(0))
-	return err == nil
+	process, err := os.FindProcess(lockPID)
+	if err != nil {
+		return false
+	}
+	return process.Signal(syscall.Signal(0)) == nil
 }
 
 // ReadPID reads the PID from the PID file.
@@ -165,8 +181,29 @@ func Stop() error {
 // StopWithPaths stops the running daemon using the given paths.
 func StopWithPaths(paths *config.Paths) error {
 	pid, err := ReadPID(paths.PIDFile())
-	if err != nil {
-		return fmt.Errorf("failed to read PID: %w", err)
+	if err != nil || pid <= 0 {
+		pid = 0
+	}
+
+	// If PID file is stale, use the held lock PID.
+	if pid > 0 {
+		if proc, ferr := os.FindProcess(pid); ferr == nil {
+			if proc.Signal(syscall.Signal(0)) != nil {
+				pid = 0
+			}
+		} else {
+			pid = 0
+		}
+	}
+	if pid == 0 {
+		lockPID, held, lerr := ReadHeldPID(LockFilePath(paths.BaseDir))
+		if lerr != nil {
+			return fmt.Errorf("failed to read PID and lock PID: %w", lerr)
+		}
+		if !held || lockPID <= 0 {
+			return fmt.Errorf("daemon not running")
+		}
+		pid = lockPID
 	}
 
 	process, err := os.FindProcess(pid)

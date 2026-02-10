@@ -93,6 +93,27 @@ func TestIsRunningWithPaths_StalePID(t *testing.T) {
 	}
 }
 
+func TestIsRunningWithPaths_LockHeldPIDFallback(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	paths := &config.Paths{
+		BaseDir: tmpDir,
+	}
+
+	// Hold the daemon lock in this process, but do not create a PID file.
+	lockPath := LockFilePath(paths.BaseDir)
+	lock := NewLockFile(lockPath)
+	if err := lock.Acquire(); err != nil {
+		t.Fatalf("Acquire lock failed: %v", err)
+	}
+	t.Cleanup(func() { _ = lock.Release() })
+
+	if !IsRunningWithPaths(paths) {
+		t.Error("expected IsRunningWithPaths to return true when lock is held by a live process")
+	}
+}
+
 func TestCleanupStaleWithPaths(t *testing.T) {
 	t.Parallel()
 

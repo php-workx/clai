@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -31,9 +32,22 @@ var daemonStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the clai daemon",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if daemon.IsRunning() {
+		paths := config.DefaultPaths()
+
+		// If the process is alive but the socket is missing, treat it as unhealthy
+		// and restart. This can happen if the socket path was unlinked while the
+		// daemon is still running, leaving it unreachable.
+		socketExists := false
+		if _, err := os.Stat(paths.SocketFile()); err == nil {
+			socketExists = true
+		}
+		if daemon.IsRunning() && socketExists {
 			fmt.Printf("Daemon: %salready running%s\n", colorCyan, colorReset)
 			return nil
+		}
+		if daemon.IsRunning() && !socketExists {
+			fmt.Printf("Daemon: %sunhealthy%s (socket missing), restarting...\n", colorYellow, colorReset)
+			_ = daemon.Stop() // best-effort; Stop() now falls back to lock PID
 		}
 
 		fmt.Print("Starting daemon...")
@@ -105,6 +119,9 @@ var daemonStatusCmd = &cobra.Command{
 				fmt.Printf("  PID:    %d\n", pid)
 			}
 			fmt.Printf("  Socket: %s\n", paths.SocketFile())
+			if _, err := os.Stat(paths.SocketFile()); err != nil {
+				fmt.Printf("  Socket: %smissing%s\n", colorYellow, colorReset)
+			}
 		} else {
 			fmt.Printf("Daemon: %snot running%s\n", colorDim, colorReset)
 		}

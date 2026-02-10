@@ -232,6 +232,7 @@ func TestRemoveStaleSocketRetriesBeforeDelete(t *testing.T) {
 	oldSocketExists := socketExistsFn
 	oldSocketPath := socketPathFn
 	oldRemove := removeFileFn
+	oldDaemonLock := daemonLockFn
 	oldAttempts := staleSocketDialAttempts
 	oldDelay := staleSocketRetryDelay
 	t.Cleanup(func() {
@@ -239,12 +240,14 @@ func TestRemoveStaleSocketRetriesBeforeDelete(t *testing.T) {
 		socketExistsFn = oldSocketExists
 		socketPathFn = oldSocketPath
 		removeFileFn = oldRemove
+		daemonLockFn = oldDaemonLock
 		staleSocketDialAttempts = oldAttempts
 		staleSocketRetryDelay = oldDelay
 	})
 
 	socketExistsFn = func() bool { return true }
 	socketPathFn = func() string { return "/tmp/fake-clai.sock" }
+	daemonLockFn = func() (int, bool, error) { return 0, false, nil }
 	staleSocketDialAttempts = 3
 	staleSocketRetryDelay = 0
 
@@ -276,6 +279,7 @@ func TestRemoveStaleSocketDeleteError(t *testing.T) {
 	oldSocketExists := socketExistsFn
 	oldSocketPath := socketPathFn
 	oldRemove := removeFileFn
+	oldDaemonLock := daemonLockFn
 	oldAttempts := staleSocketDialAttempts
 	oldDelay := staleSocketRetryDelay
 	t.Cleanup(func() {
@@ -283,12 +287,14 @@ func TestRemoveStaleSocketDeleteError(t *testing.T) {
 		socketExistsFn = oldSocketExists
 		socketPathFn = oldSocketPath
 		removeFileFn = oldRemove
+		daemonLockFn = oldDaemonLock
 		staleSocketDialAttempts = oldAttempts
 		staleSocketRetryDelay = oldDelay
 	})
 
 	socketExistsFn = func() bool { return true }
 	socketPathFn = func() string { return "/tmp/fake-clai.sock" }
+	daemonLockFn = func() (int, bool, error) { return 0, false, nil }
 	staleSocketDialAttempts = 2
 	staleSocketRetryDelay = 0
 	quickDialFn = func() (io.Closer, error) {
@@ -309,6 +315,7 @@ func TestRemoveStaleSocketDoesNotDeleteForUnknownDialError(t *testing.T) {
 	oldSocketExists := socketExistsFn
 	oldSocketPath := socketPathFn
 	oldRemove := removeFileFn
+	oldDaemonLock := daemonLockFn
 	oldAttempts := staleSocketDialAttempts
 	oldDelay := staleSocketRetryDelay
 	t.Cleanup(func() {
@@ -316,12 +323,14 @@ func TestRemoveStaleSocketDoesNotDeleteForUnknownDialError(t *testing.T) {
 		socketExistsFn = oldSocketExists
 		socketPathFn = oldSocketPath
 		removeFileFn = oldRemove
+		daemonLockFn = oldDaemonLock
 		staleSocketDialAttempts = oldAttempts
 		staleSocketRetryDelay = oldDelay
 	})
 
 	socketExistsFn = func() bool { return true }
 	socketPathFn = func() string { return "/tmp/fake-clai.sock" }
+	daemonLockFn = func() (int, bool, error) { return 0, false, nil }
 	staleSocketDialAttempts = 2
 	staleSocketRetryDelay = 0
 	quickDialFn = func() (io.Closer, error) {
@@ -347,16 +356,19 @@ func TestRemoveStaleSocketDoesNotDeleteForUnknownDialError(t *testing.T) {
 func TestRemoveStaleSocketHonorsCancellation(t *testing.T) {
 	oldQuickDial := quickDialFn
 	oldSocketExists := socketExistsFn
+	oldDaemonLock := daemonLockFn
 	oldAttempts := staleSocketDialAttempts
 	oldDelay := staleSocketRetryDelay
 	t.Cleanup(func() {
 		quickDialFn = oldQuickDial
 		socketExistsFn = oldSocketExists
+		daemonLockFn = oldDaemonLock
 		staleSocketDialAttempts = oldAttempts
 		staleSocketRetryDelay = oldDelay
 	})
 
 	socketExistsFn = func() bool { return true }
+	daemonLockFn = func() (int, bool, error) { return 0, false, nil }
 	staleSocketDialAttempts = 3
 	staleSocketRetryDelay = 20 * time.Millisecond
 	quickDialFn = func() (io.Closer, error) {
