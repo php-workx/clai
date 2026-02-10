@@ -162,7 +162,7 @@ func TestOutputSuggestions_GhostFormat(t *testing.T) {
 	if lines[0] != "make install\t· global  · score 0.47" {
 		t.Fatalf("unexpected ghost line 1: %q", lines[0])
 	}
-	if lines[1] != "rm -rf /\t· global  · score 0.99  · risk destructive" {
+	if lines[1] != "rm -rf /\t· global  · score 0.99  · [!] destructive" {
 		t.Fatalf("unexpected ghost line 2: %q", lines[1])
 	}
 }

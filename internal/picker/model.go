@@ -567,6 +567,31 @@ func (m Model) viewTabBar() string {
 }
 
 func (m Model) viewFooter() string {
+	lines := []string{}
+
+	// Selection details (shown above keyboard shortcuts).
+	if m.state == stateLoaded && len(m.items) > 0 && m.selection >= 0 && m.selection < len(m.items) {
+		details := m.items[m.selection].Details
+		if len(details) > 0 {
+			// Cap to 2 lines to keep the layout stable.
+			if len(details) > 2 {
+				details = details[:2]
+			}
+			cw := m.contentWidth()
+			for _, d := range details {
+				if cw > 0 && lipgloss.Width(d) > cw {
+					// Match list truncation behavior; account for " … " styling in render.
+					truncateWidth := cw - 2
+					if truncateWidth < 0 {
+						truncateWidth = 0
+					}
+					d = MiddleTruncate(d, truncateWidth)
+				}
+				lines = append(lines, dimStyle.Render(d))
+			}
+		}
+	}
+
 	parts := []string{
 		"Enter accept",
 		"Ctrl+U delete",
@@ -578,7 +603,8 @@ func (m Model) viewFooter() string {
 	if m.state == stateLoaded && len(m.items) > 0 {
 		parts = append(parts, rightRefineHintLabel())
 	}
-	return dimStyle.Render(strings.Join(parts, " · "))
+	lines = append(lines, dimStyle.Render(strings.Join(parts, " · ")))
+	return strings.Join(lines, "\n")
 }
 
 // viewContent renders the item list or a status message.

@@ -198,7 +198,7 @@ func TestSessionManager_StashCommandInfo(t *testing.T) {
 
 	m.Start("sess-stash", "zsh", "darwin", "host1", "user1", "/tmp", now)
 
-	m.StashCommand("sess-stash", "cmd-1", "git status", "/home/user/repo", "myrepo", "main")
+	m.StashCommand("sess-stash", "cmd-1", "git status", "/home/user/repo", "myrepo", "/home/user/repo", "main")
 
 	info, ok := m.Get("sess-stash")
 	if !ok {
@@ -230,8 +230,8 @@ func TestSessionManager_StashOverwrites(t *testing.T) {
 
 	m.Start("sess-overwrite", "bash", "linux", "", "", "/tmp", now)
 
-	m.StashCommand("sess-overwrite", "cmd-1", "ls -la", "/first", "repo1", "dev")
-	m.StashCommand("sess-overwrite", "cmd-2", "cat file.txt", "/second", "repo2", "feature")
+	m.StashCommand("sess-overwrite", "cmd-1", "ls -la", "/first", "repo1", "/first", "dev")
+	m.StashCommand("sess-overwrite", "cmd-2", "cat file.txt", "/second", "repo2", "/second", "feature")
 
 	info, ok := m.Get("sess-overwrite")
 	if !ok {
@@ -262,7 +262,7 @@ func TestSessionManager_StashClearedOnEnd(t *testing.T) {
 	now := time.Now()
 
 	m.Start("sess-clear", "zsh", "darwin", "", "", "/tmp", now)
-	m.StashCommand("sess-clear", "cmd-1", "make build", "/project", "proj", "main")
+	m.StashCommand("sess-clear", "cmd-1", "make build", "/project", "proj", "/project", "main")
 
 	m.End("sess-clear")
 
@@ -278,7 +278,7 @@ func TestSessionManager_StashOnNonexistentSession(t *testing.T) {
 	m := NewSessionManager()
 
 	// Should not panic
-	m.StashCommand("nonexistent", "cmd-1", "echo hello", "/tmp", "repo", "main")
+	m.StashCommand("nonexistent", "cmd-1", "echo hello", "/tmp", "repo", "/tmp", "main")
 
 	_, ok := m.Get("nonexistent")
 	if ok {

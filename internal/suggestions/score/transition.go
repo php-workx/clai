@@ -89,7 +89,7 @@ func (ts *TransitionStore) prepareStatements() error {
 
 	// Get top next commands for a given prev_norm
 	ts.getTopNextStmt, err = ts.db.Prepare(`
-		SELECT next_norm, count FROM transition
+		SELECT next_norm, count, last_ts FROM transition
 		WHERE scope = ? AND prev_norm = ?
 		ORDER BY count DESC
 		LIMIT ?
@@ -272,6 +272,7 @@ type Transition struct {
 	PrevNorm string
 	NextNorm string
 	Count    int
+	LastTsMs int64
 }
 
 // GetTopNextCommands retrieves the most frequent commands that follow a given command.
@@ -286,7 +287,7 @@ func (ts *TransitionStore) GetTopNextCommands(ctx context.Context, scope, prevNo
 	for rows.Next() {
 		var t Transition
 		t.PrevNorm = prevNorm
-		if err := rows.Scan(&t.NextNorm, &t.Count); err != nil {
+		if err := rows.Scan(&t.NextNorm, &t.Count, &t.LastTsMs); err != nil {
 			return nil, err
 		}
 		results = append(results, t)

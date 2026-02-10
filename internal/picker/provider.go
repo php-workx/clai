@@ -9,6 +9,7 @@ import "context"
 type Item struct {
 	Value   string
 	Display string
+	Details []string
 }
 
 func (it Item) displayText() string {

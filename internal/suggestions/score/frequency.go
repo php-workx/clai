@@ -264,8 +264,9 @@ func (fs *FrequencyStore) GetTopCommands(ctx context.Context, scope string, limi
 
 // ScoredCommand represents a command with its score.
 type ScoredCommand struct {
-	CmdNorm string
-	Score   float64
+	CmdNorm  string
+	Score    float64
+	LastTsMs int64
 }
 
 // GetTopCommandsAt retrieves the top N commands by decayed score at a specific time.
@@ -300,8 +301,9 @@ func (fs *FrequencyStore) GetTopCommandsAt(ctx context.Context, scope string, li
 		decayedScore := score * decay
 
 		results = append(results, ScoredCommand{
-			CmdNorm: cmdNorm,
-			Score:   decayedScore,
+			CmdNorm:  cmdNorm,
+			Score:    decayedScore,
+			LastTsMs: lastTs,
 		})
 	}
 

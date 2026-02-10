@@ -161,15 +161,27 @@ func DefaultScorerConfig() ScorerConfig {
 
 // Suggestion represents a scored command suggestion.
 type Suggestion struct {
-	Command    string    // The suggested command (normalized)
-	TemplateID string    // Template ID for near-duplicate suppression
-	Score      float64   // Combined score
-	Confidence float64   // Confidence score (0-1)
-	Reasons    []string  // Tags explaining why this was suggested
-	scores     scoreInfo // Internal scoring breakdown
-	frequency  float64   // Raw frequency for tie-breaking
-	lastSeenMs int64     // Last seen timestamp for tie-breaking
+	Command       string    // The suggested command (normalized)
+	TemplateID    string    // Template ID for near-duplicate suppression
+	Score         float64   // Combined score
+	Confidence    float64   // Confidence score (0-1)
+	Reasons       []string  // Tags explaining why this was suggested
+	scores        scoreInfo // Internal scoring breakdown
+	frequency     float64   // Raw frequency signal for tie-breaking (source-dependent)
+	lastSeenMs    int64     // Best-effort last-seen timestamp (unix ms) for UI/tie-breaking
+	maxFreqScore  float64   // Best-effort decayed frequency score (from FrequencyStore)
+	maxTransCount int       // Best-effort transition count (from TransitionStore)
 }
+
+// LastSeenMs returns the best-effort last-seen timestamp (unix ms) for this suggestion.
+// This is used for UI hints and deterministic tie-breaking.
+func (s Suggestion) LastSeenMs() int64 { return s.lastSeenMs }
+
+// MaxFreqScore returns the best-effort decayed frequency score observed for this suggestion.
+func (s Suggestion) MaxFreqScore() float64 { return s.maxFreqScore }
+
+// MaxTransitionCount returns the best-effort transition count observed for this suggestion.
+func (s Suggestion) MaxTransitionCount() int { return s.maxTransCount }
 
 // scoreInfo tracks the breakdown of scoring sources.
 type scoreInfo struct {
@@ -341,7 +353,7 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 			s.cfg.Logger.Debug("repo transitions query failed", "error", err)
 		} else {
 			for _, t := range repoTrans {
-				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonRepoTransition, s.cfg.Weights.RepoTransition)
+				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonRepoTransition, s.cfg.Weights.RepoTransition, t.LastTsMs)
 			}
 		}
 	}
@@ -353,7 +365,7 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 			s.cfg.Logger.Debug("global transitions query failed", "error", err)
 		} else {
 			for _, t := range globalTrans {
-				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonGlobalTransition, s.cfg.Weights.GlobalTransition)
+				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonGlobalTransition, s.cfg.Weights.GlobalTransition, t.LastTsMs)
 			}
 		}
 	}
@@ -365,7 +377,7 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 			s.cfg.Logger.Debug("dir transitions query failed", "error", err)
 		} else {
 			for _, t := range dirTrans {
-				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonDirTransition, s.cfg.Weights.DirTransition)
+				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonDirTransition, s.cfg.Weights.DirTransition, t.LastTsMs)
 			}
 		}
 	}
@@ -377,7 +389,7 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 			s.cfg.Logger.Debug("repo frequency query failed", "error", err)
 		} else {
 			for _, f := range repoFreq {
-				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonRepoFrequency, s.cfg.Weights.RepoFrequency)
+				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonRepoFrequency, s.cfg.Weights.RepoFrequency, f.LastTsMs)
 			}
 		}
 	}
@@ -389,7 +401,7 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 			s.cfg.Logger.Debug("global frequency query failed", "error", err)
 		} else {
 			for _, f := range globalFreq {
-				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonGlobalFrequency, s.cfg.Weights.GlobalFrequency)
+				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonGlobalFrequency, s.cfg.Weights.GlobalFrequency, f.LastTsMs)
 			}
 		}
 	}
@@ -401,7 +413,7 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 			s.cfg.Logger.Debug("dir frequency query failed", "error", err)
 		} else {
 			for _, f := range dirFreq {
-				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonDirFrequency, s.cfg.Weights.DirFrequency)
+				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonDirFrequency, s.cfg.Weights.DirFrequency, f.LastTsMs)
 			}
 		}
 	}
@@ -413,7 +425,7 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 			s.cfg.Logger.Debug("project tasks query failed", "error", err)
 		} else {
 			for _, t := range tasks {
-				s.addCandidate(candidates, t.Command, 1.0, ReasonProjectTask, s.cfg.Weights.ProjectTask)
+				s.addCandidate(candidates, t.Command, 1.0, ReasonProjectTask, s.cfg.Weights.ProjectTask, 0)
 			}
 		}
 	}
@@ -797,7 +809,7 @@ func suppressNearDuplicates(suggestions []Suggestion) []Suggestion {
 // addCandidate adds or updates a candidate suggestion.
 // Per spec Section 11.3: use log(count+1) for scoring.
 // Per spec Section 11.5: deduplicate by cmd_norm, merge reasons.
-func (s *Scorer) addCandidate(candidates map[string]*Suggestion, cmd string, rawScore float64, reason string, weight float64) {
+func (s *Scorer) addCandidate(candidates map[string]*Suggestion, cmd string, rawScore float64, reason string, weight float64, lastSeenMs int64) {
 	// Apply log(count+1) per spec Section 11.3
 	adjustedScore := math.Log(rawScore+1) * weight
 
@@ -809,6 +821,21 @@ func (s *Scorer) addCandidate(candidates map[string]*Suggestion, cmd string, raw
 		// Track frequency for tie-breaking (use max of raw scores)
 		if rawScore > existing.frequency {
 			existing.frequency = rawScore
+		}
+		if lastSeenMs > existing.lastSeenMs {
+			existing.lastSeenMs = lastSeenMs
+		}
+
+		// Track best-effort raw signals for UI display.
+		switch reason {
+		case ReasonRepoFrequency, ReasonGlobalFrequency, ReasonDirFrequency:
+			if rawScore > existing.maxFreqScore {
+				existing.maxFreqScore = rawScore
+			}
+		case ReasonRepoTransition, ReasonGlobalTransition, ReasonDirTransition:
+			if int(rawScore) > existing.maxTransCount {
+				existing.maxTransCount = int(rawScore)
+			}
 		}
 
 		// Track score breakdown
@@ -831,10 +858,18 @@ func (s *Scorer) addCandidate(candidates map[string]*Suggestion, cmd string, raw
 	} else {
 		// New candidate
 		sug := &Suggestion{
-			Command:   cmd,
-			Score:     adjustedScore,
-			Reasons:   []string{reason},
-			frequency: rawScore,
+			Command:    cmd,
+			Score:      adjustedScore,
+			Reasons:    []string{reason},
+			frequency:  rawScore,
+			lastSeenMs: lastSeenMs,
+		}
+		// Track best-effort raw signals for UI display.
+		switch reason {
+		case ReasonRepoFrequency, ReasonGlobalFrequency, ReasonDirFrequency:
+			sug.maxFreqScore = rawScore
+		case ReasonRepoTransition, ReasonGlobalTransition, ReasonDirTransition:
+			sug.maxTransCount = int(rawScore)
 		}
 
 		switch reason {

@@ -19,6 +19,7 @@ import (
 	"github.com/runger/clai/internal/sanitize"
 	"github.com/runger/clai/internal/suggestions/explain"
 	"github.com/runger/clai/internal/suggestions/normalize"
+	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 	"github.com/runger/clai/internal/suggestions/timing"
 )
 
@@ -186,9 +187,12 @@ func formatGhostMeta(s suggestOutput) string {
 	}
 
 	meta := fmt.Sprintf("· %s  · score %.2f", src, score)
+	if s.CwdMatch {
+		meta += "  · cwd"
+	}
 	risk := strings.TrimSpace(strings.ToLower(s.Risk))
-	if risk != "" {
-		meta += "  · risk " + risk
+	if risk == "destructive" {
+		meta += "  · [!] destructive"
 	}
 	return meta
 }
@@ -235,6 +239,7 @@ type suggestOutput struct {
 	Score       float64          `json:"score"`
 	Description string           `json:"description"`
 	Risk        string           `json:"risk"`
+	CwdMatch    bool             `json:"cwd_match,omitempty"`
 	Reasons     []explain.Reason `json:"reasons,omitempty"`
 }
 
@@ -323,12 +328,24 @@ func getSuggestionsFromDaemon(prefix string, limit int) []suggestOutput {
 	// Convert to suggestOutput slice
 	results := make([]suggestOutput, len(daemonSuggestions))
 	for i, s := range daemonSuggestions {
+		cwdMatch := false
+		for _, r := range s.Reasons {
+			switch strings.TrimSpace(r.Type) {
+			case suggest2.ReasonDirTransition, suggest2.ReasonDirFrequency:
+				cwdMatch = true
+			}
+		}
+		if strings.TrimSpace(s.Source) == "cwd" {
+			cwdMatch = true
+		}
+
 		out := suggestOutput{
 			Text:        s.Text,
 			Source:      s.Source,
 			Score:       float64(s.Score),
 			Description: s.Description,
 			Risk:        s.Risk,
+			CwdMatch:    cwdMatch,
 		}
 
 		// Convert daemon-provided reasons to explain.Reason when enabled.

@@ -20,6 +20,7 @@ type SessionInfo struct {
 	LastCmdRaw    string // Raw command from CommandStarted
 	LastCmdCWD    string // CWD from CommandStarted
 	LastGitRepo   string // Git repo name from CommandStarted
+	LastGitRoot   string // Git repo root from CommandStarted
 	LastGitBranch string // Git branch from CommandStarted
 	LastCmdID     string // Command ID from CommandStarted
 }
@@ -99,7 +100,7 @@ func (m *SessionManager) UpdateCWD(sessionID, cwd string) {
 }
 
 // StashCommand stores command data from CommandStarted for later retrieval by CommandEnded.
-func (m *SessionManager) StashCommand(sessionID, cmdID, cmdRaw, cwd, gitRepo, gitBranch string) {
+func (m *SessionManager) StashCommand(sessionID, cmdID, cmdRaw, cwd, gitRepo, gitRoot, gitBranch string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -107,6 +108,7 @@ func (m *SessionManager) StashCommand(sessionID, cmdID, cmdRaw, cwd, gitRepo, gi
 		info.LastCmdRaw = cmdRaw
 		info.LastCmdCWD = cwd
 		info.LastGitRepo = gitRepo
+		info.LastGitRoot = gitRoot
 		info.LastGitBranch = gitBranch
 		info.LastCmdID = cmdID
 		info.LastActivity = time.Now()

@@ -12,6 +12,7 @@ import (
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/ipc"
+	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
 // suggestFetchTimeout is the maximum time allowed for a single Fetch call,
@@ -162,7 +163,11 @@ func (p *SuggestProvider) fetchWithContext(ctx context.Context, req Request) (Re
 			continue
 		}
 		display := formatSuggestionDisplay(p.view, cmd, s)
-		items = append(items, Item{Value: cmd, Display: display})
+		items = append(items, Item{
+			Value:   cmd,
+			Display: display,
+			Details: formatSuggestionDetails(s),
+		})
 	}
 
 	return Response{
@@ -188,6 +193,17 @@ func oneLine(s string) string {
 	return strings.TrimSpace(s)
 }
 
+func suggestionHasCwdSignal(s *pb.Suggestion) bool {
+	for _, r := range s.Reasons {
+		switch strings.TrimSpace(r.Type) {
+		case suggest2.ReasonDirTransition, suggest2.ReasonDirFrequency:
+			return true
+		}
+	}
+	// Fallback: treat source "cwd" as a cwd signal even if reasons are missing.
+	return strings.TrimSpace(s.Source) == "cwd"
+}
+
 func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 	src := strings.TrimSpace(s.Source)
 	if src == "" {
@@ -195,18 +211,20 @@ func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 	}
 
 	risk := strings.TrimSpace(strings.ToLower(s.Risk))
-	riskTag := ""
-	if risk == "destructive" {
-		riskTag = "[!]"
-	}
+	riskTag := risk == "destructive"
+	cwdTag := suggestionHasCwdSignal(s)
 
 	switch strings.ToLower(view) {
 	case "compact":
 		// Mode 2: command + source (+ risk)
-		if riskTag != "" {
-			return fmt.Sprintf("%s  · %s  · %s", cmd, src, riskTag)
+		meta := fmt.Sprintf("%s  · %s", cmd, src)
+		if cwdTag {
+			meta += "  · cwd"
 		}
-		return fmt.Sprintf("%s  · %s", cmd, src)
+		if riskTag {
+			meta += "  · [!] destructive"
+		}
+		return meta
 
 	default:
 		// Mode 3: command + source + risk + score + reasons/description
@@ -222,8 +240,11 @@ func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 		}
 
 		meta := fmt.Sprintf("%s  · %s  · %s%s", cmd, src, scoreStr, confStr)
-		if risk != "" {
-			meta += "  · risk " + risk
+		if cwdTag {
+			meta += "  · cwd"
+		}
+		if riskTag {
+			meta += "  · [!] destructive"
 		}
 
 		// Prefer description; fall back to top reasons.
@@ -251,10 +272,84 @@ func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 			meta += "  — " + desc
 		}
 
-		if riskTag != "" {
-			meta += "  · " + riskTag
-		}
-
 		return meta
 	}
+}
+
+func formatSuggestionDetails(s *pb.Suggestion) []string {
+	src := strings.TrimSpace(s.Source)
+	if src == "" {
+		src = "unknown"
+	}
+
+	score := s.Score
+	if math.IsNaN(score) || math.IsInf(score, 0) {
+		score = 0
+	}
+
+	parts := []string{
+		src,
+		fmt.Sprintf("score %.2f", score),
+	}
+	if s.Confidence > 0 {
+		parts = append(parts, fmt.Sprintf("conf %.2f", s.Confidence))
+	}
+
+	if suggestionHasCwdSignal(s) {
+		parts = append(parts, "cwd")
+	}
+
+	// Pull simple info-hints from reasons list (recency/frequency), and also
+	// gather the top causality tags (with contributions) for display.
+	var causality []string
+	for _, r := range s.Reasons {
+		typ := strings.TrimSpace(r.Type)
+		desc := strings.TrimSpace(oneLine(r.Description))
+		switch typ {
+		case "recency", "frequency", "transition_count":
+			if desc != "" {
+				parts = append(parts, desc)
+			}
+		default:
+			if typ == "" {
+				continue
+			}
+			// Only include high-signal scoring tags (those with non-zero contributions).
+			if r.Contribution != 0 {
+				causality = append(causality, fmt.Sprintf("%s %.2f", typ, r.Contribution))
+			}
+		}
+	}
+	if len(causality) > 0 {
+		// Keep short; show top 3 tags (the daemon already caps explain reasons).
+		if len(causality) > 3 {
+			causality = causality[:3]
+		}
+		parts = append(parts, "tags "+strings.Join(causality, ", "))
+	}
+
+	risk := strings.TrimSpace(strings.ToLower(s.Risk))
+	if risk == "destructive" {
+		parts = append(parts, "[!] destructive")
+	}
+
+	line1 := strings.Join(parts, " · ")
+
+	why := strings.TrimSpace(oneLine(s.Description))
+	if why == "" {
+		// Fall back to the first scoring reason description if available.
+		for _, r := range s.Reasons {
+			if strings.TrimSpace(r.Type) == "recency" || strings.TrimSpace(r.Type) == "frequency" || strings.TrimSpace(r.Type) == "transition_count" {
+				continue
+			}
+			why = strings.TrimSpace(oneLine(r.Description))
+			if why != "" {
+				break
+			}
+		}
+	}
+	if why == "" {
+		return []string{line1}
+	}
+	return []string{line1, "Why: " + why}
 }
