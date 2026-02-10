@@ -617,8 +617,9 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 	}
 
 	q := storage.CommandQuery{
-		Limit:       limit + 1, // Fetch one extra to determine at_end
-		Offset:      offset,
+		Limit:  limit + 1, // Fetch one extra to determine at_end
+		Offset: offset,
+		// Deduplicate by raw command string for pickers; do not collapse by command_norm.
 		Deduplicate: true,
 	}
 

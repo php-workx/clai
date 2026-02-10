@@ -160,9 +160,14 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 	return commands, nil
 }
 
-// QueryHistoryCommands queries deduplicated command history.
-// It groups by command_norm and returns the most recent timestamp for each unique command.
+// QueryHistoryCommands queries command history rows intended for interactive pickers.
+// When q.Deduplicate is true, it groups by raw command text and returns the most
+// recent timestamp for each unique command string.
 func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) ([]HistoryRow, error) {
+	// This API is specifically for "history picker" style queries: always
+	// deduplicate to avoid overwhelming the UI with repeated commands.
+	q.Deduplicate = true
+
 	query, args := buildHistoryQuerySQL(q)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -188,6 +193,9 @@ func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) 
 }
 
 func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
+	// Deduplicate by exact command text. Do not group by command_norm: command_norm
+	// intentionally normalizes variable arguments (paths, URLs, numbers) and is too
+	// aggressive for history browsing.
 	query := `
 		SELECT command, MAX(ts_start_unix_ms) as latest_ts
 		FROM commands
@@ -222,7 +230,7 @@ func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
 		query += " AND is_success = 0"
 	}
 
-	query += " GROUP BY command_norm ORDER BY latest_ts DESC"
+	query += " GROUP BY command ORDER BY latest_ts DESC"
 
 	if q.Limit > 0 {
 		query += " LIMIT ?"

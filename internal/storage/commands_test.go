@@ -1296,6 +1296,69 @@ func TestSQLiteStore_QueryHistoryCommands_EmptyResult(t *testing.T) {
 	}
 }
 
+func TestSQLiteStore_QueryHistoryCommands_DoesNotCollapseNormalizedArgs(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+
+	session := &Session{
+		SessionID:       "hist-path-session",
+		StartedAtUnixMs: 1700000000000,
+		Shell:           "zsh",
+		OS:              "darwin",
+		InitialCWD:      "/tmp",
+	}
+	if err := store.CreateSession(ctx, session); err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+
+	// These normalize to the same command_norm ("cd <path>") but should remain
+	// distinct history items when deduplicating for pickers.
+	cmds := []*Command{
+		{
+			CommandID:     "hist-path-cmd-1",
+			SessionID:     session.SessionID,
+			TsStartUnixMs: 1000,
+			CWD:           "/tmp",
+			Command:       "cd /tmp",
+		},
+		{
+			CommandID:     "hist-path-cmd-2",
+			SessionID:     session.SessionID,
+			TsStartUnixMs: 2000,
+			CWD:           "/tmp",
+			Command:       "cd /Users/example/project",
+		},
+	}
+	for _, c := range cmds {
+		if err := store.CreateCommand(ctx, c); err != nil {
+			t.Fatalf("CreateCommand(%s) error = %v", c.CommandID, err)
+		}
+	}
+
+	results, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		Substring:   "cd",
+		Limit:       10,
+		Deduplicate: true,
+	})
+	if err != nil {
+		t.Fatalf("QueryHistoryCommands() error = %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("Got %d results, want 2", len(results))
+	}
+	if results[0].Command != "cd /Users/example/project" {
+		t.Errorf("results[0].Command = %q, want %q", results[0].Command, "cd /Users/example/project")
+	}
+	if results[1].Command != "cd /tmp" {
+		t.Errorf("results[1].Command = %q, want %q", results[1].Command, "cd /tmp")
+	}
+}
+
 func TestSQLiteStore_QueryCommands_StatusWithOtherFilters(t *testing.T) {
 	t.Parallel()
 
