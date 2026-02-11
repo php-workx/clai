@@ -7,6 +7,11 @@ import (
 	"time"
 )
 
+const (
+	exitClassNotFound = "class:not_found"
+	exitClassGeneral  = "class:general"
+)
+
 // BootstrapPattern defines a pre-seeded recovery pattern.
 type BootstrapPattern struct {
 	// FailedCmdNorm is the normalized command that fails.
@@ -30,25 +35,25 @@ func DefaultBootstrapPatterns() []BootstrapPattern {
 		// Command not found (exit 127) => suggest package installation
 		{
 			FailedCmdNorm:      "*",
-			ExitCodeClass:      "class:not_found",
+			ExitCodeClass:      exitClassNotFound,
 			RecoveryCmdNorm:    "brew install <arg>",
 			InitialSuccessRate: 0.70,
 		},
 		{
 			FailedCmdNorm:      "*",
-			ExitCodeClass:      "class:not_found",
+			ExitCodeClass:      exitClassNotFound,
 			RecoveryCmdNorm:    "apt install <arg>",
 			InitialSuccessRate: 0.70,
 		},
 		{
 			FailedCmdNorm:      "*",
-			ExitCodeClass:      "class:not_found",
+			ExitCodeClass:      exitClassNotFound,
 			RecoveryCmdNorm:    "npm install -g <arg>",
 			InitialSuccessRate: 0.50,
 		},
 		{
 			FailedCmdNorm:      "*",
-			ExitCodeClass:      "class:not_found",
+			ExitCodeClass:      exitClassNotFound,
 			RecoveryCmdNorm:    "pip install <arg>",
 			InitialSuccessRate: 0.50,
 		},
@@ -71,25 +76,25 @@ func DefaultBootstrapPatterns() []BootstrapPattern {
 		// Git merge conflicts
 		{
 			FailedCmdNorm:      "git merge <arg>",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "git merge --abort",
 			InitialSuccessRate: 0.85,
 		},
 		{
 			FailedCmdNorm:      "git merge <arg>",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "git stash",
 			InitialSuccessRate: 0.60,
 		},
 		{
 			FailedCmdNorm:      "git pull",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "git stash && git pull",
 			InitialSuccessRate: 0.70,
 		},
 		{
 			FailedCmdNorm:      "git rebase <arg>",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "git rebase --abort",
 			InitialSuccessRate: 0.85,
 		},
@@ -97,7 +102,7 @@ func DefaultBootstrapPatterns() []BootstrapPattern {
 		// Build failures
 		{
 			FailedCmdNorm:      "make <arg>",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "make clean",
 			InitialSuccessRate: 0.50,
 		},
@@ -111,13 +116,13 @@ func DefaultBootstrapPatterns() []BootstrapPattern {
 		// npm/yarn errors
 		{
 			FailedCmdNorm:      "npm install",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "rm -rf node_modules && npm install",
 			InitialSuccessRate: 0.65,
 		},
 		{
 			FailedCmdNorm:      "npm run <arg>",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "npm install",
 			InitialSuccessRate: 0.55,
 		},
@@ -125,7 +130,7 @@ func DefaultBootstrapPatterns() []BootstrapPattern {
 		// Docker errors
 		{
 			FailedCmdNorm:      "docker build <arg>",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "docker system prune -f",
 			InitialSuccessRate: 0.40,
 		},
@@ -133,13 +138,13 @@ func DefaultBootstrapPatterns() []BootstrapPattern {
 		// Go errors
 		{
 			FailedCmdNorm:      "go build <arg>",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "go mod tidy",
 			InitialSuccessRate: 0.50,
 		},
 		{
 			FailedCmdNorm:      "go test <arg>",
-			ExitCodeClass:      "class:general",
+			ExitCodeClass:      exitClassGeneral,
 			RecoveryCmdNorm:    "go mod tidy",
 			InitialSuccessRate: 0.35,
 		},

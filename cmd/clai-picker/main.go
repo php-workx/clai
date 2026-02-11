@@ -38,6 +38,8 @@ const (
 // maxQueryLen is the maximum length of a query string in bytes.
 const maxQueryLen = 4096
 
+const pickerErrorFmt = "clai-picker: %v\n"
+
 // pickerOpts holds the parsed command-line options for the history subcommand.
 type pickerOpts struct {
 	tabs    string
@@ -65,19 +67,19 @@ const (
 func run(args []string) int {
 	// Step 1: Check /dev/tty is openable.
 	if err := checkTTY(); err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 
 	// Step 2: Check TERM != "dumb".
 	if err := checkTERM(); err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 
 	// Step 3: Check terminal width >= 20 columns.
 	if err := checkTermWidth(); err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 
@@ -93,7 +95,7 @@ func run(args []string) int {
 	lockPath := cacheDir + "/picker.lock"
 	lockFd, err := acquireLock(lockPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 	defer releaseLock(lockFd)
@@ -136,7 +138,7 @@ func run(args []string) int {
 		parseErr = fmt.Errorf("unknown command %q", args[0])
 	}
 	if parseErr != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", parseErr)
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, parseErr)
 		return exitFallback
 	}
 

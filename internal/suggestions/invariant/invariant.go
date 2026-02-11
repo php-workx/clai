@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+const sessionScopeFmt = "session:%s"
+
 // AssertSessionIsolation validates invariant I1: suggestions for session A
 // must not include session-scoped transitions derived exclusively from session B.
 //
@@ -40,13 +42,13 @@ func AssertSessionIsolation(t *testing.T, db *sql.DB, sessionA, sessionB string)
 	insertEvent(t, db, sessionB, "cmd_b2", "cmd_b2", "tmpl_b2", nowMs+3)
 
 	// Insert session-scoped transitions
-	insertTransition(t, db, fmt.Sprintf("session:%s", sessionA), "tmpl_a1", "tmpl_a2", nowMs)
-	insertTransition(t, db, fmt.Sprintf("session:%s", sessionB), "tmpl_b1", "tmpl_b2", nowMs)
+	insertTransition(t, db, fmt.Sprintf(sessionScopeFmt, sessionA), "tmpl_a1", "tmpl_a2", nowMs)
+	insertTransition(t, db, fmt.Sprintf(sessionScopeFmt, sessionB), "tmpl_b1", "tmpl_b2", nowMs)
 
 	// Verify: session A scope should NOT contain session B transitions
 	rows, err := db.QueryContext(ctx,
 		"SELECT next_template_id FROM transition_stat WHERE scope = ?",
-		fmt.Sprintf("session:%s", sessionA))
+		fmt.Sprintf(sessionScopeFmt, sessionA))
 	if err != nil {
 		t.Fatalf("failed to query session A transitions: %v", err)
 	}
@@ -66,7 +68,7 @@ func AssertSessionIsolation(t *testing.T, db *sql.DB, sessionA, sessionB string)
 	// Verify: session B scope should NOT contain session A transitions
 	rows2, err := db.QueryContext(ctx,
 		"SELECT next_template_id FROM transition_stat WHERE scope = ?",
-		fmt.Sprintf("session:%s", sessionB))
+		fmt.Sprintf(sessionScopeFmt, sessionB))
 	if err != nil {
 		t.Fatalf("failed to query session B transitions: %v", err)
 	}

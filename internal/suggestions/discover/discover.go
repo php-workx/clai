@@ -29,6 +29,7 @@ const (
 	SourcePlaybook    = "playbook"
 	SourceProjectType = "project_type"
 	SourceToolCommon  = "tool_common"
+	makeTestCommand   = "make test"
 )
 
 // Candidate represents a single discovery suggestion.
@@ -224,16 +225,16 @@ func dedup(candidates []Candidate) []Candidate {
 // These are suggested when a project type is detected but there is no
 // command history.
 var projectTypePriors = map[string][]string{
-	"go":        {"go test ./...", "go build ./...", "go run .", "make test", "make build"},
+	"go":        {"go test ./...", "go build ./...", "go run .", makeTestCommand, "make build"},
 	"node":      {"npm test", "npm run build", "npm start", "npm install"},
 	"python":    {"pytest", "python -m pytest", "pip install -r requirements.txt"},
 	"rust":      {"cargo test", "cargo build", "cargo run"},
 	"docker":    {"docker build .", "docker compose up", "docker ps"},
 	"java":      {"mvn test", "mvn package", "gradle build", "gradle test"},
 	"ruby":      {"bundle exec rspec", "bundle install", "rake test"},
-	"make":      {"make", "make build", "make test", "make clean"},
+	"make":      {"make", "make build", makeTestCommand, "make clean"},
 	"terraform": {"terraform plan", "terraform apply", "terraform init"},
-	"cpp":       {"cmake --build .", "make", "make test"},
+	"cpp":       {"cmake --build .", "make", makeTestCommand},
 	"haskell":   {"cabal build", "cabal test", "stack build"},
 	"nix":       {"nix build", "nix develop", "nix flake check"},
 }

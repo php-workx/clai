@@ -8,6 +8,11 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
+const (
+	readableEscCSI = "<ESC>["
+	readableEscOSC = "<ESC>]"
+)
+
 // ansiRE matches ANSI escape sequences:
 //   - CSI sequences: ESC [ ... final_byte  (covers SGR like \x1b[31m)
 //   - OSC sequences: ESC ] ... (ST | BEL)
@@ -61,14 +66,14 @@ func PrettyEscapeLiterals(s string) string {
 	// Common ANSI escape spellings found in shell commands, including printf.
 	// Note: these are *literal* backslashes, not actual ESC bytes.
 	r := strings.NewReplacer(
-		"\\033[", "<ESC>[",
-		"\\033]", "<ESC>]",
-		"\\x1b[", "<ESC>[",
-		"\\x1B[", "<ESC>[",
-		"\\x1b]", "<ESC>]",
-		"\\x1B]", "<ESC>]",
-		"\\e[", "<ESC>[",
-		"\\e]", "<ESC>]",
+		"\\033[", readableEscCSI,
+		"\\033]", readableEscOSC,
+		"\\x1b[", readableEscCSI,
+		"\\x1B[", readableEscCSI,
+		"\\x1b]", readableEscOSC,
+		"\\x1B]", readableEscOSC,
+		"\\e[", readableEscCSI,
+		"\\e]", readableEscOSC,
 	)
 	return r.Replace(s)
 }

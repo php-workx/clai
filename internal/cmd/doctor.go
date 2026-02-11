@@ -38,6 +38,8 @@ type checkResult struct {
 	message string
 }
 
+const dbCorruptionHistoryCheckName = "DB corruption history"
+
 func runDoctor(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%sclai Doctor%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
@@ -249,7 +251,7 @@ func checkCorruptionHistory() []checkResult {
 	historyPath, err := db.CorruptionHistoryPath()
 	if err != nil {
 		results = append(results, checkResult{
-			name:    "DB corruption history",
+			name:    dbCorruptionHistoryCheckName,
 			status:  "warn",
 			message: fmt.Sprintf("Could not determine history path: %v", err),
 		})
@@ -259,7 +261,7 @@ func checkCorruptionHistory() []checkResult {
 	history, err := db.LoadCorruptionHistory(historyPath)
 	if err != nil {
 		results = append(results, checkResult{
-			name:    "DB corruption history",
+			name:    dbCorruptionHistoryCheckName,
 			status:  "warn",
 			message: fmt.Sprintf("Could not load history: %v", err),
 		})
@@ -268,7 +270,7 @@ func checkCorruptionHistory() []checkResult {
 
 	if len(history.Events) == 0 {
 		results = append(results, checkResult{
-			name:    "DB corruption history",
+			name:    dbCorruptionHistoryCheckName,
 			status:  "ok",
 			message: "No corruption events recorded",
 		})
@@ -283,7 +285,7 @@ func checkCorruptionHistory() []checkResult {
 	}
 
 	results = append(results, checkResult{
-		name:   "DB corruption history",
+		name:   dbCorruptionHistoryCheckName,
 		status: statusStr,
 		message: fmt.Sprintf("%d event(s); latest: %s (%s)",
 			len(history.Events),

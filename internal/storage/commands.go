@@ -12,6 +12,8 @@ import (
 // ErrCommandNotFound is returned when a command is not found.
 var ErrCommandNotFound = errors.New("command not found")
 
+const commandNormLikeClause = " AND command_norm LIKE ?"
+
 // CreateCommand creates a new command record.
 // It automatically normalizes the command and generates a hash.
 func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
@@ -216,11 +218,11 @@ func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
 		args = append(args, *q.CWD)
 	}
 	if q.Prefix != "" {
-		query += " AND command_norm LIKE ?"
+		query += commandNormLikeClause
 		args = append(args, q.Prefix+"%")
 	}
 	if q.Substring != "" {
-		query += " AND command_norm LIKE ?"
+		query += commandNormLikeClause
 		args = append(args, "%"+q.Substring+"%")
 	}
 	if q.SuccessOnly {
@@ -274,11 +276,11 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 		args = append(args, *q.CWD)
 	}
 	if q.Prefix != "" {
-		query += " AND command_norm LIKE ?"
+		query += commandNormLikeClause
 		args = append(args, q.Prefix+"%")
 	}
 	if q.Substring != "" {
-		query += " AND command_norm LIKE ?"
+		query += commandNormLikeClause
 		args = append(args, "%"+q.Substring+"%")
 	}
 	if q.SuccessOnly {

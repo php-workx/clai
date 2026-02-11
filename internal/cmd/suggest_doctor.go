@@ -20,6 +20,11 @@ import (
 
 var suggestDoctorJSON bool
 
+const (
+	statusDBUnavailable = "error: DB unavailable"
+	statusErrorFmt      = "error: %v"
+)
+
 var suggestDoctorCmd = &cobra.Command{
 	Use:    "suggest-doctor",
 	Short:  "Diagnose the suggestions engine health",
@@ -160,11 +165,11 @@ func buildSuggestDoctorReport() suggestDoctorReport {
 		report.EventCount = checkEventCount(ctx, sdb)
 		report.FeedbackStats = checkFeedbackStats(ctx, sdb)
 	} else {
-		report.SchemaVersion = schemaVersionInfo{Status: "error: DB unavailable"}
-		report.CacheStats = cacheStatsInfo{Status: "error: DB unavailable"}
-		report.TemplateCount = countInfo{Status: "error: DB unavailable"}
-		report.EventCount = countInfo{Status: "error: DB unavailable"}
-		report.FeedbackStats = feedbackStatsInfo{Status: "error: DB unavailable"}
+		report.SchemaVersion = schemaVersionInfo{Status: statusDBUnavailable}
+		report.CacheStats = cacheStatsInfo{Status: statusDBUnavailable}
+		report.TemplateCount = countInfo{Status: statusDBUnavailable}
+		report.EventCount = countInfo{Status: statusDBUnavailable}
+		report.FeedbackStats = feedbackStatsInfo{Status: statusDBUnavailable}
 	}
 
 	report.PlaybookStatus = checkPlaybookStatus(cfg)
@@ -200,7 +205,7 @@ func checkDaemonHealth(paths *config.Paths) daemonHealthInfo {
 func checkSchemaVersion(ctx context.Context, sdb *sql.DB) schemaVersionInfo {
 	version, err := db.GetSchemaVersion(ctx, sdb)
 	if err != nil {
-		return schemaVersionInfo{Status: fmt.Sprintf("error: %v", err)}
+		return schemaVersionInfo{Status: fmt.Sprintf(statusErrorFmt, err)}
 	}
 	status := "ok"
 	if version == 0 {
@@ -215,7 +220,7 @@ func checkCacheStats(ctx context.Context, sdb *sql.DB) cacheStatsInfo {
 	var count int64
 	err := sdb.QueryRowContext(ctx, "SELECT COUNT(*) FROM suggestion_cache").Scan(&count)
 	if err != nil {
-		return cacheStatsInfo{Status: fmt.Sprintf("error: %v", err)}
+		return cacheStatsInfo{Status: fmt.Sprintf(statusErrorFmt, err)}
 	}
 	return cacheStatsInfo{
 		EntryCount: count,
@@ -227,7 +232,7 @@ func checkFTSAvailability() ftsInfo {
 	// Test FTS5 by opening a temporary in-memory DB and trying to create an FTS5 table
 	tmpDB, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
-		return ftsInfo{Enabled: false, Status: fmt.Sprintf("error: %v", err)}
+		return ftsInfo{Enabled: false, Status: fmt.Sprintf(statusErrorFmt, err)}
 	}
 	defer tmpDB.Close()
 
@@ -263,7 +268,7 @@ func checkPlaybookStatus(cfg *config.Config) playbookInfo {
 			info.Status = "not found"
 			return info
 		}
-		info.Status = fmt.Sprintf("error: %v", err)
+		info.Status = fmt.Sprintf(statusErrorFmt, err)
 		return info
 	}
 
@@ -318,7 +323,7 @@ func checkTemplateCount(ctx context.Context, sdb *sql.DB) countInfo {
 	var count int64
 	err := sdb.QueryRowContext(ctx, "SELECT COUNT(*) FROM command_template").Scan(&count)
 	if err != nil {
-		return countInfo{Status: fmt.Sprintf("error: %v", err)}
+		return countInfo{Status: fmt.Sprintf(statusErrorFmt, err)}
 	}
 	return countInfo{Count: count, Status: "ok"}
 }
@@ -327,7 +332,7 @@ func checkEventCount(ctx context.Context, sdb *sql.DB) countInfo {
 	var count int64
 	err := sdb.QueryRowContext(ctx, "SELECT COUNT(*) FROM command_event").Scan(&count)
 	if err != nil {
-		return countInfo{Status: fmt.Sprintf("error: %v", err)}
+		return countInfo{Status: fmt.Sprintf(statusErrorFmt, err)}
 	}
 	return countInfo{Count: count, Status: "ok"}
 }
@@ -338,7 +343,7 @@ func checkFeedbackStats(ctx context.Context, sdb *sql.DB) feedbackStatsInfo {
 	rows, err := sdb.QueryContext(ctx,
 		"SELECT action, COUNT(*) FROM suggestion_feedback GROUP BY action")
 	if err != nil {
-		info.Status = fmt.Sprintf("error: %v", err)
+		info.Status = fmt.Sprintf(statusErrorFmt, err)
 		return info
 	}
 	defer rows.Close()

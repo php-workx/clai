@@ -35,6 +35,9 @@ const (
 
 	// MaxTimeFutureMs is the maximum allowed time in the future (5 minutes).
 	MaxTimeFutureMs = 5 * 60 * 1000
+
+	errExceedsMaxLengthFmt = "exceeds max length %d"
+	errRequiredNonEmpty    = "is required and must be non-empty"
 )
 
 // sessionIDPattern matches alphanumeric characters and dashes.
@@ -190,7 +193,7 @@ func ValidateSuggestRequest(req *pb.SuggestRequest) *ValidationResult {
 
 	// buffer (command): optional for suggest, but if present max 10KB
 	if len(req.Buffer) > MaxCommandLen {
-		result.addError("buffer", fmt.Sprintf("exceeds max length %d", MaxCommandLen))
+		result.addError("buffer", fmt.Sprintf(errExceedsMaxLengthFmt, MaxCommandLen))
 	}
 
 	// max_results (limit): optional, range [1, 50], default 10
@@ -228,11 +231,11 @@ func ValidateSuggestRequest(req *pb.SuggestRequest) *ValidationResult {
 // validateSessionID validates session_id: required, non-empty, max 128 chars, alphanumeric + dashes.
 func validateSessionID(result *ValidationResult, sessionID string) {
 	if sessionID == "" {
-		result.addError("session_id", "is required and must be non-empty")
+		result.addError("session_id", errRequiredNonEmpty)
 		return
 	}
 	if len(sessionID) > MaxSessionIDLen {
-		result.addError("session_id", fmt.Sprintf("exceeds max length %d", MaxSessionIDLen))
+		result.addError("session_id", fmt.Sprintf(errExceedsMaxLengthFmt, MaxSessionIDLen))
 		return
 	}
 	if !sessionIDPattern.MatchString(sessionID) {
@@ -243,22 +246,22 @@ func validateSessionID(result *ValidationResult, sessionID string) {
 // validateCommandID validates command_id: required, non-empty, max 128 chars.
 func validateCommandID(result *ValidationResult, commandID string) {
 	if commandID == "" {
-		result.addError("command_id", "is required and must be non-empty")
+		result.addError("command_id", errRequiredNonEmpty)
 		return
 	}
 	if len(commandID) > MaxCommandIDLen {
-		result.addError("command_id", fmt.Sprintf("exceeds max length %d", MaxCommandIDLen))
+		result.addError("command_id", fmt.Sprintf(errExceedsMaxLengthFmt, MaxCommandIDLen))
 	}
 }
 
 // validateCwd validates cwd: required, valid absolute path, max 4096 chars.
 func validateCwd(result *ValidationResult, cwd string) {
 	if cwd == "" {
-		result.addError("cwd", "is required and must be non-empty")
+		result.addError("cwd", errRequiredNonEmpty)
 		return
 	}
 	if len(cwd) > MaxCwdLen {
-		result.addError("cwd", fmt.Sprintf("exceeds max length %d", MaxCwdLen))
+		result.addError("cwd", fmt.Sprintf(errExceedsMaxLengthFmt, MaxCwdLen))
 		return
 	}
 	if !filepath.IsAbs(cwd) {
@@ -269,11 +272,11 @@ func validateCwd(result *ValidationResult, cwd string) {
 // validateCommand validates command: required, non-empty, max 10KB.
 func validateCommand(result *ValidationResult, command string) {
 	if command == "" {
-		result.addError("command", "is required and must be non-empty")
+		result.addError("command", errRequiredNonEmpty)
 		return
 	}
 	if len(command) > MaxCommandLen {
-		result.addError("command", fmt.Sprintf("exceeds max length %d", MaxCommandLen))
+		result.addError("command", fmt.Sprintf(errExceedsMaxLengthFmt, MaxCommandLen))
 	}
 }
 
@@ -292,14 +295,14 @@ func validateTimestamp(result *ValidationResult, tsUnixMs int64, field string) {
 // validateOptionalString validates an optional string field with a max length.
 func validateOptionalString(result *ValidationResult, value, field string, maxLen int) {
 	if len(value) > maxLen {
-		result.addError(field, fmt.Sprintf("exceeds max length %d", maxLen))
+		result.addError(field, fmt.Sprintf(errExceedsMaxLengthFmt, maxLen))
 	}
 }
 
 // validateOptionalPath validates an optional path field: valid path, max length.
 func validateOptionalPath(result *ValidationResult, value, field string, maxLen int) {
 	if len(value) > maxLen {
-		result.addError(field, fmt.Sprintf("exceeds max length %d", maxLen))
+		result.addError(field, fmt.Sprintf(errExceedsMaxLengthFmt, maxLen))
 		return
 	}
 	if !filepath.IsAbs(value) {

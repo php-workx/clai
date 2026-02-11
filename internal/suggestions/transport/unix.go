@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+const daemonSocketName = "daemon.sock"
+
 // UnixTransport implements Transport using Unix domain sockets.
 type UnixTransport struct {
 	socketPath string
@@ -39,18 +41,18 @@ func NewUnixTransport(socketPath string) *UnixTransport {
 func DefaultUnixSocketPath() string {
 	// Priority 1: XDG_RUNTIME_DIR
 	if xdgRuntime := os.Getenv("XDG_RUNTIME_DIR"); xdgRuntime != "" {
-		return filepath.Join(xdgRuntime, "clai", "daemon.sock")
+		return filepath.Join(xdgRuntime, "clai", daemonSocketName)
 	}
 
 	uid := strconv.Itoa(os.Getuid())
 
 	// Priority 2: TMPDIR
 	if tmpdir := os.Getenv("TMPDIR"); tmpdir != "" {
-		return filepath.Join(tmpdir, "clai-"+uid, "daemon.sock")
+		return filepath.Join(tmpdir, "clai-"+uid, daemonSocketName)
 	}
 
 	// Priority 3: /tmp fallback
-	return filepath.Join("/tmp", "clai-"+uid, "daemon.sock")
+	return filepath.Join("/tmp", "clai-"+uid, daemonSocketName)
 }
 
 // Listen creates and returns a listener for the Unix socket.

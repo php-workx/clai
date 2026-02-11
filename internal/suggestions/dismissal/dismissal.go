@@ -17,6 +17,7 @@ package dismissal
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -31,6 +32,8 @@ const (
 	StateLearned   State = "learned"
 	StatePermanent State = "permanent"
 )
+
+var errRequiredDismissalFields = errors.New("scope, context_template_id, and dismissed_template_id are required")
 
 // IsValid returns true if s is a recognized dismissal state.
 func (s State) IsValid() bool {
@@ -99,7 +102,7 @@ type PatternRecord struct {
 //   - PERMANENT stays PERMANENT (dismiss does not downgrade permanent)
 func (s *Store) RecordDismissal(ctx context.Context, scope, contextTemplateID, dismissedTemplateID string, nowMs int64) error {
 	if scope == "" || contextTemplateID == "" || dismissedTemplateID == "" {
-		return fmt.Errorf("scope, context_template_id, and dismissed_template_id are required")
+		return errRequiredDismissalFields
 	}
 	if nowMs == 0 {
 		nowMs = time.Now().UnixMilli()
@@ -154,7 +157,7 @@ func (s *Store) RecordDismissal(ctx context.Context, scope, contextTemplateID, d
 // are forgiven. The record is deleted from the table.
 func (s *Store) RecordAcceptance(ctx context.Context, scope, contextTemplateID, dismissedTemplateID string) error {
 	if scope == "" || contextTemplateID == "" || dismissedTemplateID == "" {
-		return fmt.Errorf("scope, context_template_id, and dismissed_template_id are required")
+		return errRequiredDismissalFields
 	}
 
 	_, err := s.db.ExecContext(ctx,
@@ -176,7 +179,7 @@ func (s *Store) RecordAcceptance(ctx context.Context, scope, contextTemplateID, 
 // The user explicitly chose "never show this suggestion".
 func (s *Store) RecordNever(ctx context.Context, scope, contextTemplateID, dismissedTemplateID string, nowMs int64) error {
 	if scope == "" || contextTemplateID == "" || dismissedTemplateID == "" {
-		return fmt.Errorf("scope, context_template_id, and dismissed_template_id are required")
+		return errRequiredDismissalFields
 	}
 	if nowMs == 0 {
 		nowMs = time.Now().UnixMilli()
@@ -207,7 +210,7 @@ func (s *Store) RecordNever(ctx context.Context, scope, contextTemplateID, dismi
 // Only affects patterns that are currently PERMANENT.
 func (s *Store) RecordUnblock(ctx context.Context, scope, contextTemplateID, dismissedTemplateID string) error {
 	if scope == "" || contextTemplateID == "" || dismissedTemplateID == "" {
-		return fmt.Errorf("scope, context_template_id, and dismissed_template_id are required")
+		return errRequiredDismissalFields
 	}
 
 	_, err := s.db.ExecContext(ctx,
