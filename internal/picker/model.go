@@ -101,6 +101,9 @@ type Model struct {
 
 	// copied is true while the "Copied!" indicator is visible.
 	copied bool
+
+	// pageSize overrides listHeight() for fetch requests when > 0.
+	pageSize int
 }
 
 // NewModel creates a new picker Model.
@@ -130,6 +133,14 @@ func (m Model) WithQuery(q string) Model {
 // WithLayout returns a copy of the Model with the given layout.
 func (m Model) WithLayout(l Layout) Model {
 	m.layout = l
+	return m
+}
+
+// WithPageSize returns a copy of the Model with the given page size.
+// When set to a positive value, this overrides the dynamic listHeight()
+// calculation for fetch requests, honoring the user's configured limit.
+func (m Model) WithPageSize(size int) Model {
+	m.pageSize = size
 	return m
 }
 
@@ -325,12 +336,16 @@ func (m *Model) startFetch() tea.Cmd {
 	m.cancelFetch = cancel
 
 	tab := m.currentTab()
+	limit := m.listHeight()
+	if m.pageSize > 0 {
+		limit = m.pageSize
+	}
 	req := Request{
 		RequestID: reqID,
 		Query:     m.textInput.Value(),
 		TabID:     tab.ID,
 		Options:   tab.Args,
-		Limit:     m.listHeight(),
+		Limit:     limit,
 		Offset:    m.offset,
 	}
 

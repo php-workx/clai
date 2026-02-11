@@ -300,6 +300,9 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	provider := picker.NewHistoryProvider(socketPath(cfg))
 
 	model := picker.NewModel(tabs, provider).WithLayout(picker.LayoutBottomUp)
+	if opts.limit > 0 {
+		model = model.WithPageSize(opts.limit)
+	}
 	if opts.query != "" {
 		model = model.WithQuery(opts.query)
 	}
