@@ -77,6 +77,14 @@ func (p *Paths) HooksDir() string {
 	return filepath.Join(p.BaseDir, "hooks")
 }
 
+// WorkflowLogDir returns the path to the workflow log directory.
+// Creates the directory if it doesn't exist.
+func (p *Paths) WorkflowLogDir() string {
+	dir := filepath.Join(p.BaseDir, "workflow-logs")
+	_ = os.MkdirAll(dir, 0755)
+	return dir
+}
+
 // CacheDir returns the path to the cache directory.
 func (p *Paths) CacheDir() string {
 	return filepath.Join(p.BaseDir, "cache")

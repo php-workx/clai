@@ -970,3 +970,361 @@ func TestDefaultConfigIsValid(t *testing.T) {
 		t.Errorf("DefaultConfig() should be valid, but Validate() returned: %v", err)
 	}
 }
+
+// ============================================================================
+// Workflow config tests
+// ============================================================================
+
+func TestDefaultWorkflowsConfig(t *testing.T) {
+	cfg := DefaultConfig()
+
+	if cfg.Workflows.Enabled {
+		t.Error("Expected workflows.enabled=false by default")
+	}
+	if cfg.Workflows.DefaultMode != "interactive" {
+		t.Errorf("Expected workflows.default_mode=interactive, got %s", cfg.Workflows.DefaultMode)
+	}
+	if cfg.Workflows.DefaultShell != "" {
+		t.Errorf("Expected workflows.default_shell empty, got %s", cfg.Workflows.DefaultShell)
+	}
+	if cfg.Workflows.LogDir != "" {
+		t.Errorf("Expected workflows.log_dir empty, got %s", cfg.Workflows.LogDir)
+	}
+	if cfg.Workflows.RetainRuns != 100 {
+		t.Errorf("Expected workflows.retain_runs=100, got %d", cfg.Workflows.RetainRuns)
+	}
+	if cfg.Workflows.StrictPermissions {
+		t.Error("Expected workflows.strict_permissions=false by default")
+	}
+	if cfg.Workflows.SecretFile != "" {
+		t.Errorf("Expected workflows.secret_file empty, got %s", cfg.Workflows.SecretFile)
+	}
+	if cfg.Workflows.SearchPaths != nil {
+		t.Errorf("Expected workflows.search_paths nil, got %v", cfg.Workflows.SearchPaths)
+	}
+}
+
+func TestWorkflowsConfigGet(t *testing.T) {
+	cfg := DefaultConfig()
+
+	tests := []struct {
+		key      string
+		expected string
+	}{
+		{"workflows.enabled", "false"},
+		{"workflows.default_mode", "interactive"},
+		{"workflows.default_shell", ""},
+		{"workflows.log_dir", ""},
+		{"workflows.search_paths", ""},
+		{"workflows.retain_runs", "100"},
+		{"workflows.strict_permissions", "false"},
+		{"workflows.secret_file", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key, func(t *testing.T) {
+			got, err := cfg.Get(tt.key)
+			if err != nil {
+				t.Errorf("Get(%q) error: %v", tt.key, err)
+				return
+			}
+			if got != tt.expected {
+				t.Errorf("Get(%q) = %q, want %q", tt.key, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestWorkflowsConfigSet(t *testing.T) {
+	tests := []struct {
+		key      string
+		value    string
+		expected string
+	}{
+		{"workflows.enabled", "true", "true"},
+		{"workflows.enabled", "false", "false"},
+		{"workflows.default_mode", "interactive", "interactive"},
+		{"workflows.default_mode", "non-interactive-fail", "non-interactive-fail"},
+		{"workflows.default_shell", "/bin/bash", "/bin/bash"},
+		{"workflows.default_shell", "", ""},
+		{"workflows.log_dir", "/tmp/logs", "/tmp/logs"},
+		{"workflows.log_dir", "", ""},
+		{"workflows.search_paths", "/a,/b,/c", "/a,/b,/c"},
+		{"workflows.search_paths", "", ""},
+		{"workflows.retain_runs", "50", "50"},
+		{"workflows.retain_runs", "1", "1"},
+		{"workflows.strict_permissions", "true", "true"},
+		{"workflows.strict_permissions", "false", "false"},
+		{"workflows.secret_file", "/home/user/.secrets", "/home/user/.secrets"},
+		{"workflows.secret_file", "", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
+			cfg := DefaultConfig()
+			err := cfg.Set(tt.key, tt.value)
+			if err != nil {
+				t.Errorf("Set(%q, %q) error: %v", tt.key, tt.value, err)
+				return
+			}
+
+			got, err := cfg.Get(tt.key)
+			if err != nil {
+				t.Errorf("Get(%q) error: %v", tt.key, err)
+				return
+			}
+			if got != tt.expected {
+				t.Errorf("After Set, Get(%q) = %q, want %q", tt.key, got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestWorkflowsConfigSetInvalid(t *testing.T) {
+	tests := []struct {
+		key   string
+		value string
+	}{
+		// Invalid booleans
+		{"workflows.enabled", "yes"},
+		{"workflows.strict_permissions", "maybe"},
+		// Invalid mode
+		{"workflows.default_mode", "non-interactive-auto"},
+		{"workflows.default_mode", "batch"},
+		{"workflows.default_mode", ""},
+		// Invalid retain_runs
+		{"workflows.retain_runs", "not_a_number"},
+		{"workflows.retain_runs", "0"},
+		{"workflows.retain_runs", "-1"},
+		// Unknown field
+		{"workflows.unknown_field", "value"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
+			cfg := DefaultConfig()
+			err := cfg.Set(tt.key, tt.value)
+			if err == nil {
+				t.Errorf("Set(%q, %q) should have failed", tt.key, tt.value)
+			}
+		})
+	}
+}
+
+func TestWorkflowsConfigGetUnknownField(t *testing.T) {
+	cfg := DefaultConfig()
+	_, err := cfg.Get("workflows.unknown_field")
+	if err == nil {
+		t.Error("Get(workflows.unknown_field) should have failed")
+	}
+}
+
+func TestWorkflowsConfigValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		modify  func(*Config)
+		wantErr string
+	}{
+		{
+			name:    "valid_interactive",
+			modify:  func(c *Config) { c.Workflows.DefaultMode = "interactive" },
+			wantErr: "",
+		},
+		{
+			name:    "valid_non_interactive_fail",
+			modify:  func(c *Config) { c.Workflows.DefaultMode = "non-interactive-fail" },
+			wantErr: "",
+		},
+		{
+			name:    "rejects_non_interactive_auto",
+			modify:  func(c *Config) { c.Workflows.DefaultMode = "non-interactive-auto" },
+			wantErr: "workflows.default_mode must be interactive or non-interactive-fail",
+		},
+		{
+			name:    "rejects_invalid_mode",
+			modify:  func(c *Config) { c.Workflows.DefaultMode = "batch" },
+			wantErr: "workflows.default_mode must be interactive or non-interactive-fail",
+		},
+		{
+			name:    "rejects_negative_retain_runs",
+			modify:  func(c *Config) { c.Workflows.RetainRuns = -1 },
+			wantErr: "workflows.retain_runs must be > 0",
+		},
+		{
+			name: "zero_retain_runs_gets_default",
+			modify: func(c *Config) {
+				c.Workflows.RetainRuns = 0
+			},
+			wantErr: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			tt.modify(cfg)
+			err := cfg.Validate()
+
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Errorf("Validate() error = %v, want nil", err)
+				}
+			} else {
+				if err == nil {
+					t.Errorf("Validate() error = nil, want error containing %q", tt.wantErr)
+				} else if !strings.Contains(err.Error(), tt.wantErr) {
+					t.Errorf("Validate() error = %q, want error containing %q", err.Error(), tt.wantErr)
+				}
+			}
+		})
+	}
+}
+
+func TestWorkflowsConfigYAMLParsing(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `
+workflows:
+  enabled: true
+  default_mode: non-interactive-fail
+  default_shell: /bin/zsh
+  log_dir: /tmp/wf-logs
+  search_paths:
+    - /home/user/workflows
+    - /etc/clai/workflows
+  retain_runs: 50
+  strict_permissions: true
+  secret_file: /home/user/.secrets
+`
+	if err := os.WriteFile(configFile, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("Failed to write YAML: %v", err)
+	}
+
+	cfg, err := LoadFromFile(configFile)
+	if err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+
+	if !cfg.Workflows.Enabled {
+		t.Error("Expected workflows.enabled=true")
+	}
+	if cfg.Workflows.DefaultMode != "non-interactive-fail" {
+		t.Errorf("Expected default_mode=non-interactive-fail, got %s", cfg.Workflows.DefaultMode)
+	}
+	if cfg.Workflows.DefaultShell != "/bin/zsh" {
+		t.Errorf("Expected default_shell=/bin/zsh, got %s", cfg.Workflows.DefaultShell)
+	}
+	if cfg.Workflows.LogDir != "/tmp/wf-logs" {
+		t.Errorf("Expected log_dir=/tmp/wf-logs, got %s", cfg.Workflows.LogDir)
+	}
+	if len(cfg.Workflows.SearchPaths) != 2 {
+		t.Fatalf("Expected 2 search paths, got %d", len(cfg.Workflows.SearchPaths))
+	}
+	if cfg.Workflows.SearchPaths[0] != "/home/user/workflows" {
+		t.Errorf("Expected search_paths[0]=/home/user/workflows, got %s", cfg.Workflows.SearchPaths[0])
+	}
+	if cfg.Workflows.SearchPaths[1] != "/etc/clai/workflows" {
+		t.Errorf("Expected search_paths[1]=/etc/clai/workflows, got %s", cfg.Workflows.SearchPaths[1])
+	}
+	if cfg.Workflows.RetainRuns != 50 {
+		t.Errorf("Expected retain_runs=50, got %d", cfg.Workflows.RetainRuns)
+	}
+	if !cfg.Workflows.StrictPermissions {
+		t.Error("Expected strict_permissions=true")
+	}
+	if cfg.Workflows.SecretFile != "/home/user/.secrets" {
+		t.Errorf("Expected secret_file=/home/user/.secrets, got %s", cfg.Workflows.SecretFile)
+	}
+}
+
+func TestWorkflowsConfigYAMLPartial(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `
+workflows:
+  enabled: true
+`
+	if err := os.WriteFile(configFile, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("Failed to write YAML: %v", err)
+	}
+
+	cfg, err := LoadFromFile(configFile)
+	if err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+
+	if !cfg.Workflows.Enabled {
+		t.Error("Expected workflows.enabled=true")
+	}
+	// RetainRuns zero value gets defaulted by Validate
+	if cfg.Workflows.RetainRuns != 100 {
+		t.Errorf("Expected retain_runs defaulted to 100, got %d", cfg.Workflows.RetainRuns)
+	}
+}
+
+func TestValidWorkflowModes(t *testing.T) {
+	validModes := []string{"interactive", "non-interactive-fail"}
+	for _, mode := range validModes {
+		if !isValidWorkflowMode(mode) {
+			t.Errorf("isValidWorkflowMode(%q) = false, want true", mode)
+		}
+	}
+
+	invalidModes := []string{"non-interactive-auto", "batch", "auto", "INTERACTIVE", ""}
+	for _, mode := range invalidModes {
+		if isValidWorkflowMode(mode) {
+			t.Errorf("isValidWorkflowMode(%q) = true, want false", mode)
+		}
+	}
+}
+
+func TestWorkflowsConfigSaveAndLoad(t *testing.T) {
+	tmpDir := t.TempDir()
+	configFile := filepath.Join(tmpDir, "config.yaml")
+
+	cfg := DefaultConfig()
+	cfg.Workflows.Enabled = true
+	cfg.Workflows.DefaultMode = "non-interactive-fail"
+	cfg.Workflows.DefaultShell = "/bin/bash"
+	cfg.Workflows.LogDir = "/tmp/logs"
+	cfg.Workflows.SearchPaths = []string{"/a", "/b"}
+	cfg.Workflows.RetainRuns = 25
+	cfg.Workflows.StrictPermissions = true
+	cfg.Workflows.SecretFile = "/home/user/.secrets"
+
+	if err := cfg.SaveToFile(configFile); err != nil {
+		t.Fatalf("SaveToFile failed: %v", err)
+	}
+
+	loaded, err := LoadFromFile(configFile)
+	if err != nil {
+		t.Fatalf("LoadFromFile failed: %v", err)
+	}
+
+	if !loaded.Workflows.Enabled {
+		t.Error("Expected workflows.enabled=true after round-trip")
+	}
+	if loaded.Workflows.DefaultMode != "non-interactive-fail" {
+		t.Errorf("Expected default_mode=non-interactive-fail, got %s", loaded.Workflows.DefaultMode)
+	}
+	if loaded.Workflows.DefaultShell != "/bin/bash" {
+		t.Errorf("Expected default_shell=/bin/bash, got %s", loaded.Workflows.DefaultShell)
+	}
+	if loaded.Workflows.LogDir != "/tmp/logs" {
+		t.Errorf("Expected log_dir=/tmp/logs, got %s", loaded.Workflows.LogDir)
+	}
+	if len(loaded.Workflows.SearchPaths) != 2 || loaded.Workflows.SearchPaths[0] != "/a" || loaded.Workflows.SearchPaths[1] != "/b" {
+		t.Errorf("Expected search_paths=[/a, /b], got %v", loaded.Workflows.SearchPaths)
+	}
+	if loaded.Workflows.RetainRuns != 25 {
+		t.Errorf("Expected retain_runs=25, got %d", loaded.Workflows.RetainRuns)
+	}
+	if !loaded.Workflows.StrictPermissions {
+		t.Error("Expected strict_permissions=true after round-trip")
+	}
+	if loaded.Workflows.SecretFile != "/home/user/.secrets" {
+		t.Errorf("Expected secret_file=/home/user/.secrets, got %s", loaded.Workflows.SecretFile)
+	}
+}
