@@ -62,7 +62,7 @@ func main() {
 
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(0)
+		return
 	}
 
 	cmd := os.Args[1]
@@ -96,7 +96,8 @@ func main() {
 		printUsage()
 	}
 
-	os.Exit(0)
+	// Always exit 0 for silent failure (defer above is only for panic recovery)
+	os.Exit(0) //nolint:gocritic // exitAfterDefer: defer is for panic recovery only
 }
 
 func printVersion() {
@@ -110,7 +111,7 @@ func printUsage() {
 func parseFlags(args []string) map[string]string {
 	result := make(map[string]string)
 	for i := 0; i < len(args); i++ {
-		arg := args[i]
+		arg := args[i] //nolint:gosec // G602: bounds checked by loop condition
 		if strings.HasPrefix(arg, "--") {
 			key := strings.TrimPrefix(arg, "--")
 			if idx := strings.Index(key, "="); idx >= 0 {

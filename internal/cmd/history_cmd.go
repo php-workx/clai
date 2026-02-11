@@ -167,19 +167,19 @@ func outputHistory(commands []storage.Command) error {
 	}
 	switch format {
 	case "raw":
-		for _, c := range commands {
-			fmt.Println(c.Command)
+		for i := range commands {
+			fmt.Println(commands[i].Command)
 		}
 		return nil
 	case "json":
 		entries := make([]historyOutput, 0, len(commands))
 		source := historySource(historyGlobal, historyCWD, historySession)
-		for _, c := range commands {
+		for i := range commands {
 			entries = append(entries, historyOutput{
-				Text:     c.Command,
-				Cwd:      c.CWD,
-				TsUnixMs: c.TsStartUnixMs,
-				ExitCode: c.ExitCode,
+				Text:     commands[i].Command,
+				Cwd:      commands[i].CWD,
+				TsUnixMs: commands[i].TsStartUnixMs,
+				ExitCode: commands[i].ExitCode,
 				Source:   source,
 			})
 		}

@@ -74,8 +74,8 @@ func (m *SessionManager) Get(sessionID string) (*SessionInfo, bool) {
 	}
 
 	// Return a copy to avoid data races
-	copy := *info
-	return &copy, true
+	infoCopy := *info
+	return &infoCopy, true
 }
 
 // Touch updates the last activity time for a session.
@@ -151,8 +151,8 @@ func (m *SessionManager) GetAll() []*SessionInfo {
 
 	infos := make([]*SessionInfo, 0, len(m.sessions))
 	for _, info := range m.sessions {
-		copy := *info
-		infos = append(infos, &copy)
+		infoCopy := *info
+		infos = append(infos, &infoCopy)
 	}
 	return infos
 }
