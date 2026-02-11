@@ -1,6 +1,6 @@
 # clai Workflow Execution — Technical Specification
 
-**Version:** 4.1
+**Version:** 4.2
 **Date:** 2026-02-11
 **Status:** Approved for Implementation
 **Supersedes:** `specs/tech_workflows_v4.md` (v4)
@@ -18,6 +18,17 @@
 - **isTransientError typed checks (M7):** Replaced string-matching error detection with `errors.Is()` typed checks to prevent false positives.
 - **limitedBuffer concurrency lock (M8):** Added `sync.Mutex` to `limitedBuffer` for thread-safe writes from concurrent goroutines.
 - **Matrix key canonical format (M9):** Keys are sorted alphabetically and joined as `key=value` pairs separated by `,`.
+
+### Changelog from v4.1
+
+- **LLMQuerier interface (D23):** `AnalyzeStepOutput` handler uses an `LLMQuerier` interface instead of calling `claude.QueryFast()` directly. Enables dependency injection and testing without Claude daemon.
+- **CLI-side LLM fallback (D24, C6):** When claid is unavailable, CLI calls `QueryFast()` directly as fallback. If that also fails → `needs_human`. Ensures `--daemon=false` (Windows Tier 0) gets working LLM analysis.
+- **WorkflowWatch deferred to Tier 1 (D25):** Push-based stop signals via streaming RPC deferred. Tier 0 uses `signal.NotifyContext` for Ctrl+C.
+- **Status/history/stop RPCs deferred to Tier 1 (D26):** `WorkflowStatus`, `WorkflowStop`, `WorkflowWatch`, `WorkflowHistory` RPCs deferred. Tier 0 RPCs: `WorkflowRunStart`, `WorkflowStepUpdate`, `WorkflowRunEnd`, `AnalyzeStepOutput`.
+- **schema_meta migration tracking (D27):** Spec now references `schema_meta` table (matching existing `internal/storage/db.go`) instead of `PRAGMA user_version`.
+- **Scope reduction (D28):** Moderate scope reduction (~5-6 weeks). FR-33 remnants removed from Tier 0, streaming/control RPCs deferred, retention deferred. Config and search paths retained.
+- **scrubbed_output size corrected (C5):** Proto comment updated from ≤4KB to ≤100KB to match `buildAnalysisContext` output size.
+- **Run retention deferred to Tier 1:** Pruning logic deferred; Tier 0 accumulates runs without limit.
 - **Implementation ordering (M10):** Added §3.8 with build sequence for Tier 0.
 - **Config integration (C3):** Documented `WorkflowsConfig` embedding in existing `Config` struct.
 - **Store interface note (C4):** Clarified that new workflow methods are additive; existing store interface unchanged.
@@ -254,7 +265,7 @@ The minimum viable implementation targeting the Pulumi compliance workflow from 
 | FR-30 | Human interaction interface | Terminal prompts |
 | FR-31 | Terminal-based interaction | stdin/stdout |
 | FR-32 | Human interaction options | approve/reject/inspect/command/question |
-| FR-33 | LLM follow-up conversation | Context-preserving follow-up |
+| FR-33 | LLM follow-up conversation | Context-preserving follow-up — **Tier 1 only**; Tier 0 uses single-turn `QueryFast()` |
 | FR-36 | LLM secret scrubbing | Pattern-based before LLM context |
 | FR-37 | Expression interpolation | Subset: env, matrix, steps.outputs |
 | FR-41 | Human-readable real-time output | Step names, status, durations |
@@ -486,7 +497,8 @@ If the daemon is unavailable:
 2. If daemon still unreachable: run workflow **without** state persistence
 3. Print warning: `"daemon unavailable — run history will not be persisted"`
 4. RunArtifact (JSONL file) is always written regardless of daemon availability
-5. All other functionality (execution, LLM analysis, human prompts) works normally
+5. LLM analysis falls back to direct `claude.QueryFast()` call from CLI (D24); if that also fails → `needs_human`. Warning logged: `"daemon unavailable — LLM analysis not persisted to SQLite"`
+6. Human prompts and all other execution functionality work normally
 
 ### 3.7 Transport Abstraction
 
@@ -560,6 +572,7 @@ const (
 
     // ModeNonInteractiveAuto auto-approves low/medium risk decisions.
     // For CI pipelines with pre-vetted workflows. Tier 1 only.
+    // Tier 0: selecting this mode returns an error ("non-interactive-auto mode requires Tier 1").
     ModeNonInteractiveAuto
 )
 ```
@@ -1573,7 +1586,9 @@ The CLI sends step analysis requests to claid via the `AnalyzeStepOutput` RPC (D
 2. **claude CLI**: one-shot `claude --print` via `QueryWithContext()` in `internal/claude/claude.go`
 3. **API provider**: direct Anthropic/OpenAI API call via `internal/provider/` (Tier 1)
 
-If all backends fail, claid returns `needs_human` as the decision (FR-24). The CLI never calls `QueryFast()` directly during workflow execution — all LLM traffic routes through claid for centralized logging and future rate limiting.
+If all backends fail, claid returns `needs_human` as the decision (FR-24).
+
+**CLI-side fallback (D24):** When claid is unavailable (daemon not running, `EnsureDaemon()` failed, RPC connection error), the CLI calls `claude.QueryFast()` directly as a local fallback. If that also fails, the analysis returns `needs_human`. A warning is logged: `"daemon unavailable — LLM analysis not persisted to SQLite"`. This ensures `--daemon=false` (Windows Tier 0) still gets working LLM analysis. The CLI imports `internal/claude` for this fallback path only (it already imports it for `clai ask` etc.).
 
 ### 10.5 Structured Response Parsing
 
@@ -1676,7 +1691,9 @@ type LLMClient interface {
 }
 ```
 
-### 10.9 Follow-Up Conversation (FR-33)
+### 10.9 Follow-Up Conversation (FR-33) — Tier 1
+
+> **Tier 0 note:** Multi-turn conversation via `Converse()` is deferred to Tier 1. In Tier 0, the `[q]uestion` option uses a single-turn `QueryFast()` call (no transcript history). See §11.2.
 
 ```go
 type ReviewSession struct {
@@ -1795,6 +1812,8 @@ func (hr *TerminalReviewer) Review(ctx context.Context, step *StepDef, result *S
         default:
         }
 
+        // Tier 0: [q]uestion uses single-turn QueryFast() (no transcript).
+        // Tier 1: [q]uestion uses multi-turn Converse() via ReviewSession (FR-33).
         hr.prompt("[a]pprove / [r]eject / [i]nspect full output / [c]ommand / [q]uestion: ")
         choice := hr.readLine()
         switch strings.ToLower(strings.TrimSpace(choice)) {
@@ -2121,7 +2140,9 @@ Full step output is written to log files (SQLite stores only 4KB tails):
 
 **Path sanitization:** `<job>`, `<matrix-key>`, and `<step-id>` values are sanitized via `sanitizePathComponent()` (SS7.5) to prevent path traversal or malformed filenames on all platforms.
 
-### 12.6 Push-Based Stop Signals
+### 12.6 Push-Based Stop Signals — Tier 1 (D25)
+
+> **Tier 1.** Tier 0 uses `signal.NotifyContext` for Ctrl+C stop handling. Push-based remote stop via streaming RPC is deferred to Tier 1 when `clai workflow stop <run-id>` is implemented.
 
 The v1 spec used 500ms polling. v2 replaces this with a push-based approach:
 
@@ -2148,7 +2169,9 @@ func (r *Runner) watchStopSignal(ctx context.Context, cancel context.CancelFunc)
 }
 ```
 
-### 12.7 Retention
+### 12.7 Retention — Tier 1
+
+> **Tier 1.** Tier 0 accumulates runs without limit. Pruning deferred until history browsing is implemented.
 
 - Default: keep last 100 runs per workflow name
 - Pruning runs in the daemon's periodic maintenance loop
@@ -2160,7 +2183,7 @@ func (r *Runner) watchStopSignal(ctx context.Context, cancel context.CancelFunc)
 Protobuf schema changes and SQLite migrations are coupled to the binary release:
 
 1. **Atomic delivery:** Both proto changes and migration SQL ship in the same binary. No separate migration step.
-2. **Auto-apply on startup:** The daemon checks `PRAGMA user_version` on startup and applies pending migrations before accepting RPCs.
+2. **Auto-apply on startup:** The daemon checks the `schema_meta` table on startup (matching existing pattern in `internal/storage/db.go` lines 141-192) and applies pending migrations before accepting RPCs. (D27)
 3. **Forward-compatible wire format:** New proto fields are additive (never remove or renumber). Old clients sending fewer fields is safe; new fields have zero-value defaults.
 4. **Rollback:** Downgrading the binary may leave new columns in SQLite -- these are ignored by older code (SQLite is schema-flexible). No destructive rollback migration is provided.
 5. **Version check:** The CLI sends its build version in the gRPC metadata. If the daemon is older than the CLI, the CLI logs a warning suggesting `clai daemon restart`.
@@ -2231,7 +2254,7 @@ message AnalyzeStepOutputRequest {
   string step_id = 2;
   string matrix_key = 3;
   string analysis_prompt = 4;
-  string scrubbed_output = 5;    // step output with secrets masked, ≤4KB tail
+  string scrubbed_output = 5;    // step output with secrets masked, ≤100KB (head+tail from buildAnalysisContext)
 }
 
 message AnalyzeStepOutputResponse {
@@ -2309,13 +2332,11 @@ service ClaiService {
   rpc WorkflowStepUpdate(WorkflowStepUpdateRequest) returns (WorkflowStepUpdateResponse);
   rpc AnalyzeStepOutput(AnalyzeStepOutputRequest) returns (AnalyzeStepOutputResponse);  // LLM pass-through (D22)
 
-  // Workflow control
-  rpc WorkflowStatus(WorkflowStatusRequest) returns (WorkflowStatusResponse);
-  rpc WorkflowStop(WorkflowStopRequest) returns (WorkflowStopResponse);
-  rpc WorkflowWatch(WorkflowWatchRequest) returns (stream WorkflowWatchEvent);  // push-based
-
-  // Workflow history
-  rpc WorkflowHistory(WorkflowHistoryRequest) returns (WorkflowHistoryResponse);
+  // Tier 1: Workflow control and history (CLI consumers `status`, `stop`, `logs`, `history` are Tier 1)
+  // rpc WorkflowStatus(WorkflowStatusRequest) returns (WorkflowStatusResponse);       // Tier 1 (D26)
+  // rpc WorkflowStop(WorkflowStopRequest) returns (WorkflowStopResponse);             // Tier 1 (D26)
+  // rpc WorkflowWatch(WorkflowWatchRequest) returns (stream WorkflowWatchEvent);      // Tier 1 (D25)
+  // rpc WorkflowHistory(WorkflowHistoryRequest) returns (WorkflowHistoryResponse);    // Tier 1 (D26)
 }
 ```
 
@@ -2343,9 +2364,38 @@ func (s *Server) handleWorkflowStepUpdate(ctx context.Context, req *pb.WorkflowS
 
 Note: The handler now passes `req.RunId`, `req.StepId`, and `req.MatrixKey` to the store, matching the composite key signature from §12.4. The v2 handler only passed `req.StepId` as a single identifier, which created a type mismatch between the gRPC string IDs and the store's int64 auto-increment key. The composite key model eliminates this mismatch entirely.
 
-### 13.4 LLM Analysis Handler (D22)
+### 13.4 LLM Analysis Handler (D22, D23)
 
-The `AnalyzeStepOutput` handler is the LLM pass-through endpoint. The CLI sends analysis requests to claid, which internally calls `QueryFast()`, parses the response, persists the analysis record, and returns the structured decision:
+The `AnalyzeStepOutput` handler is the LLM pass-through endpoint. The CLI sends analysis requests to claid, which queries the LLM through the `LLMQuerier` interface (D23), parses the response, persists the analysis record, and returns the structured decision.
+
+**LLMQuerier interface (D23):** To avoid a direct `internal/daemon` → `internal/claude` import (which would create lifecycle coupling — see round 2 pre-mortem shared finding), the handler uses dependency injection:
+
+```go
+// LLMQuerier abstracts LLM queries for testability (D23).
+// Production implementation wraps claude.QueryFast().
+type LLMQuerier interface {
+    Query(ctx context.Context, prompt string) (string, error)
+}
+
+// claudeQuerier is the production implementation.
+type claudeQuerier struct{}
+
+func (cq *claudeQuerier) Query(ctx context.Context, prompt string) (string, error) {
+    return claude.QueryFast(ctx, prompt)
+}
+```
+
+The `Server` struct accepts an `LLMQuerier` field, injected at construction:
+
+```go
+type Server struct {
+    // ... existing fields ...
+    llm   LLMQuerier // injected; production uses &claudeQuerier{}
+    store Store
+}
+```
+
+Handler implementation:
 
 ```go
 func (s *Server) handleAnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutputRequest) (*pb.AnalyzeStepOutputResponse, error) {
@@ -2354,9 +2404,9 @@ func (s *Server) handleAnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeSte
     // 1. Build the analysis prompt from the request
     prompt := buildAnalysisPrompt(req.AnalysisPrompt, req.ScrubbedOutput)
 
-    // 2. Call QueryFast() — Claude daemon → CLI fallback
+    // 2. Query LLM via injected interface (D23)
     start := time.Now()
-    raw, err := claude.QueryFast(ctx, prompt)
+    raw, err := s.llm.Query(ctx, prompt)
     latency := time.Since(start)
 
     var resp *AnalysisResponse
@@ -2391,6 +2441,7 @@ This merges the former `WorkflowAnalysis` persistence-only RPC with the actual L
 - **Unified error handling:** claid handles Claude daemon availability (fallback chain) in one place
 - **Future rate limiting (Tier 1):** claid can enforce per-workflow or global LLM rate limits
 - **Smaller CLI surface:** CLI does not need to import `internal/claude` for workflow execution
+- **Testability (D23):** `LLMQuerier` interface enables handler unit tests with a mock — no Claude daemon required
 
 ---
 
@@ -3167,11 +3218,11 @@ func (s *ScriptedInteractionHandler) Review(ctx context.Context, step *StepDef, 
 - [ ] Shell mode works when `shell: true` is set
 - [ ] Step outputs exported via `$CLAI_OUTPUT` resolve in downstream `${{ }}` expressions
 - [ ] Unresolved expressions produce hard error (not passed to subprocess)
-- [ ] `analyze: true` steps send output to claid via `AnalyzeStepOutput` RPC (D22); claid calls `QueryFast()` internally
+- [ ] `analyze: true` steps send output to claid via `AnalyzeStepOutput` RPC (D22); claid queries LLM via `LLMQuerier` interface (D23)
 - [ ] LLM unparseable response → `needs_human` → follows risk matrix (FR-24, P0-2)
 - [ ] Risk level decision matrix correctly determines when to prompt human
-- [ ] Human review interface presents approve/reject/inspect/command/question options
-- [ ] Follow-up LLM conversation preserves context (Tier 1 — single-turn only in Tier 0)
+- [ ] Human review interface presents approve/reject/inspect/command/question options (interactive mode)
+- [ ] `[q]uestion` option sends single-turn `QueryFast()` query (Tier 0); multi-turn conversation deferred to Tier 1 (FR-33)
 - [ ] Step failure halts remaining steps in the matrix entry
 - [ ] Workflow run state persisted in SQLite via daemon gRPC
 - [ ] RunArtifact (JSONL) written for every run
@@ -3194,7 +3245,7 @@ func (s *ScriptedInteractionHandler) Review(ctx context.Context, step *StepDef, 
 
 ### 24.3 Effort Estimate
 
-Full Tier 0 implementation: **6–8 weeks** (3–4 weeks for core engine through LLM integration; remaining weeks for state persistence, CLI polish, and testing). See §3.8 for build sequence.
+Full Tier 0 implementation: **5–6 weeks** (3–4 weeks for core engine through LLM integration; remaining weeks for state persistence, CLI polish, and testing). Reduced from 6–8 weeks via D25/D26 scope deferrals and FR-33 multi-turn removal (D28). See §3.8 for build sequence.
 
 ### 24.2 Tier 1
 
@@ -3313,3 +3364,9 @@ For workflow users:
 | D20 | Truncation safety | (a) Byte slicing (b) Rune-aware truncation | **(b)** | Byte slicing can break multi-byte UTF-8 characters, causing `json.Marshal` errors or LLM confusion. (AR-C) |
 | D21 | Stdin workflow input | (a) File-only input (b) Support `-` for stdin | **(b)** | Enables dynamic workflow generation via pipes. Resume not supported for stdin sources. (MR-A) |
 | D22 | LLM analysis routing | (a) CLI calls QueryFast() directly (b) CLI sends AnalyzeStepOutput RPC to claid | **(b)** | Centralized logging: all LLM prompts/responses recorded in SQLite. Unified control plane. Future rate limiting. (Pre-mortem C1, D22) |
+| D23 | LLMQuerier interface vs direct import | (a) Interface with DI (b) Direct `internal/claude` import | **(a)** | Avoids `internal/daemon` → `internal/claude` import coupling. Enables handler unit tests without Claude daemon. Standard Go DI pattern. (Round 2 shared finding) |
+| D24 | LLM fallback when daemon unavailable | (a) Return needs_human (b) CLI calls QueryFast() directly; if that also fails → needs_human | **(b)** | Preserves user experience when claid is unavailable (e.g., Windows Tier 0 with `--daemon=false`). Warning logged about missing centralized persistence. (Round 2 C6) |
+| D25 | WorkflowWatch streaming RPC timing | (a) Keep in Tier 0 (b) Defer to Tier 1 | **(b)** | Ctrl+C via `signal.NotifyContext` is sufficient for Tier 0. WorkflowWatch is the first streaming RPC in the codebase — risky for MVP. (Round 2 M22) |
+| D26 | Status/history/stop RPCs timing | (a) Keep proto + handlers in Tier 0 (b) Defer to Tier 1 | **(b)** | CLI consumers (`workflow status`, `workflow history`, `workflow stop`) are already Tier 1. No Tier 0 consumer exists. (Round 2 scope judge) |
+| D27 | Schema migration tracking | (a) Match existing code (`schema_meta` table) (b) Migrate to `PRAGMA user_version` | **(a)** | Consistency with existing `internal/storage/db.go` pattern. Avoids unnecessary migration system change. (Round 2 M19) |
+| D28 | Tier 0 scope reduction | (a) Full current Tier 0 (6-8 weeks) (b) Minimal MVP (4 weeks) (c) Moderate cut (5-6 weeks) | **(c)** | Apply D25+D26 deferrals + FR-33 multi-turn removal. Keep config/search paths. Reduces to ~5-6 weeks. (Round 2 scope judge consensus) |
