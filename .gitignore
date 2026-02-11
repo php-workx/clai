@@ -7,6 +7,7 @@ bin/
 # Built binaries in project root
 /clai
 /clai-shim
+/clai-picker
 
 # Test coverage
 coverage.out
