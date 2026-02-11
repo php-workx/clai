@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -449,5 +450,253 @@ func TestSpawnDaemonWritesPIDFile(t *testing.T) {
 	proc, err := os.FindProcess(pid)
 	if err == nil && proc != nil {
 		_ = proc.Kill()
+	}
+}
+
+func TestSpawnAndWait_MissingBinary(t *testing.T) {
+	oldPath := os.Getenv("PATH")
+	oldHome := os.Getenv("HOME")
+	oldXDG := os.Getenv("XDG_RUNTIME_DIR")
+	t.Cleanup(func() {
+		_ = os.Setenv("PATH", oldPath)
+		_ = os.Setenv("HOME", oldHome)
+		_ = os.Setenv("XDG_RUNTIME_DIR", oldXDG)
+	})
+
+	tmpDir := t.TempDir()
+	_ = os.Setenv("PATH", "/nonexistent")
+	_ = os.Setenv("HOME", tmpDir)
+	_ = os.Setenv("XDG_RUNTIME_DIR", tmpDir)
+	_ = os.Unsetenv("CLAI_DAEMON_PATH")
+
+	if err := SpawnAndWait(50 * time.Millisecond); err == nil {
+		t.Fatalf("SpawnAndWait() expected error when daemon binary is missing")
+	}
+}
+
+func TestIsSocketDialable(t *testing.T) {
+	oldQuickDial := quickDialFn
+	t.Cleanup(func() { quickDialFn = oldQuickDial })
+
+	quickDialFn = func() (io.Closer, error) {
+		return io.NopCloser(strings.NewReader("")), nil
+	}
+	if !isSocketDialable() {
+		t.Fatalf("isSocketDialable() = false, want true")
+	}
+
+	quickDialFn = func() (io.Closer, error) {
+		return nil, errors.New("dial failed")
+	}
+	if isSocketDialable() {
+		t.Fatalf("isSocketDialable() = true, want false")
+	}
+}
+
+func TestEnsureHealthySocket(t *testing.T) {
+	t.Run("no socket", func(t *testing.T) {
+		oldSocketExists := socketExistsFn
+		t.Cleanup(func() { socketExistsFn = oldSocketExists })
+		socketExistsFn = func() bool { return false }
+
+		ready, err := ensureHealthySocket()
+		if err != nil {
+			t.Fatalf("ensureHealthySocket() error = %v", err)
+		}
+		if ready {
+			t.Fatalf("ensureHealthySocket() ready = true, want false")
+		}
+	})
+
+	t.Run("socket dialable", func(t *testing.T) {
+		oldSocketExists := socketExistsFn
+		oldQuickDial := quickDialFn
+		t.Cleanup(func() {
+			socketExistsFn = oldSocketExists
+			quickDialFn = oldQuickDial
+		})
+		socketExistsFn = func() bool { return true }
+		quickDialFn = func() (io.Closer, error) {
+			return io.NopCloser(strings.NewReader("")), nil
+		}
+
+		ready, err := ensureHealthySocket()
+		if err != nil {
+			t.Fatalf("ensureHealthySocket() error = %v", err)
+		}
+		if !ready {
+			t.Fatalf("ensureHealthySocket() ready = false, want true")
+		}
+	})
+
+	t.Run("stale removal error", func(t *testing.T) {
+		oldQuickDial := quickDialFn
+		oldSocketExists := socketExistsFn
+		oldSocketPath := socketPathFn
+		oldRemove := removeFileFn
+		oldDaemonLock := daemonLockFn
+		oldAttempts := staleSocketDialAttempts
+		oldDelay := staleSocketRetryDelay
+		t.Cleanup(func() {
+			quickDialFn = oldQuickDial
+			socketExistsFn = oldSocketExists
+			socketPathFn = oldSocketPath
+			removeFileFn = oldRemove
+			daemonLockFn = oldDaemonLock
+			staleSocketDialAttempts = oldAttempts
+			staleSocketRetryDelay = oldDelay
+		})
+
+		socketExistsFn = func() bool { return true }
+		socketPathFn = func() string { return "/tmp/fake-clai.sock" }
+		daemonLockFn = func() (int, bool, error) { return 0, false, nil }
+		staleSocketDialAttempts = 1
+		staleSocketRetryDelay = 0
+		quickDialFn = func() (io.Closer, error) {
+			return nil, errors.New("connection refused")
+		}
+		removeFileFn = func(path string) error { return fmt.Errorf("permission denied") }
+
+		_, err := ensureHealthySocket()
+		if err == nil || !strings.Contains(err.Error(), "failed to remove stale socket") {
+			t.Fatalf("ensureHealthySocket() error = %v, want stale socket removal error", err)
+		}
+	})
+}
+
+func TestRecoverMissingSocketDaemon(t *testing.T) {
+	t.Run("kill stale daemon when socket not published", func(t *testing.T) {
+		oldSocketExists := socketExistsFn
+		oldDaemonLock := daemonLockFn
+		oldKill := killPIDFn
+		oldQuickDial := quickDialFn
+		t.Cleanup(func() {
+			socketExistsFn = oldSocketExists
+			daemonLockFn = oldDaemonLock
+			killPIDFn = oldKill
+			quickDialFn = oldQuickDial
+		})
+
+		socketExistsFn = func() bool { return false }
+		daemonLockFn = func() (int, bool, error) { return 321, true, nil }
+		quickDialFn = func() (io.Closer, error) { return nil, errors.New("dial failed") }
+
+		killedPID := 0
+		killPIDFn = func(pid int, timeout time.Duration) error {
+			killedPID = pid
+			return nil
+		}
+
+		recoverMissingSocketDaemon()
+		if killedPID != 321 {
+			t.Fatalf("killed PID = %d, want 321", killedPID)
+		}
+	})
+
+	t.Run("skip kill when socket is published quickly", func(t *testing.T) {
+		oldSocketExists := socketExistsFn
+		oldDaemonLock := daemonLockFn
+		oldKill := killPIDFn
+		oldQuickDial := quickDialFn
+		t.Cleanup(func() {
+			socketExistsFn = oldSocketExists
+			daemonLockFn = oldDaemonLock
+			killPIDFn = oldKill
+			quickDialFn = oldQuickDial
+		})
+
+		socketChecks := 0
+		socketExistsFn = func() bool {
+			socketChecks++
+			return socketChecks > 1
+		}
+		daemonLockFn = func() (int, bool, error) { return 123, true, nil }
+		quickDialFn = func() (io.Closer, error) { return io.NopCloser(strings.NewReader("")), nil }
+
+		killCalls := 0
+		killPIDFn = func(pid int, timeout time.Duration) error {
+			killCalls++
+			return nil
+		}
+
+		recoverMissingSocketDaemon()
+		if killCalls != 0 {
+			t.Fatalf("killPID calls = %d, want 0", killCalls)
+		}
+	})
+}
+
+func TestWaitWithContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := waitWithContext(ctx, time.Second); !errors.Is(err, context.Canceled) {
+		t.Fatalf("waitWithContext() error = %v, want context.Canceled", err)
+	}
+
+	if err := waitWithContext(context.Background(), 1*time.Millisecond); err != nil {
+		t.Fatalf("waitWithContext() error = %v, want nil", err)
+	}
+}
+
+func TestEnsureSocketNotOwnedByLiveDaemon(t *testing.T) {
+	oldDaemonLock := daemonLockFn
+	t.Cleanup(func() { daemonLockFn = oldDaemonLock })
+
+	daemonLockFn = nil
+	if err := ensureSocketNotOwnedByLiveDaemon(errors.New("dial failed")); err != nil {
+		t.Fatalf("ensureSocketNotOwnedByLiveDaemon() error = %v, want nil when no lock fn", err)
+	}
+
+	daemonLockFn = func() (int, bool, error) { return 77, true, nil }
+	err := ensureSocketNotOwnedByLiveDaemon(errors.New("dial failed"))
+	if err == nil || !strings.Contains(err.Error(), "lock is held") {
+		t.Fatalf("ensureSocketNotOwnedByLiveDaemon() error = %v, want lock-held error", err)
+	}
+}
+
+func TestIsLikelyStaleSocketDialError(t *testing.T) {
+	if isLikelyStaleSocketDialError(nil) {
+		t.Fatalf("expected false for nil error")
+	}
+	if !isLikelyStaleSocketDialError(syscall.ECONNREFUSED) {
+		t.Fatalf("expected true for ECONNREFUSED")
+	}
+	if !isLikelyStaleSocketDialError(errors.New("transport: no such file or directory")) {
+		t.Fatalf("expected true for ENOENT message")
+	}
+	if isLikelyStaleSocketDialError(errors.New("permission denied")) {
+		t.Fatalf("expected false for non-stale dial error")
+	}
+}
+
+func TestDaemonLockHeldPID_NoLockFile(t *testing.T) {
+	oldXDG := os.Getenv("XDG_RUNTIME_DIR")
+	oldHome := os.Getenv("HOME")
+	t.Cleanup(func() {
+		_ = os.Setenv("XDG_RUNTIME_DIR", oldXDG)
+		_ = os.Setenv("HOME", oldHome)
+	})
+
+	tmpDir := t.TempDir()
+	_ = os.Setenv("XDG_RUNTIME_DIR", tmpDir)
+	_ = os.Setenv("HOME", tmpDir)
+
+	pid, held, err := daemonLockHeldPID()
+	if err != nil {
+		t.Fatalf("daemonLockHeldPID() error = %v", err)
+	}
+	if held || pid != 0 {
+		t.Fatalf("daemonLockHeldPID() = (pid=%d, held=%v), want (0,false)", pid, held)
+	}
+}
+
+func TestTerminatePID(t *testing.T) {
+	if err := terminatePID(0, 10*time.Millisecond); err != nil {
+		t.Fatalf("terminatePID(0) error = %v, want nil", err)
+	}
+
+	if err := terminatePID(999999999, 10*time.Millisecond); err != nil {
+		t.Fatalf("terminatePID(nonexistent) error = %v, want nil, got %v", err, err)
 	}
 }

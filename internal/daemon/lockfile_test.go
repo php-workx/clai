@@ -1,11 +1,15 @@
 package daemon
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"testing"
+	"time"
 )
 
 func TestLockFile_Acquire_Release(t *testing.T) {
@@ -409,4 +413,123 @@ func TestLockFile_FlockBehavior(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to release flock: %v", err)
 	}
+}
+
+func TestReadHeldPID(t *testing.T) {
+	t.Run("missing file", func(t *testing.T) {
+		pid, held, err := ReadHeldPID(filepath.Join(t.TempDir(), "missing.lock"))
+		if err != nil {
+			t.Fatalf("ReadHeldPID() error = %v", err)
+		}
+		if held || pid != 0 {
+			t.Fatalf("ReadHeldPID() = (pid=%d, held=%v), want (0,false)", pid, held)
+		}
+	})
+
+	t.Run("unlocked file", func(t *testing.T) {
+		lockPath := filepath.Join(t.TempDir(), "test.lock")
+		if err := os.WriteFile(lockPath, []byte("123\n"), 0600); err != nil {
+			t.Fatalf("WriteFile() error = %v", err)
+		}
+
+		pid, held, err := ReadHeldPID(lockPath)
+		if err != nil {
+			t.Fatalf("ReadHeldPID() error = %v", err)
+		}
+		if held || pid != 0 {
+			t.Fatalf("ReadHeldPID() = (pid=%d, held=%v), want (0,false)", pid, held)
+		}
+	})
+
+	t.Run("open error", func(t *testing.T) {
+		_, _, err := ReadHeldPID(t.TempDir())
+		if err == nil {
+			t.Fatalf("ReadHeldPID() expected error for directory path")
+		}
+	})
+
+	t.Run("held by helper process", func(t *testing.T) {
+		lockPath := filepath.Join(t.TempDir(), "held.lock")
+		cmd := exec.Command(os.Args[0], "-test.run=^TestHelperProcessHoldLock$")
+		cmd.Env = append(os.Environ(),
+			"CLAI_TEST_HOLD_LOCK=1",
+			"CLAI_TEST_LOCK_PATH="+lockPath,
+		)
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			t.Fatalf("StdoutPipe() error = %v", err)
+		}
+		if err := cmd.Start(); err != nil {
+			t.Fatalf("Start() error = %v", err)
+		}
+		t.Cleanup(func() {
+			_ = cmd.Process.Kill()
+			_ = cmd.Wait()
+		})
+
+		readyCh := make(chan string, 1)
+		go func() {
+			scanner := bufio.NewScanner(stdout)
+			if scanner.Scan() {
+				readyCh <- scanner.Text()
+				return
+			}
+			readyCh <- ""
+		}()
+
+		select {
+		case ready := <-readyCh:
+			if strings.TrimSpace(ready) != "ready" {
+				t.Fatalf("helper readiness = %q, want %q", ready, "ready")
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("timed out waiting for lock helper readiness")
+		}
+
+		pid, held, err := ReadHeldPID(lockPath)
+		if err != nil {
+			t.Fatalf("ReadHeldPID() error = %v", err)
+		}
+		if !held {
+			t.Fatalf("ReadHeldPID() held = false, want true")
+		}
+		if pid <= 0 {
+			t.Fatalf("ReadHeldPID() pid = %d, want > 0", pid)
+		}
+	})
+}
+
+func TestHelperProcessHoldLock(t *testing.T) {
+	if os.Getenv("CLAI_TEST_HOLD_LOCK") != "1" {
+		return
+	}
+
+	lockPath := os.Getenv("CLAI_TEST_LOCK_PATH")
+	if lockPath == "" {
+		os.Exit(2)
+	}
+
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		os.Exit(3)
+	}
+	defer f.Close()
+
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		os.Exit(4)
+	}
+	if err := f.Truncate(0); err != nil {
+		os.Exit(5)
+	}
+	if _, err := f.Seek(0, 0); err != nil {
+		os.Exit(6)
+	}
+	if _, err := fmt.Fprintf(f, "%d\n", os.Getpid()); err != nil {
+		os.Exit(7)
+	}
+	_ = f.Sync()
+
+	fmt.Println("ready")
+	time.Sleep(5 * time.Second)
+	os.Exit(0)
 }

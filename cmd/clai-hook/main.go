@@ -14,6 +14,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -25,41 +26,42 @@ var (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		printUsage()
-		os.Exit(1)
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdout, stderr io.Writer) int {
+	if len(args) < 1 {
+		printUsage(stderr)
+		return 1
 	}
 
-	cmd := os.Args[1]
-	args := os.Args[2:]
+	cmd := args[0]
+	cmdArgs := args[1:]
 
-	var exitCode int
 	switch cmd {
 	case "ingest":
-		exitCode = runIngest(args)
+		return runIngest(cmdArgs)
 	case "session-start":
-		exitCode = runSessionStart(args)
+		return runSessionStart(cmdArgs)
 	case "version", "--version", "-v":
-		printVersion()
-		exitCode = 0
+		printVersion(stdout)
+		return 0
 	case "help", "--help", "-h":
-		printUsage()
-		exitCode = 0
+		printUsage(stderr)
+		return 0
 	default:
-		fmt.Fprintf(os.Stderr, "clai-hook: unknown command: %s\n", cmd)
-		printUsage()
-		exitCode = 1
+		fmt.Fprintf(stderr, "clai-hook: unknown command: %s\n", cmd)
+		printUsage(stderr)
+		return 1
 	}
-
-	os.Exit(exitCode)
 }
 
-func printVersion() {
-	fmt.Printf("clai-hook %s (commit: %s, built: %s)\n", Version, GitCommit, BuildDate)
+func printVersion(w io.Writer) {
+	fmt.Fprintf(w, "clai-hook %s (commit: %s, built: %s)\n", Version, GitCommit, BuildDate)
 }
 
-func printUsage() {
-	fmt.Fprintln(os.Stderr, `clai-hook - Shell hook for clai command ingestion
+func printUsage(w io.Writer) {
+	fmt.Fprintln(w, `clai-hook - Shell hook for clai command ingestion
 
 Usage: clai-hook <command> [flags...]
 
