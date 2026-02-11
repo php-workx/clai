@@ -57,7 +57,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get hook content: %w", err)
 	}
 
-	if err := os.WriteFile(hookFile, []byte(hookContent), 0644); err != nil {
+	if err := os.WriteFile(hookFile, []byte(hookContent), 0o644); err != nil {
 		return fmt.Errorf("failed to write hook file: %w", err)
 	}
 	fmt.Printf("Wrote hook file: %s\n", hookFile)
@@ -67,7 +67,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not determine rc file for %s", shell)
 	}
 
-	sourceLine := fmt.Sprintf(`source "%s"`, hookFile)
+	sourceLine := fmt.Sprintf(`source "%s"`, hookFile) //nolint:gocritic // shell syntax, not Go string
 	allInstalled := true
 	addedFiles := make([]string, 0, len(rcFiles))
 	for _, rcFile := range rcFiles {
@@ -163,7 +163,7 @@ func evalCommand(shell string) string {
 }
 
 func appendToRCFile(rcFile, sourceLine string) error {
-	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return fmt.Errorf("failed to open %s: %w", rcFile, err)
 	}
@@ -226,7 +226,7 @@ func getRCFiles(shell string) []string {
 	case "fish":
 		// Fish config is in ~/.config/fish/config.fish
 		configDir := filepath.Join(home, ".config", "fish")
-		if err := os.MkdirAll(configDir, 0755); err != nil {
+		if err := os.MkdirAll(configDir, 0o755); err != nil {
 			return nil
 		}
 		return []string{filepath.Join(configDir, "config.fish")}
@@ -259,10 +259,10 @@ func isInstalled(rcFile, hookFile, shell string) (bool, string, error) {
 	}
 	defer f.Close()
 
-	// Patterns to look for
+	// Patterns to look for (shell syntax, not Go strings)
 	patterns := []string{
-		fmt.Sprintf(`source "%s"`, hookFile),
-		fmt.Sprintf(`source '%s'`, hookFile),
+		fmt.Sprintf(`source "%s"`, hookFile), //nolint:gocritic // shell syntax
+		fmt.Sprintf(`source '%s'`, hookFile), //nolint:gocritic // shell syntax
 		fmt.Sprintf(". %s", hookFile),
 		"clai init " + shell,
 	}

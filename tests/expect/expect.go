@@ -134,7 +134,7 @@ func NewSession(shell string, opts ...SessionOption) (*ShellSession, error) {
 		args = []string{"-i"}
 	}
 
-	cmd := exec.Command(shellPath, args...)
+	cmd := exec.Command(shellPath, args...) //nolint:gosec // G204: shellPath is from test config
 	cmd.Stdin = console.Tty()
 	cmd.Stdout = console.Tty()
 	cmd.Stderr = console.Tty()

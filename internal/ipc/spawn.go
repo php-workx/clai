@@ -55,7 +55,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 	}
 
 	// Ensure run directory exists
-	if err := os.MkdirAll(RunDir(), 0755); err != nil {
+	if err := os.MkdirAll(RunDir(), 0o755); err != nil {
 		return fmt.Errorf("failed to create run dir: %w", err)
 	}
 
@@ -70,7 +70,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 	}
 
 	// Create log file
-	logFile, err := os.OpenFile(LogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	logFile, err := os.OpenFile(LogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	if err != nil {
 		// Log file creation failed, use /dev/null
 		logFile, _ = os.Open(os.DevNull)
@@ -78,7 +78,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 	defer logFile.Close()
 
 	// Start daemon process
-	cmd := exec.Command(daemonPath)
+	cmd := exec.Command(daemonPath) //nolint:gosec // G204: daemonPath is our own binary
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
@@ -91,7 +91,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 	}
 
 	// Write PID file (non-fatal if it fails)
-	_ = os.WriteFile(PidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0644)
+	_ = os.WriteFile(PidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o644)
 
 	// Detach from child - let it run independently
 	// We don't call cmd.Wait() so the process continues after shim exits

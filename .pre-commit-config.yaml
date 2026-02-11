@@ -49,3 +49,9 @@ repos:
         language: system
         pass_filenames: false
         types: [go]
+      - id: deadcode
+        name: deadcode
+        entry: deadcode ./...
+        language: system
+        pass_filenames: false
+        types: [go]
