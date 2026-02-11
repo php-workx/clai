@@ -64,6 +64,12 @@ type pipelineSegmentInfo struct {
 	operator   string
 }
 
+type seedAggregates struct {
+	templates        map[string]*templateInfo
+	transitions      map[transitionKey]int
+	transitionLastMs map[transitionKey]int64
+}
+
 // Seed bulk-inserts imported shell history into the V2 suggestion tables.
 // It is idempotent: if a backfill session for the given shell already exists,
 // it returns nil without modifying the database.
@@ -91,7 +97,12 @@ func Seed(ctx context.Context, db *sql.DB, entries []history.ImportEntry, shell 
 	normalized := parallelNormalize(ctx, sorted)
 	templates := buildTemplateAggregates(normalized)
 	transitions, transitionLastMs := buildTransitionAggregates(normalized)
-	return seedNormalizedEntries(ctx, db, shell, sessionID, normalized, templates, transitions, transitionLastMs)
+	aggregates := seedAggregates{
+		templates:        templates,
+		transitions:      transitions,
+		transitionLastMs: transitionLastMs,
+	}
+	return seedNormalizedEntries(ctx, db, shell, sessionID, normalized, aggregates)
 }
 
 func isBackfillSeeded(ctx context.Context, db *sql.DB, sessionID string) (bool, error) {
@@ -160,9 +171,7 @@ func seedNormalizedEntries(
 	shell string,
 	sessionID string,
 	normalized []normalizedEntry,
-	templates map[string]*templateInfo,
-	transitions map[transitionKey]int,
-	transitionLastMs map[transitionKey]int64,
+	aggregates seedAggregates,
 ) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -177,13 +186,13 @@ func seedNormalizedEntries(
 	if err != nil {
 		return fmt.Errorf("insert command_events: %w", err)
 	}
-	if err := insertCommandTemplates(ctx, tx, templates); err != nil {
+	if err := insertCommandTemplates(ctx, tx, aggregates.templates); err != nil {
 		return fmt.Errorf("insert command_templates: %w", err)
 	}
-	if err := insertCommandStats(ctx, tx, templates); err != nil {
+	if err := insertCommandStats(ctx, tx, aggregates.templates); err != nil {
 		return fmt.Errorf("insert command_stats: %w", err)
 	}
-	if err := insertTransitionStats(ctx, tx, transitions, transitionLastMs); err != nil {
+	if err := insertTransitionStats(ctx, tx, aggregates.transitions, aggregates.transitionLastMs); err != nil {
 		return fmt.Errorf("insert transition_stats: %w", err)
 	}
 	if err := insertPipelineData(ctx, tx, normalized, eventIDs); err != nil {

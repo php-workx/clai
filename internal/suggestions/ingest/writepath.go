@@ -504,7 +504,14 @@ func updateSlotStats(ctx context.Context, tx *sql.Tx, wctx *WritePathContext, ta
 
 	for _, slot := range wctx.Slots {
 		for _, scope := range scopes {
-			if err := upsertSlotStatInTx(ctx, tx, scope, wctx.PreNorm.TemplateID, slot.Index, slot.Value, wctx.NowMs, tauMs); err != nil {
+			if err := upsertSlotStatInTx(ctx, tx, slotStatUpsertInput{
+				scope:      scope,
+				templateID: wctx.PreNorm.TemplateID,
+				slotIndex:  slot.Index,
+				value:      slot.Value,
+				nowMs:      wctx.NowMs,
+				tauMs:      tauMs,
+			}); err != nil {
 				return err
 			}
 		}
@@ -512,7 +519,16 @@ func updateSlotStats(ctx context.Context, tx *sql.Tx, wctx *WritePathContext, ta
 	return nil
 }
 
-func upsertSlotStatInTx(ctx context.Context, tx *sql.Tx, scope, templateID string, slotIndex int, value string, nowMs, tauMs int64) error {
+type slotStatUpsertInput struct {
+	scope      string
+	templateID string
+	slotIndex  int
+	value      string
+	nowMs      int64
+	tauMs      int64
+}
+
+func upsertSlotStatInTx(ctx context.Context, tx *sql.Tx, input slotStatUpsertInput) error {
 	var currentWeight float64
 	var currentCount int
 	var lastSeenMs int64
@@ -521,7 +537,7 @@ func upsertSlotStatInTx(ctx context.Context, tx *sql.Tx, scope, templateID strin
 		SELECT weight, count, last_seen_ms
 		FROM slot_stat
 		WHERE scope = ? AND template_id = ? AND slot_index = ? AND value = ?
-	`, scope, templateID, slotIndex, value).Scan(&currentWeight, &currentCount, &lastSeenMs)
+	`, input.scope, input.templateID, input.slotIndex, input.value).Scan(&currentWeight, &currentCount, &lastSeenMs)
 
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
@@ -533,22 +549,22 @@ func upsertSlotStatInTx(ctx context.Context, tx *sql.Tx, scope, templateID strin
 		newWeight = 1.0
 		newCount = 1
 	} else {
-		elapsed := float64(nowMs - lastSeenMs)
-		decay := math.Exp(-elapsed / float64(tauMs))
+		elapsed := float64(input.nowMs - lastSeenMs)
+		decay := math.Exp(-elapsed / float64(input.tauMs))
 		newWeight = currentWeight*decay + 1.0
 		newCount = currentCount + 1
 	}
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO slot_stat (scope, template_id, slot_index, value, weight, count, last_seen_ms)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(scope, template_id, slot_index, value) DO UPDATE SET
-			weight = ?,
-			count = ?,
-			last_seen_ms = ?
+			VALUES (?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(scope, template_id, slot_index, value) DO UPDATE SET
+				weight = ?,
+				count = ?,
+				last_seen_ms = ?
 	`,
-		scope, templateID, slotIndex, value, newWeight, newCount, nowMs,
-		newWeight, newCount, nowMs,
+		input.scope, input.templateID, input.slotIndex, input.value, newWeight, newCount, input.nowMs,
+		newWeight, newCount, input.nowMs,
 	)
 	return err
 }

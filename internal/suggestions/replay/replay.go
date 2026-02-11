@@ -298,7 +298,15 @@ func (r *Runner) replayCommandStep(
 	tsMs := r.resolveReplayTimestamp(cmdIdx, cmd)
 	cwd := r.resolveReplayCWD(cmd)
 	cmdRaw := resolveReplayCmdRaw(cmd)
-	preNorm, err := r.ingestReplayCommand(ctx, runtime, session, cmdIdx, cmd, prevTemplateID, tsMs, cwd, cmdRaw)
+	preNorm, err := r.ingestReplayCommand(ctx, runtime, replayIngestInput{
+		session:        session,
+		cmdIdx:         cmdIdx,
+		cmd:            cmd,
+		prevTemplateID: prevTemplateID,
+		tsMs:           tsMs,
+		cwd:            cwd,
+		cmdRaw:         cmdRaw,
+	})
 	if err != nil {
 		return nil, "", err
 	}
@@ -330,45 +338,49 @@ func resolveReplayCmdRaw(cmd Command) string {
 	return cmd.CmdNorm
 }
 
+type replayIngestInput struct {
+	session        Session
+	cmdIdx         int
+	cmd            Command
+	prevTemplateID string
+	tsMs           int64
+	cwd            string
+	cmdRaw         string
+}
+
 func (r *Runner) ingestReplayCommand(
 	ctx context.Context,
 	runtime *replayRuntime,
-	session Session,
-	cmdIdx int,
-	cmd Command,
-	prevTemplateID string,
-	tsMs int64,
-	cwd string,
-	cmdRaw string,
+	input replayIngestInput,
 ) (normalize.PreNormResult, error) {
 	ev := &event.CommandEvent{
 		Version:   event.EventVersion,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        tsMs,
+		Ts:        input.tsMs,
 		SessionID: r.cfg.SessionID,
 		Shell:     event.ShellZsh,
-		Cwd:       cwd,
-		CmdRaw:    cmdRaw,
-		ExitCode:  cmd.ExitCode,
+		Cwd:       input.cwd,
+		CmdRaw:    input.cmdRaw,
+		ExitCode:  input.cmd.ExitCode,
 	}
-	prevExitCode, prevFailed := previousReplayStatus(session.Commands, cmdIdx)
-	wctx := ingest.PrepareWriteContext(ev, r.cfg.RepoKey, "", prevTemplateID, prevExitCode, prevFailed, nil)
+	prevExitCode, prevFailed := previousReplayStatus(input.session.Commands, input.cmdIdx)
+	wctx := ingest.PrepareWriteContext(ev, r.cfg.RepoKey, "", input.prevTemplateID, prevExitCode, prevFailed, nil)
 	if _, err := ingest.WritePath(ctx, runtime.sqlDB, wctx, ingest.WritePathConfig{}); err != nil {
-		return normalize.PreNormResult{}, fmt.Errorf("write path for command %d (%q): %w", cmdIdx, cmd.CmdNorm, err)
+		return normalize.PreNormResult{}, fmt.Errorf("write path for command %d (%q): %w", input.cmdIdx, input.cmd.CmdNorm, err)
 	}
-	preNorm := normalize.PreNormalize(cmdRaw, normalize.PreNormConfig{})
-	if err := runtime.freqStore.Update(ctx, score.ScopeGlobal, preNorm.CmdNorm, tsMs); err != nil {
-		return normalize.PreNormResult{}, fmt.Errorf("update global frequency for command %d: %w", cmdIdx, err)
+	preNorm := normalize.PreNormalize(input.cmdRaw, normalize.PreNormConfig{})
+	if err := runtime.freqStore.Update(ctx, score.ScopeGlobal, preNorm.CmdNorm, input.tsMs); err != nil {
+		return normalize.PreNormResult{}, fmt.Errorf("update global frequency for command %d: %w", input.cmdIdx, err)
 	}
-	if err := runtime.freqStore.Update(ctx, r.cfg.RepoKey, preNorm.CmdNorm, tsMs); err != nil {
-		return normalize.PreNormResult{}, fmt.Errorf("update repo frequency for command %d: %w", cmdIdx, err)
+	if err := runtime.freqStore.Update(ctx, r.cfg.RepoKey, preNorm.CmdNorm, input.tsMs); err != nil {
+		return normalize.PreNormResult{}, fmt.Errorf("update repo frequency for command %d: %w", input.cmdIdx, err)
 	}
-	if prevTemplateID != "" {
-		if err := runtime.transStore.RecordTransition(ctx, score.ScopeGlobal, prevTemplateID, preNorm.CmdNorm, tsMs); err != nil {
-			return normalize.PreNormResult{}, fmt.Errorf("record global transition for command %d: %w", cmdIdx, err)
+	if input.prevTemplateID != "" {
+		if err := runtime.transStore.RecordTransition(ctx, score.ScopeGlobal, input.prevTemplateID, preNorm.CmdNorm, input.tsMs); err != nil {
+			return normalize.PreNormResult{}, fmt.Errorf("record global transition for command %d: %w", input.cmdIdx, err)
 		}
-		if err := runtime.transStore.RecordTransition(ctx, r.cfg.RepoKey, prevTemplateID, preNorm.CmdNorm, tsMs); err != nil {
-			return normalize.PreNormResult{}, fmt.Errorf("record repo transition for command %d: %w", cmdIdx, err)
+		if err := runtime.transStore.RecordTransition(ctx, r.cfg.RepoKey, input.prevTemplateID, preNorm.CmdNorm, input.tsMs); err != nil {
+			return normalize.PreNormResult{}, fmt.Errorf("record repo transition for command %d: %w", input.cmdIdx, err)
 		}
 	}
 	return preNorm, nil

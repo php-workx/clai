@@ -230,10 +230,7 @@ func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.
 	case "json":
 		return writeSuggestJSON(suggestions, hint)
 	case "fzf":
-		// fzf format: plain commands, one per line (for piping to fzf)
-		for _, s := range suggestions {
-			fmt.Println(s.Text)
-		}
+		outputPlainSuggestions(suggestions)
 	case "ghost":
 		// ghost format: one suggestion per line as "command<TAB>meta".
 		// This is used for inline ghost text in shells where accepting the
@@ -253,11 +250,15 @@ func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.
 		}
 	default:
 		// Unknown format, treat as fzf (plain output)
-		for _, s := range suggestions {
-			fmt.Println(s.Text)
-		}
+		outputPlainSuggestions(suggestions)
 	}
 	return nil
+}
+
+func outputPlainSuggestions(suggestions []suggestOutput) {
+	for _, s := range suggestions {
+		fmt.Println(s.Text)
+	}
 }
 
 type suggestOutput struct {

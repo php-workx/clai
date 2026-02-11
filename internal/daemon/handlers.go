@@ -615,8 +615,7 @@ func (s *Server) RecordFeedback(ctx context.Context, req *pb.RecordFeedbackReque
 // SuggestFeedback handles the SuggestFeedback RPC.
 // It records user feedback on a suggestion (alias for RecordFeedback).
 func (s *Server) SuggestFeedback(ctx context.Context, req *pb.RecordFeedbackRequest) (*pb.RecordFeedbackResponse, error) {
-	s.touchActivity()
-	return s.handleRecordFeedback(ctx, req)
+	return s.RecordFeedback(ctx, req)
 }
 
 // handleRecordFeedback is the shared implementation for RecordFeedback and SuggestFeedback.
