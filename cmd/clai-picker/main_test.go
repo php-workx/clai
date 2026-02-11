@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
@@ -100,6 +101,22 @@ func TestSanitizeQuery_ExactMaxLen(t *testing.T) {
 	}
 	if len(result) != maxQueryLen {
 		t.Fatalf("expected length %d, got %d", maxQueryLen, len(result))
+	}
+}
+
+func TestSanitizeQuery_TruncateLongUtf8Safe(t *testing.T) {
+	// 4094 bytes + 3-byte rune + 1 byte => 4098 bytes total.
+	// Truncation at 4096 would split the rune unless boundary-safe.
+	input := strings.Repeat("a", 4094) + "界" + "x"
+	result, err := sanitizeQuery(input)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !utf8.ValidString(result) {
+		t.Fatalf("expected valid UTF-8 after truncation, got invalid string")
+	}
+	if len(result) > maxQueryLen {
+		t.Fatalf("expected len <= %d, got %d", maxQueryLen, len(result))
 	}
 }
 
@@ -779,9 +796,26 @@ func TestDispatchFzf_CoversBranches(t *testing.T) {
 
 	lookPathFn = func(string) (string, error) { return "/usr/bin/fzf", nil }
 	runFzfCommandOutputFn = func(_ []string, _ string) ([]byte, error) { return nil, errors.New("fzf failed") }
-	newHistoryProviderFn = func(string) picker.Provider { return &fakeHistoryProvider{} }
-	if got := dispatchFzf(cfg, opts); got != exitSuccess {
-		t.Fatalf("expected exitSuccess when fzf errors, got %d", got)
+	newHistoryProviderFn = func(string) picker.Provider {
+		return &fakeHistoryProvider{
+			resp: []picker.Response{{Items: []picker.Item{{Value: "git status"}}, AtEnd: true}},
+		}
+	}
+	if got := dispatchFzf(cfg, opts); got != exitFallback {
+		t.Fatalf("expected exitFallback when fzf errors, got %d", got)
+	}
+
+	runFzfCommandOutputFn = func(_ []string, _ string) ([]byte, error) {
+		cmd := exec.Command("sh", "-c", "exit 1")
+		return nil, cmd.Run()
+	}
+	newHistoryProviderFn = func(string) picker.Provider {
+		return &fakeHistoryProvider{
+			resp: []picker.Response{{Items: []picker.Item{{Value: "git status"}}, AtEnd: true}},
+		}
+	}
+	if got := dispatchFzf(cfg, opts); got != exitCancelled {
+		t.Fatalf("expected exitCancelled on fzf no-match, got %d", got)
 	}
 }
 

@@ -133,11 +133,15 @@ func parseFlags(args []string) map[string]string {
 // Up to 16 events are buffered in a ring buffer during temporary connection loss.
 func runPersistent() {
 	signal.Ignore(syscall.SIGPIPE)
-	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	ctx, cancel := signalAwareContext()
 	defer cancel()
 	dialFn := shim.DefaultDialFunc(Version)
 	runner := shim.NewRunner(dialFn, Version)
 	_ = runner.Run(ctx, os.Stdin)
+}
+
+func signalAwareContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 }
 
 func runSessionStart() {
@@ -257,7 +261,9 @@ func runSuggest() {
 		return
 	}
 	defer client.Close()
-	suggestions := client.Suggest(context.Background(), sessionID, cwd, buffer, cursorPos, false, limit)
+	ctx, cancel := signalAwareContext()
+	defer cancel()
+	suggestions := client.Suggest(ctx, sessionID, cwd, buffer, cursorPos, false, limit)
 	if len(suggestions) == 0 {
 		return
 	}
@@ -289,7 +295,9 @@ func runTextToCommand() {
 		return
 	}
 	defer client.Close()
-	resp, err := client.TextToCommand(context.Background(), sessionID, prompt, cwd, 3)
+	ctx, cancel := signalAwareContext()
+	defer cancel()
+	resp, err := client.TextToCommand(ctx, sessionID, prompt, cwd, 3)
 	if err != nil || resp == nil || len(resp.Suggestions) == 0 {
 		return
 	}
@@ -347,7 +355,9 @@ func runImportHistory() {
 		return
 	}
 	defer client.Close()
-	resp, err := client.ImportHistory(context.Background(), shell, historyPath, ifNotExists, force)
+	ctx, cancel := signalAwareContext()
+	defer cancel()
+	resp, err := client.ImportHistory(ctx, shell, historyPath, ifNotExists, force)
 	if err != nil {
 		output := map[string]interface{}{
 			"error": err.Error(),

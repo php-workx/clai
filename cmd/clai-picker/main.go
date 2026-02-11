@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -344,7 +346,12 @@ func sanitizeQuery(q string) (string, error) {
 
 	// Truncate to maxQueryLen bytes.
 	if len(result) > maxQueryLen {
-		result = result[:maxQueryLen]
+		// Keep string valid UTF-8 by trimming to the last rune boundary.
+		end := maxQueryLen
+		for end > 0 && !utf8.RuneStart(result[end]) {
+			end--
+		}
+		result = result[:end]
 	}
 
 	return result, nil
@@ -545,9 +552,17 @@ func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 
 	result, err := runFzfBackend(cfg, opts)
 	if err != nil {
-		// fzf exit code 130 = cancelled by user, exit code 1 = no match
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			// fzf exit code 130 = cancelled by user, exit code 1 = no match
+			// Keep the original input unchanged in both cases.
+			if code := exitErr.ExitCode(); code == 130 || code == 1 {
+				debugLog("fzf cancelled/no-match (exit=%d)", code)
+				return exitCancelled
+			}
+		}
 		debugLog("fzf backend error: %v", err)
-		return exitSuccess
+		return exitFallback
 	}
 
 	if result != "" {
