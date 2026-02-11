@@ -44,7 +44,7 @@ func (s *Service) discoverPackageJSON(ctx context.Context, repoRoot string, nowM
 	}
 
 	// Convert scripts to tasks
-	var tasks []Task
+	tasks := make([]Task, 0, len(pkg.Scripts))
 	for name, script := range pkg.Scripts {
 		// Check context cancellation
 		select {

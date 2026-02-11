@@ -177,8 +177,12 @@ func (t *Tracker) tryActivate(templateID string, nowMs int64) {
 
 // collectCandidates gathers next-step suggestions from all active workflows.
 func (t *Tracker) collectCandidates() []Candidate {
-	seen := make(map[string]bool)
-	var candidates []Candidate
+	seen := make(map[string]bool, len(t.active))
+	maxCandidates := len(t.active)
+	if t.cfg.MaxCandidates > 0 && t.cfg.MaxCandidates < maxCandidates {
+		maxCandidates = t.cfg.MaxCandidates
+	}
+	candidates := make([]Candidate, 0, maxCandidates)
 
 	for _, aw := range t.active {
 		nextStep := aw.CurrentStep + 1

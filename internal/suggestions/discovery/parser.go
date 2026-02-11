@@ -72,7 +72,7 @@ func (p *JSONKeysParser) Parse(output []byte) ([]ParsedTask, error) {
 		return nil, fmt.Errorf("value at path %q is not an object", p.path)
 	}
 
-	var tasks []ParsedTask
+	tasks := make([]ParsedTask, 0, len(objMap))
 	for key, val := range objMap {
 		task := ParsedTask{
 			Name:    key,

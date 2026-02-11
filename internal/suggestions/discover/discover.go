@@ -224,7 +224,7 @@ func sourceOrder(source string) int {
 // higher source priority due to insertion order).
 func dedup(candidates []Candidate) []Candidate {
 	seen := make(map[string]bool, len(candidates))
-	var result []Candidate
+	result := make([]Candidate, 0, len(candidates))
 	for _, c := range candidates {
 		if seen[c.Command] {
 			continue
