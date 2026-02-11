@@ -1,6 +1,6 @@
 # clai Workflow Execution — Technical Specification
 
-**Version:** 4.2
+**Version:** 4.3
 **Date:** 2026-02-11
 **Status:** Approved for Implementation
 **Supersedes:** `specs/tech_workflows_v4.md` (v4)
@@ -18,6 +18,14 @@
 - **isTransientError typed checks (M7):** Replaced string-matching error detection with `errors.Is()` typed checks to prevent false positives.
 - **limitedBuffer concurrency lock (M8):** Added `sync.Mutex` to `limitedBuffer` for thread-safe writes from concurrent goroutines.
 - **Matrix key canonical format (M9):** Keys are sorted alphabetically and joined as `key=value` pairs separated by `,`.
+
+### Changelog from v4.2
+
+- **RunArtifact JSONL kept in Tier 0 (D29):** FR-39/FR-40 placement in Tier 1 table contradicts Tier 0 acceptance criteria and §3.8 build sequence. Resolved: keep in Tier 0 for debugging and integration test verification.
+- **Plan restructured to 18 issues / 4 waves (D30):** Merged Issue 19 (exit codes) → Issue 18 (CLI), Issue 4 (validator) → Issue 3 (parser), Issue 9 (limitedBuffer) → Issue 11 (executor). Eliminates false sequential dependencies.
+- **LLM analysis split into core + transport (D31):** D24 dual-path creates distinct code paths. Split into core (prompt, parsing, risk matrix) and transport (RPC + QueryFast fallback) for clarity.
+- **Human review UI moved to Wave 2 (D32):** Only needs analysis result types, not full LLM integration. Enables Wave 3 to focus on integration.
+- **Effort estimate updated:** 5-7 weeks consensus from plan pre-mortem council.
 
 ### Changelog from v4.1
 
@@ -3370,3 +3378,7 @@ For workflow users:
 | D26 | Status/history/stop RPCs timing | (a) Keep proto + handlers in Tier 0 (b) Defer to Tier 1 | **(b)** | CLI consumers (`workflow status`, `workflow history`, `workflow stop`) are already Tier 1. No Tier 0 consumer exists. (Round 2 scope judge) |
 | D27 | Schema migration tracking | (a) Match existing code (`schema_meta` table) (b) Migrate to `PRAGMA user_version` | **(a)** | Consistency with existing `internal/storage/db.go` pattern. Avoids unnecessary migration system change. (Round 2 M19) |
 | D28 | Tier 0 scope reduction | (a) Full current Tier 0 (6-8 weeks) (b) Minimal MVP (4 weeks) (c) Moderate cut (5-6 weeks) | **(c)** | Apply D25+D26 deferrals + FR-33 multi-turn removal. Keep config/search paths. Reduces to ~5-6 weeks. (Round 2 scope judge consensus) |
+| D29 | RunArtifact JSONL tier placement | (a) Keep in Tier 0 + document (b) Defer to Tier 1 | **(a)** | FR-39/FR-40 listed as Tier 1 in §2.2 table but referenced in §3.8 build sequence and Tier 0 acceptance criteria. Internal spec contradiction resolved: JSONL artifact needed for debugging workflow runs and integration test event verification. (Plan pre-mortem C5) |
+| D30 | Plan restructuring: merge issues | (a) Keep 20 issues / 5 waves (b) Merge to 18 issues / 4 waves | **(b)** | Merge Issue 19 (exit codes) → Issue 18 (CLI), Issue 4 (validator) → Issue 3 (parser), Issue 9 (limitedBuffer) → Issue 11 (executor). Eliminates false sequential dependencies, reduces process overhead. (Plan pre-mortem scope judge) |
+| D31 | Split Issue 12 (LLM analysis) | (a) Single issue (b) Split into core + transport | **(b)** | D24 dual-path (claid RPC + direct QueryFast fallback) creates two code paths with different error handling. Split into Issue 14 (core: prompt, parsing, risk matrix) + Issue 21 (transport: RPC + fallback). (Plan pre-mortem C4) |
+| D32 | Move Issue 14 (Human Review UI) timing | (a) Keep in Wave 3 (b) Move to Wave 2 | **(b)** | Review UI only needs analysis result types (decision enum, reasoning string, flags map), not the full LLM integration. Building it in Wave 2 allows Wave 3 to focus on integration. (Plan pre-mortem scope judge) |
