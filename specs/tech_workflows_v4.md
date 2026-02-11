@@ -1,14 +1,27 @@
 # clai Workflow Execution — Technical Specification
 
-**Version:** 4.0
+**Version:** 4.1
 **Date:** 2026-02-11
 **Status:** Approved for Implementation
-**Supersedes:** `specs/tech_workflows_v3.md` (v3)
+**Supersedes:** `specs/tech_workflows_v4.md` (v4)
 **Companion:** `specs/func_workflows.md` (functional requirements)
 
 > This document specifies **how** to implement the workflow execution feature defined in `func_workflows.md`. It covers architecture, data structures, protocols, and implementation details. Reference the functional spec for *what* the system should do.
 >
 > Implementation draws inspiration from [dagu-org/dagu](https://github.com/dagu-org/dagu) — a self-contained Go workflow engine with YAML definitions, DAG-based step execution, and structured run artifacts.
+
+### Changelog from v4
+
+- **Daemon architecture overview (C1):** Added §3.0 with ASCII diagram explicitly distinguishing `claid` (gRPC state daemon) from Claude daemon (LLM subprocess). Resolves naming confusion across all sections.
+- **LLM pass-through via claid (D22):** All workflow LLM analysis routes through claid's new `AnalyzeStepOutput` RPC, which internally calls `QueryFast()`. Merges the former `WorkflowAnalysis` persistence-only RPC with the analysis call into a single RPC. Provides centralized logging and future rate limiting.
+- **FR-33 deferred to Tier 1 (C2):** Multi-turn follow-up conversation (`Converse()`) moved to Tier 1. Tier 0 uses single-turn `QueryFast()` only.
+- **isTransientError typed checks (M7):** Replaced string-matching error detection with `errors.Is()` typed checks to prevent false positives.
+- **limitedBuffer concurrency lock (M8):** Added `sync.Mutex` to `limitedBuffer` for thread-safe writes from concurrent goroutines.
+- **Matrix key canonical format (M9):** Keys are sorted alphabetically and joined as `key=value` pairs separated by `,`.
+- **Implementation ordering (M10):** Added §3.8 with build sequence for Tier 0.
+- **Config integration (C3):** Documented `WorkflowsConfig` embedding in existing `Config` struct.
+- **Store interface note (C4):** Clarified that new workflow methods are additive; existing store interface unchanged.
+- **Effort estimate (M11):** Added 6–8 week estimate for full Tier 0 implementation.
 
 ### Changelog from v3
 
@@ -20,6 +33,23 @@
 - **Orphan process cleanup (MR-C):** Linux subprocess setup includes `Pdeathsig: syscall.SIGKILL` to kill children if parent receives SIGKILL
 - **Shell completion to stdout (DG-A):** Completion scripts are output to stdout for user redirection; binary never writes directly to system paths
 - **Testscript binary compilation (DG-B):** E2E test harness compiles `clai` to a temp directory and prepends it to `$PATH` before running testscript files
+
+### V4 Pre-Mortem Traceability
+
+Every critical and major finding from the v4 pre-mortem council maps to a v4.1 section.
+
+| ID | Finding | V4.1 Section |
+|----|---------|--------------|
+| C1 | Dual-daemon confusion | §3.0 Daemon Architecture Overview |
+| C2 | Tier 0 scope / FR-33 deferred | §10.4 Fallback Chain (Tier 0 note) |
+| C3 | Config integration gap | §14.1 (integration note) |
+| C4 | Store interface breaking change | §12.4 (additive note) |
+| D22 | LLM pass-through via claid | §13.1, §13.2, §13.3 (AnalyzeStepOutput) |
+| M7 | isTransientError false positive | §10.7 Resilience (typed checks) |
+| M8 | limitedBuffer concurrency | §5.6 limitedBuffer (sync.Mutex) |
+| M9 | Matrix key canonical format | §17.1 (format definition) |
+| M10 | Implementation ordering | §3.8 Build Sequence |
+| M11 | Effort estimate | §24.3 Effort Estimate |
 
 ### V3 Review Feedback Traceability
 
@@ -215,7 +245,7 @@ The minimum viable implementation targeting the Pulumi compliance workflow from 
 | FR-9 | Output auto-inheritance | Within same job |
 | FR-13 | Matrix strategy | `include` entries only |
 | FR-14 | Matrix include/exclude | Sequential execution |
-| FR-22 | Step LLM analysis | analyze: true → QueryFast() |
+| FR-22 | Step LLM analysis | analyze: true → AnalyzeStepOutput RPC → QueryFast() (D22) |
 | FR-23 | Structured LLM response | proceed/halt/needs_human + flags |
 | FR-24 | Fallback on parse failure | Unparseable → needs_human |
 | FR-25 | Risk level decision matrix | low/medium/high modifiers |
@@ -290,6 +320,47 @@ Deferred beyond this specification:
 
 ## 3. Technical Architecture
 
+### 3.0 Daemon Architecture Overview
+
+The clai project has **two separate daemons** that already exist and serve different purposes. When this specification says "daemon" without qualifier, it means **claid** (the gRPC state daemon).
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                     CLI Process                                   │
+│  (clai workflow run)                                              │
+│                                                                   │
+│  ┌──────────────┐        ┌──────────────────────────────────┐    │
+│  │ All workflow  │───────>│ claid daemon                     │    │
+│  │ operations   │  gRPC  │ internal/daemon/server.go         │    │
+│  │ ipc.Client   │        │ ~/.clai/daemon.sock               │    │
+│  │              │        │                                    │    │
+│  │ - State mgmt │        │ Handles:                          │    │
+│  │ - LLM proxy  │        │ - State persistence (SQLite)      │    │
+│  │ - History    │        │ - LLM analysis pass-through       │    │
+│  │ - Stop/Watch │        │ - Status/history queries          │    │
+│  └──────────────┘        │ - Stop signal streaming           │    │
+│                          │                                    │    │
+│                          │  ┌────────────────────────────┐   │    │
+│                          │  │ Claude daemon (internal)    │   │    │
+│                          │  │ internal/claude/daemon.go   │   │    │
+│                          │  │ JSON-over-Unix-socket       │   │    │
+│                          │  │ ~/.cache/clai/daemon.sock   │   │    │
+│                          │  └────────────────────────────┘   │    │
+│                          └──────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+| Component | Binary | Protocol | Socket | Purpose | Idle Timeout |
+|-----------|--------|----------|--------|---------|--------------|
+| **claid** | `cmd/claid/main.go` | gRPC (protobuf) | `~/.clai/daemon.sock` | State persistence, session tracking, workflow RPCs, LLM pass-through | 20 min |
+| **Claude daemon** | managed subprocess | JSON-over-Unix-socket | `~/.cache/clai/daemon.sock` | Persistent Claude CLI process for LLM queries | 2 hr |
+
+**Key design decisions:**
+
+1. **Workflow RPCs (§13) are added to the existing claid gRPC service.** No new daemon is created.
+2. **LLM analysis routes through claid (D22).** The CLI sends an `AnalyzeStepOutput` RPC to claid, which internally calls `QueryFast()` (Claude daemon → CLI fallback). This gives claid centralized visibility into all LLM operations for logging and future rate limiting.
+3. **When the spec says "daemon unavailable" (§3.6), it means claid is unreachable.** The Claude daemon's availability is handled internally by `QueryFast()`'s fallback chain.
+
 ### 3.1 Hybrid Execution Model
 
 The workflow system uses a **hybrid** model: the CLI process orchestrates execution, the daemon tracks state, and steps run as subprocesses.
@@ -309,19 +380,20 @@ User invokes:  clai workflow run pulumi-compliance-run
               |  5. Resolve expressions    |
               |  6. Validate DAG           |
               |  7. WorkflowRunStart ------+-------> +------------------+
-              |     RPC to daemon          |         |  Daemon (claid)  |
+              |     RPC to claid           |         |  claid daemon    |
               |  8. Execute steps via      |         |                  |
               |     ShellAdapter           |         |  Persists:       |
               |  9. WorkflowStepUpdate ----+-------> |  - run state     |
               |     RPC per state change   |         |  - step state    |
-              | 10. LLM analysis via       |         |  - analyses      |
-              |     claude daemon          |         |  in SQLite       |
+              | 10. AnalyzeStepOutput -----+-------> |  - analyses      |
+              |     RPC (LLM via claid)    |         |  in SQLite       |
               | 11. Human prompts via      |         |                  |
               |     InteractionHandler     |         |  Serves:         |
               | 12. WorkflowRunEnd --------+-------> |  - status RPCs   |
               +----------------------------+         |  - history RPCs  |
                         |                            |  - stop stream   |
-                        | spawns per step            +------------------+
+                        | spawns per step            |  - LLM proxy     |
+                        v                            +------------------+
                         v
               +----------------------------+
               |  Subprocesses              |
@@ -370,17 +442,17 @@ The CLI process:
 - Has direct terminal access for human interaction (when in interactive mode)
 - Supports `Ctrl+C` via `context.Context` (existing pattern)
 - Lifecycle matches the workflow run lifecycle
-- Interacts with Claude daemon directly via `QueryFast()` (see `internal/claude/daemon.go`)
+- Interacts with claid for LLM analysis via `AnalyzeStepOutput` RPC (claid calls `QueryFast()` internally — see D22)
 
 ### 3.4 Component Responsibilities
 
 | Component | Responsibilities |
 |-----------|-----------------|
 | **CLI** (`clai workflow run`) | YAML parsing, expression evaluation, matrix expansion, DAG validation, step execution via ShellAdapter, output capture, LLM interaction, human prompts via InteractionHandler, RunArtifact writing |
-| **Daemon** (`claid`) | Persist run/step state in SQLite, serve status/history queries, stream stop signals |
+| **Daemon** (`claid`) | Persist run/step state in SQLite, serve status/history queries, stream stop signals, LLM analysis pass-through via `AnalyzeStepOutput` RPC (D22) |
 | **ShellAdapter** | Execute commands (argv or shell mode), platform-specific shell selection |
 | **ProcessController** | Subprocess lifecycle, signal delivery, process tree management |
-| **Claude daemon** (`internal/claude/daemon.go`) | Analyze step output via `QueryFast()`, return structured decisions, support follow-up conversation |
+| **Claude daemon** (`internal/claude/daemon.go`) | Persistent Claude CLI subprocess for LLM queries. Called by claid internally via `QueryFast()`, not directly by the CLI during workflow execution. |
 | **InteractionHandler** | Abstract human interaction (terminal or non-interactive implementations) |
 
 ### 3.5 Config Precedence
@@ -452,6 +524,20 @@ type TransportDialer interface {
 #### Tier 0 on Windows
 
 In Tier 0, Windows does not have daemon IPC support. The `--daemon=false` flag disables daemon IPC. The workflow engine runs locally — argv/shell execution works, state persistence is deferred. RunArtifact (JSONL file) is still written.
+
+### 3.8 Implementation Build Sequence (Tier 0)
+
+The Tier 0 implementation should follow this build order, where each layer depends on the previous:
+
+1. **YAML parser + validator** (§4, §7) — Define types, parse workflow files, validate schema
+2. **ShellAdapter + ProcessController** (§5, §6) — Execute commands, manage subprocesses
+3. **DAG executor + expression engine** (§9, §4.5) — Step sequencing, expression evaluation, output capture
+4. **LLM integration** (§10) — Connect to existing `QueryFast()` for step analysis
+5. **RunArtifact + state persistence** (§12, §13) — JSONL event log, extend claid with workflow RPCs
+6. **CLI commands + output formatting** (§11, §26) — `clai workflow run`, progress display, completion
+7. **Testing harness** (§23) — Unit tests, integration tests, testscript E2E
+
+**Estimated effort:** 6–8 weeks for full Tier 0 (3–4 weeks for core engine through step 4; remaining weeks for state persistence, CLI polish, and testing).
 
 ---
 
@@ -694,11 +780,14 @@ For argv mode, the `run` field is split into tokens:
 ### 5.6 limitedBuffer
 
 ```go
-// limitedBuffer is a ring buffer that retains the last maxSize bytes.
+// limitedBuffer is a thread-safe ring buffer that retains the last maxSize bytes.
 // Used to capture step stdout/stderr tails for storage without unbounded memory.
+// The mutex is required because stdout and stderr writers may be called from
+// concurrent goroutines (e.g., io.Copy in separate goroutines for tee) (M8).
 const defaultBufferSize = 4096 // 4KB
 
 type limitedBuffer struct {
+    mu      sync.Mutex
     buf     []byte
     maxSize int
     pos     int
@@ -709,8 +798,18 @@ func newLimitedBuffer(size int) *limitedBuffer {
     return &limitedBuffer{buf: make([]byte, size), maxSize: size}
 }
 
-func (lb *limitedBuffer) Write(p []byte) (int, error) { /* ring buffer write */ }
-func (lb *limitedBuffer) String() string              { /* linearize ring buffer */ }
+func (lb *limitedBuffer) Write(p []byte) (int, error) {
+    lb.mu.Lock()
+    defer lb.mu.Unlock()
+    // ring buffer write ...
+    return len(p), nil
+}
+func (lb *limitedBuffer) String() string {
+    lb.mu.Lock()
+    defer lb.mu.Unlock()
+    // linearize ring buffer ...
+    return ""
+}
 ```
 
 ---
@@ -1466,13 +1565,15 @@ func isValidDecision(d string) bool {
 
 ### 10.4 Fallback Chain
 
-`QueryFast()` in `internal/claude/daemon.go` already implements the first two levels:
+**Tier 0 scope:** Single-turn analysis via claid's `AnalyzeStepOutput` RPC. FR-33 follow-up conversation (multi-turn `Converse()`) is deferred to Tier 1. Tier 0 is single-turn only.
+
+The CLI sends step analysis requests to claid via the `AnalyzeStepOutput` RPC (D22). claid internally calls `QueryFast()` in `internal/claude/daemon.go`, which implements the fallback chain:
 
 1. **Claude daemon** (preferred): warm session via `QueryViaDaemon()`, fast response, Unix socket IPC
 2. **claude CLI**: one-shot `claude --print` via `QueryWithContext()` in `internal/claude/claude.go`
 3. **API provider**: direct Anthropic/OpenAI API call via `internal/provider/` (Tier 1)
 
-If all backends fail, treat the analysis as `needs_human` (FR-24).
+If all backends fail, claid returns `needs_human` as the decision (FR-24). The CLI never calls `QueryFast()` directly during workflow execution — all LLM traffic routes through claid for centralized logging and future rate limiting.
 
 ### 10.5 Structured Response Parsing
 
@@ -1631,14 +1732,18 @@ func (r *Runner) queryLLMWithResilience(ctx context.Context, prompt string) (str
 }
 
 // isTransientError returns true for errors that may succeed on retry.
+// Uses typed error checks to avoid false positives from string matching (M7).
 func isTransientError(err error) bool {
     if errors.Is(err, context.DeadlineExceeded) {
         return true
     }
-    // Connection refused, reset, or timeout errors
+    if errors.Is(err, syscall.ECONNRESET) || errors.Is(err, syscall.ECONNREFUSED) {
+        return true
+    }
+    // Network timeout errors (typed check, not string matching)
     var netErr net.Error
-    if errors.As(err, &netErr) {
-        return netErr.Timeout() || !netErr.Temporary()
+    if errors.As(err, &netErr) && netErr.Timeout() {
+        return true
     }
     return false
 }
@@ -1990,8 +2095,8 @@ CreateWorkflowStep(ctx context.Context, step *WorkflowStep) error
 UpdateWorkflowStep(ctx context.Context, runID string, stepID string, matrixKey string, update WorkflowStepUpdate) error
 GetWorkflowSteps(ctx context.Context, runID string) ([]WorkflowStep, error)
 
-// Workflow Analyses
-CreateWorkflowAnalysis(ctx context.Context, a *WorkflowAnalysis) error
+// Workflow Analyses (used by AnalyzeStepOutput handler, D22)
+RecordWorkflowAnalysis(ctx context.Context, runID string, stepID string, matrixKey string, record WorkflowAnalysisRecord) error
 GetWorkflowAnalyses(ctx context.Context, runID string) ([]WorkflowAnalysis, error)
 
 // Retention
@@ -1999,6 +2104,8 @@ PruneWorkflowRuns(ctx context.Context, maxPerWorkflow int) (int64, error)
 ```
 
 **Note (P0-4):** `UpdateWorkflowStep` uses the composite key `(runID, stepID, matrixKey)` to identify a step row instead of an `int64` row ID. This matches the gRPC handler which receives `run_id`, `step_id`, and `matrix_key` as string fields from the RPC request. The unique index `idx_wf_steps_composite` guarantees this triple is unique.
+
+**Note (C4):** These workflow store methods are **additive** — they extend the existing `storage.Store` interface without modifying any existing method signatures. Existing mocks and test implementations only need stub implementations for the new methods. No migration of existing data or breaking changes to the current store interface.
 
 ### 12.5 Log File Layout
 
@@ -2114,23 +2221,24 @@ message WorkflowStepUpdateResponse {
   bool ok = 1;
 }
 
-// --- Workflow Analysis Messages ---
+// --- LLM Analysis via claid (D22) ---
+// Replaces the former WorkflowAnalysis persistence-only RPC.
+// The CLI sends analysis requests to claid, which internally calls QueryFast()
+// to get the LLM decision, persists the result in SQLite, and returns the decision.
 
-message WorkflowAnalysisRequest {
+message AnalyzeStepOutputRequest {
   string run_id = 1;
   string step_id = 2;
   string matrix_key = 3;
   string analysis_prompt = 4;
-  string output_sent_masked = 5;
-  string decision = 6;
-  string reasoning = 7;
-  string flags_json = 8;
-  string transcript_json = 9;
-  string human_decision = 10;
+  string scrubbed_output = 5;    // step output with secrets masked, ≤4KB tail
 }
 
-message WorkflowAnalysisResponse {
-  bool ok = 1;
+message AnalyzeStepOutputResponse {
+  string decision = 1;           // "proceed", "halt", "needs_human"
+  string reasoning = 2;
+  string flags_json = 3;         // JSON array of FlaggedItem
+  int64 latency_ms = 4;          // LLM query latency for monitoring
 }
 
 // --- Workflow Status / Control ---
@@ -2199,7 +2307,7 @@ service ClaiService {
   rpc WorkflowRunStart(WorkflowRunStartRequest) returns (WorkflowRunStartResponse);
   rpc WorkflowRunEnd(WorkflowRunEndRequest) returns (WorkflowRunEndResponse);
   rpc WorkflowStepUpdate(WorkflowStepUpdateRequest) returns (WorkflowStepUpdateResponse);
-  rpc WorkflowAnalysis(WorkflowAnalysisRequest) returns (WorkflowAnalysisResponse);
+  rpc AnalyzeStepOutput(AnalyzeStepOutputRequest) returns (AnalyzeStepOutputResponse);  // LLM pass-through (D22)
 
   // Workflow control
   rpc WorkflowStatus(WorkflowStatusRequest) returns (WorkflowStatusResponse);
@@ -2235,11 +2343,62 @@ func (s *Server) handleWorkflowStepUpdate(ctx context.Context, req *pb.WorkflowS
 
 Note: The handler now passes `req.RunId`, `req.StepId`, and `req.MatrixKey` to the store, matching the composite key signature from §12.4. The v2 handler only passed `req.StepId` as a single identifier, which created a type mismatch between the gRPC string IDs and the store's int64 auto-increment key. The composite key model eliminates this mismatch entirely.
 
+### 13.4 LLM Analysis Handler (D22)
+
+The `AnalyzeStepOutput` handler is the LLM pass-through endpoint. The CLI sends analysis requests to claid, which internally calls `QueryFast()`, parses the response, persists the analysis record, and returns the structured decision:
+
+```go
+func (s *Server) handleAnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutputRequest) (*pb.AnalyzeStepOutputResponse, error) {
+    s.touchActivity()
+
+    // 1. Build the analysis prompt from the request
+    prompt := buildAnalysisPrompt(req.AnalysisPrompt, req.ScrubbedOutput)
+
+    // 2. Call QueryFast() — Claude daemon → CLI fallback
+    start := time.Now()
+    raw, err := claude.QueryFast(ctx, prompt)
+    latency := time.Since(start)
+
+    var resp *AnalysisResponse
+    if err != nil {
+        // LLM unavailable → needs_human (FR-24)
+        resp = &AnalysisResponse{Decision: "needs_human", Reasoning: fmt.Sprintf("LLM query failed: %v", err)}
+    } else {
+        resp = parseAnalysisResponse(raw)
+    }
+
+    // 3. Persist the analysis record in SQLite
+    _ = s.store.RecordWorkflowAnalysis(ctx, req.RunId, req.StepId, req.MatrixKey, WorkflowAnalysisRecord{
+        Prompt:    req.AnalysisPrompt,
+        Output:    req.ScrubbedOutput,
+        Decision:  resp.Decision,
+        Reasoning: resp.Reasoning,
+        LatencyMs: latency.Milliseconds(),
+    })
+
+    // 4. Return the decision to the CLI
+    return &pb.AnalyzeStepOutputResponse{
+        Decision:  resp.Decision,
+        Reasoning: resp.Reasoning,
+        FlagsJson: marshalFlags(resp.Flags),
+        LatencyMs: latency.Milliseconds(),
+    }, nil
+}
+```
+
+This merges the former `WorkflowAnalysis` persistence-only RPC with the actual LLM query into a single operation. Benefits:
+- **Centralized logging:** All LLM prompts, responses, and latencies recorded in SQLite
+- **Unified error handling:** claid handles Claude daemon availability (fallback chain) in one place
+- **Future rate limiting (Tier 1):** claid can enforce per-workflow or global LLM rate limits
+- **Smaller CLI surface:** CLI does not need to import `internal/claude` for workflow execution
+
 ---
 
 ## 14. Configuration
 
 ### 14.1 New Config Section
+
+The `WorkflowsConfig` struct is embedded in the existing `Config` struct from `internal/config/config.go`. It is deserialized from the `workflows:` key in `~/.clai/config.yaml`. No new config file is introduced.
 
 ```go
 type WorkflowsConfig struct {
@@ -2380,6 +2539,8 @@ If `analyze: true` is used in any step, `claude` is automatically added to the i
 ## 17. Concurrency Design (Tier 1)
 
 ### 17.1 Parallel Matrix Execution
+
+**Matrix key canonical format (M9):** Matrix keys are constructed by sorting the include entry's keys alphabetically and joining as `key=value` pairs separated by `,`. Example: an entry `{os: linux, arch: amd64}` produces the canonical key `arch=amd64,os=linux`. This key is used in the composite store key `(runID, stepID, matrixKey)`, in RunArtifact events, and in gRPC messages. Canonical ordering ensures deterministic keys regardless of YAML source ordering.
 
 The context cancellation is created in the outer scope so that goroutines can trigger cancellation when `fail_fast` is enabled (P1-3). The `cancel()` call is deferred until after `wg.Wait()` to ensure that when `FailFast=false`, the context remains live for all goroutines until they all complete (AR-B):
 
@@ -2735,7 +2896,7 @@ internal/workflow/
   process_windows.go     # Windows ProcessController (//go:build windows)
   runner.go              # Main orchestration loop
   runner_test.go
-  llm.go                 # LLM integration (uses claude daemon via QueryFast, fallback)
+  llm.go                 # LLM integration (sends AnalyzeStepOutput RPC to claid, D22)
   llm_test.go
   review.go              # InteractionHandler implementations
   review_test.go
@@ -2885,7 +3046,7 @@ Each file in `internal/workflow/` has a corresponding `_test.go` file. Key cover
 - End-to-end workflow run with `echo` commands (no LLM)
 - Matrix expansion with 3 entries
 - Step output passing (`$CLAI_OUTPUT` → expression resolution)
-- LLM analysis with mock claude daemon (pre-recorded responses via test socket)
+- LLM analysis via mock claid AnalyzeStepOutput handler (pre-recorded responses via test gRPC server)
 - Human review with simulated stdin
 - Non-interactive mode (verify exit codes)
 - Daemon state persistence (verify SQLite rows after run)
@@ -3006,11 +3167,11 @@ func (s *ScriptedInteractionHandler) Review(ctx context.Context, step *StepDef, 
 - [ ] Shell mode works when `shell: true` is set
 - [ ] Step outputs exported via `$CLAI_OUTPUT` resolve in downstream `${{ }}` expressions
 - [ ] Unresolved expressions produce hard error (not passed to subprocess)
-- [ ] `analyze: true` steps send output to Claude daemon via `QueryFast()` and receive structured response
+- [ ] `analyze: true` steps send output to claid via `AnalyzeStepOutput` RPC (D22); claid calls `QueryFast()` internally
 - [ ] LLM unparseable response → `needs_human` → follows risk matrix (FR-24, P0-2)
 - [ ] Risk level decision matrix correctly determines when to prompt human
 - [ ] Human review interface presents approve/reject/inspect/command/question options
-- [ ] Follow-up LLM conversation preserves context
+- [ ] Follow-up LLM conversation preserves context (Tier 1 — single-turn only in Tier 0)
 - [ ] Step failure halts remaining steps in the matrix entry
 - [ ] Workflow run state persisted in SQLite via daemon gRPC
 - [ ] RunArtifact (JSONL) written for every run
@@ -3026,6 +3187,14 @@ func (s *ScriptedInteractionHandler) Review(ctx context.Context, step *StepDef, 
 - [ ] `clai workflow validate` checks YAML without executing
 - [ ] Strict YAML parsing rejects unknown fields
 - [ ] Output parser validates key names and handles malformed files
+- [ ] `limitedBuffer` is thread-safe (sync.Mutex) for concurrent stdout/stderr writes (M8)
+- [ ] `isTransientError` uses typed error checks (no string matching) (M7)
+- [ ] Matrix keys use canonical format: alphabetical, comma-separated `key=value` pairs (M9)
+- [ ] LLM analysis latency logged in SQLite via `AnalyzeStepOutput` handler (D22)
+
+### 24.3 Effort Estimate
+
+Full Tier 0 implementation: **6–8 weeks** (3–4 weeks for core engine through LLM integration; remaining weeks for state persistence, CLI polish, and testing). See §3.8 for build sequence.
 
 ### 24.2 Tier 1
 
@@ -3127,7 +3296,7 @@ For workflow users:
 | D3 | Output routing | (a) All through daemon (b) CLI captures, sends tails | **(b)** | Avoids routing large output through gRPC. |
 | D4 | YAML syntax | (a) Dagu-style (b) GHA-style (c) Custom | **(b)** | GHA is widely known. Matrix strategy from GHA/act is essential for multi-target use cases. |
 | D5 | Expression syntax | (a) `${VAR}` dagu-style (b) `${{ }}` GHA-style | **(b)** | GHA-style is unambiguous (no conflict with shell `$VAR`). Evaluated Go-side. |
-| D6 | LLM backend | (a) API only (b) daemon only (c) daemon + fallback | **(c)** | Existing `QueryFast()` provides daemon for speed, CLI fallback for availability. |
+| D6 | LLM backend | (a) API only (b) daemon only (c) daemon + fallback | **(c)** | Existing `QueryFast()` provides daemon for speed, CLI fallback for availability. Routed through claid for centralized logging (D22). |
 | D7 | Tier 0 scope | (a) Full DAG (b) Sequential only | **(b)** | Sequential sufficient for Pulumi use case. DAG in Tier 1. |
 | D8 | Command execution | (a) Shell by default (b) Argv by default, shell opt-in | **(b)** | Argv eliminates command injection. Shell opt-in for pipes/redirects. |
 | D9 | Stop signals | (a) Polling (500ms) (b) Push (streaming RPC) | **(b)** | Reduces overhead and race windows. Streaming RPC is natural fit. |
@@ -3143,3 +3312,4 @@ For workflow users:
 | D19 | Path normalization | (a) OS-native paths in JSON (b) Forward-slash normalized | **(b)** | Windows backslashes require double-escaping in JSON. Forward slashes work universally and simplify downstream parsing. (AR-A) |
 | D20 | Truncation safety | (a) Byte slicing (b) Rune-aware truncation | **(b)** | Byte slicing can break multi-byte UTF-8 characters, causing `json.Marshal` errors or LLM confusion. (AR-C) |
 | D21 | Stdin workflow input | (a) File-only input (b) Support `-` for stdin | **(b)** | Enables dynamic workflow generation via pipes. Resume not supported for stdin sources. (MR-A) |
+| D22 | LLM analysis routing | (a) CLI calls QueryFast() directly (b) CLI sends AnalyzeStepOutput RPC to claid | **(b)** | Centralized logging: all LLM prompts/responses recorded in SQLite. Unified control plane. Future rate limiting. (Pre-mortem C1, D22) |
