@@ -101,9 +101,38 @@ func run(args []string) int {
 	defer releaseLock(lockFd)
 
 	// Step 6: Parse subcommand and flags.
-	if len(args) == 0 {
-		printUsage()
+	cmd, opts, exitCode, showUsage, parseErr := parseRunInputs(args)
+	if parseErr != nil {
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, parseErr)
+		if showUsage {
+			printUsage()
+		}
 		return exitFallback
+	}
+	if exitCode != 0 {
+		if showUsage {
+			printUsage()
+		}
+		return exitCode
+	}
+
+	// Step 7: Load config.
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "clai-picker: failed to load config: %v\n", err)
+		return exitFallback
+	}
+
+	// Apply config defaults for flags that weren't explicitly set.
+	applyRunDefaults(cmd, cfg, opts)
+
+	// Step 8: Dispatch to backend.
+	return dispatchRunCommand(cmd, cfg, opts)
+}
+
+func parseRunInputs(args []string) (subcommand, *pickerOpts, int, bool, error) {
+	if len(args) == 0 {
+		return cmdUnknown, nil, exitFallback, true, nil
 	}
 
 	var cmd subcommand
@@ -114,14 +143,12 @@ func run(args []string) int {
 		cmd = cmdSuggest
 	case "--help", "-h":
 		printUsage()
-		return exitSuccess
+		return cmdUnknown, nil, exitSuccess, false, nil
 	case "--version", "-v":
 		printVersion()
-		return exitSuccess
+		return cmdUnknown, nil, exitSuccess, false, nil
 	default:
-		fmt.Fprintf(os.Stderr, "clai-picker: unknown command %q\n", args[0])
-		printUsage()
-		return exitFallback
+		return cmdUnknown, nil, exitFallback, true, fmt.Errorf("unknown command %q", args[0])
 	}
 
 	var (
@@ -134,22 +161,16 @@ func run(args []string) int {
 	case cmdSuggest:
 		opts, parseErr = parseSuggestFlags(args[1:])
 	default:
-		cmd = cmdUnknown
 		parseErr = fmt.Errorf("unknown command %q", args[0])
 	}
 	if parseErr != nil {
-		fmt.Fprintf(os.Stderr, pickerErrorFmt, parseErr)
-		return exitFallback
+		return cmd, nil, exitFallback, false, parseErr
 	}
 
-	// Step 7: Load config.
-	cfg, err := config.Load()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: failed to load config: %v\n", err)
-		return exitFallback
-	}
+	return cmd, opts, 0, false, nil
+}
 
-	// Apply config defaults for flags that weren't explicitly set.
+func applyRunDefaults(cmd subcommand, cfg *config.Config, opts *pickerOpts) {
 	switch cmd {
 	case cmdHistory:
 		if opts.limit == 0 {
@@ -167,8 +188,9 @@ func run(args []string) int {
 			opts.limit = cfg.Suggestions.MaxResults
 		}
 	}
+}
 
-	// Step 8: Dispatch to backend.
+func dispatchRunCommand(cmd subcommand, cfg *config.Config, opts *pickerOpts) int {
 	switch cmd {
 	case cmdHistory:
 		return dispatchHistory(cfg, opts)
@@ -327,39 +349,47 @@ func dispatchBackend(backend string, cfg *config.Config, opts *pickerOpts) int {
 // If opts.tabs is empty, all configured tabs are returned.
 // Variable substitution is performed on tab Args values.
 func resolveTabs(cfg *config.Config, opts *pickerOpts) []config.TabDef {
-	var srcTabs []config.TabDef
-	if opts.tabs == "" {
-		srcTabs = cfg.History.PickerTabs
-	} else {
-		ids := strings.Split(opts.tabs, ",")
-		idSet := make(map[string]bool, len(ids))
-		for _, id := range ids {
-			idSet[strings.TrimSpace(id)] = true
-		}
-		for _, t := range cfg.History.PickerTabs {
-			if idSet[t.ID] {
-				srcTabs = append(srcTabs, t)
-			}
-		}
-		// If no matches, return all configured tabs as fallback.
-		if len(srcTabs) == 0 {
-			srcTabs = cfg.History.PickerTabs
-		}
+	srcTabs := selectConfiguredTabs(cfg.History.PickerTabs, opts.tabs)
+	return substituteTabArgs(srcTabs, opts.session)
+}
+
+func selectConfiguredTabs(allTabs []config.TabDef, tabsArg string) []config.TabDef {
+	if tabsArg == "" {
+		return allTabs
 	}
 
-	// Substitute variables in tab Args.
+	ids := strings.Split(tabsArg, ",")
+	idSet := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		idSet[strings.TrimSpace(id)] = true
+	}
+
+	var selected []config.TabDef
+	for _, t := range allTabs {
+		if idSet[t.ID] {
+			selected = append(selected, t)
+		}
+	}
+	if len(selected) == 0 {
+		return allTabs
+	}
+	return selected
+}
+
+func substituteTabArgs(srcTabs []config.TabDef, session string) []config.TabDef {
 	tabs := make([]config.TabDef, len(srcTabs))
 	for i, t := range srcTabs {
 		tabs[i] = t
-		if len(t.Args) > 0 {
-			tabs[i].Args = make(map[string]string, len(t.Args))
-			for k, v := range t.Args {
-				// Replace $CLAI_SESSION_ID with the actual session ID.
-				if v == "$CLAI_SESSION_ID" && opts.session != "" {
-					v = opts.session
-				}
-				tabs[i].Args[k] = v
+		if len(t.Args) == 0 {
+			continue
+		}
+
+		tabs[i].Args = make(map[string]string, len(t.Args))
+		for k, v := range t.Args {
+			if v == "$CLAI_SESSION_ID" && session != "" {
+				v = session
 			}
+			tabs[i].Args[k] = v
 		}
 	}
 	return tabs

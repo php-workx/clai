@@ -101,39 +101,12 @@ func tailLogs(filename string, n int) error {
 	remainder := "" // Carry partial line fragment between chunks
 
 	for len(lines) < n && offset > 0 {
-		// Calculate read position
-		readSize := bufSize
-		if offset < bufSize {
-			readSize = offset
+		var chunkLines []string
+		offset, chunkLines, remainder, err = readTailChunk(f, offset, bufSize, remainder)
+		if err != nil {
+			return err
 		}
-		offset -= readSize
-
-		// Read chunk
-		buf := make([]byte, readSize)
-		_, err := f.ReadAt(buf, offset)
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("failed to read log file: %w", err)
-		}
-
-		// Parse lines from chunk (in reverse order)
-		// Prepend remainder from previous chunk to handle lines spanning chunks
-		chunk := string(buf) + remainder
-		chunkLines := splitLines(chunk)
-
-		// The first element may be a partial line if we're not at file start
-		if offset > 0 && len(chunkLines) > 0 {
-			remainder = chunkLines[0]
-			chunkLines = chunkLines[1:]
-		} else {
-			remainder = ""
-		}
-
-		// Prepend lines
-		for i := len(chunkLines) - 1; i >= 0 && len(lines) < n; i-- {
-			if chunkLines[i] != "" || len(lines) > 0 {
-				lines = append([]string{chunkLines[i]}, lines...)
-			}
-		}
+		lines = prependChunkLines(lines, chunkLines, n)
 	}
 
 	// Include remainder if we have room and it's not empty
@@ -147,6 +120,37 @@ func tailLogs(filename string, n int) error {
 	}
 
 	return nil
+}
+
+func readTailChunk(f *os.File, offset, bufSize int64, remainder string) (int64, []string, string, error) {
+	readSize := bufSize
+	if offset < bufSize {
+		readSize = offset
+	}
+	offset -= readSize
+
+	buf := make([]byte, readSize)
+	_, err := f.ReadAt(buf, offset)
+	if err != nil && err != io.EOF {
+		return offset, nil, remainder, fmt.Errorf("failed to read log file: %w", err)
+	}
+
+	chunk := string(buf) + remainder
+	chunkLines := splitLines(chunk)
+
+	if offset > 0 && len(chunkLines) > 0 {
+		return offset, chunkLines[1:], chunkLines[0], nil
+	}
+	return offset, chunkLines, "", nil
+}
+
+func prependChunkLines(lines, chunkLines []string, n int) []string {
+	for i := len(chunkLines) - 1; i >= 0 && len(lines) < n; i-- {
+		if chunkLines[i] != "" || len(lines) > 0 {
+			lines = append([]string{chunkLines[i]}, lines...)
+		}
+	}
+	return lines
 }
 
 func splitLines(s string) []string {

@@ -76,69 +76,39 @@ func runIngest(args []string) int {
 func readIngestEnv(cfg *ingestConfig) (*event.CommandEvent, error) {
 	ev := event.NewCommandEvent()
 
-	// Read command string
-	var cmdRaw string
-	if cfg.cmdStdin {
-		// Read command from stdin
-		scanner := bufio.NewScanner(os.Stdin)
-		var lines []string
-		for scanner.Scan() {
-			lines = append(lines, scanner.Text())
-		}
-		if err := scanner.Err(); err != nil {
-			return nil, fmt.Errorf("failed to read command from stdin: %w", err)
-		}
-		cmdRaw = strings.Join(lines, "\n")
-	} else {
-		cmdRaw = os.Getenv("CLAI_CMD")
-		if cmdRaw == "" {
-			return nil, fmt.Errorf("CLAI_CMD is required (or use --cmd-stdin)")
-		}
+	cmdRaw, err := readCommandRaw(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	// Perform lossy UTF-8 conversion (spec requirement 6.3)
 	ev.CmdRaw = toValidUTF8(cmdRaw)
 
-	// Read required fields
-	cwd := os.Getenv("CLAI_CWD")
-	if cwd == "" {
-		return nil, fmt.Errorf("CLAI_CWD is required")
+	cwd, err := readRequiredEnv("CLAI_CWD")
+	if err != nil {
+		return nil, err
 	}
+	exitCode, err := readRequiredInt("CLAI_EXIT")
+	if err != nil {
+		return nil, err
+	}
+	ts, err := readRequiredInt64("CLAI_TS")
+	if err != nil {
+		return nil, err
+	}
+	shell, err := readRequiredShell()
+	if err != nil {
+		return nil, err
+	}
+	sessionID, err := readRequiredEnv("CLAI_SESSION_ID")
+	if err != nil {
+		return nil, err
+	}
+
 	ev.Cwd = cwd
-
-	exitStr := os.Getenv("CLAI_EXIT")
-	if exitStr == "" {
-		return nil, fmt.Errorf("CLAI_EXIT is required")
-	}
-	exitCode, err := strconv.Atoi(exitStr)
-	if err != nil {
-		return nil, fmt.Errorf("CLAI_EXIT must be an integer: %w", err)
-	}
 	ev.ExitCode = exitCode
-
-	tsStr := os.Getenv("CLAI_TS")
-	if tsStr == "" {
-		return nil, fmt.Errorf("CLAI_TS is required")
-	}
-	ts, err := strconv.ParseInt(tsStr, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("CLAI_TS must be an integer: %w", err)
-	}
 	ev.Ts = ts
-
-	shell := os.Getenv("CLAI_SHELL")
-	if shell == "" {
-		return nil, fmt.Errorf("CLAI_SHELL is required")
-	}
-	if !event.ValidShell(shell) {
-		return nil, fmt.Errorf("CLAI_SHELL must be one of: bash, zsh, fish")
-	}
-	ev.Shell = event.Shell(shell)
-
-	sessionID := os.Getenv("CLAI_SESSION_ID")
-	if sessionID == "" {
-		return nil, fmt.Errorf("CLAI_SESSION_ID is required")
-	}
+	ev.Shell = shell
 	ev.SessionID = sessionID
 
 	// Read optional fields
@@ -155,6 +125,69 @@ func readIngestEnv(cfg *ingestConfig) (*event.CommandEvent, error) {
 	}
 
 	return ev, nil
+}
+
+func readCommandRaw(cfg *ingestConfig) (string, error) {
+	if !cfg.cmdStdin {
+		cmdRaw := os.Getenv("CLAI_CMD")
+		if cmdRaw == "" {
+			return "", fmt.Errorf("CLAI_CMD is required (or use --cmd-stdin)")
+		}
+		return cmdRaw, nil
+	}
+
+	scanner := bufio.NewScanner(os.Stdin)
+	var lines []string
+	for scanner.Scan() {
+		lines = append(lines, scanner.Text())
+	}
+	if err := scanner.Err(); err != nil {
+		return "", fmt.Errorf("failed to read command from stdin: %w", err)
+	}
+	return strings.Join(lines, "\n"), nil
+}
+
+func readRequiredEnv(name string) (string, error) {
+	v := os.Getenv(name)
+	if v == "" {
+		return "", fmt.Errorf("%s is required", name)
+	}
+	return v, nil
+}
+
+func readRequiredInt(name string) (int, error) {
+	v, err := readRequiredEnv(name)
+	if err != nil {
+		return 0, err
+	}
+	parsed, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an integer: %w", name, err)
+	}
+	return parsed, nil
+}
+
+func readRequiredInt64(name string) (int64, error) {
+	v, err := readRequiredEnv(name)
+	if err != nil {
+		return 0, err
+	}
+	parsed, err := strconv.ParseInt(v, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an integer: %w", name, err)
+	}
+	return parsed, nil
+}
+
+func readRequiredShell() (event.Shell, error) {
+	v, err := readRequiredEnv("CLAI_SHELL")
+	if err != nil {
+		return "", err
+	}
+	if !event.ValidShell(v) {
+		return "", fmt.Errorf("CLAI_SHELL must be one of: bash, zsh, fish")
+	}
+	return event.Shell(v), nil
 }
 
 // toValidUTF8 performs lossy UTF-8 conversion by replacing invalid bytes
