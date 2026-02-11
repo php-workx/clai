@@ -15,6 +15,7 @@ import (
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
 	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/feedback"
 )
 
 // mockStore implements storage.Store for testing.
@@ -22,6 +23,27 @@ type mockStore struct {
 	sessions map[string]*storage.Session
 	commands map[string]*storage.Command
 	cache    map[string]*storage.CacheEntry
+}
+
+type importStatusStore struct {
+	*mockStore
+	has       bool
+	hasErr    error
+	importErr error
+}
+
+func (m *importStatusStore) HasImportedHistory(ctx context.Context, shell string) (bool, error) {
+	if m.hasErr != nil {
+		return false, m.hasErr
+	}
+	return m.has, nil
+}
+
+func (m *importStatusStore) ImportHistory(ctx context.Context, entries []history.ImportEntry, shell string) (int, error) {
+	if m.importErr != nil {
+		return 0, m.importErr
+	}
+	return len(entries), nil
 }
 
 func newMockStore() *mockStore {
@@ -405,6 +427,260 @@ func TestHandler_CommandEnded_Success(t *testing.T) {
 	if server.getCommandsLogged() != 1 {
 		t.Errorf("expected commands logged to be 1, got %d", server.getCommandsLogged())
 	}
+}
+
+func newFeedbackStoreWithDB(t *testing.T) (*feedback.Store, func()) {
+	t.Helper()
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "feedback_test.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open feedback db: %v", err)
+	}
+	store := feedback.NewStore(v2db.DB(), feedback.DefaultConfig(), nil)
+	cleanup := func() {
+		_ = v2db.Close()
+	}
+	return store, cleanup
+}
+
+func TestHandler_RecordFeedback_NoStoreConfigured(t *testing.T) {
+	t.Parallel()
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	resp, err := server.RecordFeedback(ctx, &pb.RecordFeedbackRequest{
+		SessionId:     "sess-1",
+		SuggestedText: "make test",
+		Action:        "accepted",
+	})
+	if err != nil {
+		t.Fatalf("RecordFeedback failed: %v", err)
+	}
+	if resp.Ok {
+		t.Fatal("expected response.Ok=false without feedback store")
+	}
+	if resp.Error == nil || resp.Error.Code != "E_NO_FEEDBACK_STORE" {
+		t.Fatalf("expected E_NO_FEEDBACK_STORE, got %+v", resp.Error)
+	}
+}
+
+func TestHandler_RecordFeedback_ValidationAndSuccess(t *testing.T) {
+	store := newMockStore()
+	feedbackStore, cleanup := newFeedbackStoreWithDB(t)
+	defer cleanup()
+
+	server, err := NewServer(&ServerConfig{
+		Store:         store,
+		Ranker:        &mockRanker{},
+		FeedbackStore: feedbackStore,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	cases := []struct {
+		name    string
+		req     *pb.RecordFeedbackRequest
+		wantMsg string
+	}{
+		{
+			name: "missing session",
+			req: &pb.RecordFeedbackRequest{
+				SuggestedText: "git status",
+				Action:        "accepted",
+			},
+			wantMsg: "session_id is required",
+		},
+		{
+			name: "missing suggested text",
+			req: &pb.RecordFeedbackRequest{
+				SessionId: "sess-1",
+				Action:    "accepted",
+			},
+			wantMsg: "suggested_text is required",
+		},
+		{
+			name: "missing action",
+			req: &pb.RecordFeedbackRequest{
+				SessionId:     "sess-1",
+				SuggestedText: "git status",
+			},
+			wantMsg: "action is required",
+		},
+	}
+	for _, tc := range cases {
+		resp, err := server.RecordFeedback(ctx, tc.req)
+		if err != nil {
+			t.Fatalf("%s: RecordFeedback returned error: %v", tc.name, err)
+		}
+		if resp.Ok {
+			t.Fatalf("%s: expected response.Ok=false", tc.name)
+		}
+		if resp.Error == nil || resp.Error.Code != "E_INVALID_REQUEST" || !strings.Contains(resp.Error.Message, tc.wantMsg) {
+			t.Fatalf("%s: expected validation error %q, got %+v", tc.name, tc.wantMsg, resp.Error)
+		}
+	}
+
+	successReq := &pb.RecordFeedbackRequest{
+		SessionId:     "sess-success",
+		SuggestedText: "git status",
+		Action:        "accepted",
+		ExecutedText:  "git status",
+		Prefix:        "git st",
+		LatencyMs:     42,
+	}
+	resp, err := server.RecordFeedback(ctx, successReq)
+	if err != nil {
+		t.Fatalf("success RecordFeedback error: %v", err)
+	}
+	if !resp.Ok {
+		t.Fatalf("expected success response, got %+v", resp.Error)
+	}
+
+	aliasResp, err := server.SuggestFeedback(ctx, &pb.RecordFeedbackRequest{
+		SessionId:     "sess-success",
+		SuggestedText: "git diff",
+		Action:        "dismissed",
+	})
+	if err != nil {
+		t.Fatalf("SuggestFeedback error: %v", err)
+	}
+	if !aliasResp.Ok {
+		t.Fatalf("expected alias success response, got %+v", aliasResp.Error)
+	}
+
+	recs, err := feedbackStore.QueryFeedback(ctx, "sess-success", 10)
+	if err != nil {
+		t.Fatalf("QueryFeedback failed: %v", err)
+	}
+	if len(recs) != 2 {
+		t.Fatalf("expected 2 feedback records, got %d", len(recs))
+	}
+}
+
+func TestHandler_RecordFeedback_StoreError(t *testing.T) {
+	store := newMockStore()
+	feedbackStore, cleanup := newFeedbackStoreWithDB(t)
+	cleanup()
+
+	server, err := NewServer(&ServerConfig{
+		Store:         store,
+		Ranker:        &mockRanker{},
+		FeedbackStore: feedbackStore,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	resp, err := server.RecordFeedback(context.Background(), &pb.RecordFeedbackRequest{
+		SessionId:     "sess-err",
+		SuggestedText: "npm test",
+		Action:        "accepted",
+	})
+	if err != nil {
+		t.Fatalf("RecordFeedback returned error: %v", err)
+	}
+	if resp.Ok {
+		t.Fatal("expected Ok=false when feedback store write fails")
+	}
+	if resp.Error == nil || resp.Error.Code != "E_STORE_ERROR" {
+		t.Fatalf("expected E_STORE_ERROR, got %+v", resp.Error)
+	}
+}
+
+func TestImportHistory_EdgeCases(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("if_not_exists_skip", func(t *testing.T) {
+		store := &importStatusStore{mockStore: newMockStore(), has: true}
+		server, err := NewServer(&ServerConfig{Store: store, Ranker: &mockRanker{}})
+		if err != nil {
+			t.Fatalf("NewServer failed: %v", err)
+		}
+
+		resp, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{
+			Shell:       "bash",
+			IfNotExists: true,
+		})
+		if err != nil {
+			t.Fatalf("ImportHistory failed: %v", err)
+		}
+		if !resp.Skipped {
+			t.Fatalf("expected import to be skipped: %+v", resp)
+		}
+	})
+
+	t.Run("if_not_exists_status_error", func(t *testing.T) {
+		store := &importStatusStore{mockStore: newMockStore(), hasErr: fmt.Errorf("boom")}
+		server, err := NewServer(&ServerConfig{Store: store, Ranker: &mockRanker{}})
+		if err != nil {
+			t.Fatalf("NewServer failed: %v", err)
+		}
+
+		if _, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{Shell: "bash", IfNotExists: true}); err == nil {
+			t.Fatal("expected HasImportedHistory error")
+		}
+	})
+
+	t.Run("unsupported_shell", func(t *testing.T) {
+		server := createTestServer(t)
+		resp, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{Shell: "pwsh"})
+		if err != nil {
+			t.Fatalf("ImportHistory failed: %v", err)
+		}
+		if !strings.Contains(resp.Error, "unsupported shell") {
+			t.Fatalf("expected unsupported shell response, got %+v", resp)
+		}
+	})
+
+	t.Run("auto_detect_failure", func(t *testing.T) {
+		server := createTestServer(t)
+		t.Setenv("SHELL", "")
+		resp, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{Shell: "auto"})
+		if err != nil {
+			t.Fatalf("ImportHistory failed: %v", err)
+		}
+		if !strings.Contains(resp.Error, "could not detect shell type") {
+			t.Fatalf("expected detect shell failure, got %+v", resp)
+		}
+	})
+
+	t.Run("read_error", func(t *testing.T) {
+		server := createTestServer(t)
+		if _, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{
+			Shell:       "bash",
+			HistoryPath: t.TempDir(),
+		}); err == nil {
+			t.Fatal("expected read error for directory history path")
+		}
+	})
+
+	t.Run("store_import_error", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		histPath := filepath.Join(tmpDir, "bash_history")
+		if err := writeTestFile(histPath, "#1700000000\ngit status\n"); err != nil {
+			t.Fatalf("failed writing history file: %v", err)
+		}
+
+		store := &importStatusStore{mockStore: newMockStore(), importErr: fmt.Errorf("import failed")}
+		server, err := NewServer(&ServerConfig{Store: store, Ranker: &mockRanker{}})
+		if err != nil {
+			t.Fatalf("NewServer failed: %v", err)
+		}
+
+		if _, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{
+			Shell:       "bash",
+			HistoryPath: histPath,
+		}); err == nil {
+			t.Fatal("expected ImportHistory store error")
+		}
+	})
 }
 
 func TestHandler_Suggest_ReturnsHistorySuggestions(t *testing.T) {

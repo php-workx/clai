@@ -23,6 +23,36 @@ var (
 	BuildDate = "unknown"
 )
 
+var (
+	checkTTYFn       = checkTTY
+	checkTERMFn      = checkTERM
+	checkTermWidthFn = checkTermWidth
+	mkdirAllFn       = os.MkdirAll
+	defaultPathsFn   = config.DefaultPaths
+	acquireLockFn    = acquireLock
+	releaseLockFn    = releaseLock
+	loadConfigFn     = config.Load
+
+	dispatchHistoryFn = dispatchHistory
+	dispatchSuggestFn = dispatchSuggest
+	dispatchBuiltinFn = dispatchBuiltin
+	dispatchFzfFn     = dispatchFzf
+	runTUIFn          = runTUI
+
+	lookPathFn = exec.LookPath
+
+	newHistoryProviderFn = func(socketPath string) picker.Provider {
+		return picker.NewHistoryProvider(socketPath)
+	}
+
+	runFzfCommandOutputFn = func(args []string, input string) ([]byte, error) {
+		cmd := exec.Command("fzf", args...)
+		cmd.Stdin = strings.NewReader(input)
+		cmd.Stderr = os.Stderr // Let fzf render its TUI on stderr/tty.
+		return cmd.Output()
+	}
+)
+
 // Exit codes.
 // These match the expectations of shell scripts:
 //
@@ -66,39 +96,39 @@ const (
 // It is separated from main() to enable testing.
 func run(args []string) int {
 	// Step 1: Check /dev/tty is openable.
-	if err := checkTTY(); err != nil {
+	if err := checkTTYFn(); err != nil {
 		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 
 	// Step 2: Check TERM != "dumb".
-	if err := checkTERM(); err != nil {
+	if err := checkTERMFn(); err != nil {
 		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 
 	// Step 3: Check terminal width >= 20 columns.
-	if err := checkTermWidth(); err != nil {
+	if err := checkTermWidthFn(); err != nil {
 		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 
 	// Step 4: Ensure cache directory exists.
-	paths := config.DefaultPaths()
+	paths := defaultPathsFn()
 	cacheDir := paths.CacheDir()
-	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+	if err := mkdirAllFn(cacheDir, 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: failed to create cache directory: %v\n", err)
 		return exitFallback
 	}
 
 	// Step 5: Acquire advisory file lock.
 	lockPath := cacheDir + "/picker.lock"
-	lockFd, err := acquireLock(lockPath)
+	lockFd, err := acquireLockFn(lockPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
-	defer releaseLock(lockFd)
+	defer releaseLockFn(lockFd)
 
 	// Step 6: Parse subcommand and flags.
 	cmd, opts, exitCode, showUsage, parseErr := parseRunInputs(args)
@@ -117,7 +147,7 @@ func run(args []string) int {
 	}
 
 	// Step 7: Load config.
-	cfg, err := config.Load()
+	cfg, err := loadConfigFn()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: failed to load config: %v\n", err)
 		return exitFallback
@@ -193,9 +223,9 @@ func applyRunDefaults(cmd subcommand, cfg *config.Config, opts *pickerOpts) {
 func dispatchRunCommand(cmd subcommand, cfg *config.Config, opts *pickerOpts) int {
 	switch cmd {
 	case cmdHistory:
-		return dispatchHistory(cfg, opts)
+		return dispatchHistoryFn(cfg, opts)
 	case cmdSuggest:
-		return dispatchSuggest(cfg, opts)
+		return dispatchSuggestFn(cfg, opts)
 	default:
 		printUsage()
 		return exitFallback
@@ -333,15 +363,15 @@ func dispatchHistory(cfg *config.Config, opts *pickerOpts) int {
 func dispatchBackend(backend string, cfg *config.Config, opts *pickerOpts) int {
 	switch backend {
 	case "fzf":
-		return dispatchFzf(cfg, opts)
+		return dispatchFzfFn(cfg, opts)
 	case "clai":
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltinFn(cfg, opts)
 	case "builtin":
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltinFn(cfg, opts)
 	default:
 		// Unknown backend, fall back to builtin.
 		debugLog("unknown backend %q, falling back to builtin", backend)
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltinFn(cfg, opts)
 	}
 }
 
@@ -444,14 +474,14 @@ func runTUI(model picker.Model) (int, string) {
 // dispatchBuiltin runs the built-in Bubble Tea TUI for history.
 func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	tabs := resolveTabs(cfg, opts)
-	provider := picker.NewHistoryProvider(socketPath(cfg))
+	provider := newHistoryProviderFn(socketPath(cfg))
 
 	model := picker.NewModel(tabs, provider).WithLayout(picker.LayoutBottomUp)
 	if opts.query != "" {
 		model = model.WithQuery(opts.query)
 	}
 
-	code, result := runTUI(model)
+	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
 			fmt.Fprintln(os.Stderr, result)
@@ -469,7 +499,7 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 func dispatchSuggest(cfg *config.Config, opts *pickerOpts) int {
 	model := newSuggestModel(cfg, opts)
 
-	code, result := runTUI(model)
+	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
 			fmt.Fprintln(os.Stderr, result)
@@ -507,10 +537,10 @@ func newSuggestModel(cfg *config.Config, opts *pickerOpts) picker.Model {
 
 // dispatchFzf checks for fzf on PATH and falls back to builtin if missing.
 func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
-	_, err := exec.LookPath("fzf")
+	_, err := lookPathFn("fzf")
 	if err != nil {
 		debugLog("fzf not found on PATH, falling back to builtin")
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltinFn(cfg, opts)
 	}
 
 	result, err := runFzfBackend(cfg, opts)
@@ -529,7 +559,7 @@ func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 
 // runFzfBackend fetches all history and pipes it through fzf.
 func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
-	provider := picker.NewHistoryProvider(socketPath(cfg))
+	provider := newHistoryProviderFn(socketPath(cfg))
 	tabs := resolveTabs(cfg, opts)
 
 	// Use the first tab for fzf (fzf doesn't support tabs).
@@ -580,11 +610,7 @@ func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
 		args = append(args, "--query", opts.query)
 	}
 
-	cmd := exec.Command("fzf", args...)
-	cmd.Stdin = strings.NewReader(strings.Join(allItems, "\n"))
-	cmd.Stderr = os.Stderr // Let fzf render its TUI on stderr/tty.
-
-	output, err := cmd.Output()
+	output, err := runFzfCommandOutputFn(args, strings.Join(allItems, "\n"))
 	if err != nil {
 		return "", err
 	}

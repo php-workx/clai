@@ -3,11 +3,15 @@ package daemon
 import (
 	"context"
 	"path/filepath"
+	"reflect"
 	"testing"
+	"unsafe"
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/suggest"
 	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/explain"
+	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
 // ============================================================================
@@ -478,6 +482,138 @@ func TestMergeResponses_EmptyInputs(t *testing.T) {
 	result = mergeResponses(&pb.SuggestResponse{}, v2, 5)
 	if len(result.Suggestions) != 1 || result.Suggestions[0].Text != "git diff" {
 		t.Error("empty V1 should return V2 unchanged")
+	}
+}
+
+func setSuggestionPrivateInt64(s *suggest2.Suggestion, field string, value int64) {
+	v := reflect.ValueOf(s).Elem().FieldByName(field)
+	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetInt(value)
+}
+
+func setSuggestionPrivateInt(s *suggest2.Suggestion, field string, value int) {
+	v := reflect.ValueOf(s).Elem().FieldByName(field)
+	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetInt(int64(value))
+}
+
+func setSuggestionPrivateFloat64(s *suggest2.Suggestion, field string, value float64) {
+	v := reflect.ValueOf(s).Elem().FieldByName(field)
+	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetFloat(value)
+}
+
+func TestV2SuggestionRisk(t *testing.T) {
+	t.Parallel()
+	if got := v2SuggestionRisk("rm -rf /tmp/test"); got != "destructive" {
+		t.Fatalf("expected destructive risk, got %q", got)
+	}
+	if got := v2SuggestionRisk("git status"); got != "" {
+		t.Fatalf("expected no risk for safe command, got %q", got)
+	}
+}
+
+func TestV2SuggestionDescription_CoversBranches(t *testing.T) {
+	t.Parallel()
+
+	s := suggest2.Suggestion{Command: "git status"}
+	why := []explain.Reason{{Tag: "repo_trans", Description: "From repository workflow", Contribution: 0.4}}
+	if got := v2SuggestionDescription(s, why, "git add ."); got != "From repository workflow" {
+		t.Fatalf("expected why-first description, got %q", got)
+	}
+
+	s2 := suggest2.Suggestion{Command: "git commit"}
+	setSuggestionPrivateInt(&s2, "maxTransCount", 2)
+	if got := v2SuggestionDescription(s2, nil, "a very long previous command that should be truncated for display in description"); got == "" || got[:15] != "Often run after" {
+		t.Fatalf("expected transition description, got %q", got)
+	}
+
+	s3 := suggest2.Suggestion{Command: "npm test"}
+	setSuggestionPrivateFloat64(&s3, "maxFreqScore", 1.1)
+	if got := v2SuggestionDescription(s3, nil, ""); got != "Frequently used command." {
+		t.Fatalf("expected frequency description, got %q", got)
+	}
+
+	s4 := suggest2.Suggestion{Command: "ls"}
+	setSuggestionPrivateInt64(&s4, "lastSeenMs", 1700000000000)
+	if got := v2SuggestionDescription(s4, nil, ""); got != "Used recently." {
+		t.Fatalf("expected recency description, got %q", got)
+	}
+
+	if got := v2SuggestionDescription(suggest2.Suggestion{Command: "echo hi"}, nil, ""); got != "" {
+		t.Fatalf("expected empty description fallback, got %q", got)
+	}
+}
+
+func TestV2SuggestionReasons_IncludesExplainAndSignals(t *testing.T) {
+	t.Parallel()
+	nowMs := int64(1_700_000_010_000)
+	s := suggest2.Suggestion{Command: "make test"}
+	setSuggestionPrivateInt64(&s, "lastSeenMs", 1_700_000_000_000)
+	setSuggestionPrivateFloat64(&s, "maxFreqScore", 2.5)
+	setSuggestionPrivateInt(&s, "maxTransCount", 3)
+
+	why := []explain.Reason{
+		{Tag: "repo_trans", Description: "Common in this repo", Contribution: 0.3},
+	}
+	reasons := v2SuggestionReasons(s, why, nowMs)
+	if len(reasons) < 4 {
+		t.Fatalf("expected explain + recency + frequency + transition reasons, got %d", len(reasons))
+	}
+
+	hasType := map[string]bool{}
+	for _, r := range reasons {
+		hasType[r.Type] = true
+	}
+	for _, typ := range []string{"repo_trans", "recency", "frequency", "transition_count"} {
+		if !hasType[typ] {
+			t.Fatalf("expected reason type %q in %+v", typ, reasons)
+		}
+	}
+}
+
+func TestV2SuggestionToProto_MapsFields(t *testing.T) {
+	t.Parallel()
+	nowMs := int64(1_700_000_010_000)
+	s := suggest2.Suggestion{
+		Command:    "rm -rf /tmp/demo",
+		Score:      0.91,
+		Confidence: 0.77,
+	}
+	setSuggestionPrivateInt64(&s, "lastSeenMs", 1_700_000_000_000)
+	cfg := explain.DefaultConfig()
+	got := v2SuggestionToProto(s, "git clean", nowMs, cfg)
+
+	if got.Text != s.Command || got.CmdNorm != s.Command {
+		t.Fatalf("expected command text/cmd_norm to match, got %+v", got)
+	}
+	if got.Source != "global" {
+		t.Fatalf("expected source=global, got %q", got.Source)
+	}
+	if got.Risk != "destructive" {
+		t.Fatalf("expected destructive risk for rm -rf, got %q", got.Risk)
+	}
+	if got.Score != s.Score || got.Confidence != s.Confidence {
+		t.Fatalf("expected score/confidence copied, got score=%f confidence=%f", got.Score, got.Confidence)
+	}
+	if len(got.Reasons) == 0 {
+		t.Fatal("expected reasons to be populated")
+	}
+}
+
+func TestFormatAgo_CoversRanges(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		delta int64
+		want  string
+	}{
+		{-1, "0s"},
+		{30 * 1000, "30s"},
+		{2 * 60 * 1000, "2m"},
+		{3 * 60 * 60 * 1000, "3h"},
+		{2 * 24 * 60 * 60 * 1000, "2d"},
+	}
+	for _, tc := range cases {
+		if got := formatAgo(tc.delta); got != tc.want {
+			t.Fatalf("formatAgo(%d) = %q, want %q", tc.delta, got, tc.want)
+		}
 	}
 }
 
