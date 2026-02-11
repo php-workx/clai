@@ -19,6 +19,19 @@ linters:
   # Start with default linters minus errcheck (codebase has many intentional unchecked errors)
   # Enable errcheck later after fixing existing issues
   default: none
+  # Exclude complexity/length/style linters from test files (table-driven tests are verbose by design)
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - gocognit
+          - funlen
+          - dupl
+          - lll
+          - cyclop
+          - gocritic
+          - revive
+          - gosec
   enable:
     - govet
     - ineffassign
@@ -32,9 +45,95 @@ linters:
     - nilerr
     - prealloc
     - unconvert
+    # Complexity analysis
+    - gocognit
+    - cyclop
+    - nestif
+    - maintidx
+    # Length limits
+    - lll
+    - funlen
+    # Duplication detection
+    - dupl
+    # Style & quality
+    - gocritic
+    - revive
+    # Security
+    - gosec
+    # Architecture
+    - depguard
   settings:
     govet:
       enable-all: true
       disable:
         - fieldalignment
         - shadow
+    # Complexity settings (permissive to start, tighten over time)
+    gocognit:
+      min-complexity: 35
+    cyclop:
+      max-complexity: 25
+      package-average: 10.0
+    nestif:
+      min-complexity: 7
+    maintidx:
+      under: 15
+    # Length limits (permissive to start, tighten over time)
+    lll:
+      line-length: 180
+    funlen:
+      lines: 100
+      statements: 60
+    # Duplication threshold
+    dupl:
+      threshold: 150
+    # Style settings
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+      disabled-checks:
+        - whyNoLint
+        - unnamedResult      # Named returns not always clearer
+        - commentedOutCode   # False positives on example comments
+        - hugeParam          # bubbletea models pass by value intentionally
+        - paramTypeCombine   # Style preference, not impactful
+        - regexpSimplify     # Readability vs brevity tradeoff
+        - evalOrder          # bubbletea pattern returns cmd before model update
+        - octalLiteral       # 0600 vs 0o600 is minor style (enable later)
+        - sprintfQuotedString # %s vs %q is minor style (enable later)
+        - ifElseChain        # Style preference
+        - deprecatedComment  # Documentation work (enable later)
+        - appendCombine      # Performance optimization (enable later)
+        - rangeValCopy       # Performance optimization (enable later)
+        - badRegexp          # ANSI escape sequences use intentional char ranges
+        - builtinShadow      # TODO: fix `copy` variable shadowing (enable later)
+        - exitAfterDefer     # TODO: fix in clai-shim (enable later)
+    # Revive settings
+    revive:
+      rules:
+        - name: unused-parameter
+          disabled: true  # Cobra patterns use unused cmd/args params
+        - name: package-comments
+          disabled: true  # Defer package documentation work
+    # Security settings
+    gosec:
+      excludes:
+        - G103  # Unsafe calls required for TTY ioctl
+        - G104  # Use errcheck instead
+        - G101  # False positives on test credentials
+        - G115  # Integer conversion in picker is bounded by terminal size
+        - G204  # Subprocess launching is core to shell integration
+        - G301  # World-readable dirs (0755) are intentional for user access
+        - G302  # World-readable files (0644) are intentional for logs
+        - G304  # File paths from variables are expected for file operations
+        - G306  # History files use 0644 intentionally for user readability
+        - G602  # TODO: investigate slice bounds in clai-shim (enable later)
+    # Architecture rules
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: io/ioutil
+              desc: "Deprecated; use io and os packages"
