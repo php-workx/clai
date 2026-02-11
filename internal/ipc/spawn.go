@@ -48,48 +48,62 @@ var (
 // EnsureDaemon ensures the daemon is running, spawning it if necessary.
 // Returns nil if daemon is available, error otherwise.
 func EnsureDaemon() error {
-	// Fast path: socket exists and is connectable
-	if socketExistsFn() {
-		conn, err := quickDialFn()
-		if err == nil {
-			if conn != nil {
-				_ = conn.Close()
-			}
-			return nil
-		}
-		// Socket exists but can't connect - might be stale
-		// Remove it only after retrying dial checks.
-		if err := removeStaleSocket(context.Background()); err != nil {
-			return err
-		}
+	ready, err := ensureHealthySocket()
+	if ready || err != nil {
+		return err
 	}
-
-	// Socket missing: if the daemon lock is held, a daemon may still be running
-	// but unreachable due to an unlinked socket path. Try to stop it so a fresh
-	// daemon can recreate the socket.
-	if !socketExistsFn() && daemonLockFn != nil && killPIDFn != nil {
-		if pid, held, _ := daemonLockFn(); held && pid > 0 {
-			// Give a legitimately starting daemon a short grace window to publish its socket
-			// before we terminate it. This avoids killing during a narrow startup race.
-			deadline := time.Now().Add(150 * time.Millisecond)
-			for time.Now().Before(deadline) {
-				if socketExistsFn() {
-					conn, err := quickDialFn()
-					if err == nil {
-						if conn != nil {
-							_ = conn.Close()
-						}
-						return nil
-					}
-				}
-				time.Sleep(25 * time.Millisecond)
-			}
-			_ = killPIDFn(pid, 500*time.Millisecond)
-		}
-	}
-
-	// Try to spawn the daemon
+	recoverMissingSocketDaemon()
 	return SpawnDaemon()
+}
+
+func ensureHealthySocket() (bool, error) {
+	if !socketExistsFn() {
+		return false, nil
+	}
+	if isSocketDialable() {
+		return true, nil
+	}
+	// Socket exists but can't connect - might be stale.
+	if err := removeStaleSocket(context.Background()); err != nil {
+		return false, err
+	}
+	return false, nil
+}
+
+func isSocketDialable() bool {
+	conn, err := quickDialFn()
+	if err != nil {
+		return false
+	}
+	if conn != nil {
+		_ = conn.Close()
+	}
+	return true
+}
+
+func recoverMissingSocketDaemon() {
+	if socketExistsFn() || daemonLockFn == nil || killPIDFn == nil {
+		return
+	}
+	pid, held, _ := daemonLockFn()
+	if !held || pid <= 0 {
+		return
+	}
+	if waitForSocketPublication(150 * time.Millisecond) {
+		return
+	}
+	_ = killPIDFn(pid, 500*time.Millisecond)
+}
+
+func waitForSocketPublication(timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if socketExistsFn() && isSocketDialable() {
+			return true
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
+	return false
 }
 
 // SpawnDaemon starts the daemon process in the background.
@@ -265,62 +279,71 @@ func removeStaleSocket(ctx context.Context) error {
 	if !socketExistsFn() {
 		return nil
 	}
+	lastDialErr, active, err := dialSocketWithRetry(ctx)
+	if err != nil {
+		return err
+	}
+	if active {
+		return nil
+	}
+	if errors.Is(lastDialErr, syscall.ENOENT) {
+		return nil
+	}
+	if !isLikelyStaleSocketDialError(lastDialErr) {
+		return fmt.Errorf("socket exists but dial failed: %w", lastDialErr)
+	}
+	if err := ensureSocketNotOwnedByLiveDaemon(lastDialErr); err != nil {
+		return err
+	}
+	if !socketExistsFn() {
+		return nil
+	}
+	if err := removeFileFn(socketPathFn()); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove stale socket: %w", err)
+	}
+	return nil
+}
 
-	// Retry dial a few times to avoid deleting an active socket after
-	// a transient connection failure.
+func dialSocketWithRetry(ctx context.Context) (error, bool, error) {
 	var lastDialErr error
 	for attempt := 0; attempt < staleSocketDialAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
-			return err
+			return nil, false, err
 		}
 		conn, err := quickDialFn()
 		if err == nil {
 			if conn != nil {
 				_ = conn.Close()
 			}
-			return nil
+			return nil, true, nil
 		}
 		lastDialErr = err
 		if attempt < staleSocketDialAttempts-1 {
-			timer := time.NewTimer(staleSocketRetryDelay)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return ctx.Err()
-			case <-timer.C:
+			if err := waitWithContext(ctx, staleSocketRetryDelay); err != nil {
+				return nil, false, err
 			}
 		}
 	}
+	return lastDialErr, false, nil
+}
 
-	// The socket disappeared between our earlier existence check and dialing.
-	if errors.Is(lastDialErr, syscall.ENOENT) {
+func waitWithContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
 		return nil
 	}
+}
 
-	// Don't delete the socket for arbitrary dial failures (permissions, resource
-	// exhaustion, deadline exceeded, etc.). Deletion is only safe when the error
-	// strongly suggests an orphaned unix socket file.
-	if !isLikelyStaleSocketDialError(lastDialErr) {
-		return fmt.Errorf("socket exists but dial failed: %w", lastDialErr)
-	}
-
-	// If the daemon lock is currently held, the daemon process is alive. Deleting
-	// the socket path would orphan the running daemon (it keeps listening on an
-	// unlinked socket), making recovery impossible without killing it.
-	if daemonLockFn != nil {
-		if pid, held, _ := daemonLockFn(); held {
-			return fmt.Errorf("socket dial failed but daemon lock is held (pid %d): %w", pid, lastDialErr)
-		}
-	}
-
-	// Re-check existence to avoid deleting a socket created by a concurrently
-	// starting daemon after our dial attempts.
-	if !socketExistsFn() {
+func ensureSocketNotOwnedByLiveDaemon(lastDialErr error) error {
+	if daemonLockFn == nil {
 		return nil
 	}
-
-	if err := removeFileFn(socketPathFn()); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to remove stale socket: %w", err)
+	if pid, held, _ := daemonLockFn(); held {
+		return fmt.Errorf("socket dial failed but daemon lock is held (pid %d): %w", pid, lastDialErr)
 	}
 	return nil
 }

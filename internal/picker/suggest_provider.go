@@ -21,6 +21,7 @@ import (
 // Suggest can be slower than history fetch, but we still want the picker to
 // stay responsive.
 const suggestFetchTimeout = 400 * time.Millisecond
+const destructiveLabel = "[!] destructive"
 
 // SuggestProvider implements Provider using the daemon's Suggest gRPC RPC.
 type SuggestProvider struct {
@@ -216,130 +217,145 @@ func formatSuggestionDisplay(view, cmd string, s *pb.Suggestion) string {
 
 	switch strings.ToLower(view) {
 	case "compact":
-		// Mode 2: command + source (+ risk)
-		meta := fmt.Sprintf("%s  · %s", cmd, src)
-		if cwdTag {
-			meta += "  · cwd"
-		}
-		if riskTag {
-			meta += "  · [!] destructive"
-		}
-		return meta
-
+		return compactSuggestionDisplay(cmd, src, cwdTag, riskTag)
 	default:
-		// Mode 3: command + source + risk + score + reasons/description
-		score := s.Score
-		if math.IsNaN(score) || math.IsInf(score, 0) {
-			score = 0
-		}
-		scoreStr := fmt.Sprintf("score %.2f", score)
-
-		confStr := ""
-		if s.Confidence > 0 {
-			confStr = fmt.Sprintf(" conf %.2f", s.Confidence)
-		}
-
-		meta := fmt.Sprintf("%s  · %s  · %s%s", cmd, src, scoreStr, confStr)
-		if cwdTag {
-			meta += "  · cwd"
-		}
-		if riskTag {
-			meta += "  · [!] destructive"
-		}
-
-		// Keep list rows compact: only show recency hint (if available).
-		// Richer details belong in the details panel under the list.
-		for _, r := range s.Reasons {
-			if strings.TrimSpace(r.Type) != "recency" {
-				continue
-			}
-			desc := strings.TrimSpace(oneLine(r.Description))
-			if desc != "" {
-				meta += "  · " + desc
-				break
-			}
-		}
-
-		return meta
+		return detailedSuggestionDisplay(cmd, src, s, cwdTag, riskTag)
 	}
 }
 
 func formatSuggestionDetails(s *pb.Suggestion) []string {
-	src := strings.TrimSpace(s.Source)
-	if src == "" {
-		src = "unknown"
-	}
-
-	score := s.Score
-	if math.IsNaN(score) || math.IsInf(score, 0) {
-		score = 0
-	}
-
-	parts := []string{
-		src,
-		fmt.Sprintf("score %.2f", score),
-	}
-	if s.Confidence > 0 {
-		parts = append(parts, fmt.Sprintf("conf %.2f", s.Confidence))
-	}
-
-	if suggestionHasCwdSignal(s) {
-		parts = append(parts, "cwd")
-	}
-
-	// Pull simple info-hints from reasons list (recency/frequency), and also
-	// gather the top causality tags (with contributions) for display.
-	var causality []string
-	for _, r := range s.Reasons {
-		typ := strings.TrimSpace(r.Type)
-		desc := strings.TrimSpace(oneLine(r.Description))
-		if typ == "" {
-			continue
-		}
-
-		// Always treat non-zero contribution reasons as causality tags, even if
-		// the type is also used for "info hints" (e.g. v1 recency).
-		if r.Contribution != 0 {
-			causality = append(causality, fmt.Sprintf("%s %.2f", typ, r.Contribution))
-		}
-
-		switch typ {
-		case "recency", "frequency", "transition_count", "success":
-			if desc != "" {
-				parts = append(parts, desc)
-			}
-		}
-	}
+	parts := baseSuggestionDetailParts(s)
+	causality, infoHints := collectSuggestionReasonDetails(s.Reasons)
+	parts = append(parts, infoHints...)
 	if len(causality) > 0 {
-		// Keep short; show top 3 tags (the daemon already caps explain reasons).
-		if len(causality) > 3 {
-			causality = causality[:3]
-		}
-		parts = append(parts, "tags "+strings.Join(causality, ", "))
+		parts = append(parts, "tags "+strings.Join(capStrings(causality, 3), ", "))
 	}
-
-	risk := strings.TrimSpace(strings.ToLower(s.Risk))
-	if risk == "destructive" {
-		parts = append(parts, "[!] destructive")
+	if strings.TrimSpace(strings.ToLower(s.Risk)) == "destructive" {
+		parts = append(parts, destructiveLabel)
 	}
-
 	line1 := strings.Join(parts, " · ")
-
-	why := strings.TrimSpace(oneLine(s.Description))
-	if why == "" {
-		// Fall back to the first scoring reason description if available.
-		for _, r := range s.Reasons {
-			if strings.TrimSpace(r.Type) == "recency" || strings.TrimSpace(r.Type) == "frequency" || strings.TrimSpace(r.Type) == "transition_count" {
-				continue
-			}
-			why = strings.TrimSpace(oneLine(r.Description))
-			if why != "" {
-				break
-			}
-		}
-	}
+	why := resolveSuggestionWhy(s)
 	if why == "" {
 		return []string{line1}
 	}
 	return []string{line1, "Why: " + why}
+}
+
+func compactSuggestionDisplay(cmd, src string, cwdTag, riskTag bool) string {
+	parts := []string{cmd, src}
+	if cwdTag {
+		parts = append(parts, "cwd")
+	}
+	if riskTag {
+		parts = append(parts, destructiveLabel)
+	}
+	return strings.Join(parts, "  · ")
+}
+
+func detailedSuggestionDisplay(cmd, src string, s *pb.Suggestion, cwdTag, riskTag bool) string {
+	parts := []string{cmd, src, fmt.Sprintf("score %.2f%s", sanitizeScore(s.Score), confidenceSuffix(s.Confidence))}
+	if cwdTag {
+		parts = append(parts, "cwd")
+	}
+	if riskTag {
+		parts = append(parts, destructiveLabel)
+	}
+	if recency := firstSuggestionReason(s.Reasons, "recency"); recency != "" {
+		parts = append(parts, recency)
+	}
+	return strings.Join(parts, "  · ")
+}
+
+func sanitizeScore(score float64) float64 {
+	if math.IsNaN(score) || math.IsInf(score, 0) {
+		return 0
+	}
+	return score
+}
+
+func confidenceSuffix(confidence float64) string {
+	if confidence <= 0 {
+		return ""
+	}
+	return fmt.Sprintf(" conf %.2f", confidence)
+}
+
+func firstSuggestionReason(reasons []*pb.SuggestionReason, typ string) string {
+	for _, r := range reasons {
+		if r == nil || strings.TrimSpace(r.Type) != typ {
+			continue
+		}
+		if desc := strings.TrimSpace(oneLine(r.Description)); desc != "" {
+			return desc
+		}
+	}
+	return ""
+}
+
+func baseSuggestionDetailParts(s *pb.Suggestion) []string {
+	src := strings.TrimSpace(s.Source)
+	if src == "" {
+		src = "unknown"
+	}
+	parts := []string{src, fmt.Sprintf("score %.2f", sanitizeScore(s.Score))}
+	if s.Confidence > 0 {
+		parts = append(parts, fmt.Sprintf("conf %.2f", s.Confidence))
+	}
+	if suggestionHasCwdSignal(s) {
+		parts = append(parts, "cwd")
+	}
+	return parts
+}
+
+func collectSuggestionReasonDetails(reasons []*pb.SuggestionReason) ([]string, []string) {
+	var causality []string
+	var hints []string
+	for _, r := range reasons {
+		if r == nil {
+			continue
+		}
+		typ := strings.TrimSpace(r.Type)
+		if typ == "" {
+			continue
+		}
+		desc := strings.TrimSpace(oneLine(r.Description))
+		if r.Contribution != 0 {
+			causality = append(causality, fmt.Sprintf("%s %.2f", typ, r.Contribution))
+		}
+		switch typ {
+		case "recency", "frequency", "transition_count", "success":
+			if desc != "" {
+				hints = append(hints, desc)
+			}
+		}
+	}
+	return causality, hints
+}
+
+func resolveSuggestionWhy(s *pb.Suggestion) string {
+	why := strings.TrimSpace(oneLine(s.Description))
+	if why != "" {
+		return why
+	}
+	for _, r := range s.Reasons {
+		if r == nil {
+			continue
+		}
+		typ := strings.TrimSpace(r.Type)
+		if typ == "recency" || typ == "frequency" || typ == "transition_count" {
+			continue
+		}
+		why = strings.TrimSpace(oneLine(r.Description))
+		if why != "" {
+			return why
+		}
+	}
+	return ""
+}
+
+func capStrings(values []string, limit int) []string {
+	if len(values) <= limit {
+		return values
+	}
+	return values[:limit]
 }

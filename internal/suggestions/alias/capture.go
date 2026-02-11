@@ -155,47 +155,43 @@ func parseFishAbbreviations(output string) AliasMap {
 		if line == "" {
 			continue
 		}
-
-		// Modern format: "abbr -a -- name expansion"
-		if strings.HasPrefix(line, "abbr -a -- ") {
-			rest := line[len("abbr -a -- "):]
-			name, expansion := splitFirstWord(rest)
-			if name != "" {
-				aliases[name] = unquote(expansion)
-			}
-			continue
-		}
-
-		// Alternate modern format: "abbr -a name -- expansion"
-		if strings.HasPrefix(line, "abbr -a ") {
-			rest := line[len("abbr -a "):]
-			// Look for " -- " separator
-			if dashIdx := strings.Index(rest, " -- "); dashIdx > 0 {
-				name := strings.TrimSpace(rest[:dashIdx])
-				expansion := strings.TrimSpace(rest[dashIdx+4:])
-				if name != "" {
-					aliases[name] = unquote(expansion)
-				}
-				continue
-			}
-			// Simple format: "abbr -a name expansion"
-			name, expansion := splitFirstWord(rest)
-			if name != "" {
-				aliases[name] = unquote(expansion)
-			}
-			continue
-		}
-
-		// Legacy format: "abbr name expansion"
-		if strings.HasPrefix(line, "abbr ") {
-			rest := line[len("abbr "):]
-			name, expansion := splitFirstWord(rest)
-			if name != "" {
-				aliases[name] = unquote(expansion)
-			}
-		}
+		parseFishAbbreviationLine(aliases, line)
 	}
 	return aliases
+}
+
+func parseFishAbbreviationLine(aliases AliasMap, line string) {
+	if strings.HasPrefix(line, "abbr -a -- ") {
+		addFishAbbreviation(aliases, line[len("abbr -a -- "):])
+		return
+	}
+	if strings.HasPrefix(line, "abbr -a ") {
+		parseModernFishAbbreviation(aliases, line[len("abbr -a "):])
+		return
+	}
+	if strings.HasPrefix(line, "abbr ") {
+		addFishAbbreviation(aliases, line[len("abbr "):])
+	}
+}
+
+func parseModernFishAbbreviation(aliases AliasMap, rest string) {
+	if dashIdx := strings.Index(rest, " -- "); dashIdx > 0 {
+		name := strings.TrimSpace(rest[:dashIdx])
+		expansion := strings.TrimSpace(rest[dashIdx+4:])
+		if name != "" {
+			aliases[name] = unquote(expansion)
+		}
+		return
+	}
+	addFishAbbreviation(aliases, rest)
+}
+
+func addFishAbbreviation(aliases AliasMap, text string) {
+	name, expansion := splitFirstWord(text)
+	if name == "" {
+		return
+	}
+	aliases[name] = unquote(expansion)
 }
 
 // unquote removes matching surrounding quotes from a string.

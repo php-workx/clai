@@ -141,69 +141,92 @@ func ParsePlaybook(data []byte) (*Playbook, error) {
 		return nil, ErrEmptyPlaybook
 	}
 
-	p := &Playbook{
-		tasks:            make(map[string]*Task, len(pf.Tasks)),
-		taskOrder:        make([]*Task, 0, len(pf.Tasks)),
-		afterDeps:        make(map[string][]*Task),
-		afterFailureDeps: make(map[string][]*Task),
-		workflowTasks:    make(map[string][]*Task),
+	p := newPlaybook(len(pf.Tasks))
+	if err := registerTasks(p, pf.Tasks); err != nil {
+		return nil, err
 	}
-
-	// First pass: register all tasks by name.
-	for i := range pf.Tasks {
-		t := &pf.Tasks[i]
-
-		if t.Name == "" {
-			return nil, fmt.Errorf("task at index %d: name is required", i)
-		}
-		if t.Command == "" {
-			return nil, fmt.Errorf("task %q: command is required", t.Name)
-		}
-
-		// Normalize priority
-		if t.Priority == "" {
-			t.Priority = PriorityNormal
-		}
-		t.Priority = strings.ToLower(t.Priority)
-		if _, ok := priorityWeight[t.Priority]; !ok {
-			return nil, fmt.Errorf("task %q: invalid priority %q (must be low, normal, or high)", t.Name, t.Priority)
-		}
-
-		if _, exists := p.tasks[t.Name]; exists {
-			return nil, fmt.Errorf("%w: %q", ErrDuplicateTask, t.Name)
-		}
-
-		p.tasks[t.Name] = t
-		p.taskOrder = append(p.taskOrder, t)
+	if err := buildPlaybookDependencyMaps(p); err != nil {
+		return nil, err
 	}
-
-	// Second pass: validate references and build dependency maps.
-	for _, t := range p.taskOrder {
-		if t.After != "" {
-			if _, exists := p.tasks[t.After]; !exists {
-				return nil, fmt.Errorf("%w: task %q references after=%q", ErrMissingTask, t.Name, t.After)
-			}
-			p.afterDeps[t.After] = append(p.afterDeps[t.After], t)
-		}
-
-		if t.AfterFailure != "" {
-			if _, exists := p.tasks[t.AfterFailure]; !exists {
-				return nil, fmt.Errorf("%w: task %q references after_failure=%q", ErrMissingTask, t.Name, t.AfterFailure)
-			}
-			p.afterFailureDeps[t.AfterFailure] = append(p.afterFailureDeps[t.AfterFailure], t)
-		}
-
-		for _, wf := range t.Workflows {
-			p.workflowTasks[wf] = append(p.workflowTasks[wf], t)
-		}
-	}
-
-	// Validate no circular dependencies in the "after" DAG.
 	if err := p.validateDAG(); err != nil {
 		return nil, err
 	}
 
 	return p, nil
+}
+
+func newPlaybook(capacity int) *Playbook {
+	return &Playbook{
+		tasks:            make(map[string]*Task, capacity),
+		taskOrder:        make([]*Task, 0, capacity),
+		afterDeps:        make(map[string][]*Task),
+		afterFailureDeps: make(map[string][]*Task),
+		workflowTasks:    make(map[string][]*Task),
+	}
+}
+
+func registerTasks(p *Playbook, tasks []Task) error {
+	for i := range tasks {
+		t := &tasks[i]
+		if err := validateTaskDefinition(i, t); err != nil {
+			return err
+		}
+		if _, exists := p.tasks[t.Name]; exists {
+			return fmt.Errorf("%w: %q", ErrDuplicateTask, t.Name)
+		}
+		p.tasks[t.Name] = t
+		p.taskOrder = append(p.taskOrder, t)
+	}
+	return nil
+}
+
+func validateTaskDefinition(index int, t *Task) error {
+	if t.Name == "" {
+		return fmt.Errorf("task at index %d: name is required", index)
+	}
+	if t.Command == "" {
+		return fmt.Errorf("task %q: command is required", t.Name)
+	}
+	if t.Priority == "" {
+		t.Priority = PriorityNormal
+	}
+	t.Priority = strings.ToLower(t.Priority)
+	if _, ok := priorityWeight[t.Priority]; !ok {
+		return fmt.Errorf("task %q: invalid priority %q (must be low, normal, or high)", t.Name, t.Priority)
+	}
+	return nil
+}
+
+func buildPlaybookDependencyMaps(p *Playbook) error {
+	for _, t := range p.taskOrder {
+		if err := addTaskReference(p.tasks, p.afterDeps, t.Name, t.After, "after"); err != nil {
+			return err
+		}
+		if err := addTaskReference(p.tasks, p.afterFailureDeps, t.Name, t.AfterFailure, "after_failure"); err != nil {
+			return err
+		}
+		for _, wf := range t.Workflows {
+			p.workflowTasks[wf] = append(p.workflowTasks[wf], t)
+		}
+	}
+	return nil
+}
+
+func addTaskReference(
+	tasks map[string]*Task,
+	deps map[string][]*Task,
+	taskName string,
+	refName string,
+	field string,
+) error {
+	if refName == "" {
+		return nil
+	}
+	if _, exists := tasks[refName]; !exists {
+		return fmt.Errorf("%w: task %q references %s=%q", ErrMissingTask, taskName, field, refName)
+	}
+	deps[refName] = append(deps[refName], tasks[taskName])
+	return nil
 }
 
 // validateDAG checks for circular dependencies using DFS cycle detection
@@ -226,19 +249,9 @@ func (p *Playbook) validateDAG() error {
 	var dfs func(name string) error
 	dfs = func(name string) error {
 		colors[name] = gray
-
-		// Visit all tasks that depend on this one (via "after").
-		for _, dep := range p.afterDeps[name] {
-			switch colors[dep.Name] {
-			case gray:
-				return fmt.Errorf("%w: %s -> %s", ErrCircularDependency, name, dep.Name)
-			case white:
-				if err := dfs(dep.Name); err != nil {
-					return err
-				}
-			}
+		if err := p.visitAfterDependencies(name, colors, gray, white, dfs); err != nil {
+			return err
 		}
-
 		colors[name] = black
 		return nil
 	}
@@ -251,6 +264,26 @@ func (p *Playbook) validateDAG() error {
 		}
 	}
 
+	return nil
+}
+
+func (p *Playbook) visitAfterDependencies(
+	name string,
+	colors map[string]int,
+	gray int,
+	white int,
+	dfs func(string) error,
+) error {
+	for _, dep := range p.afterDeps[name] {
+		switch colors[dep.Name] {
+		case gray:
+			return fmt.Errorf("%w: %s -> %s", ErrCircularDependency, name, dep.Name)
+		case white:
+			if err := dfs(dep.Name); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 

@@ -129,17 +129,10 @@ type WritePathResult struct {
 //  10. Update failure_recovery (when previous command failed)
 //  11. Invalidate cache index (after commit)
 func WritePath(ctx context.Context, db *sql.DB, wctx *WritePathContext, cfg WritePathConfig) (*WritePathResult, error) {
-	if wctx == nil {
-		return nil, errors.New("write path context is nil")
+	if err := validateWritePathInputs(db, wctx); err != nil {
+		return nil, err
 	}
-	if db == nil {
-		return nil, errors.New("database is nil")
-	}
-
-	tauMs := cfg.TauMs
-	if tauMs <= 0 {
-		tauMs = DefaultTauMs
-	}
+	tauMs := resolveTauMs(cfg.TauMs)
 
 	result := &WritePathResult{
 		TemplateID: wctx.PreNorm.TemplateID,
@@ -155,75 +148,9 @@ func WritePath(ctx context.Context, db *sql.DB, wctx *WritePathContext, cfg Writ
 	}
 	defer tx.Rollback() //nolint:errcheck // Best-effort rollback after commit
 
-	// Step 1: Insert command_event row
-	eventID, err := insertCommandEvent(ctx, tx, wctx)
+	_, err = executeWritePathSteps(ctx, tx, wctx, cfg, tauMs, result)
 	if err != nil {
-		return nil, fmt.Errorf("step 1 (command_event): %w", err)
-	}
-	result.EventID = eventID
-
-	// Step 2: Upsert command_template
-	if err := upsertCommandTemplate(ctx, tx, wctx); err != nil {
-		return nil, fmt.Errorf("step 2 (command_template): %w", err)
-	}
-
-	// Step 3: Update command_stat (frequency + success/failure counts)
-	if err := updateCommandStat(ctx, tx, wctx, tauMs); err != nil {
-		return nil, fmt.Errorf("step 3 (command_stat): %w", err)
-	}
-
-	// Step 4: Update transition_stat (if previous template known)
-	if wctx.PrevTemplateID != "" {
-		if err := updateTransitionStat(ctx, tx, wctx, tauMs); err != nil {
-			return nil, fmt.Errorf("step 4 (transition_stat): %w", err)
-		}
-		result.TransitionRecorded = true
-	}
-
-	// Step 5: Update slot_stat values
-	if err := updateSlotStats(ctx, tx, wctx, tauMs); err != nil {
-		return nil, fmt.Errorf("step 5 (slot_stat): %w", err)
-	}
-
-	// Step 6: Update slot_correlation for configured tuples
-	if len(cfg.SlotCorrelationKeys) > 0 {
-		if err := updateSlotCorrelations(ctx, tx, wctx, cfg.SlotCorrelationKeys); err != nil {
-			return nil, fmt.Errorf("step 6 (slot_correlation): %w", err)
-		}
-	}
-
-	// Step 7: Update project_type_stat/project_type_transition
-	if len(cfg.ProjectTypes) > 0 {
-		if err := updateProjectTypeStats(ctx, tx, wctx, cfg.ProjectTypes, tauMs); err != nil {
-			return nil, fmt.Errorf("step 7 (project_type_stat): %w", err)
-		}
-	}
-
-	// Step 8: Update directory-scoped aggregates
-	if err := updateDirectoryScopedAggregates(ctx, tx, wctx, tauMs); err != nil {
-		return nil, fmt.Errorf("step 8 (dir aggregates): %w", err)
-	}
-
-	// Step 9: Update pipeline tables (for compound commands)
-	segments := wctx.PreNorm.Segments
-	if len(segments) > 1 {
-		maxSegments := cfg.PipelineMaxSegments
-		if maxSegments <= 0 {
-			maxSegments = DefaultPipelineMaxSegments
-		}
-		n, err := updatePipelineTables(ctx, tx, wctx, eventID, maxSegments)
-		if err != nil {
-			return nil, fmt.Errorf("step 9 (pipeline): %w", err)
-		}
-		result.PipelineSegments = n
-	}
-
-	// Step 10: Update failure_recovery (when previous command failed)
-	if wctx.PrevFailed && wctx.PrevTemplateID != "" {
-		if err := updateFailureRecovery(ctx, tx, wctx); err != nil {
-			return nil, fmt.Errorf("step 10 (failure_recovery): %w", err)
-		}
-		result.FailureRecoveryRecorded = true
+		return nil, err
 	}
 
 	// Commit the transaction
@@ -237,6 +164,113 @@ func WritePath(ctx context.Context, db *sql.DB, wctx *WritePathContext, cfg Writ
 	}
 
 	return result, nil
+}
+
+func validateWritePathInputs(db *sql.DB, wctx *WritePathContext) error {
+	if wctx == nil {
+		return errors.New("write path context is nil")
+	}
+	if db == nil {
+		return errors.New("database is nil")
+	}
+	return nil
+}
+
+func resolveTauMs(tauMs int64) int64 {
+	if tauMs <= 0 {
+		return DefaultTauMs
+	}
+	return tauMs
+}
+
+func executeWritePathSteps(
+	ctx context.Context,
+	tx *sql.Tx,
+	wctx *WritePathContext,
+	cfg WritePathConfig,
+	tauMs int64,
+	result *WritePathResult,
+) (int64, error) {
+	eventID, err := insertCommandEvent(ctx, tx, wctx)
+	if err != nil {
+		return 0, fmt.Errorf("step 1 (command_event): %w", err)
+	}
+	result.EventID = eventID
+	if err := upsertCommandTemplate(ctx, tx, wctx); err != nil {
+		return 0, fmt.Errorf("step 2 (command_template): %w", err)
+	}
+	if err := updateCommandStat(ctx, tx, wctx, tauMs); err != nil {
+		return 0, fmt.Errorf("step 3 (command_stat): %w", err)
+	}
+	if err := runOptionalWritePathSteps(ctx, tx, wctx, cfg, tauMs, eventID, result); err != nil {
+		return 0, err
+	}
+	return eventID, nil
+}
+
+func runOptionalWritePathSteps(
+	ctx context.Context,
+	tx *sql.Tx,
+	wctx *WritePathContext,
+	cfg WritePathConfig,
+	tauMs int64,
+	eventID int64,
+	result *WritePathResult,
+) error {
+	if wctx.PrevTemplateID != "" {
+		if err := updateTransitionStat(ctx, tx, wctx, tauMs); err != nil {
+			return fmt.Errorf("step 4 (transition_stat): %w", err)
+		}
+		result.TransitionRecorded = true
+	}
+	if err := updateSlotStats(ctx, tx, wctx, tauMs); err != nil {
+		return fmt.Errorf("step 5 (slot_stat): %w", err)
+	}
+	if len(cfg.SlotCorrelationKeys) > 0 {
+		if err := updateSlotCorrelations(ctx, tx, wctx, cfg.SlotCorrelationKeys); err != nil {
+			return fmt.Errorf("step 6 (slot_correlation): %w", err)
+		}
+	}
+	if len(cfg.ProjectTypes) > 0 {
+		if err := updateProjectTypeStats(ctx, tx, wctx, cfg.ProjectTypes, tauMs); err != nil {
+			return fmt.Errorf("step 7 (project_type_stat): %w", err)
+		}
+	}
+	if err := updateDirectoryScopedAggregates(ctx, tx, wctx, tauMs); err != nil {
+		return fmt.Errorf("step 8 (dir aggregates): %w", err)
+	}
+	if err := runPipelineAndRecoverySteps(ctx, tx, wctx, cfg, eventID, result); err != nil {
+		return err
+	}
+	return nil
+}
+
+func runPipelineAndRecoverySteps(
+	ctx context.Context,
+	tx *sql.Tx,
+	wctx *WritePathContext,
+	cfg WritePathConfig,
+	eventID int64,
+	result *WritePathResult,
+) error {
+	if len(wctx.PreNorm.Segments) > 1 {
+		maxSegments := cfg.PipelineMaxSegments
+		if maxSegments <= 0 {
+			maxSegments = DefaultPipelineMaxSegments
+		}
+		n, err := updatePipelineTables(ctx, tx, wctx, eventID, maxSegments)
+		if err != nil {
+			return fmt.Errorf("step 9 (pipeline): %w", err)
+		}
+		result.PipelineSegments = n
+	}
+	if wctx.PrevFailed && wctx.PrevTemplateID != "" {
+		if err := updateFailureRecovery(ctx, tx, wctx); err != nil {
+			return fmt.Errorf("step 10 (failure_recovery): %w", err)
+		}
+		result.FailureRecoveryRecorded = true
+	}
+	return nil
 }
 
 // beginImmediate starts a BEGIN IMMEDIATE transaction.
@@ -525,59 +559,82 @@ func updateSlotCorrelations(ctx context.Context, tx *sql.Tx, wctx *WritePathCont
 		return nil
 	}
 
-	// Build a map of slot index -> value for quick lookup
-	slotMap := make(map[int]string, len(wctx.Slots))
-	for _, s := range wctx.Slots {
+	slotMap := buildSlotValueMap(wctx.Slots)
+	scopes := writePathScopes(wctx.RepoKey)
+	for _, indices := range correlationKeys {
+		slotKey, tupleHash, tupleValueJSON, ok, err := buildCorrelationTuple(indices, slotMap)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			continue
+		}
+		if err := upsertCorrelationTuple(ctx, tx, scopes, wctx, slotKey, tupleHash, tupleValueJSON); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func buildSlotValueMap(slots []normalize.SlotValue) map[int]string {
+	slotMap := make(map[int]string, len(slots))
+	for _, s := range slots {
 		slotMap[s.Index] = s.Value
 	}
+	return slotMap
+}
 
+func writePathScopes(repoKey string) []string {
 	scopes := []string{ScopeGlobal}
-	if wctx.RepoKey != "" {
-		scopes = append(scopes, wctx.RepoKey)
+	if repoKey != "" {
+		scopes = append(scopes, repoKey)
 	}
+	return scopes
+}
 
-	for _, indices := range correlationKeys {
-		if len(indices) < 2 {
-			continue
+func buildCorrelationTuple(indices []int, slotMap map[int]string) (string, string, string, bool, error) {
+	if len(indices) < 2 {
+		return "", "", "", false, nil
+	}
+	values := make([]string, 0, len(indices))
+	for _, idx := range indices {
+		v, ok := slotMap[idx]
+		if !ok {
+			return "", "", "", false, nil
 		}
+		values = append(values, v)
+	}
+	valueJSON, err := json.Marshal(values)
+	if err != nil {
+		return "", "", "", false, fmt.Errorf("marshal tuple values: %w", err)
+	}
+	slotKey := buildSlotKey(indices)
+	tupleHash := computeHash(string(valueJSON))
+	return slotKey, tupleHash, string(valueJSON), true, nil
+}
 
-		// Collect values for this tuple; skip if any slot is missing
-		values := make([]string, 0, len(indices))
-		allPresent := true
-		for _, idx := range indices {
-			v, ok := slotMap[idx]
-			if !ok {
-				allPresent = false
-				break
-			}
-			values = append(values, v)
-		}
-		if !allPresent {
-			continue
-		}
-
-		// Build slot key (e.g., "0:1") and tuple hash
-		slotKey := buildSlotKey(indices)
-		tupleValueJSON, err := json.Marshal(values)
+func upsertCorrelationTuple(
+	ctx context.Context,
+	tx *sql.Tx,
+	scopes []string,
+	wctx *WritePathContext,
+	slotKey string,
+	tupleHash string,
+	tupleValueJSON string,
+) error {
+	for _, scope := range scopes {
+		_, err := tx.ExecContext(ctx, `
+			INSERT INTO slot_correlation (scope, template_id, slot_key, tuple_hash, tuple_value_json, weight, count, last_seen_ms)
+			VALUES (?, ?, ?, ?, ?, 1.0, 1, ?)
+			ON CONFLICT(scope, template_id, slot_key, tuple_hash) DO UPDATE SET
+				weight = weight + 1.0,
+				count = count + 1,
+				last_seen_ms = excluded.last_seen_ms
+		`,
+			scope, wctx.PreNorm.TemplateID, slotKey, tupleHash, tupleValueJSON, wctx.NowMs,
+		)
 		if err != nil {
-			return fmt.Errorf("marshal tuple values: %w", err)
-		}
-		tupleHash := computeHash(string(tupleValueJSON))
-
-		for _, scope := range scopes {
-			_, err := tx.ExecContext(ctx, `
-				INSERT INTO slot_correlation (scope, template_id, slot_key, tuple_hash, tuple_value_json, weight, count, last_seen_ms)
-				VALUES (?, ?, ?, ?, ?, 1.0, 1, ?)
-				ON CONFLICT(scope, template_id, slot_key, tuple_hash) DO UPDATE SET
-					weight = weight + 1.0,
-					count = count + 1,
-					last_seen_ms = excluded.last_seen_ms
-			`,
-				scope, wctx.PreNorm.TemplateID, slotKey, tupleHash, string(tupleValueJSON), wctx.NowMs,
-			)
-			if err != nil {
-				return err
-			}
+			return err
 		}
 	}
 	return nil
@@ -705,84 +762,117 @@ func updateDirectoryScopedAggregates(ctx context.Context, tx *sql.Tx, wctx *Writ
 
 // Step 9: Update pipeline tables (pipeline_event, pipeline_transition, pipeline_pattern)
 func updatePipelineTables(ctx context.Context, tx *sql.Tx, wctx *WritePathContext, eventID int64, maxSegments int) (int, error) {
-	segments := wctx.PreNorm.Segments
+	segments := trimPipelineSegments(wctx.PreNorm.Segments, maxSegments)
 	if len(segments) <= 1 {
 		return 0, nil
 	}
-
-	// Enforce max segments bound
-	if maxSegments > 0 && len(segments) > maxSegments {
-		segments = segments[:maxSegments]
-	}
-
 	normalizer := normalize.NewNormalizer()
+	segInfos := buildWritePathPipelineInfos(normalizer, segments)
+	if err := insertWritePathPipelineEvents(ctx, tx, eventID, segInfos); err != nil {
+		return 0, err
+	}
+	if err := insertWritePathPipelineTransitions(ctx, tx, wctx.NowMs, writePathScopes(wctx.RepoKey), segInfos); err != nil {
+		return 0, err
+	}
+	if err := upsertWritePathPipelinePatterns(ctx, tx, wctx, writePathScopes(wctx.RepoKey), segments, segInfos); err != nil {
+		return 0, err
+	}
+	return len(segments), nil
+}
 
-	// Collect segment template IDs for pipeline_pattern
-	segTemplateIDs := make([]string, len(segments))
-	segOperators := make([]string, len(segments))
+func trimPipelineSegments(segments []normalize.Segment, maxSegments int) []normalize.Segment {
+	if maxSegments > 0 && len(segments) > maxSegments {
+		return segments[:maxSegments]
+	}
+	return segments
+}
 
+type writePathPipelineInfo struct {
+	raw        string
+	norm       string
+	templateID string
+	operator   string
+}
+
+func buildWritePathPipelineInfos(normalizer *normalize.Normalizer, segments []normalize.Segment) []writePathPipelineInfo {
+	infos := make([]writePathPipelineInfo, len(segments))
 	for i, seg := range segments {
 		segNorm, _ := normalizer.Normalize(seg.Raw)
-		segTemplateID := normalize.ComputeTemplateID(segNorm)
-		segTemplateIDs[i] = segTemplateID
-
 		operator := ""
 		if seg.Operator != "" {
 			operator = string(seg.Operator)
 		}
-		segOperators[i] = operator
+		infos[i] = writePathPipelineInfo{
+			raw:        seg.Raw,
+			norm:       segNorm,
+			templateID: normalize.ComputeTemplateID(segNorm),
+			operator:   operator,
+		}
+	}
+	return infos
+}
 
-		// Insert pipeline_event row
+func insertWritePathPipelineEvents(ctx context.Context, tx *sql.Tx, eventID int64, segInfos []writePathPipelineInfo) error {
+	for i, si := range segInfos {
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO pipeline_event (command_event_id, position, operator, cmd_raw, cmd_norm, template_id)
 			VALUES (?, ?, ?, ?, ?, ?)
 		`,
-			eventID, i, nullableString(operator), seg.Raw, segNorm, segTemplateID,
+			eventID, i, nullableString(si.operator), si.raw, si.norm, si.templateID,
 		)
 		if err != nil {
-			return 0, err
+			return err
 		}
+	}
+	return nil
+}
 
-		// Insert pipeline_transition for consecutive segments
-		if i > 0 {
-			prevOp := segOperators[i-1]
-			if prevOp == "" {
-				prevOp = "|" // default operator for transitions
-			}
-
-			scopes := []string{ScopeGlobal}
-			if wctx.RepoKey != "" {
-				scopes = append(scopes, wctx.RepoKey)
-			}
-
-			for _, scope := range scopes {
-				_, err := tx.ExecContext(ctx, `
-					INSERT INTO pipeline_transition (scope, prev_template_id, next_template_id, operator, weight, count, last_seen_ms)
-					VALUES (?, ?, ?, ?, 1.0, 1, ?)
-					ON CONFLICT(scope, prev_template_id, next_template_id, operator) DO UPDATE SET
-						weight = weight + 1.0,
-						count = count + 1,
-						last_seen_ms = excluded.last_seen_ms
-				`,
-					scope, segTemplateIDs[i-1], segTemplateID, prevOp, wctx.NowMs,
-				)
-				if err != nil {
-					return 0, err
-				}
+func insertWritePathPipelineTransitions(
+	ctx context.Context,
+	tx *sql.Tx,
+	nowMs int64,
+	scopes []string,
+	segInfos []writePathPipelineInfo,
+) error {
+	for i := 1; i < len(segInfos); i++ {
+		prevOp := segInfos[i-1].operator
+		if prevOp == "" {
+			prevOp = "|"
+		}
+		for _, scope := range scopes {
+			_, err := tx.ExecContext(ctx, `
+				INSERT INTO pipeline_transition (scope, prev_template_id, next_template_id, operator, weight, count, last_seen_ms)
+				VALUES (?, ?, ?, ?, 1.0, 1, ?)
+				ON CONFLICT(scope, prev_template_id, next_template_id, operator) DO UPDATE SET
+					weight = weight + 1.0,
+					count = count + 1,
+					last_seen_ms = excluded.last_seen_ms
+			`,
+				scope, segInfos[i-1].templateID, segInfos[i].templateID, prevOp, nowMs,
+			)
+			if err != nil {
+				return err
 			}
 		}
 	}
+	return nil
+}
 
-	// Update pipeline_pattern
+func upsertWritePathPipelinePatterns(
+	ctx context.Context,
+	tx *sql.Tx,
+	wctx *WritePathContext,
+	scopes []string,
+	segments []normalize.Segment,
+	segInfos []writePathPipelineInfo,
+) error {
+	segTemplateIDs := make([]string, len(segInfos))
+	for i, si := range segInfos {
+		segTemplateIDs[i] = si.templateID
+	}
 	templateChain := strings.Join(segTemplateIDs, "|")
 	operatorChain := buildOperatorChain(segments)
 	patternHash := computeHash(templateChain + ":" + operatorChain)
-
-	scopes := []string{ScopeGlobal}
-	if wctx.RepoKey != "" {
-		scopes = append(scopes, wctx.RepoKey)
-	}
-
 	for _, scope := range scopes {
 		_, err := tx.ExecContext(ctx, `
 			INSERT INTO pipeline_pattern (pattern_hash, template_chain, operator_chain, scope, count, last_seen_ms, cmd_norm_display)
@@ -794,79 +884,102 @@ func updatePipelineTables(ctx context.Context, tx *sql.Tx, wctx *WritePathContex
 			patternHash+"_"+scope, templateChain, operatorChain, scope, wctx.NowMs, wctx.PreNorm.CmdNorm,
 		)
 		if err != nil {
-			return 0, err
+			return err
 		}
 	}
-
-	return len(segments), nil
+	return nil
 }
 
 // Step 10: Update failure_recovery
 func updateFailureRecovery(ctx context.Context, tx *sql.Tx, wctx *WritePathContext) error {
 	exitCodeClass := classifyExitCode(wctx.PrevExitCode)
-
-	scopes := []string{ScopeGlobal}
-	if wctx.RepoKey != "" {
-		scopes = append(scopes, wctx.RepoKey)
-	}
-
-	// Determine if the current (recovery) command succeeded
+	scopes := writePathScopes(wctx.RepoKey)
 	isRecoverySuccess := wctx.Event.ExitCode == 0
 
 	for _, scope := range scopes {
-		// Read current counts to compute success_rate
-		var currentCount int
-		var currentSuccessRate float64
-
-		err := tx.QueryRowContext(ctx, `
-			SELECT count, success_rate
-			FROM failure_recovery
-			WHERE scope = ? AND failed_template_id = ? AND exit_code_class = ? AND recovery_template_id = ?
-		`, scope, wctx.PrevTemplateID, exitCodeClass, wctx.PreNorm.TemplateID).Scan(&currentCount, &currentSuccessRate)
-
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		current, err := readFailureRecoveryState(ctx, tx, scope, wctx, exitCodeClass)
+		if err != nil {
 			return err
 		}
-
-		var newCount int
-		var newSuccessRate float64
-		var newWeight float64
-
-		if errors.Is(err, sql.ErrNoRows) {
-			newCount = 1
-			if isRecoverySuccess {
-				newSuccessRate = 1.0
-			}
-			newWeight = 1.0
-		} else {
-			newCount = currentCount + 1
-			// Running average of success rate
-			successSoFar := currentSuccessRate * float64(currentCount)
-			if isRecoverySuccess {
-				successSoFar++
-			}
-			newSuccessRate = successSoFar / float64(newCount)
-			newWeight = float64(newCount)
-		}
-
-		_, err = tx.ExecContext(ctx, `
-			INSERT INTO failure_recovery (scope, failed_template_id, exit_code_class, recovery_template_id, weight, count, success_rate, last_seen_ms, source)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'learned')
-			ON CONFLICT(scope, failed_template_id, exit_code_class, recovery_template_id) DO UPDATE SET
-				weight = ?,
-				count = ?,
-				success_rate = ?,
-				last_seen_ms = ?
-		`,
-			scope, wctx.PrevTemplateID, exitCodeClass, wctx.PreNorm.TemplateID,
-			newWeight, newCount, newSuccessRate, wctx.NowMs,
-			newWeight, newCount, newSuccessRate, wctx.NowMs,
-		)
-		if err != nil {
+		next := computeFailureRecoveryState(current, isRecoverySuccess)
+		if err := upsertFailureRecoveryState(ctx, tx, scope, wctx, exitCodeClass, next); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+type failureRecoveryState struct {
+	count       int
+	successRate float64
+	weight      float64
+}
+
+func readFailureRecoveryState(
+	ctx context.Context,
+	tx *sql.Tx,
+	scope string,
+	wctx *WritePathContext,
+	exitCodeClass string,
+) (failureRecoveryState, error) {
+	var state failureRecoveryState
+	err := tx.QueryRowContext(ctx, `
+		SELECT count, success_rate
+		FROM failure_recovery
+		WHERE scope = ? AND failed_template_id = ? AND exit_code_class = ? AND recovery_template_id = ?
+	`, scope, wctx.PrevTemplateID, exitCodeClass, wctx.PreNorm.TemplateID).Scan(&state.count, &state.successRate)
+	if errors.Is(err, sql.ErrNoRows) {
+		return failureRecoveryState{}, nil
+	}
+	if err != nil {
+		return failureRecoveryState{}, err
+	}
+	state.weight = float64(state.count)
+	return state, nil
+}
+
+func computeFailureRecoveryState(current failureRecoveryState, success bool) failureRecoveryState {
+	if current.count == 0 {
+		next := failureRecoveryState{count: 1, weight: 1.0}
+		if success {
+			next.successRate = 1.0
+		}
+		return next
+	}
+	nextCount := current.count + 1
+	successSoFar := current.successRate * float64(current.count)
+	if success {
+		successSoFar++
+	}
+	return failureRecoveryState{
+		count:       nextCount,
+		successRate: successSoFar / float64(nextCount),
+		weight:      float64(nextCount),
+	}
+}
+
+func upsertFailureRecoveryState(
+	ctx context.Context,
+	tx *sql.Tx,
+	scope string,
+	wctx *WritePathContext,
+	exitCodeClass string,
+	state failureRecoveryState,
+) error {
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO failure_recovery (scope, failed_template_id, exit_code_class, recovery_template_id, weight, count, success_rate, last_seen_ms, source)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'learned')
+		ON CONFLICT(scope, failed_template_id, exit_code_class, recovery_template_id) DO UPDATE SET
+			weight = ?,
+			count = ?,
+			success_rate = ?,
+			last_seen_ms = ?
+	`,
+		scope, wctx.PrevTemplateID, exitCodeClass, wctx.PreNorm.TemplateID,
+		state.weight, state.count, state.successRate, wctx.NowMs,
+		state.weight, state.count, state.successRate, wctx.NowMs,
+	)
+	return err
 }
 
 // Helper functions

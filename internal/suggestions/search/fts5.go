@@ -139,79 +139,89 @@ func (s *Service) initFTS5() error {
 
 // prepareStatements prepares SQL statements.
 func (s *Service) prepareStatements() error {
-	var err error
-
 	if s.fts5Available {
-		// FTS5 search query with BM25 scoring
-		// Per spec Section 12.3: top K results ordered by bm25 score and recency
-		s.searchStmt, err = s.db.Prepare(`
-			SELECT ce.id, ce.cmd_raw, COALESCE(ce.repo_key, ''), ce.cwd, ce.ts,
-			       bm25(command_fts, 1.0, 0.5, 0.3) as score
-			FROM command_fts
-			JOIN command_event ce ON command_fts.rowid = ce.id
-			WHERE command_fts MATCH ?
-			  AND (? = '' OR ce.repo_key = ?)
-			  AND (? = '' OR ce.cwd = ?)
-			  AND ce.ephemeral = 0
-			ORDER BY score, ce.ts DESC
-			LIMIT ?
-		`)
-		if err != nil {
-			return err
-		}
-
-		// Insert into FTS5 index
-		// Per spec Section 12.4: Do not index ephemeral events
-		s.insertStmt, err = s.db.Prepare(`
-			INSERT INTO command_fts(rowid, cmd_raw, repo_key, cwd)
-			SELECT id, cmd_raw, COALESCE(repo_key, ''), cwd
-			FROM command_event
-			WHERE id = ? AND ephemeral = 0
-		`)
-		if err != nil {
-			s.searchStmt.Close()
-			return err
-		}
-
-		// Delete from FTS5 index
-		s.deleteStmt, err = s.db.Prepare(`
-			INSERT INTO command_fts(command_fts, rowid, cmd_raw, repo_key, cwd)
-			VALUES('delete', ?, ?, ?, ?)
-		`)
-		if err != nil {
-			s.searchStmt.Close()
-			s.insertStmt.Close()
+		if err := s.prepareFTSStatements(); err != nil {
 			return err
 		}
 	}
 
 	// Fallback LIKE-based search
 	if s.fallbackEnabled || !s.fts5Available {
-		s.fallbackStmt, err = s.db.Prepare(`
-			SELECT id, cmd_raw, COALESCE(repo_key, ''), cwd, ts, 0.0 as score
-			FROM command_event
-			WHERE cmd_raw LIKE ?
-			  AND (? = '' OR repo_key = ?)
-			  AND (? = '' OR cwd = ?)
-			  AND ephemeral = 0
-			ORDER BY ts DESC
-			LIMIT ?
-		`)
-		if err != nil {
-			if s.searchStmt != nil {
-				s.searchStmt.Close()
-			}
-			if s.insertStmt != nil {
-				s.insertStmt.Close()
-			}
-			if s.deleteStmt != nil {
-				s.deleteStmt.Close()
-			}
+		if err := s.prepareFallbackStatement(); err != nil {
+			s.closePreparedFTSStatements()
 			return err
 		}
 	}
 
 	return nil
+}
+
+func (s *Service) prepareFTSStatements() error {
+	var err error
+	s.searchStmt, err = s.db.Prepare(`
+		SELECT ce.id, ce.cmd_raw, COALESCE(ce.repo_key, ''), ce.cwd, ce.ts,
+		       bm25(command_fts, 1.0, 0.5, 0.3) as score
+		FROM command_fts
+		JOIN command_event ce ON command_fts.rowid = ce.id
+		WHERE command_fts MATCH ?
+		  AND (? = '' OR ce.repo_key = ?)
+		  AND (? = '' OR ce.cwd = ?)
+		  AND ce.ephemeral = 0
+		ORDER BY score, ce.ts DESC
+		LIMIT ?
+	`)
+	if err != nil {
+		return err
+	}
+	s.insertStmt, err = s.db.Prepare(`
+		INSERT INTO command_fts(rowid, cmd_raw, repo_key, cwd)
+		SELECT id, cmd_raw, COALESCE(repo_key, ''), cwd
+		FROM command_event
+		WHERE id = ? AND ephemeral = 0
+	`)
+	if err != nil {
+		s.closePreparedFTSStatements()
+		return err
+	}
+	s.deleteStmt, err = s.db.Prepare(`
+		INSERT INTO command_fts(command_fts, rowid, cmd_raw, repo_key, cwd)
+		VALUES('delete', ?, ?, ?, ?)
+	`)
+	if err != nil {
+		s.closePreparedFTSStatements()
+		return err
+	}
+	return nil
+}
+
+func (s *Service) prepareFallbackStatement() error {
+	stmt, err := s.db.Prepare(`
+		SELECT id, cmd_raw, COALESCE(repo_key, ''), cwd, ts, 0.0 as score
+		FROM command_event
+		WHERE cmd_raw LIKE ?
+		  AND (? = '' OR repo_key = ?)
+		  AND (? = '' OR cwd = ?)
+		  AND ephemeral = 0
+		ORDER BY ts DESC
+		LIMIT ?
+	`)
+	if err != nil {
+		return err
+	}
+	s.fallbackStmt = stmt
+	return nil
+}
+
+func (s *Service) closePreparedFTSStatements() {
+	if s.searchStmt != nil {
+		s.searchStmt.Close()
+	}
+	if s.insertStmt != nil {
+		s.insertStmt.Close()
+	}
+	if s.deleteStmt != nil {
+		s.deleteStmt.Close()
+	}
 }
 
 // Close releases resources held by the service.

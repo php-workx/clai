@@ -567,31 +567,7 @@ func (m Model) viewTabBar() string {
 }
 
 func (m Model) viewFooter() string {
-	lines := []string{}
-
-	// Selection details (shown above keyboard shortcuts).
-	if m.state == stateLoaded && len(m.items) > 0 && m.selection >= 0 && m.selection < len(m.items) {
-		details := m.items[m.selection].Details
-		if len(details) > 0 {
-			// Cap to 2 lines to keep the layout stable.
-			if len(details) > 2 {
-				details = details[:2]
-			}
-			cw := m.contentWidth()
-			for _, d := range details {
-				if cw > 0 && lipgloss.Width(d) > cw {
-					// Match list truncation behavior; account for " … " styling in render.
-					truncateWidth := cw - 2
-					if truncateWidth < 0 {
-						truncateWidth = 0
-					}
-					d = MiddleTruncate(d, truncateWidth)
-				}
-				lines = append(lines, dimStyle.Render(d))
-			}
-		}
-	}
-
+	lines := m.footerDetailLines()
 	parts := []string{
 		"Enter accept",
 		"Ctrl+U delete",
@@ -605,6 +581,36 @@ func (m Model) viewFooter() string {
 	}
 	lines = append(lines, dimStyle.Render(strings.Join(parts, " · ")))
 	return strings.Join(lines, "\n")
+}
+
+func (m Model) footerDetailLines() []string {
+	if m.state != stateLoaded || len(m.items) == 0 || m.selection < 0 || m.selection >= len(m.items) {
+		return nil
+	}
+	details := m.items[m.selection].Details
+	if len(details) == 0 {
+		return nil
+	}
+	if len(details) > 2 {
+		details = details[:2]
+	}
+	cw := m.contentWidth()
+	lines := make([]string, 0, len(details))
+	for _, d := range details {
+		lines = append(lines, dimStyle.Render(truncateFooterDetail(d, cw)))
+	}
+	return lines
+}
+
+func truncateFooterDetail(detail string, width int) string {
+	if width <= 0 || lipgloss.Width(detail) <= width {
+		return detail
+	}
+	truncateWidth := width - 2
+	if truncateWidth < 0 {
+		truncateWidth = 0
+	}
+	return MiddleTruncate(detail, truncateWidth)
 }
 
 // viewContent renders the item list or a status message.
@@ -648,85 +654,90 @@ func (m Model) viewList() string {
 		n = maxItems
 	}
 
-	// Build rendered lines for visible items.
-	query := m.textInput.Value()
 	lines := make([]string, 0, n)
 	for i := 0; i < n; i++ {
-		display := m.items[i].displayText()
-		cw := m.contentWidth()
-		display = StripANSI(display)
-		isGlobalFallback := strings.HasPrefix(display, "[G] ")
-
-		// Reserve width so appended hints do not cause wrapping.
-		reserved := 2 // prefix: "> " or "  "
-		if i == m.selection {
-			reserved += lipgloss.Width("  " + rightRefineHintLabel())
-		}
-
-		maxDisplayWidth := cw - reserved
-		if maxDisplayWidth < 0 {
-			maxDisplayWidth = 0
-		}
-
-		// If truncation is needed, account for renderItem styling which expands
-		// the ellipsis to " … " (adds 2 columns).
-		if lipgloss.Width(display) > maxDisplayWidth {
-			truncateWidth := maxDisplayWidth - 2
-			if truncateWidth < 0 {
-				truncateWidth = 0
-			}
-			display = MiddleTruncate(display, truncateWidth)
-		}
-
-		var base, hl lipgloss.Style
-		var prefix string
-		if i == m.selection {
-			base, hl, prefix = selectedStyle, matchSelectedStyle, "> "
-		} else {
-			if isGlobalFallback {
-				// Ghosttext-like global fallback in Session tab.
-				base, hl, prefix = dimStyle, matchStyle, "  "
-			} else {
-				base, hl, prefix = normalStyle, matchStyle, "  "
-			}
-		}
-
-		// Render "command" portion in normal/selected style, and dim the metadata
-		// portion (the " · source · score ..." suffix) as ghosttext.
-		cmdPart := display
-		metaPart := ""
-		if idx := strings.Index(display, "  · "); idx >= 0 {
-			cmdPart = display[:idx]
-			metaPart = display[idx:]
-		}
-
-		line := base.Render(prefix) + renderItem(cmdPart, query, base, hl)
-		if metaPart != "" {
-			line += dimStyle.Render(metaPart)
-		}
-		if i == m.selection {
-			line += hintStyle.Render("  " + rightRefineHintLabel())
-		}
-		lines = append(lines, line)
+		lines = append(lines, m.renderListLine(i))
 	}
 
 	if m.layout == LayoutBottomUp {
-		// Reverse so newest (index 0) is at bottom, closest to input.
-		for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
-			lines[i], lines[j] = lines[j], lines[i]
-		}
-		// Pad above to bottom-align items.
-		pad := maxItems - len(lines)
-		if pad > 0 {
-			padding := make([]string, pad)
-			for i := range padding {
-				padding[i] = ""
-			}
-			lines = append(padding, lines...)
-		}
+		lines = bottomAlignLines(reverseLines(lines), maxItems)
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderListLine(i int) string {
+	query := m.textInput.Value()
+	display := m.prepareDisplayForLine(i)
+	base, hl, prefix := m.lineStyles(i, strings.HasPrefix(display, "[G] "))
+	cmdPart, metaPart := splitDisplayMeta(display)
+	line := base.Render(prefix) + renderItem(cmdPart, query, base, hl)
+	if metaPart != "" {
+		line += dimStyle.Render(metaPart)
+	}
+	if i == m.selection {
+		line += hintStyle.Render("  " + rightRefineHintLabel())
+	}
+	return line
+}
+
+func (m Model) prepareDisplayForLine(i int) string {
+	display := StripANSI(m.items[i].displayText())
+	maxDisplayWidth := m.contentWidth() - lineReservedWidth(i == m.selection)
+	if maxDisplayWidth < 0 {
+		maxDisplayWidth = 0
+	}
+	if lipgloss.Width(display) <= maxDisplayWidth {
+		return display
+	}
+	truncateWidth := maxDisplayWidth - 2
+	if truncateWidth < 0 {
+		truncateWidth = 0
+	}
+	return MiddleTruncate(display, truncateWidth)
+}
+
+func lineReservedWidth(selected bool) int {
+	width := 2 // prefix: "> " or "  "
+	if selected {
+		width += lipgloss.Width("  " + rightRefineHintLabel())
+	}
+	return width
+}
+
+func (m Model) lineStyles(i int, isGlobalFallback bool) (lipgloss.Style, lipgloss.Style, string) {
+	if i == m.selection {
+		return selectedStyle, matchSelectedStyle, "> "
+	}
+	if isGlobalFallback {
+		return dimStyle, matchStyle, "  "
+	}
+	return normalStyle, matchStyle, "  "
+}
+
+func splitDisplayMeta(display string) (string, string) {
+	if idx := strings.Index(display, "  · "); idx >= 0 {
+		return display[:idx], display[idx:]
+	}
+	return display, ""
+}
+
+func reverseLines(lines []string) []string {
+	out := make([]string, len(lines))
+	copy(out, lines)
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out
+}
+
+func bottomAlignLines(lines []string, maxItems int) []string {
+	pad := maxItems - len(lines)
+	if pad <= 0 {
+		return lines
+	}
+	padding := make([]string, pad)
+	return append(padding, lines...)
 }
 
 // ellipsis is the truncation marker used by MiddleTruncate.

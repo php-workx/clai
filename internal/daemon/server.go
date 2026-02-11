@@ -141,31 +141,11 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		return nil, fmt.Errorf("store is required")
 	}
 
-	// Set defaults
-	paths := cfg.Paths
-	if paths == nil {
-		paths = config.DefaultPaths()
-	}
-
-	logger := cfg.Logger
-	if logger == nil {
-		logger = slog.Default()
-	}
-
-	ranker := cfg.Ranker
-	if ranker == nil {
-		ranker = suggest.NewRanker(cfg.Store)
-	}
-
-	registry := cfg.Registry
-	if registry == nil {
-		registry = provider.NewRegistry()
-	}
-
-	idleTimeout := cfg.IdleTimeout
-	if idleTimeout == 0 {
-		idleTimeout = 20 * time.Minute
-	}
+	paths := defaultPaths(cfg.Paths)
+	logger := defaultLogger(cfg.Logger)
+	ranker := defaultRanker(cfg.Ranker, cfg.Store)
+	registry := defaultRegistry(cfg.Registry)
+	idleTimeout := defaultIdleTimeout(cfg.IdleTimeout)
 
 	// Create ingestion queue with default capacity (8192)
 	ingestQueue := NewIngestionQueue(0, logger)
@@ -175,41 +155,9 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		Logger: logger,
 	})
 
-	// Initialize V2 batch writer (nil-safe: only if V2DB is available)
-	var bw *batch.Writer
-	if cfg.BatchWriter != nil {
-		bw = cfg.BatchWriter
-	} else if cfg.V2DB != nil {
-		opts := batch.DefaultOptions()
-		opts.WritePathConfig = &ingest.WritePathConfig{}
-		bw = batch.NewWriter(cfg.V2DB.DB(), opts)
-	}
-
-	// Initialize V2 scorer: use explicit scorer if provided, otherwise
-	// auto-initialize from V2DB with partial dependency wiring.
-	var v2scorer *suggest2.Scorer
-	if cfg.V2Scorer != nil {
-		v2scorer = cfg.V2Scorer
-	} else if cfg.V2DB != nil {
-		v2scorer = initV2Scorer(cfg.V2DB.DB(), logger)
-	}
-
-	// Determine scorer version with fallback logic
-	scorerVersion := cfg.ScorerVersion
-	if scorerVersion == "" {
-		// Default to blend when V2 is available; otherwise stay on V1.
-		if v2scorer != nil {
-			scorerVersion = "blend"
-		} else {
-			scorerVersion = "v1"
-		}
-	}
-	if (scorerVersion == "v2" || scorerVersion == "blend") && v2scorer == nil {
-		logger.Warn("scorer_version requires V2 scorer but V2 is unavailable; falling back to v1",
-			"requested", scorerVersion,
-		)
-		scorerVersion = "v1"
-	}
+	bw := resolveBatchWriter(cfg.BatchWriter, cfg.V2DB)
+	v2scorer := resolveV2Scorer(cfg.V2Scorer, cfg.V2DB, logger)
+	scorerVersion := resolveScorerVersion(cfg.ScorerVersion, v2scorer, logger)
 
 	now := time.Now()
 	return &Server{
@@ -232,6 +180,81 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		ingestionQueue:    ingestQueue,
 		circuitBreaker:    cb,
 	}, nil
+}
+
+func defaultPaths(paths *config.Paths) *config.Paths {
+	if paths == nil {
+		return config.DefaultPaths()
+	}
+	return paths
+}
+
+func defaultLogger(logger *slog.Logger) *slog.Logger {
+	if logger == nil {
+		return slog.Default()
+	}
+	return logger
+}
+
+func defaultRanker(ranker suggest.Ranker, store storage.Store) suggest.Ranker {
+	if ranker == nil {
+		return suggest.NewRanker(store)
+	}
+	return ranker
+}
+
+func defaultRegistry(registry *provider.Registry) *provider.Registry {
+	if registry == nil {
+		return provider.NewRegistry()
+	}
+	return registry
+}
+
+func defaultIdleTimeout(timeout time.Duration) time.Duration {
+	if timeout == 0 {
+		return 20 * time.Minute
+	}
+	return timeout
+}
+
+func resolveBatchWriter(override *batch.Writer, v2db *suggestdb.DB) *batch.Writer {
+	if override != nil {
+		return override
+	}
+	if v2db == nil {
+		return nil
+	}
+	opts := batch.DefaultOptions()
+	opts.WritePathConfig = &ingest.WritePathConfig{}
+	return batch.NewWriter(v2db.DB(), opts)
+}
+
+func resolveV2Scorer(override *suggest2.Scorer, v2db *suggestdb.DB, logger *slog.Logger) *suggest2.Scorer {
+	if override != nil {
+		return override
+	}
+	if v2db == nil {
+		return nil
+	}
+	return initV2Scorer(v2db.DB(), logger)
+}
+
+func resolveScorerVersion(requested string, v2scorer *suggest2.Scorer, logger *slog.Logger) string {
+	version := requested
+	if version == "" {
+		if v2scorer != nil {
+			version = "blend"
+		} else {
+			version = "v1"
+		}
+	}
+	if (version == "v2" || version == "blend") && v2scorer == nil {
+		logger.Warn("scorer_version requires V2 scorer but V2 is unavailable; falling back to v1",
+			"requested", version,
+		)
+		return "v1"
+	}
+	return version
 }
 
 // Start starts the gRPC server and listens on the Unix socket.

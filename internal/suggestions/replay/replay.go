@@ -185,178 +185,245 @@ func (r *Runner) Replay(ctx context.Context, tmpDir string, session Session) ([]
 		return nil, nil
 	}
 
-	// Open a fresh database for this replay
-	d, err := openReplayDB(tmpDir)
+	runtime, cleanup, err := r.setupReplayRuntime(ctx, tmpDir, session)
 	if err != nil {
 		return nil, err
 	}
-	defer d.Close()
-
-	sqlDB := d.DB()
-
-	// Create the V1 tables needed by the scorer's FrequencyStore and TransitionStore.
-	// The V2 schema uses different table names (command_stat, transition_stat) but the
-	// scorer dependencies use the V1-era tables (command_score, transition).
-	if err := createScorerTables(ctx, sqlDB); err != nil {
-		return nil, fmt.Errorf("create scorer tables: %w", err)
-	}
-
-	// Create the session row
-	_, err = sqlDB.ExecContext(ctx, `
-		INSERT INTO session (id, shell, started_at_ms) VALUES (?, 'zsh', ?)
-	`, r.cfg.SessionID, r.cfg.BaseTimestampMs)
-	if err != nil {
-		return nil, fmt.Errorf("insert session: %w", err)
-	}
-
-	// Build expectation lookup: afterCommand -> []ExpectedTopK index
-	expectationMap := make(map[int][]int)
-	for i, exp := range session.Expected {
-		expectationMap[exp.AfterCommand] = append(expectationMap[exp.AfterCommand], i)
-	}
-
-	// Create scorer dependencies
-	freqStore, err := score.NewFrequencyStore(sqlDB, score.DefaultFrequencyOptions())
-	if err != nil {
-		return nil, fmt.Errorf("create frequency store: %w", err)
-	}
-	defer freqStore.Close()
-
-	transStore, err := score.NewTransitionStore(sqlDB)
-	if err != nil {
-		return nil, fmt.Errorf("create transition store: %w", err)
-	}
-	defer transStore.Close()
-
-	scorerCfg := suggest.ScorerConfig{
-		Weights:    suggest.DefaultWeights(),
-		Amplifiers: suggest.DefaultAmplifierConfig(),
-		TopK:       r.cfg.TopK,
-	}
-
-	scorer, err := suggest.NewScorer(suggest.ScorerDependencies{
-		DB:              sqlDB,
-		FreqStore:       freqStore,
-		TransitionStore: transStore,
-	}, scorerCfg)
-	if err != nil {
-		return nil, fmt.Errorf("create scorer: %w", err)
-	}
+	defer cleanup()
 
 	var diffs []DiffResult
 	var prevTemplateID string
 
-	// Replay each command
 	for cmdIdx, cmd := range session.Commands {
-		// Resolve timestamps deterministically
-		tsMs := cmd.TimestampMs
-		if tsMs == 0 {
-			tsMs = r.cfg.BaseTimestampMs + int64(cmdIdx)*r.cfg.TimestampIncrementMs
+		stepDiffs, nextTemplateID, stepErr := r.replayCommandStep(ctx, runtime, session, cmdIdx, cmd, prevTemplateID)
+		if stepErr != nil {
+			return nil, stepErr
 		}
-
-		// Resolve CWD
-		cwd := cmd.CWD
-		if cwd == "" {
-			cwd = r.cfg.CWD
-		}
-
-		// Resolve raw command
-		cmdRaw := cmd.CmdRaw
-		if cmdRaw == "" {
-			cmdRaw = cmd.CmdNorm
-		}
-
-		// Ingest the command through the write path
-		ev := &event.CommandEvent{
-			Version:   event.EventVersion,
-			Type:      event.EventTypeCommandEnd,
-			Ts:        tsMs,
-			SessionID: r.cfg.SessionID,
-			Shell:     event.ShellZsh,
-			Cwd:       cwd,
-			CmdRaw:    cmdRaw,
-			ExitCode:  cmd.ExitCode,
-		}
-
-		prevExitCode := 0
-		prevFailed := false
-		if cmdIdx > 0 {
-			prevExitCode = session.Commands[cmdIdx-1].ExitCode
-			prevFailed = prevExitCode != 0
-		}
-
-		wctx := ingest.PrepareWriteContext(ev, r.cfg.RepoKey, "", prevTemplateID, prevExitCode, prevFailed, nil)
-
-		_, err := ingest.WritePath(ctx, sqlDB, wctx, ingest.WritePathConfig{})
-		if err != nil {
-			return nil, fmt.Errorf("write path for command %d (%q): %w", cmdIdx, cmd.CmdNorm, err)
-		}
-
-		// Also update the frequency and transition stores directly
-		// (the V1 stores used by the scorer use different tables than the V2 write path)
-		preNorm := normalize.PreNormalize(cmdRaw, normalize.PreNormConfig{})
-
-		if err := freqStore.Update(ctx, score.ScopeGlobal, preNorm.CmdNorm, tsMs); err != nil {
-			return nil, fmt.Errorf("update global frequency for command %d: %w", cmdIdx, err)
-		}
-		if err := freqStore.Update(ctx, r.cfg.RepoKey, preNorm.CmdNorm, tsMs); err != nil {
-			return nil, fmt.Errorf("update repo frequency for command %d: %w", cmdIdx, err)
-		}
-
-		if prevTemplateID != "" {
-			if err := transStore.RecordTransition(ctx, score.ScopeGlobal, prevTemplateID, preNorm.CmdNorm, tsMs); err != nil {
-				return nil, fmt.Errorf("record global transition for command %d: %w", cmdIdx, err)
-			}
-			if err := transStore.RecordTransition(ctx, r.cfg.RepoKey, prevTemplateID, preNorm.CmdNorm, tsMs); err != nil {
-				return nil, fmt.Errorf("record repo transition for command %d: %w", cmdIdx, err)
-			}
-		}
-
-		// Update prevTemplateID for next iteration
-		prevTemplateID = preNorm.CmdNorm
-
-		// Check if there are expectations after this command
-		expIndices, hasExpectation := expectationMap[cmdIdx]
-		if !hasExpectation {
-			continue
-		}
-
-		// Query suggestions
-		suggestCtx := suggest.SuggestContext{
-			SessionID: r.cfg.SessionID,
-			RepoKey:   r.cfg.RepoKey,
-			LastCmd:   preNorm.CmdNorm,
-			Cwd:       cwd,
-			NowMs:     tsMs,
-		}
-
-		suggestions, err := scorer.Suggest(ctx, suggestCtx)
-		if err != nil {
-			return nil, fmt.Errorf("suggest after command %d: %w", cmdIdx, err)
-		}
-
-		// Extract actual top-k
-		got := make([]string, len(suggestions))
-		for i, s := range suggestions {
-			got[i] = s.Command
-		}
-
-		// Compare against each expectation for this command
-		for _, expIdx := range expIndices {
-			exp := session.Expected[expIdx]
-			mismatches := computeMismatches(exp.TopK, got)
-			if len(mismatches) > 0 {
-				diffs = append(diffs, DiffResult{
-					StepIndex:    expIdx,
-					AfterCommand: cmdIdx,
-					Expected:     exp.TopK,
-					Got:          got,
-					Mismatches:   mismatches,
-				})
-			}
-		}
+		prevTemplateID = nextTemplateID
+		diffs = append(diffs, stepDiffs...)
 	}
 
+	return diffs, nil
+}
+
+type replayRuntime struct {
+	sqlDB          *sql.DB
+	freqStore      *score.FrequencyStore
+	transStore     *score.TransitionStore
+	scorer         *suggest.Scorer
+	expectationMap map[int][]int
+}
+
+func (r *Runner) setupReplayRuntime(ctx context.Context, tmpDir string, session Session) (*replayRuntime, func(), error) {
+	d, err := openReplayDB(tmpDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	cleanup := func() { d.Close() }
+	sqlDB := d.DB()
+	if err := createScorerTables(ctx, sqlDB); err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("create scorer tables: %w", err)
+	}
+	if err := insertReplaySession(ctx, sqlDB, r.cfg.SessionID, r.cfg.BaseTimestampMs); err != nil {
+		cleanup()
+		return nil, nil, err
+	}
+	freqStore, err := score.NewFrequencyStore(sqlDB, score.DefaultFrequencyOptions())
+	if err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("create frequency store: %w", err)
+	}
+	transStore, err := score.NewTransitionStore(sqlDB)
+	if err != nil {
+		freqStore.Close()
+		cleanup()
+		return nil, nil, fmt.Errorf("create transition store: %w", err)
+	}
+	scorer, err := suggest.NewScorer(suggest.ScorerDependencies{
+		DB:              sqlDB,
+		FreqStore:       freqStore,
+		TransitionStore: transStore,
+	}, suggest.ScorerConfig{
+		Weights:    suggest.DefaultWeights(),
+		Amplifiers: suggest.DefaultAmplifierConfig(),
+		TopK:       r.cfg.TopK,
+	})
+	if err != nil {
+		transStore.Close()
+		freqStore.Close()
+		cleanup()
+		return nil, nil, fmt.Errorf("create scorer: %w", err)
+	}
+	finalCleanup := func() {
+		transStore.Close()
+		freqStore.Close()
+		cleanup()
+	}
+	return &replayRuntime{
+		sqlDB:          sqlDB,
+		freqStore:      freqStore,
+		transStore:     transStore,
+		scorer:         scorer,
+		expectationMap: buildExpectationMap(session.Expected),
+	}, finalCleanup, nil
+}
+
+func insertReplaySession(ctx context.Context, db *sql.DB, sessionID string, startedAtMs int64) error {
+	_, err := db.ExecContext(ctx, `
+		INSERT INTO session (id, shell, started_at_ms) VALUES (?, 'zsh', ?)
+	`, sessionID, startedAtMs)
+	if err != nil {
+		return fmt.Errorf("insert session: %w", err)
+	}
+	return nil
+}
+
+func buildExpectationMap(expected []ExpectedTopK) map[int][]int {
+	expectationMap := make(map[int][]int)
+	for i, exp := range expected {
+		expectationMap[exp.AfterCommand] = append(expectationMap[exp.AfterCommand], i)
+	}
+	return expectationMap
+}
+
+func (r *Runner) replayCommandStep(
+	ctx context.Context,
+	runtime *replayRuntime,
+	session Session,
+	cmdIdx int,
+	cmd Command,
+	prevTemplateID string,
+) ([]DiffResult, string, error) {
+	tsMs := r.resolveReplayTimestamp(cmdIdx, cmd)
+	cwd := r.resolveReplayCWD(cmd)
+	cmdRaw := resolveReplayCmdRaw(cmd)
+	preNorm, err := r.ingestReplayCommand(ctx, runtime, session, cmdIdx, cmd, prevTemplateID, tsMs, cwd, cmdRaw)
+	if err != nil {
+		return nil, "", err
+	}
+	stepDiffs, err := r.evaluateReplayExpectations(ctx, runtime, session, cmdIdx, preNorm.CmdNorm, cwd, tsMs)
+	if err != nil {
+		return nil, "", err
+	}
+	return stepDiffs, preNorm.CmdNorm, nil
+}
+
+func (r *Runner) resolveReplayTimestamp(cmdIdx int, cmd Command) int64 {
+	if cmd.TimestampMs != 0 {
+		return cmd.TimestampMs
+	}
+	return r.cfg.BaseTimestampMs + int64(cmdIdx)*r.cfg.TimestampIncrementMs
+}
+
+func (r *Runner) resolveReplayCWD(cmd Command) string {
+	if cmd.CWD != "" {
+		return cmd.CWD
+	}
+	return r.cfg.CWD
+}
+
+func resolveReplayCmdRaw(cmd Command) string {
+	if cmd.CmdRaw != "" {
+		return cmd.CmdRaw
+	}
+	return cmd.CmdNorm
+}
+
+func (r *Runner) ingestReplayCommand(
+	ctx context.Context,
+	runtime *replayRuntime,
+	session Session,
+	cmdIdx int,
+	cmd Command,
+	prevTemplateID string,
+	tsMs int64,
+	cwd string,
+	cmdRaw string,
+) (normalize.PreNormResult, error) {
+	ev := &event.CommandEvent{
+		Version:   event.EventVersion,
+		Type:      event.EventTypeCommandEnd,
+		Ts:        tsMs,
+		SessionID: r.cfg.SessionID,
+		Shell:     event.ShellZsh,
+		Cwd:       cwd,
+		CmdRaw:    cmdRaw,
+		ExitCode:  cmd.ExitCode,
+	}
+	prevExitCode, prevFailed := previousReplayStatus(session.Commands, cmdIdx)
+	wctx := ingest.PrepareWriteContext(ev, r.cfg.RepoKey, "", prevTemplateID, prevExitCode, prevFailed, nil)
+	if _, err := ingest.WritePath(ctx, runtime.sqlDB, wctx, ingest.WritePathConfig{}); err != nil {
+		return normalize.PreNormResult{}, fmt.Errorf("write path for command %d (%q): %w", cmdIdx, cmd.CmdNorm, err)
+	}
+	preNorm := normalize.PreNormalize(cmdRaw, normalize.PreNormConfig{})
+	if err := runtime.freqStore.Update(ctx, score.ScopeGlobal, preNorm.CmdNorm, tsMs); err != nil {
+		return normalize.PreNormResult{}, fmt.Errorf("update global frequency for command %d: %w", cmdIdx, err)
+	}
+	if err := runtime.freqStore.Update(ctx, r.cfg.RepoKey, preNorm.CmdNorm, tsMs); err != nil {
+		return normalize.PreNormResult{}, fmt.Errorf("update repo frequency for command %d: %w", cmdIdx, err)
+	}
+	if prevTemplateID != "" {
+		if err := runtime.transStore.RecordTransition(ctx, score.ScopeGlobal, prevTemplateID, preNorm.CmdNorm, tsMs); err != nil {
+			return normalize.PreNormResult{}, fmt.Errorf("record global transition for command %d: %w", cmdIdx, err)
+		}
+		if err := runtime.transStore.RecordTransition(ctx, r.cfg.RepoKey, prevTemplateID, preNorm.CmdNorm, tsMs); err != nil {
+			return normalize.PreNormResult{}, fmt.Errorf("record repo transition for command %d: %w", cmdIdx, err)
+		}
+	}
+	return preNorm, nil
+}
+
+func previousReplayStatus(commands []Command, idx int) (int, bool) {
+	if idx <= 0 {
+		return 0, false
+	}
+	prevExitCode := commands[idx-1].ExitCode
+	return prevExitCode, prevExitCode != 0
+}
+
+func (r *Runner) evaluateReplayExpectations(
+	ctx context.Context,
+	runtime *replayRuntime,
+	session Session,
+	cmdIdx int,
+	lastCmd string,
+	cwd string,
+	tsMs int64,
+) ([]DiffResult, error) {
+	expIndices, hasExpectation := runtime.expectationMap[cmdIdx]
+	if !hasExpectation {
+		return nil, nil
+	}
+	suggestions, err := runtime.scorer.Suggest(ctx, suggest.SuggestContext{
+		SessionID: r.cfg.SessionID,
+		RepoKey:   r.cfg.RepoKey,
+		LastCmd:   lastCmd,
+		Cwd:       cwd,
+		NowMs:     tsMs,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("suggest after command %d: %w", cmdIdx, err)
+	}
+	got := make([]string, len(suggestions))
+	for i, s := range suggestions {
+		got[i] = s.Command
+	}
+	diffs := make([]DiffResult, 0, len(expIndices))
+	for _, expIdx := range expIndices {
+		exp := session.Expected[expIdx]
+		mismatches := computeMismatches(exp.TopK, got)
+		if len(mismatches) == 0 {
+			continue
+		}
+		diffs = append(diffs, DiffResult{
+			StepIndex:    expIdx,
+			AfterCommand: cmdIdx,
+			Expected:     exp.TopK,
+			Got:          got,
+			Mismatches:   mismatches,
+		})
+	}
 	return diffs, nil
 }
 
@@ -475,76 +542,72 @@ func createScorerTables(ctx context.Context, sqlDB *sql.DB) error {
 func computeMismatches(expected, got []string) []Mismatch {
 	var mismatches []Mismatch
 
-	// Build lookup sets
-	gotSet := make(map[string]int) // value -> position
-	for i, g := range got {
-		gotSet[g] = i
-	}
-	expectedSet := make(map[string]int) // value -> position
-	for i, e := range expected {
-		expectedSet[e] = i
-	}
+	gotSet := toPositionSet(got)
+	expectedSet := toPositionSet(expected)
 
-	// Check each expected entry
-	maxLen := len(expected)
-	if len(got) > maxLen {
-		maxLen = len(got)
-	}
-
-	for i := 0; i < maxLen; i++ {
-		var expVal, gotVal string
-		if i < len(expected) {
-			expVal = expected[i]
-		}
-		if i < len(got) {
-			gotVal = got[i]
-		}
-
+	for i := 0; i < maxSliceLen(expected, got); i++ {
+		expVal := valueAt(expected, i)
+		gotVal := valueAt(got, i)
 		if expVal == gotVal {
 			continue
 		}
-
-		if expVal != "" && gotVal == "" {
-			// Expected something but got nothing at this position
-			mismatches = append(mismatches, Mismatch{
-				Position: i,
-				Expected: expVal,
-				Got:      "",
-				Type:     "missing",
-			})
-		} else if expVal == "" && gotVal != "" {
-			// Got something unexpected at this position
-			if _, inExpected := expectedSet[gotVal]; !inExpected {
-				mismatches = append(mismatches, Mismatch{
-					Position: i,
-					Expected: "",
-					Got:      gotVal,
-					Type:     "extra",
-				})
-			}
-		} else {
-			// Both have values but they differ
-			if _, inGot := gotSet[expVal]; inGot {
-				// Expected value exists but at wrong position
-				mismatches = append(mismatches, Mismatch{
-					Position: i,
-					Expected: expVal,
-					Got:      gotVal,
-					Type:     "reordered",
-				})
-			} else {
-				// Expected value is completely missing
-				mismatches = append(mismatches, Mismatch{
-					Position: i,
-					Expected: expVal,
-					Got:      gotVal,
-					Type:     "missing",
-				})
-			}
+		mismatch, ok := mismatchAtPosition(i, expVal, gotVal, gotSet, expectedSet)
+		if ok {
+			mismatches = append(mismatches, mismatch)
 		}
 	}
 
 	return mismatches
+}
+
+func toPositionSet(values []string) map[string]int {
+	set := make(map[string]int, len(values))
+	for i, value := range values {
+		set[value] = i
+	}
+	return set
+}
+
+func maxSliceLen(a, b []string) int {
+	if len(a) > len(b) {
+		return len(a)
+	}
+	return len(b)
+}
+
+func valueAt(values []string, index int) string {
+	if index >= 0 && index < len(values) {
+		return values[index]
+	}
+	return ""
+}
+
+func mismatchAtPosition(position int, expectedVal, gotVal string, gotSet, expectedSet map[string]int) (Mismatch, bool) {
+	switch {
+	case expectedVal != "" && gotVal == "":
+		return newMismatch(position, expectedVal, "", "missing"), true
+	case expectedVal == "" && gotVal != "":
+		if _, inExpected := expectedSet[gotVal]; !inExpected {
+			return newMismatch(position, "", gotVal, "extra"), true
+		}
+		return Mismatch{}, false
+	case expectedVal != "" && gotVal != "":
+		if _, inGot := gotSet[expectedVal]; inGot {
+			return newMismatch(position, expectedVal, gotVal, "reordered"), true
+		}
+		return newMismatch(position, expectedVal, gotVal, "missing"), true
+	default:
+		return Mismatch{}, false
+	}
+}
+
+func newMismatch(position int, expected, got, mismatchType string) Mismatch {
+	return Mismatch{
+		Position: position,
+		Expected: expected,
+		Got:      got,
+		Type:     mismatchType,
+	}
 }
 
 // FormatDiffs produces human-readable diff output showing expected vs actual top-k rankings.

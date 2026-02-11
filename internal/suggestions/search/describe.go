@@ -60,7 +60,6 @@ func (s *DescribeService) Search(ctx context.Context, query string, opts SearchO
 		return nil, nil
 	}
 
-	// Map description to tags
 	queryTags := s.mapToTags(query)
 	if len(queryTags) == 0 {
 		s.logger.Debug("describe search: no tags extracted from query", "query", query)
@@ -68,72 +67,18 @@ func (s *DescribeService) Search(ctx context.Context, query string, opts SearchO
 	}
 
 	s.logger.Debug("describe search: extracted tags", "query", query, "tags", queryTags)
+	limit := normalizeLimit(opts.Limit)
 
-	limit := opts.Limit
-	if limit <= 0 {
-		limit = DefaultLimit
-	}
-	if limit > MaxLimit {
-		limit = MaxLimit
-	}
-
-	// Query templates that have tags, joined with their most recent command_event
 	rows, err := s.queryTemplatesWithTags(ctx, opts)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	// Score each template by tag overlap
-	queryTagSet := make(map[string]bool, len(queryTags))
-	for _, t := range queryTags {
-		queryTagSet[t] = true
-	}
-
-	var results []SearchResult
-	for rows.Next() {
-		var row templateRow
-		if err := rows.Scan(&row.eventID, &row.cmdRaw, &row.repoKey, &row.cwd,
-			&row.timestamp, &row.templateID, &row.cmdNorm, &row.tagsJSON); err != nil {
-			return nil, err
-		}
-
-		// Parse tags from JSON
-		var tags []string
-		if row.tagsJSON.Valid && row.tagsJSON.String != "" && row.tagsJSON.String != "null" {
-			if err := json.Unmarshal([]byte(row.tagsJSON.String), &tags); err != nil {
-				s.logger.Warn("describe search: failed to unmarshal tags",
-					"template_id", row.templateID, "error", err)
-				continue
-			}
-		}
-
-		if len(tags) == 0 {
-			continue
-		}
-
-		// Compute tag overlap score
-		matchedTags := computeMatchedTags(tags, queryTagSet)
-		if len(matchedTags) == 0 {
-			continue
-		}
-
-		// Score = matched / queryTags (recall-oriented Jaccard-like score)
-		score := float64(len(matchedTags)) / float64(len(queryTags))
-
-		results = append(results, SearchResult{
-			ID:          row.eventID,
-			CmdRaw:      row.cmdRaw,
-			CmdNorm:     row.cmdNorm,
-			RepoKey:     row.repoKey,
-			Cwd:         row.cwd,
-			Timestamp:   row.timestamp,
-			Score:       score,
-			Tags:        tags,
-			MatchedTags: matchedTags,
-			Backend:     BackendDescribe,
-			TemplateID:  row.templateID,
-		})
+	queryTagSet := makeTagSet(queryTags)
+	results, err := s.scanDescribeResults(rows, queryTags, queryTagSet)
+	if err != nil {
+		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -153,6 +98,95 @@ func (s *DescribeService) Search(ctx context.Context, query string, opts SearchO
 	}
 
 	return results, nil
+}
+
+func normalizeLimit(limit int) int {
+	if limit <= 0 {
+		limit = DefaultLimit
+	}
+	if limit > MaxLimit {
+		return MaxLimit
+	}
+	return limit
+}
+
+func makeTagSet(tags []string) map[string]bool {
+	out := make(map[string]bool, len(tags))
+	for _, t := range tags {
+		out[t] = true
+	}
+	return out
+}
+
+func (s *DescribeService) scanDescribeResults(
+	rows *sql.Rows,
+	queryTags []string,
+	queryTagSet map[string]bool,
+) ([]SearchResult, error) {
+	var results []SearchResult
+	for rows.Next() {
+		row, err := scanTemplateRow(rows)
+		if err != nil {
+			return nil, err
+		}
+		result, ok := s.describeResultFromRow(row, queryTags, queryTagSet)
+		if ok {
+			results = append(results, result)
+		}
+	}
+	return results, nil
+}
+
+func scanTemplateRow(rows *sql.Rows) (templateRow, error) {
+	var row templateRow
+	err := rows.Scan(&row.eventID, &row.cmdRaw, &row.repoKey, &row.cwd,
+		&row.timestamp, &row.templateID, &row.cmdNorm, &row.tagsJSON)
+	return row, err
+}
+
+func (s *DescribeService) describeResultFromRow(
+	row templateRow,
+	queryTags []string,
+	queryTagSet map[string]bool,
+) (SearchResult, bool) {
+	tags, ok := s.parseTemplateTags(row)
+	if !ok {
+		return SearchResult{}, false
+	}
+	matchedTags := computeMatchedTags(tags, queryTagSet)
+	if len(matchedTags) == 0 {
+		return SearchResult{}, false
+	}
+	score := float64(len(matchedTags)) / float64(len(queryTags))
+	return SearchResult{
+		ID:          row.eventID,
+		CmdRaw:      row.cmdRaw,
+		CmdNorm:     row.cmdNorm,
+		RepoKey:     row.repoKey,
+		Cwd:         row.cwd,
+		Timestamp:   row.timestamp,
+		Score:       score,
+		Tags:        tags,
+		MatchedTags: matchedTags,
+		Backend:     BackendDescribe,
+		TemplateID:  row.templateID,
+	}, true
+}
+
+func (s *DescribeService) parseTemplateTags(row templateRow) ([]string, bool) {
+	if !row.tagsJSON.Valid || row.tagsJSON.String == "" || row.tagsJSON.String == "null" {
+		return nil, false
+	}
+	var tags []string
+	if err := json.Unmarshal([]byte(row.tagsJSON.String), &tags); err != nil {
+		s.logger.Warn("describe search: failed to unmarshal tags",
+			"template_id", row.templateID, "error", err)
+		return nil, false
+	}
+	if len(tags) == 0 {
+		return nil, false
+	}
+	return tags, true
 }
 
 // queryTemplatesWithTags retrieves templates with tags joined to their most recent event.

@@ -26,111 +26,111 @@ func SplitPipeline(cmd string) []Segment {
 		return nil
 	}
 
-	var segments []Segment
-	var current strings.Builder
-	runes := []rune(cmd)
-	n := len(runes)
-	i := 0
+	parser := newPipelineParser(cmd)
+	return parser.parse()
+}
 
-	for i < n {
-		ch := runes[i]
+type pipelineParser struct {
+	runes    []rune
+	pos      int
+	current  strings.Builder
+	segments []Segment
+}
 
-		// Handle escape sequences
-		if ch == '\\' && i+1 < n {
-			current.WriteRune(ch)
-			current.WriteRune(runes[i+1])
-			i += 2
+func newPipelineParser(cmd string) *pipelineParser {
+	return &pipelineParser{runes: []rune(cmd)}
+}
+
+func (p *pipelineParser) parse() []Segment {
+	for p.pos < len(p.runes) {
+		if p.consumeEscaped() || p.consumeSingleQuoted() || p.consumeDoubleQuoted() || p.consumeOperator() {
 			continue
 		}
-
-		// Handle single-quoted strings
-		if ch == '\'' {
-			current.WriteRune(ch)
-			i++
-			for i < n && runes[i] != '\'' {
-				current.WriteRune(runes[i])
-				i++
-			}
-			if i < n {
-				current.WriteRune(runes[i]) // closing quote
-				i++
-			}
-			continue
-		}
-
-		// Handle double-quoted strings
-		if ch == '"' {
-			current.WriteRune(ch)
-			i++
-			for i < n && runes[i] != '"' {
-				if runes[i] == '\\' && i+1 < n {
-					current.WriteRune(runes[i])
-					current.WriteRune(runes[i+1])
-					i += 2
-					continue
-				}
-				current.WriteRune(runes[i])
-				i++
-			}
-			if i < n {
-				current.WriteRune(runes[i]) // closing quote
-				i++
-			}
-			continue
-		}
-
-		// Check for operators (order matters: && before &, || before |)
-		if ch == '&' && i+1 < n && runes[i+1] == '&' {
-			seg := strings.TrimSpace(current.String())
-			if seg != "" {
-				segments = append(segments, Segment{Raw: seg, Operator: OpAnd})
-			}
-			current.Reset()
-			i += 2
-			continue
-		}
-
-		if ch == '|' && i+1 < n && runes[i+1] == '|' {
-			seg := strings.TrimSpace(current.String())
-			if seg != "" {
-				segments = append(segments, Segment{Raw: seg, Operator: OpOr})
-			}
-			current.Reset()
-			i += 2
-			continue
-		}
-
-		if ch == '|' {
-			seg := strings.TrimSpace(current.String())
-			if seg != "" {
-				segments = append(segments, Segment{Raw: seg, Operator: OpPipe})
-			}
-			current.Reset()
-			i++
-			continue
-		}
-
-		if ch == ';' {
-			seg := strings.TrimSpace(current.String())
-			if seg != "" {
-				segments = append(segments, Segment{Raw: seg, Operator: OpSemicolon})
-			}
-			current.Reset()
-			i++
-			continue
-		}
-
-		current.WriteRune(ch)
-		i++
+		p.current.WriteRune(p.runes[p.pos])
+		p.pos++
 	}
+	p.flush("")
+	return p.segments
+}
 
-	// Add the last segment (no trailing operator)
-	seg := strings.TrimSpace(current.String())
+func (p *pipelineParser) consumeEscaped() bool {
+	if p.runes[p.pos] != '\\' || p.pos+1 >= len(p.runes) {
+		return false
+	}
+	p.current.WriteRune(p.runes[p.pos])
+	p.current.WriteRune(p.runes[p.pos+1])
+	p.pos += 2
+	return true
+}
+
+func (p *pipelineParser) consumeSingleQuoted() bool {
+	if p.runes[p.pos] != '\'' {
+		return false
+	}
+	p.consumeQuoted('\'', false)
+	return true
+}
+
+func (p *pipelineParser) consumeDoubleQuoted() bool {
+	if p.runes[p.pos] != '"' {
+		return false
+	}
+	p.consumeQuoted('"', true)
+	return true
+}
+
+func (p *pipelineParser) consumeQuoted(quote rune, allowEscapes bool) {
+	p.current.WriteRune(p.runes[p.pos])
+	p.pos++
+	for p.pos < len(p.runes) && p.runes[p.pos] != quote {
+		if allowEscapes && p.runes[p.pos] == '\\' && p.pos+1 < len(p.runes) {
+			p.current.WriteRune(p.runes[p.pos])
+			p.current.WriteRune(p.runes[p.pos+1])
+			p.pos += 2
+			continue
+		}
+		p.current.WriteRune(p.runes[p.pos])
+		p.pos++
+	}
+	if p.pos < len(p.runes) {
+		p.current.WriteRune(p.runes[p.pos])
+		p.pos++
+	}
+}
+
+func (p *pipelineParser) consumeOperator() bool {
+	if p.consumeDoubleOperator('&', OpAnd) || p.consumeDoubleOperator('|', OpOr) {
+		return true
+	}
+	switch p.runes[p.pos] {
+	case '|':
+		p.flush(OpPipe)
+		p.pos++
+		return true
+	case ';':
+		p.flush(OpSemicolon)
+		p.pos++
+		return true
+	default:
+		return false
+	}
+}
+
+func (p *pipelineParser) consumeDoubleOperator(ch rune, op Operator) bool {
+	if p.runes[p.pos] != ch || p.pos+1 >= len(p.runes) || p.runes[p.pos+1] != ch {
+		return false
+	}
+	p.flush(op)
+	p.pos += 2
+	return true
+}
+
+func (p *pipelineParser) flush(op Operator) {
+	seg := strings.TrimSpace(p.current.String())
 	if seg != "" {
-		segments = append(segments, Segment{Raw: seg, Operator: ""})
+		p.segments = append(p.segments, Segment{Raw: seg, Operator: op})
 	}
-
-	return segments
+	p.current.Reset()
 }
 
 // ReassemblePipeline reconstructs a command string from segments.

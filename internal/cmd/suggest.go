@@ -12,6 +12,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/cache"
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/history"
@@ -68,68 +69,19 @@ func init() {
 func runSuggest(cmd *cobra.Command, args []string) error {
 	applyColorMode()
 
-	prefix := ""
-	if len(args) > 0 {
-		prefix = args[0]
-	}
-
-	// Best-effort suppression: never suggest the exact last executed command.
-	// This is defense-in-depth for cases where the daemon is down (history fallback),
-	// session tracking is unavailable, or the AI cache repeats the last command.
-	lastCmd := strings.TrimSpace(os.Getenv("CLAI_LAST_COMMAND"))
-	lastCmdNorm := ""
-	if lastCmd != "" {
-		lastCmdNorm = strings.TrimSpace(normalize.NormalizeSimple(lastCmd))
-	}
-
-	// Determine output format (--json flag for backwards compat)
-	format := suggestFormat
-	if suggestJSON && format == "text" {
-		format = "json"
-	}
+	prefix := parseSuggestPrefix(args)
+	lastCmd, lastCmdNorm := resolveLastCommand()
+	format := resolveSuggestFormat()
 
 	if integrationDisabled() {
-		if format == "json" {
-			return writeSuggestJSON(nil, nil)
-		}
-		return nil
+		return outputIntegrationDisabled(format)
 	}
 
-	// Record keystroke in the timing state machine for this session.
-	// Each invocation of "clai suggest" implicitly signals a keystroke.
-	var hint *timing.TimingHint
-	if cfg, err := config.Load(); err == nil && cfg.Suggestions.AdaptiveTimingEnabled {
-		machine := getSessionTimingMachine()
-		if machine != nil {
-			nowMs := time.Now().UnixMilli()
-			_, _ = machine.OnKeystroke(nowMs)
-			h := machine.Hint()
-			hint = &h
-		}
-	}
+	hint := buildSuggestTimingHint()
 
 	// Empty prefix - return cached AI suggestion
 	if prefix == "" {
-		suggestion, _ := cache.ReadSuggestion()
-		if suggestion != "" && shouldSuppressLastCmd(suggestion, lastCmd, lastCmdNorm) {
-			suggestion = ""
-		}
-		if format == "json" {
-			if suggestion == "" {
-				return writeSuggestJSON(nil, hint)
-			}
-			return writeSuggestJSON([]suggestOutput{{
-				Text:        suggestion,
-				Source:      "ai",
-				Score:       0,
-				Description: "",
-				Risk:        riskFromText(suggestion),
-			}}, hint)
-		}
-		if suggestion != "" {
-			fmt.Println(suggestion)
-		}
-		return nil
+		return outputCachedSuggestion(format, hint, lastCmd, lastCmdNorm)
 	}
 
 	// Try daemon first for session-aware suggestions
@@ -147,6 +99,78 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 
 	// Output based on format
 	return outputSuggestions(suggestions, format, hint)
+}
+
+func parseSuggestPrefix(args []string) string {
+	if len(args) == 0 {
+		return ""
+	}
+	return args[0]
+}
+
+func resolveLastCommand() (string, string) {
+	lastCmd := strings.TrimSpace(os.Getenv("CLAI_LAST_COMMAND"))
+	if lastCmd == "" {
+		return "", ""
+	}
+	return lastCmd, strings.TrimSpace(normalize.NormalizeSimple(lastCmd))
+}
+
+func resolveSuggestFormat() string {
+	format := suggestFormat
+	if suggestJSON && format == "text" {
+		return "json"
+	}
+	return format
+}
+
+func outputIntegrationDisabled(format string) error {
+	if format != "json" {
+		return nil
+	}
+	return writeSuggestJSON(nil, nil)
+}
+
+func buildSuggestTimingHint() *timing.TimingHint {
+	cfg, err := config.Load()
+	if err != nil || !cfg.Suggestions.AdaptiveTimingEnabled {
+		return nil
+	}
+	machine := getSessionTimingMachine()
+	if machine == nil {
+		return nil
+	}
+	nowMs := time.Now().UnixMilli()
+	_, _ = machine.OnKeystroke(nowMs)
+	h := machine.Hint()
+	return &h
+}
+
+func outputCachedSuggestion(format string, hint *timing.TimingHint, lastCmd, lastCmdNorm string) error {
+	suggestion, _ := cache.ReadSuggestion()
+	if suggestion != "" && shouldSuppressLastCmd(suggestion, lastCmd, lastCmdNorm) {
+		suggestion = ""
+	}
+	if format == "json" {
+		return writeCachedSuggestionJSON(suggestion, hint)
+	}
+	if suggestion != "" {
+		fmt.Println(suggestion)
+	}
+	return nil
+}
+
+func writeCachedSuggestionJSON(suggestion string, hint *timing.TimingHint) error {
+	if suggestion == "" {
+		return writeSuggestJSON(nil, hint)
+	}
+	return writeSuggestJSON([]suggestOutput{{
+		Text:        suggestion,
+		Source:      "ai",
+		Score:       0,
+		Description: "",
+		Risk:        riskFromText(suggestion),
+	}}, hint)
 }
 
 func shouldSuppressLastCmd(suggestion, lastCmd, lastCmdNorm string) bool {
@@ -294,26 +318,22 @@ func getSuggestionsFromHistory(prefix string, limit int) []suggestOutput {
 // getSuggestionsFromDaemon tries to get suggestions from the running daemon.
 // Returns nil if daemon is unavailable or returns no results.
 func getSuggestionsFromDaemon(prefix string, limit int) []suggestOutput {
-	// Need session ID from environment
 	sessionID := os.Getenv("CLAI_SESSION_ID")
 	if sessionID == "" {
 		return nil
 	}
 
-	// Get current working directory
 	cwd, err := os.Getwd()
 	if err != nil {
 		return nil
 	}
 
-	// Try to connect to daemon
 	client, err := ipc.NewClient()
 	if err != nil {
-		return nil // Daemon not available
+		return nil
 	}
 	defer client.Close()
 
-	// Get suggestions from daemon (short timeout for shell integration responsiveness)
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 	daemonSuggestions := client.Suggest(ctx, sessionID, cwd, prefix, len(prefix), false, limit)
@@ -321,60 +341,78 @@ func getSuggestionsFromDaemon(prefix string, limit int) []suggestOutput {
 		return nil
 	}
 
-	// Determine whether to include reasons in output.
-	includeReasons := suggestExplain
-	if !includeReasons {
-		if cfg, err := config.Load(); err == nil {
-			includeReasons = cfg.Suggestions.ExplainEnabled
-		}
-	}
-
-	// Convert to suggestOutput slice
+	includeReasons := shouldIncludeSuggestReasons()
 	results := make([]suggestOutput, len(daemonSuggestions))
 	for i, s := range daemonSuggestions {
-		cwdMatch := false
-		recency := ""
-		for _, r := range s.Reasons {
-			switch strings.TrimSpace(r.Type) {
-			case suggest2.ReasonDirTransition, suggest2.ReasonDirFrequency:
-				cwdMatch = true
-			case "recency":
-				// Always capture recency for ghost meta; keep the list line compact.
-				if recency == "" {
-					recency = strings.TrimSpace(r.Description)
-				}
-			}
-		}
-		if strings.TrimSpace(s.Source) == "cwd" {
-			cwdMatch = true
-		}
-
-		out := suggestOutput{
-			Text:        s.Text,
-			Source:      s.Source,
-			Score:       float64(s.Score),
-			Description: s.Description,
-			Risk:        s.Risk,
-			CwdMatch:    cwdMatch,
-			Recency:     recency,
-		}
-
-		// Convert daemon-provided reasons to explain.Reason when enabled.
-		if includeReasons && len(s.Reasons) > 0 {
-			out.Reasons = make([]explain.Reason, len(s.Reasons))
-			for j, r := range s.Reasons {
-				out.Reasons[j] = explain.Reason{
-					Tag:          r.Type,
-					Description:  r.Description,
-					Contribution: float64(r.Contribution),
-				}
-			}
-		}
-
-		results[i] = out
+		results[i] = daemonSuggestionToOutput(s, includeReasons)
 	}
 
 	return results
+}
+
+func shouldIncludeSuggestReasons() bool {
+	if suggestExplain {
+		return true
+	}
+	cfg, err := config.Load()
+	return err == nil && cfg.Suggestions.ExplainEnabled
+}
+
+func daemonSuggestionToOutput(s *pb.Suggestion, includeReasons bool) suggestOutput {
+	if s == nil {
+		return suggestOutput{}
+	}
+	cwdMatch, recency := deriveSuggestionMeta(s)
+	out := suggestOutput{
+		Text:        s.Text,
+		Source:      s.Source,
+		Score:       float64(s.Score),
+		Description: s.Description,
+		Risk:        s.Risk,
+		CwdMatch:    cwdMatch,
+		Recency:     recency,
+	}
+	if includeReasons {
+		out.Reasons = daemonReasonsToExplain(s.Reasons)
+	}
+	return out
+}
+
+func deriveSuggestionMeta(s *pb.Suggestion) (bool, string) {
+	cwdMatch := strings.TrimSpace(s.Source) == "cwd"
+	recency := ""
+	for _, r := range s.Reasons {
+		if r == nil {
+			continue
+		}
+		switch strings.TrimSpace(r.Type) {
+		case suggest2.ReasonDirTransition, suggest2.ReasonDirFrequency:
+			cwdMatch = true
+		case "recency":
+			if recency == "" {
+				recency = strings.TrimSpace(r.Description)
+			}
+		}
+	}
+	return cwdMatch, recency
+}
+
+func daemonReasonsToExplain(reasons []*pb.SuggestionReason) []explain.Reason {
+	if len(reasons) == 0 {
+		return nil
+	}
+	out := make([]explain.Reason, 0, len(reasons))
+	for _, r := range reasons {
+		if r == nil {
+			continue
+		}
+		out = append(out, explain.Reason{
+			Tag:          r.Type,
+			Description:  r.Description,
+			Contribution: float64(r.Contribution),
+		})
+	}
+	return out
 }
 
 // getSessionTimingMachine returns the timing state machine for the current

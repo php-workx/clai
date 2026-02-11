@@ -208,49 +208,64 @@ func parseConfig(data []byte) (*Config, error) {
 func validateConfig(config *Config) (*Config, error) {
 	for i := range config.Entries {
 		entry := &config.Entries[i]
-
-		// Validate required fields
-		if entry.FilePattern == "" {
-			return nil, fmt.Errorf("entry %d: file_pattern is required", i)
+		if err := validateEntryRequiredFields(i, entry); err != nil {
+			return nil, err
 		}
-		if entry.Kind == "" {
-			return nil, fmt.Errorf("entry %d: kind is required", i)
+		if err := validateParserConfig(i, entry); err != nil {
+			return nil, err
 		}
-		if entry.Runner == "" {
-			return nil, fmt.Errorf("entry %d: runner is required", i)
-		}
-		if entry.Parser.Type == "" {
-			return nil, fmt.Errorf("entry %d: parser.type is required", i)
-		}
-
-		// Validate parser type
-		switch entry.Parser.Type {
-		case ParserTypeJSONKeys, ParserTypeJSONArray:
-			if entry.Parser.Path == "" {
-				return nil, fmt.Errorf("entry %d: parser.path is required for %s", i, entry.Parser.Type)
-			}
-		case ParserTypeRegexLines:
-			if entry.Parser.Pattern == "" {
-				return nil, fmt.Errorf("entry %d: parser.pattern is required for regex_lines", i)
-			}
-			regex, err := regexp.Compile(entry.Parser.Pattern)
-			if err != nil {
-				return nil, fmt.Errorf("entry %d: invalid regex pattern: %w", i, err)
-			}
-			entry.Parser.compiledRegex = regex
-		case ParserTypeMakeQP:
-			// No additional fields required
-		default:
-			return nil, fmt.Errorf("entry %d: unknown parser type: %s", i, entry.Parser.Type)
-		}
-
-		// Validate file pattern is valid
-		if _, err := filepath.Match(entry.FilePattern, "test"); err != nil {
-			return nil, fmt.Errorf("entry %d: invalid file pattern: %w", i, err)
+		if err := validateFilePattern(i, entry.FilePattern); err != nil {
+			return nil, err
 		}
 	}
 
 	return config, nil
+}
+
+func validateEntryRequiredFields(index int, entry *ConfigEntry) error {
+	if entry.FilePattern == "" {
+		return fmt.Errorf("entry %d: file_pattern is required", index)
+	}
+	if entry.Kind == "" {
+		return fmt.Errorf("entry %d: kind is required", index)
+	}
+	if entry.Runner == "" {
+		return fmt.Errorf("entry %d: runner is required", index)
+	}
+	if entry.Parser.Type == "" {
+		return fmt.Errorf("entry %d: parser.type is required", index)
+	}
+	return nil
+}
+
+func validateParserConfig(index int, entry *ConfigEntry) error {
+	switch entry.Parser.Type {
+	case ParserTypeJSONKeys, ParserTypeJSONArray:
+		if entry.Parser.Path == "" {
+			return fmt.Errorf("entry %d: parser.path is required for %s", index, entry.Parser.Type)
+		}
+	case ParserTypeRegexLines:
+		if entry.Parser.Pattern == "" {
+			return fmt.Errorf("entry %d: parser.pattern is required for regex_lines", index)
+		}
+		regex, err := regexp.Compile(entry.Parser.Pattern)
+		if err != nil {
+			return fmt.Errorf("entry %d: invalid regex pattern: %w", index, err)
+		}
+		entry.Parser.compiledRegex = regex
+	case ParserTypeMakeQP:
+		// No additional fields required.
+	default:
+		return fmt.Errorf("entry %d: unknown parser type: %s", index, entry.Parser.Type)
+	}
+	return nil
+}
+
+func validateFilePattern(index int, pattern string) error {
+	if _, err := filepath.Match(pattern, "test"); err != nil {
+		return fmt.Errorf("entry %d: invalid file pattern: %w", index, err)
+	}
+	return nil
 }
 
 // expandPath expands ~ to home directory.

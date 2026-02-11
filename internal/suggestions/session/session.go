@@ -103,38 +103,55 @@ func generateLocalSessionID() string {
 // or an empty string if not running in a container. This helps disambiguate
 // session IDs when hostname and PID may collide across containers.
 func containerFingerprint() string {
-	// Check /.dockerenv (Docker)
-	if _, err := os.Stat("/.dockerenv"); err == nil {
-		// Read container ID from cgroup (Linux)
-		if data, err := os.ReadFile("/proc/self/cgroup"); err == nil {
-			lines := strings.Split(string(data), "\n")
-			for _, line := range lines {
-				// Extract container ID from cgroup path
-				if idx := strings.LastIndex(line, "/"); idx >= 0 {
-					id := line[idx+1:]
-					if len(id) >= 12 {
-						return "docker:" + id[:12]
-					}
-				}
+	if fp, ok := dockerFingerprint(); ok {
+		return fp
+	}
+	if fp, ok := kubernetesFingerprint(); ok {
+		return fp
+	}
+	return genericContainerFingerprint()
+}
+
+func dockerFingerprint() (string, bool) {
+	if _, err := os.Stat("/.dockerenv"); err != nil {
+		return "", false
+	}
+	if data, err := os.ReadFile("/proc/self/cgroup"); err == nil {
+		if id := extractContainerIDFromCgroup(string(data)); id != "" {
+			return "docker:" + id, true
+		}
+	}
+	return "docker:unknown", true
+}
+
+func extractContainerIDFromCgroup(cgroup string) string {
+	lines := strings.Split(cgroup, "\n")
+	for _, line := range lines {
+		if idx := strings.LastIndex(line, "/"); idx >= 0 {
+			id := line[idx+1:]
+			if len(id) >= 12 {
+				return id[:12]
 			}
 		}
-		return "docker:unknown"
 	}
+	return ""
+}
 
-	// Check for Kubernetes (KUBERNETES_SERVICE_HOST is always set in k8s pods)
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
-		podName := os.Getenv("HOSTNAME")
-		if podName == "" {
-			podName = "unknown"
-		}
-		return "k8s:" + podName
+func kubernetesFingerprint() (string, bool) {
+	if os.Getenv("KUBERNETES_SERVICE_HOST") == "" {
+		return "", false
 	}
-
-	// Check for generic container indicators
-	if os.Getenv("container") != "" {
-		return "container:" + os.Getenv("container")
+	podName := os.Getenv("HOSTNAME")
+	if podName == "" {
+		podName = "unknown"
 	}
+	return "k8s:" + podName, true
+}
 
+func genericContainerFingerprint() string {
+	if val := os.Getenv("container"); val != "" {
+		return "container:" + val
+	}
 	return ""
 }
 

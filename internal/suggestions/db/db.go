@@ -101,88 +101,115 @@ func DefaultV1DBPath() (string, error) {
 // migration triggers automatic recovery: corrupt files are rotated to
 // .corrupt.<timestamp> and a fresh database is initialized.
 func Open(ctx context.Context, opts Options) (*DB, error) {
-	// Determine database path
-	dbPath := opts.Path
-	if dbPath == "" {
-		var err error
-		if opts.UseV1 {
-			dbPath, err = DefaultV1DBPath()
-		} else {
-			dbPath, err = DefaultDBPath()
-		}
-		if err != nil {
-			return nil, err
-		}
+	dbPath, err := resolveDBPath(opts)
+	if err != nil {
+		return nil, err
 	}
-
-	// Ensure the directory exists
 	dbDir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dbDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
-	// Acquire daemon lock (unless skipped or read-only)
-	var lock *LockFile
-	if !opts.SkipLock && !opts.ReadOnly {
-		lockOpts := DefaultLockOptions()
-		if opts.LockTimeout > 0 {
-			lockOpts.Timeout = opts.LockTimeout
-		}
-
-		var err error
-		lock, err = AcquireLock(dbDir, lockOpts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to acquire daemon lock: %w", err)
-		}
-	}
-
-	// Attempt to open and initialize the database
-	sqlDB, err := openAndInit(ctx, dbPath, opts)
+	lock, err := acquireOpenLock(dbDir, opts)
 	if err != nil {
-		// Check if recovery is applicable:
-		// - Recovery must be enabled
-		// - Must be V2 database (not V1)
-		// - Error must be corruption (not permission/disk-full)
-		canRecover := opts.EnableRecovery && !opts.UseV1 && !opts.ReadOnly
-		if canRecover && isCorruptionError(err) && !isPermissionError(err) && !isDiskFullError(err) {
-			logger := opts.Logger
-			if logger == nil {
-				logger = slog.Default()
-			}
-
-			sqlDB, err = recoverAndReopen(ctx, dbPath, sqlDB, err.Error(), logger)
-			if err != nil {
-				if lock != nil {
-					lock.Release()
-				}
-				return nil, fmt.Errorf("recovery failed: %w", err)
-			}
-		} else {
-			if lock != nil {
-				lock.Release()
-			}
-			return nil, err
-		}
+		return nil, err
 	}
-
-	// Run optional integrity check (only when recovery is enabled for V2)
-	if opts.EnableRecovery && opts.RunIntegrityCheck && !opts.UseV1 && !opts.ReadOnly {
-		if intErr := RunIntegrityCheck(ctx, sqlDB); intErr != nil {
-			logger := opts.Logger
-			if logger == nil {
-				logger = slog.Default()
-			}
-
-			sqlDB, err = recoverAndReopen(ctx, dbPath, sqlDB, intErr.Error(), logger)
-			if err != nil {
-				if lock != nil {
-					lock.Release()
-				}
-				return nil, fmt.Errorf("integrity check recovery failed: %w", err)
-			}
-		}
+	sqlDB, err := openDatabaseWithRecovery(ctx, dbPath, opts, lock)
+	if err != nil {
+		return nil, err
 	}
+	sqlDB, err = runIntegrityRecoveryIfNeeded(ctx, dbPath, sqlDB, opts, lock)
+	if err != nil {
+		return nil, err
+	}
+	return buildDB(sqlDB, lock, dbPath, opts.ReadOnly), nil
+}
 
+func resolveDBPath(opts Options) (string, error) {
+	if opts.Path != "" {
+		return opts.Path, nil
+	}
+	if opts.UseV1 {
+		return DefaultV1DBPath()
+	}
+	return DefaultDBPath()
+}
+
+func acquireOpenLock(dbDir string, opts Options) (*LockFile, error) {
+	if opts.SkipLock || opts.ReadOnly {
+		return nil, nil
+	}
+	lockOpts := DefaultLockOptions()
+	if opts.LockTimeout > 0 {
+		lockOpts.Timeout = opts.LockTimeout
+	}
+	lock, err := AcquireLock(dbDir, lockOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire daemon lock: %w", err)
+	}
+	return lock, nil
+}
+
+func openDatabaseWithRecovery(ctx context.Context, dbPath string, opts Options, lock *LockFile) (*sql.DB, error) {
+	sqlDB, err := openAndInit(ctx, dbPath, opts)
+	if err == nil {
+		return sqlDB, nil
+	}
+	if !canRecoverFromOpenError(opts, err) {
+		releaseLock(lock)
+		return nil, err
+	}
+	logger := resolveRecoveryLogger(opts.Logger)
+	sqlDB, recErr := recoverAndReopen(ctx, dbPath, sqlDB, err.Error(), logger)
+	if recErr != nil {
+		releaseLock(lock)
+		return nil, fmt.Errorf("recovery failed: %w", recErr)
+	}
+	return sqlDB, nil
+}
+
+func canRecoverFromOpenError(opts Options, err error) bool {
+	canRecover := opts.EnableRecovery && !opts.UseV1 && !opts.ReadOnly
+	return canRecover && isCorruptionError(err) && !isPermissionError(err) && !isDiskFullError(err)
+}
+
+func runIntegrityRecoveryIfNeeded(
+	ctx context.Context,
+	dbPath string,
+	sqlDB *sql.DB,
+	opts Options,
+	lock *LockFile,
+) (*sql.DB, error) {
+	if !opts.EnableRecovery || !opts.RunIntegrityCheck || opts.UseV1 || opts.ReadOnly {
+		return sqlDB, nil
+	}
+	intErr := RunIntegrityCheck(ctx, sqlDB)
+	if intErr == nil {
+		return sqlDB, nil
+	}
+	logger := resolveRecoveryLogger(opts.Logger)
+	recovered, err := recoverAndReopen(ctx, dbPath, sqlDB, intErr.Error(), logger)
+	if err != nil {
+		releaseLock(lock)
+		return nil, fmt.Errorf("integrity check recovery failed: %w", err)
+	}
+	return recovered, nil
+}
+
+func resolveRecoveryLogger(logger *slog.Logger) *slog.Logger {
+	if logger == nil {
+		return slog.Default()
+	}
+	return logger
+}
+
+func releaseLock(lock *LockFile) {
+	if lock != nil {
+		lock.Release()
+	}
+}
+
+func buildDB(sqlDB *sql.DB, lock *LockFile, dbPath string, readOnly bool) *DB {
 	d := &DB{
 		db:        sqlDB,
 		lock:      lock,
@@ -191,15 +218,12 @@ func Open(ctx context.Context, opts Options) (*DB, error) {
 		stoppedCh: make(chan struct{}),
 		stmts:     make(map[string]*sql.Stmt),
 	}
-
-	// Start background WAL checkpointing (unless read-only)
-	if !opts.ReadOnly {
+	if !readOnly {
 		go d.walCheckpointLoop()
 	} else {
-		close(d.stoppedCh) // No background goroutine in read-only mode
+		close(d.stoppedCh)
 	}
-
-	return d, nil
+	return d
 }
 
 // openAndInit opens the SQLite database, configures it, pings it, and

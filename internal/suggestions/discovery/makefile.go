@@ -45,15 +45,7 @@ var commonTargets = map[string]string{
 // discoverMakefile discovers tasks from Makefile targets.
 // Per spec Section 10.1, this uses "Mode A heuristic" - parsing the Makefile directly.
 func (s *Service) discoverMakefile(ctx context.Context, repoRoot string, nowMs int64) error {
-	// Check common Makefile names
-	var makefilePath string
-	for _, name := range []string{"Makefile", "makefile", "GNUmakefile"} {
-		if fileExists(repoRoot, name) {
-			makefilePath = filepath.Join(repoRoot, name)
-			break
-		}
-	}
-
+	makefilePath := findMakefilePath(repoRoot)
 	if makefilePath == "" {
 		return nil // Not an error, just no Makefile
 	}
@@ -65,26 +57,40 @@ func (s *Service) discoverMakefile(ctx context.Context, repoRoot string, nowMs i
 	}
 	defer file.Close()
 
-	// Parse targets
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64*1024), int(s.opts.MaxOutputBytes))
+	tasks, err := s.parseMakefileTargets(ctx, repoRoot, scanner)
+	if err != nil {
+		return err
+	}
+	sort.Slice(tasks, func(i, j int) bool {
+		return tasks[i].Name < tasks[j].Name
+	})
+	return s.saveTasks(ctx, repoRoot, KindMakefile, tasks, nowMs)
+}
 
+func findMakefilePath(repoRoot string) string {
+	for _, name := range []string{"Makefile", "makefile", "GNUmakefile"} {
+		if fileExists(repoRoot, name) {
+			return filepath.Join(repoRoot, name)
+		}
+	}
+	return ""
+}
+
+func (s *Service) parseMakefileTargets(ctx context.Context, repoRoot string, scanner *bufio.Scanner) ([]Task, error) {
 	seenTargets := make(map[string]bool)
 	var tasks []Task
 	var bytesRead int64
 
 	for scanner.Scan() {
-		// Check context cancellation
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
 
 		line := scanner.Text()
 		bytesRead += int64(len(line)) + 1 // +1 for newline
 
-		// Respect output size limit
 		if bytesRead > s.opts.MaxOutputBytes {
 			s.opts.Logger.Warn("Makefile too large, truncating",
 				"bytes_read", bytesRead,
@@ -93,58 +99,36 @@ func (s *Service) discoverMakefile(ctx context.Context, repoRoot string, nowMs i
 			)
 			break
 		}
-
-		// Skip empty lines and comments
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-
-		// Skip lines starting with tab (recipe lines)
-		if strings.HasPrefix(line, "\t") {
-			continue
-		}
-
-		// Skip internal targets (starting with .)
-		if strings.HasPrefix(trimmed, ".") {
-			continue
-		}
-
-		// Match target definition
-		matches := makefileTargetRegex.FindStringSubmatch(line)
-		if len(matches) < 2 {
-			continue
-		}
-
-		target := matches[1]
-
-		// Skip if already seen
-		if seenTargets[target] {
+		target, ok := parseMakefileTarget(line)
+		if !ok || seenTargets[target] {
 			continue
 		}
 		seenTargets[target] = true
-
-		// Get description from common targets, if available
-		description := commonTargets[target]
-
 		tasks = append(tasks, Task{
 			RepoKey:     repoRoot,
 			Kind:        KindMakefile,
 			Name:        target,
 			Command:     "make " + target,
-			Description: description,
+			Description: commonTargets[target],
 		})
 	}
-
 	if err := scanner.Err(); err != nil {
-		return err
+		return nil, err
 	}
+	return tasks, nil
+}
 
-	// Sort for deterministic ordering
-	sort.Slice(tasks, func(i, j int) bool {
-		return tasks[i].Name < tasks[j].Name
-	})
-
-	// Save to database
-	return s.saveTasks(ctx, repoRoot, KindMakefile, tasks, nowMs)
+func parseMakefileTarget(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		return "", false
+	}
+	if strings.HasPrefix(line, "\t") || strings.HasPrefix(trimmed, ".") {
+		return "", false
+	}
+	matches := makefileTargetRegex.FindStringSubmatch(line)
+	if len(matches) < 2 {
+		return "", false
+	}
+	return matches[1], true
 }

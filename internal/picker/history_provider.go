@@ -123,31 +123,60 @@ func (p *HistoryProvider) fetchWithContext(ctx context.Context, req Request) (Re
 func (p *HistoryProvider) fetchWithClient(ctx context.Context, client pb.ClaiServiceClient, req Request) (Response, error) {
 	sessionID, global := extractHistoryScope(req.Options)
 	if global || sessionID == "" {
-		items, atEnd, err := p.fetchHistoryItems(ctx, client, sessionID, global, req.Query, req.Limit, req.Offset)
-		if err != nil {
-			return Response{}, err
-		}
-		return Response{
-			RequestID: req.RequestID,
-			Items:     items,
-			AtEnd:     atEnd,
-		}, nil
+		return p.fetchScopedHistory(ctx, client, req, sessionID, global)
 	}
 
 	state := p.getSessionQueryState(sessionID, req.Query)
-
-	// If we already know the session segment is exhausted for this query and the
-	// request offset is in the global region, serve from global directly.
-	if state.total >= 0 && req.Offset >= state.total {
-		globalOffset := req.Offset - state.total
-		dedupe := p.sessionSeenSnapshot(state)
-		return p.fetchCompositeGlobalPage(ctx, client, req, dedupe, globalOffset, state.total == 0)
+	if p.shouldServeGlobalFromKnownSession(state, req.Offset) {
+		return p.fetchKnownGlobalPage(ctx, client, req, state)
 	}
 
-	// Otherwise, fetch the session page first.
-	sessionPage, sessionAtEnd, fetchErr := p.fetchHistoryItems(ctx, client, sessionID, false, req.Query, req.Limit, req.Offset)
-	if fetchErr != nil {
-		return Response{}, fetchErr
+	sessionPage, sessionAtEnd, total, dedupe, err := p.fetchSessionPageAndUpdateState(ctx, client, req, sessionID, state)
+	if err != nil {
+		return Response{}, err
+	}
+	return p.composeSessionAndGlobalResponse(ctx, client, req, sessionPage, sessionAtEnd, total, dedupe)
+}
+
+func (p *HistoryProvider) fetchScopedHistory(
+	ctx context.Context,
+	client pb.ClaiServiceClient,
+	req Request,
+	sessionID string,
+	global bool,
+) (Response, error) {
+	items, atEnd, err := p.fetchHistoryItems(ctx, client, sessionID, global, req.Query, req.Limit, req.Offset)
+	if err != nil {
+		return Response{}, err
+	}
+	return Response{RequestID: req.RequestID, Items: items, AtEnd: atEnd}, nil
+}
+
+func (p *HistoryProvider) shouldServeGlobalFromKnownSession(state *sessionQueryState, offset int) bool {
+	return state.total >= 0 && offset >= state.total
+}
+
+func (p *HistoryProvider) fetchKnownGlobalPage(
+	ctx context.Context,
+	client pb.ClaiServiceClient,
+	req Request,
+	state *sessionQueryState,
+) (Response, error) {
+	globalOffset := req.Offset - state.total
+	dedupe := p.sessionSeenSnapshot(state)
+	return p.fetchCompositeGlobalPage(ctx, client, req, dedupe, globalOffset, state.total == 0)
+}
+
+func (p *HistoryProvider) fetchSessionPageAndUpdateState(
+	ctx context.Context,
+	client pb.ClaiServiceClient,
+	req Request,
+	sessionID string,
+	state *sessionQueryState,
+) ([]Item, bool, int, map[string]struct{}, error) {
+	sessionPage, sessionAtEnd, err := p.fetchHistoryItems(ctx, client, sessionID, false, req.Query, req.Limit, req.Offset)
+	if err != nil {
+		return nil, false, 0, nil, err
 	}
 	sessionPage = dedupeItems(sessionPage, nil)
 
@@ -160,48 +189,56 @@ func (p *HistoryProvider) fetchWithClient(ctx context.Context, client pb.ClaiSer
 	}
 	total := state.total
 	p.stateMu.Unlock()
-	dedupe := p.sessionSeenSnapshot(state)
+	return sessionPage, sessionAtEnd, total, p.sessionSeenSnapshot(state), nil
+}
 
-	// If session is completely empty, show global directly (no [G] prefix).
+func (p *HistoryProvider) composeSessionAndGlobalResponse(
+	ctx context.Context,
+	client pb.ClaiServiceClient,
+	req Request,
+	sessionPage []Item,
+	sessionAtEnd bool,
+	total int,
+	dedupe map[string]struct{},
+) (Response, error) {
 	if sessionAtEnd && total == 0 && req.Offset == 0 {
-		items, atEnd, gerr := p.fetchHistoryItems(ctx, client, "", true, req.Query, req.Limit, req.Offset)
-		if gerr != nil {
-			return Response{}, gerr
-		}
-		return Response{RequestID: req.RequestID, Items: items, AtEnd: atEnd}, nil
+		return p.fetchScopedHistory(ctx, client, req, "", true)
 	}
-
-	// If there are more session results, return the session page only.
 	if !sessionAtEnd {
 		return Response{RequestID: req.RequestID, Items: sessionPage, AtEnd: false}, nil
 	}
-
-	// We're at the end of the session segment. If the page isn't full, fill the
-	// remainder with deduped global items.
 	remaining := req.Limit - len(sessionPage)
 	if remaining <= 0 {
-		// End-of-session at a page boundary: allow paging into global unless
-		// there are no global items after dedupe.
-		globalFiltered, globalAtEnd, gerr := p.fetchGlobalFiltered(ctx, client, req.Query, 1, dedupe)
-		if gerr != nil {
-			return Response{}, gerr
-		}
-		atEnd := globalAtEnd && len(globalFiltered) == 0
-		return Response{RequestID: req.RequestID, Items: sessionPage, AtEnd: atEnd}, nil
+		return p.sessionBoundaryResponse(ctx, client, req, sessionPage, dedupe)
 	}
+	globalOffset := computeGlobalOffset(req.Offset, total)
+	out, atEnd, err := p.fetchCompositeGlobalRemainder(ctx, client, req, dedupe, globalOffset, remaining)
+	if err != nil {
+		return Response{}, err
+	}
+	return Response{RequestID: req.RequestID, Items: append(sessionPage, out...), AtEnd: atEnd}, nil
+}
 
-	// Global offset for this page is the portion of the offset that spills past
-	// the session segment.
-	globalOffset := 0
-	if total >= 0 && req.Offset > total {
-		globalOffset = req.Offset - total
+func (p *HistoryProvider) sessionBoundaryResponse(
+	ctx context.Context,
+	client pb.ClaiServiceClient,
+	req Request,
+	sessionPage []Item,
+	dedupe map[string]struct{},
+) (Response, error) {
+	globalFiltered, globalAtEnd, err := p.fetchGlobalFiltered(ctx, client, req.Query, 1, dedupe)
+	if err != nil {
+		return Response{}, err
 	}
-	out, atEnd, gerr := p.fetchCompositeGlobalRemainder(ctx, client, req, dedupe, globalOffset, remaining)
-	if gerr != nil {
-		return Response{}, gerr
+	atEnd := globalAtEnd && len(globalFiltered) == 0
+	return Response{RequestID: req.RequestID, Items: sessionPage, AtEnd: atEnd}, nil
+}
+
+func computeGlobalOffset(requestOffset, sessionTotal int) int {
+	if sessionTotal >= 0 && requestOffset > sessionTotal {
+		return requestOffset - sessionTotal
 	}
-	out = append(sessionPage, out...)
-	return Response{RequestID: req.RequestID, Items: out, AtEnd: atEnd}, nil
+	return 0
 }
 
 func extractHistoryScope(opts map[string]string) (sessionID string, global bool) {
@@ -372,32 +409,16 @@ func (p *HistoryProvider) fetchGlobalFiltered(
 
 	offset := 0
 	for {
-		// Over-fetch a bit to compensate for filtered-out duplicates.
-		chunkLimit := want + len(dedupe) + 50
-		if chunkLimit > maxChunk {
-			chunkLimit = maxChunk
-		}
-		items, atEnd, err := p.fetchHistoryItems(ctx, client, "", true, query, chunkLimit, offset)
+		items, atEnd, nextOffset, err := p.fetchGlobalChunk(ctx, client, query, want, dedupe, offset, maxChunk)
 		if err != nil {
 			return nil, false, err
 		}
+		offset = nextOffset
 		if len(items) == 0 {
 			return out, true, nil
 		}
-		offset += len(items)
-
-		for _, it := range items {
-			if _, ok := dedupe[it.Value]; ok {
-				continue
-			}
-			if _, ok := seen[it.Value]; ok {
-				continue
-			}
-			seen[it.Value] = struct{}{}
-			out = append(out, it)
-			if len(out) >= want {
-				return out, false, nil
-			}
+		if p.appendFilteredGlobalItems(&out, items, dedupe, seen, want) {
+			return out, false, nil
 		}
 
 		if atEnd {
@@ -405,6 +426,49 @@ func (p *HistoryProvider) fetchGlobalFiltered(
 		}
 		// Continue with next chunk.
 	}
+}
+
+func (p *HistoryProvider) fetchGlobalChunk(
+	ctx context.Context,
+	client pb.ClaiServiceClient,
+	query string,
+	want int,
+	dedupe map[string]struct{},
+	offset int,
+	maxChunk int,
+) ([]Item, bool, int, error) {
+	chunkLimit := want + len(dedupe) + 50
+	if chunkLimit > maxChunk {
+		chunkLimit = maxChunk
+	}
+	items, atEnd, err := p.fetchHistoryItems(ctx, client, "", true, query, chunkLimit, offset)
+	if err != nil {
+		return nil, false, 0, err
+	}
+	return items, atEnd, offset + len(items), nil
+}
+
+func (p *HistoryProvider) appendFilteredGlobalItems(
+	out *[]Item,
+	items []Item,
+	dedupe map[string]struct{},
+	seen map[string]struct{},
+	want int,
+) bool {
+	for _, it := range items {
+		if _, ok := dedupe[it.Value]; ok {
+			continue
+		}
+		if _, ok := seen[it.Value]; ok {
+			continue
+		}
+		seen[it.Value] = struct{}{}
+		*out = append(*out, it)
+		if len(*out) >= want {
+			return true
+		}
+	}
+	return false
 }
 
 func dedupeItems(items []Item, exclude map[string]struct{}) []Item {

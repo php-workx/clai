@@ -310,28 +310,8 @@ func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.Sugge
 // suggestV1 generates suggestions using the V1 ranker (history-based).
 func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResults int) *pb.SuggestResponse {
 	nowMs := time.Now().UnixMilli()
-
-	// Get the last command from the session for affinity scoring
-	lastCommand := ""
-	sessionID := req.SessionId
-	cmds, err := s.store.QueryCommands(ctx, storage.CommandQuery{
-		SessionID: &sessionID,
-		Limit:     1,
-	})
-	if err == nil && len(cmds) > 0 {
-		lastCommand = cmds[0].Command
-	}
-
-	// Rank suggestions from history
-	rankReq := &suggest.RankRequest{
-		SessionID:   req.SessionId,
-		CWD:         req.Cwd,
-		Prefix:      req.Buffer,
-		LastCommand: lastCommand,
-		MaxResults:  maxResults,
-	}
-
-	suggestions, err := s.ranker.Rank(ctx, rankReq)
+	lastCommand := s.lastCommandForSession(ctx, req.SessionId)
+	suggestions, err := s.rankV1Suggestions(ctx, req, maxResults, lastCommand)
 	if err != nil {
 		s.logger.Warn("failed to rank suggestions",
 			"session_id", req.SessionId,
@@ -343,73 +323,110 @@ func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResul
 	// Convert to protobuf
 	pbSuggestions := make([]*pb.Suggestion, len(suggestions))
 	for i, sug := range suggestions {
-		risk := ""
-		if sanitize.IsDestructive(sug.Text) {
-			risk = riskDestructive
-		}
-
-		// Best-effort enriched reasons for explainability and richer UI.
-		pbReasons := make([]*pb.SuggestionReason, 0, len(sug.Reasons)+4)
-		for _, r := range sug.Reasons {
-			typ := strings.TrimSpace(r.Type)
-			if typ == "" {
-				continue
-			}
-			pbReasons = append(pbReasons, &pb.SuggestionReason{
-				Type:         typ,
-				Description:  r.Description,
-				Contribution: float32(r.Contribution),
-			})
-		}
-
-		// Add simple recency/frequency hints. These are not strictly score features,
-		// but they help users understand why something was suggested.
-		if sug.LastSeenUnixMs > 0 {
-			pbReasons = append(pbReasons, &pb.SuggestionReason{
-				Type:        "recency",
-				Description: fmt.Sprintf("last %s ago", formatAgo(nowMs-sug.LastSeenUnixMs)),
-			})
-		}
-		totalRuns := sug.SuccessCount + sug.FailureCount
-		if totalRuns > 0 {
-			pbReasons = append(pbReasons, &pb.SuggestionReason{
-				Type:        "frequency",
-				Description: fmt.Sprintf("freq %d", totalRuns),
-			})
-			successPct := int((float64(sug.SuccessCount) / float64(totalRuns)) * 100.0)
-			pbReasons = append(pbReasons, &pb.SuggestionReason{
-				Type:        "success",
-				Description: fmt.Sprintf("success %d%% (%d/%d)", successPct, sug.SuccessCount, totalRuns),
-			})
-		}
-
-		// Prefer a short narrative "why" (avoid repeating the numeric hints above).
-		desc := strings.TrimSpace(sug.Description)
-		if desc == "" {
-			desc = v1WhyNarrative(sug, lastCommand)
-		}
-
-		cmdNorm := strings.TrimSpace(sug.CmdNorm)
-		if cmdNorm == "" {
-			cmdNorm = suggest.NormalizeCommand(sug.Text)
-		}
-
-		pbSuggestions[i] = &pb.Suggestion{
-			Text:        sug.Text,
-			Description: desc,
-			Source:      sug.Source,
-			Score:       sug.Score,
-			Risk:        risk,
-			CmdNorm:     cmdNorm,
-			Confidence:  0, // V1 ranker does not compute a separate confidence score.
-			Reasons:     pbReasons,
-		}
+		pbSuggestions[i] = v1SuggestionToProto(sug, lastCommand, nowMs)
 	}
 
 	return &pb.SuggestResponse{
 		Suggestions: pbSuggestions,
 		FromCache:   false,
 	}
+}
+
+func (s *Server) lastCommandForSession(ctx context.Context, sessionID string) string {
+	if strings.TrimSpace(sessionID) == "" {
+		return ""
+	}
+	cmds, err := s.store.QueryCommands(ctx, storage.CommandQuery{
+		SessionID: &sessionID,
+		Limit:     1,
+	})
+	if err != nil || len(cmds) == 0 {
+		return ""
+	}
+	return cmds[0].Command
+}
+
+func (s *Server) rankV1Suggestions(
+	ctx context.Context,
+	req *pb.SuggestRequest,
+	maxResults int,
+	lastCommand string,
+) ([]suggest.Suggestion, error) {
+	return s.ranker.Rank(ctx, &suggest.RankRequest{
+		SessionID:   req.SessionId,
+		CWD:         req.Cwd,
+		Prefix:      req.Buffer,
+		LastCommand: lastCommand,
+		MaxResults:  maxResults,
+	})
+}
+
+func v1SuggestionToProto(sug suggest.Suggestion, lastCommand string, nowMs int64) *pb.Suggestion {
+	desc := strings.TrimSpace(sug.Description)
+	if desc == "" {
+		desc = v1WhyNarrative(sug, lastCommand)
+	}
+	cmdNorm := strings.TrimSpace(sug.CmdNorm)
+	if cmdNorm == "" {
+		cmdNorm = suggest.NormalizeCommand(sug.Text)
+	}
+	return &pb.Suggestion{
+		Text:        sug.Text,
+		Description: desc,
+		Source:      sug.Source,
+		Score:       sug.Score,
+		Risk:        v1SuggestionRisk(sug.Text),
+		CmdNorm:     cmdNorm,
+		Confidence:  0, // V1 ranker does not compute a separate confidence score.
+		Reasons:     v1SuggestionReasons(sug, nowMs),
+	}
+}
+
+func v1SuggestionRisk(text string) string {
+	if sanitize.IsDestructive(text) {
+		return riskDestructive
+	}
+	return ""
+}
+
+func v1SuggestionReasons(sug suggest.Suggestion, nowMs int64) []*pb.SuggestionReason {
+	reasons := make([]*pb.SuggestionReason, 0, len(sug.Reasons)+3)
+	reasons = append(reasons, v1BaseReasons(sug)...)
+	if sug.LastSeenUnixMs > 0 {
+		reasons = append(reasons, &pb.SuggestionReason{
+			Type:        "recency",
+			Description: fmt.Sprintf("last %s ago", formatAgo(nowMs-sug.LastSeenUnixMs)),
+		})
+	}
+	totalRuns := sug.SuccessCount + sug.FailureCount
+	if totalRuns > 0 {
+		reasons = append(reasons, &pb.SuggestionReason{
+			Type:        "frequency",
+			Description: fmt.Sprintf("freq %d", totalRuns),
+		})
+		successPct := int((float64(sug.SuccessCount) / float64(totalRuns)) * 100.0)
+		reasons = append(reasons, &pb.SuggestionReason{
+			Type:        "success",
+			Description: fmt.Sprintf("success %d%% (%d/%d)", successPct, sug.SuccessCount, totalRuns),
+		})
+	}
+	return reasons
+}
+
+func v1BaseReasons(sug suggest.Suggestion) []*pb.SuggestionReason {
+	reasons := make([]*pb.SuggestionReason, 0, len(sug.Reasons))
+	for _, r := range sug.Reasons {
+		typ := strings.TrimSpace(r.Type)
+		if typ == "" {
+			continue
+		}
+		reasons = append(reasons, &pb.SuggestionReason{
+			Type:         typ,
+			Description:  r.Description,
+			Contribution: float32(r.Contribution),
+		})
+	}
+	return reasons
 }
 
 // TextToCommand handles the TextToCommand RPC.

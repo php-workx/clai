@@ -336,150 +336,144 @@ type SuggestContext struct {
 // Plus amplifiers: dismissal penalty, recency decay, prefix filtering,
 // near-duplicate suppression, and deterministic tie-breaking.
 func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Suggestion, error) {
+	suggestCtx = s.normalizeSuggestContext(suggestCtx)
+	candidates := make(map[string]*Suggestion)
+
+	s.collectCandidates(ctx, suggestCtx, candidates)
+	s.applyContextBoosts(ctx, candidates, suggestCtx)
+	s.applyDangerousPenalties(candidates)
+	s.applyDismissalPenalties(ctx, candidates, suggestCtx)
+
+	candidates = s.applyPrefixFilter(candidates, suggestCtx.Prefix)
+	s.suppressLastCommand(candidates, suggestCtx.LastCmd)
+
+	return s.finalizeSuggestions(candidates), nil
+}
+
+func (s *Scorer) normalizeSuggestContext(suggestCtx SuggestContext) SuggestContext {
 	if suggestCtx.NowMs == 0 {
 		suggestCtx.NowMs = time.Now().UnixMilli()
 	}
 	if suggestCtx.Scope == "" {
 		suggestCtx.Scope = score.ScopeGlobal
 	}
+	return suggestCtx
+}
 
-	// Gather candidates from all sources
-	candidates := make(map[string]*Suggestion)
+func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx SuggestContext, candidates map[string]*Suggestion) {
+	s.collectTransitionCandidates(ctx, candidates, suggestCtx.RepoKey, suggestCtx.LastCmd, ReasonRepoTransition, s.cfg.Weights.RepoTransition, "repo transitions query failed")
+	s.collectTransitionCandidates(ctx, candidates, score.ScopeGlobal, suggestCtx.LastCmd, ReasonGlobalTransition, s.cfg.Weights.GlobalTransition, "global transitions query failed")
+	s.collectTransitionCandidates(ctx, candidates, suggestCtx.DirScopeKey, suggestCtx.LastCmd, ReasonDirTransition, s.cfg.Weights.DirTransition, "dir transitions query failed")
 
-	// 1. Repo transitions
-	if suggestCtx.RepoKey != "" && suggestCtx.LastCmd != "" && s.transitionStore != nil {
-		repoTrans, err := s.transitionStore.GetTopNextCommands(ctx, suggestCtx.RepoKey, suggestCtx.LastCmd, 10)
-		if err != nil {
-			s.cfg.Logger.Debug("repo transitions query failed", "error", err)
-		} else {
-			for _, t := range repoTrans {
-				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonRepoTransition, s.cfg.Weights.RepoTransition, t.LastTsMs)
-			}
-		}
+	s.collectFrequencyCandidates(ctx, candidates, suggestCtx.RepoKey, ReasonRepoFrequency, s.cfg.Weights.RepoFrequency, suggestCtx.NowMs, "repo frequency query failed")
+	s.collectFrequencyCandidates(ctx, candidates, score.ScopeGlobal, ReasonGlobalFrequency, s.cfg.Weights.GlobalFrequency, suggestCtx.NowMs, "global frequency query failed")
+	s.collectFrequencyCandidates(ctx, candidates, suggestCtx.DirScopeKey, ReasonDirFrequency, s.cfg.Weights.DirFrequency, suggestCtx.NowMs, "dir frequency query failed")
+
+	s.collectProjectTasks(ctx, candidates, suggestCtx.RepoKey)
+}
+
+func (s *Scorer) collectTransitionCandidates(ctx context.Context, candidates map[string]*Suggestion, scope, lastCmd, reason string, weight float64, logMessage string) {
+	if s.transitionStore == nil || scope == "" || lastCmd == "" {
+		return
 	}
 
-	// 2. Global transitions
-	if suggestCtx.LastCmd != "" && s.transitionStore != nil {
-		globalTrans, err := s.transitionStore.GetTopNextCommands(ctx, score.ScopeGlobal, suggestCtx.LastCmd, 10)
-		if err != nil {
-			s.cfg.Logger.Debug("global transitions query failed", "error", err)
-		} else {
-			for _, t := range globalTrans {
-				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonGlobalTransition, s.cfg.Weights.GlobalTransition, t.LastTsMs)
-			}
-		}
+	transitions, err := s.transitionStore.GetTopNextCommands(ctx, scope, lastCmd, 10)
+	if err != nil {
+		s.cfg.Logger.Debug(logMessage, "error", err)
+		return
 	}
 
-	// 3. Directory-scoped transitions
-	if suggestCtx.DirScopeKey != "" && suggestCtx.LastCmd != "" && s.transitionStore != nil {
-		dirTrans, err := s.transitionStore.GetTopNextCommands(ctx, suggestCtx.DirScopeKey, suggestCtx.LastCmd, 10)
-		if err != nil {
-			s.cfg.Logger.Debug("dir transitions query failed", "error", err)
-		} else {
-			for _, t := range dirTrans {
-				s.addCandidate(candidates, t.NextNorm, float64(t.Count), ReasonDirTransition, s.cfg.Weights.DirTransition, t.LastTsMs)
-			}
-		}
+	for _, t := range transitions {
+		s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTsMs)
+	}
+}
+
+func (s *Scorer) collectFrequencyCandidates(ctx context.Context, candidates map[string]*Suggestion, scope, reason string, weight float64, nowMs int64, logMessage string) {
+	if s.freqStore == nil || scope == "" {
+		return
 	}
 
-	// 4. Repo frequency
-	if suggestCtx.RepoKey != "" && s.freqStore != nil {
-		repoFreq, err := s.freqStore.GetTopCommandsAt(ctx, suggestCtx.RepoKey, 10, suggestCtx.NowMs)
-		if err != nil {
-			s.cfg.Logger.Debug("repo frequency query failed", "error", err)
-		} else {
-			for _, f := range repoFreq {
-				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonRepoFrequency, s.cfg.Weights.RepoFrequency, f.LastTsMs)
-			}
-		}
+	frequencies, err := s.freqStore.GetTopCommandsAt(ctx, scope, 10, nowMs)
+	if err != nil {
+		s.cfg.Logger.Debug(logMessage, "error", err)
+		return
 	}
 
-	// 5. Global frequency
-	if s.freqStore != nil {
-		globalFreq, err := s.freqStore.GetTopCommandsAt(ctx, score.ScopeGlobal, 10, suggestCtx.NowMs)
-		if err != nil {
-			s.cfg.Logger.Debug("global frequency query failed", "error", err)
-		} else {
-			for _, f := range globalFreq {
-				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonGlobalFrequency, s.cfg.Weights.GlobalFrequency, f.LastTsMs)
-			}
-		}
+	for _, f := range frequencies {
+		s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTsMs)
+	}
+}
+
+func (s *Scorer) collectProjectTasks(ctx context.Context, candidates map[string]*Suggestion, repoKey string) {
+	if s.discoveryService == nil || repoKey == "" {
+		return
 	}
 
-	// 6. Directory-scoped frequency
-	if suggestCtx.DirScopeKey != "" && s.freqStore != nil {
-		dirFreq, err := s.freqStore.GetTopCommandsAt(ctx, suggestCtx.DirScopeKey, 10, suggestCtx.NowMs)
-		if err != nil {
-			s.cfg.Logger.Debug("dir frequency query failed", "error", err)
-		} else {
-			for _, f := range dirFreq {
-				s.addCandidate(candidates, f.CmdNorm, f.Score, ReasonDirFrequency, s.cfg.Weights.DirFrequency, f.LastTsMs)
-			}
-		}
+	tasks, err := s.discoveryService.GetTasks(ctx, repoKey)
+	if err != nil {
+		s.cfg.Logger.Debug("project tasks query failed", "error", err)
+		return
 	}
 
-	// 7. Project tasks
-	if suggestCtx.RepoKey != "" && s.discoveryService != nil {
-		tasks, err := s.discoveryService.GetTasks(ctx, suggestCtx.RepoKey)
-		if err != nil {
-			s.cfg.Logger.Debug("project tasks query failed", "error", err)
-		} else {
-			for _, t := range tasks {
-				s.addCandidate(candidates, t.Command, 1.0, ReasonProjectTask, s.cfg.Weights.ProjectTask, 0)
-			}
-		}
+	for _, t := range tasks {
+		s.addCandidate(candidates, t.Command, 1.0, ReasonProjectTask, s.cfg.Weights.ProjectTask, 0)
 	}
+}
 
-	// 8. Workflow boost: amplify candidates matching active workflow next-step
+func (s *Scorer) applyContextBoosts(ctx context.Context, candidates map[string]*Suggestion, suggestCtx SuggestContext) {
 	s.applyWorkflowBoost(candidates, suggestCtx)
-
-	// 9. Pipeline confidence: add weight for pipeline continuation candidates
 	s.applyPipelineConfidence(ctx, candidates, suggestCtx)
-
-	// 10. Recovery boost: amplify recovery candidates after failures
 	s.applyRecoveryBoost(ctx, candidates, suggestCtx)
+}
 
-	// Apply dangerous command penalties
+func (s *Scorer) applyDangerousPenalties(candidates map[string]*Suggestion) {
 	for cmd, sug := range candidates {
-		if s.isDangerous(cmd) {
-			sug.scores.dangerous = s.cfg.Weights.DangerousPenalty
-			sug.Score += s.cfg.Weights.DangerousPenalty
-			sug.Reasons = append(sug.Reasons, ReasonDangerous)
+		if !s.isDangerous(cmd) {
+			continue
 		}
+		sug.scores.dangerous = s.cfg.Weights.DangerousPenalty
+		sug.Score += s.cfg.Weights.DangerousPenalty
+		sug.Reasons = append(sug.Reasons, ReasonDangerous)
+	}
+}
+
+func (s *Scorer) applyPrefixFilter(candidates map[string]*Suggestion, prefix string) map[string]*Suggestion {
+	if prefix == "" {
+		return candidates
+	}
+	return s.filterByPrefix(candidates, prefix)
+}
+
+func (s *Scorer) suppressLastCommand(candidates map[string]*Suggestion, lastCmd string) {
+	if lastCmd == "" {
+		return
 	}
 
-	// Apply dismissal penalties
-	s.applyDismissalPenalties(ctx, candidates, suggestCtx)
+	delete(candidates, lastCmd)
 
-	// Apply prefix filtering
-	if suggestCtx.Prefix != "" {
-		candidates = s.filterByPrefix(candidates, suggestCtx.Prefix)
+	normalized := strings.TrimSpace(normalize.NormalizeSimple(lastCmd))
+	if normalized != "" && normalized != lastCmd {
+		delete(candidates, normalized)
 	}
+}
 
-	// Never suggest the exact last command again.
-	// This is particularly important when prefix is empty (i.e., "what next?"),
-	// where the most recent command often wins frequency/recency scoring.
-	if suggestCtx.LastCmd != "" {
-		delete(candidates, suggestCtx.LastCmd)
-
-		// Defense-in-depth: callers sometimes pass raw cmd text instead of normalized.
-		// Suppress both representations if they differ.
-		if norm := strings.TrimSpace(normalize.NormalizeSimple(suggestCtx.LastCmd)); norm != "" && norm != suggestCtx.LastCmd {
-			delete(candidates, norm)
-		}
-	}
-
-	// Convert to sorted slice
+func (s *Scorer) finalizeSuggestions(candidates map[string]*Suggestion) []Suggestion {
 	suggestions := make([]Suggestion, 0, len(candidates))
 	for _, sug := range candidates {
 		sug.Confidence = s.calculateConfidence(sug)
 		suggestions = append(suggestions, *sug)
 	}
 
-	// Apply near-duplicate suppression (by template ID)
 	suggestions = suppressNearDuplicates(suggestions)
+	sortSuggestions(suggestions)
 
-	// Deterministic sort: score desc > frequency desc > recency desc > lexicographic cmd asc
+	if len(suggestions) > s.cfg.TopK {
+		return suggestions[:s.cfg.TopK]
+	}
+	return suggestions
+}
+
+func sortSuggestions(suggestions []Suggestion) {
 	sort.SliceStable(suggestions, func(i, j int) bool {
 		if suggestions[i].Score != suggestions[j].Score {
 			return suggestions[i].Score > suggestions[j].Score
@@ -492,13 +486,6 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 		}
 		return suggestions[i].Command < suggestions[j].Command
 	})
-
-	// Limit to top-K
-	if len(suggestions) > s.cfg.TopK {
-		suggestions = suggestions[:s.cfg.TopK]
-	}
-
-	return suggestions, nil
 }
 
 // applyWorkflowBoost amplifies candidates that match active workflow next-steps.
@@ -810,86 +797,74 @@ func suppressNearDuplicates(suggestions []Suggestion) []Suggestion {
 // Per spec Section 11.3: use log(count+1) for scoring.
 // Per spec Section 11.5: deduplicate by cmd_norm, merge reasons.
 func (s *Scorer) addCandidate(candidates map[string]*Suggestion, cmd string, rawScore float64, reason string, weight float64, lastSeenMs int64) {
-	// Apply log(count+1) per spec Section 11.3
 	adjustedScore := math.Log(rawScore+1) * weight
 
 	if existing, ok := candidates[cmd]; ok {
-		// Merge: add to score and append reason
-		existing.Score += adjustedScore
-		existing.Reasons = append(existing.Reasons, reason)
+		s.mergeCandidate(existing, rawScore, reason, adjustedScore, lastSeenMs)
+		return
+	}
 
-		// Track frequency for tie-breaking (use max of raw scores)
-		if rawScore > existing.frequency {
-			existing.frequency = rawScore
-		}
-		if lastSeenMs > existing.lastSeenMs {
-			existing.lastSeenMs = lastSeenMs
-		}
+	candidates[cmd] = newCandidate(cmd, rawScore, reason, adjustedScore, lastSeenMs)
+}
 
-		// Track best-effort raw signals for UI display.
-		switch reason {
-		case ReasonRepoFrequency, ReasonGlobalFrequency, ReasonDirFrequency:
-			if rawScore > existing.maxFreqScore {
-				existing.maxFreqScore = rawScore
-			}
-		case ReasonRepoTransition, ReasonGlobalTransition, ReasonDirTransition:
-			if int(rawScore) > existing.maxTransCount {
-				existing.maxTransCount = int(rawScore)
-			}
-		}
+func (s *Scorer) mergeCandidate(existing *Suggestion, rawScore float64, reason string, adjustedScore float64, lastSeenMs int64) {
+	existing.Score += adjustedScore
+	existing.Reasons = append(existing.Reasons, reason)
 
-		// Track score breakdown
-		switch reason {
-		case ReasonRepoTransition:
-			existing.scores.repoTransition += adjustedScore
-		case ReasonGlobalTransition:
-			existing.scores.globalTransition += adjustedScore
-		case ReasonRepoFrequency:
-			existing.scores.repoFrequency += adjustedScore
-		case ReasonGlobalFrequency:
-			existing.scores.globalFrequency += adjustedScore
-		case ReasonProjectTask:
-			existing.scores.projectTask += adjustedScore
-		case ReasonDirTransition:
-			existing.scores.dirTransition += adjustedScore
-		case ReasonDirFrequency:
-			existing.scores.dirFrequency += adjustedScore
-		}
-	} else {
-		// New candidate
-		sug := &Suggestion{
-			Command:    cmd,
-			Score:      adjustedScore,
-			Reasons:    []string{reason},
-			frequency:  rawScore,
-			lastSeenMs: lastSeenMs,
-		}
-		// Track best-effort raw signals for UI display.
-		switch reason {
-		case ReasonRepoFrequency, ReasonGlobalFrequency, ReasonDirFrequency:
-			sug.maxFreqScore = rawScore
-		case ReasonRepoTransition, ReasonGlobalTransition, ReasonDirTransition:
-			sug.maxTransCount = int(rawScore)
-		}
+	if rawScore > existing.frequency {
+		existing.frequency = rawScore
+	}
+	if lastSeenMs > existing.lastSeenMs {
+		existing.lastSeenMs = lastSeenMs
+	}
 
-		switch reason {
-		case ReasonRepoTransition:
-			sug.scores.repoTransition = adjustedScore
-		case ReasonGlobalTransition:
-			sug.scores.globalTransition = adjustedScore
-		case ReasonRepoFrequency:
-			sug.scores.repoFrequency = adjustedScore
-		case ReasonGlobalFrequency:
-			sug.scores.globalFrequency = adjustedScore
-		case ReasonProjectTask:
-			sug.scores.projectTask = adjustedScore
-		case ReasonDirTransition:
-			sug.scores.dirTransition = adjustedScore
-		case ReasonDirFrequency:
-			sug.scores.dirFrequency = adjustedScore
-		}
+	updateSuggestionRawSignals(existing, reason, rawScore)
+	applySuggestionScore(existing, reason, adjustedScore)
+}
 
-		candidates[cmd] = sug
+func newCandidate(cmd string, rawScore float64, reason string, adjustedScore float64, lastSeenMs int64) *Suggestion {
+	suggestion := &Suggestion{
+		Command:    cmd,
+		Score:      adjustedScore,
+		Reasons:    []string{reason},
+		frequency:  rawScore,
+		lastSeenMs: lastSeenMs,
+	}
+
+	updateSuggestionRawSignals(suggestion, reason, rawScore)
+	applySuggestionScore(suggestion, reason, adjustedScore)
+	return suggestion
+}
+
+func updateSuggestionRawSignals(suggestion *Suggestion, reason string, rawScore float64) {
+	switch reason {
+	case ReasonRepoFrequency, ReasonGlobalFrequency, ReasonDirFrequency:
+		if rawScore > suggestion.maxFreqScore {
+			suggestion.maxFreqScore = rawScore
+		}
+	case ReasonRepoTransition, ReasonGlobalTransition, ReasonDirTransition:
+		if int(rawScore) > suggestion.maxTransCount {
+			suggestion.maxTransCount = int(rawScore)
+		}
+	}
+}
+
+func applySuggestionScore(suggestion *Suggestion, reason string, adjustedScore float64) {
+	switch reason {
+	case ReasonRepoTransition:
+		suggestion.scores.repoTransition += adjustedScore
+	case ReasonGlobalTransition:
+		suggestion.scores.globalTransition += adjustedScore
+	case ReasonRepoFrequency:
+		suggestion.scores.repoFrequency += adjustedScore
+	case ReasonGlobalFrequency:
+		suggestion.scores.globalFrequency += adjustedScore
+	case ReasonProjectTask:
+		suggestion.scores.projectTask += adjustedScore
+	case ReasonDirTransition:
+		suggestion.scores.dirTransition += adjustedScore
+	case ReasonDirFrequency:
+		suggestion.scores.dirFrequency += adjustedScore
 	}
 }
 

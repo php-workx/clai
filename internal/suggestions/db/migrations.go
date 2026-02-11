@@ -210,53 +210,42 @@ func ValidateSchema(ctx context.Context, db *sql.DB) error {
 // ValidateV2Schema checks that all expected V2 tables, indexes, and triggers exist.
 // This is the primary validation for V2 database files.
 func ValidateV2Schema(ctx context.Context, db *sql.DB) error {
-	// Check all V2 tables exist
-	for _, table := range V2AllTables {
-		var name string
-		err := db.QueryRowContext(ctx, `
-			SELECT name FROM sqlite_master
-			WHERE (type='table' OR type='view') AND name=?
-		`, table).Scan(&name)
+	if err := validateSchemaObjects(ctx, db, "(type='table' OR type='view')", V2AllTables, "table"); err != nil {
+		return err
+	}
+	if err := validateSchemaObjects(ctx, db, "type='index'", V2AllIndexes, "index"); err != nil {
+		return err
+	}
+	return validateSchemaObjects(ctx, db, "type='trigger'", V2AllTriggers, "trigger")
+}
 
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("table %q does not exist", table)
-			}
-			return fmt.Errorf("failed to check table %q: %w", table, err)
+func validateSchemaObjects(
+	ctx context.Context,
+	db *sql.DB,
+	typeFilter string,
+	names []string,
+	kind string,
+) error {
+	query := fmt.Sprintf(`
+		SELECT name FROM sqlite_master
+		WHERE %s AND name=?
+	`, typeFilter)
+	for _, name := range names {
+		if err := validateSchemaObject(ctx, db, query, name, kind); err != nil {
+			return err
 		}
 	}
-
-	// Check all V2 indexes exist
-	for _, index := range V2AllIndexes {
-		var name string
-		err := db.QueryRowContext(ctx, `
-			SELECT name FROM sqlite_master
-			WHERE type='index' AND name=?
-		`, index).Scan(&name)
-
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("index %q does not exist", index)
-			}
-			return fmt.Errorf("failed to check index %q: %w", index, err)
-		}
-	}
-
-	// Check all V2 triggers exist
-	for _, trigger := range V2AllTriggers {
-		var name string
-		err := db.QueryRowContext(ctx, `
-			SELECT name FROM sqlite_master
-			WHERE type='trigger' AND name=?
-		`, trigger).Scan(&name)
-
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("trigger %q does not exist", trigger)
-			}
-			return fmt.Errorf("failed to check trigger %q: %w", trigger, err)
-		}
-	}
-
 	return nil
+}
+
+func validateSchemaObject(ctx context.Context, db *sql.DB, query, name, kind string) error {
+	var found string
+	err := db.QueryRowContext(ctx, query, name).Scan(&found)
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("%s %q does not exist", kind, name)
+	}
+	return fmt.Errorf("failed to check %s %q: %w", kind, name, err)
 }

@@ -209,21 +209,9 @@ func ExtractTags(segments []Segment) []string {
 		if cmd == "" {
 			continue
 		}
-
-		// Look up base command tags
-		if tags, ok := commandTags[cmd]; ok {
-			for _, t := range tags {
-				tagSet[t] = true
-			}
-		}
-
-		// Special handling for go subcommands
+		addTags(tagSet, commandTags[cmd])
 		if cmd == "go" && sub != "" {
-			if tags, ok := goSubcommandTags[sub]; ok {
-				for _, t := range tags {
-					tagSet[t] = true
-				}
-			}
+			addTags(tagSet, goSubcommandTags[sub])
 		}
 	}
 
@@ -237,6 +225,12 @@ func ExtractTags(segments []Segment) []string {
 	}
 	sort.Strings(tags)
 	return tags
+}
+
+func addTags(tagSet map[string]bool, tags []string) {
+	for _, t := range tags {
+		tagSet[t] = true
+	}
 }
 
 // extractCommandAndSub extracts the command name and optional subcommand

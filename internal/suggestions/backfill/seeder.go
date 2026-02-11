@@ -79,33 +79,43 @@ func Seed(ctx context.Context, db *sql.DB, entries []history.ImportEntry, shell 
 	}
 
 	sessionID := "backfill-" + shell
+	seeded, err := isBackfillSeeded(ctx, db, sessionID)
+	if err != nil {
+		return fmt.Errorf("idempotency check: %w", err)
+	}
+	if seeded {
+		return nil
+	}
 
-	// Idempotency check: if we already seeded for this shell, skip.
+	sorted := sortImportEntries(entries)
+	normalized := parallelNormalize(ctx, sorted)
+	templates := buildTemplateAggregates(normalized)
+	transitions, transitionLastMs := buildTransitionAggregates(normalized)
+	return seedNormalizedEntries(ctx, db, shell, sessionID, normalized, templates, transitions, transitionLastMs)
+}
+
+func isBackfillSeeded(ctx context.Context, db *sql.DB, sessionID string) (bool, error) {
 	var existingCount int
 	err := db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM command_event WHERE session_id = ?`, sessionID,
 	).Scan(&existingCount)
 	if err != nil {
-		return fmt.Errorf("idempotency check: %w", err)
+		return false, err
 	}
-	if existingCount > 0 {
-		return nil
-	}
+	return existingCount > 0, nil
+}
 
-	// Phase 1: Sort entries by timestamp, then parallel normalize.
+func sortImportEntries(entries []history.ImportEntry) []history.ImportEntry {
 	sorted := make([]history.ImportEntry, len(entries))
 	copy(sorted, entries)
 	sort.SliceStable(sorted, func(i, j int) bool {
 		return sorted[i].Timestamp.Before(sorted[j].Timestamp)
 	})
+	return sorted
+}
 
-	normalized := parallelNormalize(ctx, sorted)
-
-	// Phase 2: Deduplicate templates and build aggregates.
-	templates := make(map[string]*templateInfo)       // templateID -> info
-	transitions := make(map[transitionKey]int)        // bigram -> count
-	transitionLastMs := make(map[transitionKey]int64) // bigram -> last timestamp
-
+func buildTemplateAggregates(normalized []normalizedEntry) map[string]*templateInfo {
+	templates := make(map[string]*templateInfo)
 	for _, ne := range normalized {
 		tid := ne.preNorm.TemplateID
 		info, exists := templates[tid]
@@ -128,8 +138,12 @@ func Seed(ctx context.Context, db *sql.DB, entries []history.ImportEntry, shell 
 			info.lastSeenMs = ne.tsMs
 		}
 	}
+	return templates
+}
 
-	// Build transition bigrams from sequential pairs.
+func buildTransitionAggregates(normalized []normalizedEntry) (map[transitionKey]int, map[transitionKey]int64) {
+	transitions := make(map[transitionKey]int)
+	transitionLastMs := make(map[transitionKey]int64)
 	for i := 1; i < len(normalized); i++ {
 		prev := normalized[i-1].preNorm.TemplateID
 		next := normalized[i].preNorm.TemplateID
@@ -137,54 +151,58 @@ func Seed(ctx context.Context, db *sql.DB, entries []history.ImportEntry, shell 
 		transitions[key]++
 		transitionLastMs[key] = normalized[i].tsMs
 	}
+	return transitions, transitionLastMs
+}
 
-	// Phase 3: Batch SQL in a single transaction.
+func seedNormalizedEntries(
+	ctx context.Context,
+	db *sql.DB,
+	shell string,
+	sessionID string,
+	normalized []normalizedEntry,
+	templates map[string]*templateInfo,
+	transitions map[transitionKey]int,
+	transitionLastMs map[transitionKey]int64,
+) error {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	// Ensure session row exists.
-	_, err = tx.ExecContext(ctx,
-		`INSERT OR IGNORE INTO session (id, shell, started_at_ms) VALUES (?, ?, ?)`,
-		sessionID, shell, normalized[0].tsMs,
-	)
-	if err != nil {
-		return fmt.Errorf("insert session: %w", err)
+	if err := insertBackfillSession(ctx, tx, sessionID, shell, normalized[0].tsMs); err != nil {
+		return err
 	}
-
-	// Step 1: Insert command_event rows.
 	eventIDs, err := insertCommandEvents(ctx, tx, normalized, sessionID)
 	if err != nil {
 		return fmt.Errorf("insert command_events: %w", err)
 	}
-
-	// Step 2: Insert command_template rows.
 	if err := insertCommandTemplates(ctx, tx, templates); err != nil {
 		return fmt.Errorf("insert command_templates: %w", err)
 	}
-
-	// Step 3: Insert command_stat rows with decayed frequency.
 	if err := insertCommandStats(ctx, tx, templates); err != nil {
 		return fmt.Errorf("insert command_stats: %w", err)
 	}
-
-	// Step 4: Insert transition_stat rows.
 	if err := insertTransitionStats(ctx, tx, transitions, transitionLastMs); err != nil {
 		return fmt.Errorf("insert transition_stats: %w", err)
 	}
-
-	// Step 5: Insert pipeline tables for compound commands.
 	if err := insertPipelineData(ctx, tx, normalized, eventIDs); err != nil {
 		return fmt.Errorf("insert pipeline data: %w", err)
 	}
-
-	// Phase 4: Commit.
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit transaction: %w", err)
 	}
+	return nil
+}
 
+func insertBackfillSession(ctx context.Context, tx *sql.Tx, sessionID, shell string, startedAtMs int64) error {
+	_, err := tx.ExecContext(ctx,
+		`INSERT OR IGNORE INTO session (id, shell, started_at_ms) VALUES (?, ?, ?)`,
+		sessionID, shell, startedAtMs,
+	)
+	if err != nil {
+		return fmt.Errorf("insert session: %w", err)
+	}
 	return nil
 }
 
@@ -425,16 +443,49 @@ func insertTransitionStats(ctx context.Context, tx *sql.Tx, transitions map[tran
 // insertPipelineData inserts pipeline_event, pipeline_transition, and
 // pipeline_pattern rows for commands that contain pipes or compound operators.
 func insertPipelineData(ctx context.Context, tx *sql.Tx, entries []normalizedEntry, eventIDs []int64) error {
+	stmts, err := preparePipelineStatements(ctx, tx)
+	if err != nil {
+		return err
+	}
+	defer stmts.close()
+
+	normalizer := normalize.NewNormalizer()
+
+	for i, ne := range entries {
+		segments := ne.preNorm.Segments
+		if len(segments) <= 1 {
+			continue
+		}
+		segInfos := buildPipelineSegmentInfos(normalizer, segments)
+		if err := insertPipelineEventRows(ctx, stmts.eventStmt, eventIDs[i], i, segInfos); err != nil {
+			return err
+		}
+		if err := insertPipelineTransitionRows(ctx, stmts.transStmt, i, ne.tsMs, segInfos); err != nil {
+			return err
+		}
+		if err := insertPipelinePatternRow(ctx, stmts.patternStmt, i, ne, segments, segInfos); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+type pipelineStatements struct {
+	eventStmt   *sql.Stmt
+	transStmt   *sql.Stmt
+	patternStmt *sql.Stmt
+}
+
+func preparePipelineStatements(ctx context.Context, tx *sql.Tx) (*pipelineStatements, error) {
 	eventStmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO pipeline_event (
 			command_event_id, position, operator, cmd_raw, cmd_norm, template_id
 		) VALUES (?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer eventStmt.Close()
-
 	transStmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO pipeline_transition (
 			scope, prev_template_id, next_template_id, operator, weight, count, last_seen_ms
@@ -445,10 +496,9 @@ func insertPipelineData(ctx context.Context, tx *sql.Tx, entries []normalizedEnt
 			last_seen_ms = MAX(pipeline_transition.last_seen_ms, excluded.last_seen_ms)
 	`)
 	if err != nil {
-		return err
+		eventStmt.Close()
+		return nil, err
 	}
-	defer transStmt.Close()
-
 	patternStmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO pipeline_pattern (
 			pattern_hash, template_chain, operator_chain, scope, count, last_seen_ms, cmd_norm_display
@@ -458,91 +508,104 @@ func insertPipelineData(ctx context.Context, tx *sql.Tx, entries []normalizedEnt
 			last_seen_ms = MAX(pipeline_pattern.last_seen_ms, excluded.last_seen_ms)
 	`)
 	if err != nil {
-		return err
+		eventStmt.Close()
+		transStmt.Close()
+		return nil, err
 	}
-	defer patternStmt.Close()
+	return &pipelineStatements{
+		eventStmt:   eventStmt,
+		transStmt:   transStmt,
+		patternStmt: patternStmt,
+	}, nil
+}
 
-	normalizer := normalize.NewNormalizer()
+func (s *pipelineStatements) close() {
+	if s == nil {
+		return
+	}
+	s.eventStmt.Close()
+	s.transStmt.Close()
+	s.patternStmt.Close()
+}
 
-	for i, ne := range entries {
-		segments := ne.preNorm.Segments
-		if len(segments) <= 1 {
-			continue
+func buildPipelineSegmentInfos(normalizer *normalize.Normalizer, segments []normalize.Segment) []pipelineSegmentInfo {
+	segInfos := make([]pipelineSegmentInfo, len(segments))
+	for j, seg := range segments {
+		segNorm, _ := normalizer.Normalize(seg.Raw)
+		operator := ""
+		if seg.Operator != "" {
+			operator = string(seg.Operator)
 		}
-
-		eventID := eventIDs[i]
-
-		// Build segment info.
-		segInfos := make([]pipelineSegmentInfo, len(segments))
-		for j, seg := range segments {
-			segNorm, _ := normalizer.Normalize(seg.Raw)
-			segTID := normalize.ComputeTemplateID(segNorm)
-			op := ""
-			if seg.Operator != "" {
-				op = string(seg.Operator)
-			}
-			segInfos[j] = pipelineSegmentInfo{
-				raw:        seg.Raw,
-				norm:       segNorm,
-				templateID: segTID,
-				operator:   op,
-			}
+		segInfos[j] = pipelineSegmentInfo{
+			raw:        seg.Raw,
+			norm:       segNorm,
+			templateID: normalize.ComputeTemplateID(segNorm),
+			operator:   operator,
 		}
+	}
+	return segInfos
+}
 
-		// Insert pipeline_event rows.
-		for j, si := range segInfos {
-			opVal := sql.NullString{}
-			if si.operator != "" {
-				opVal = sql.NullString{String: si.operator, Valid: true}
-			}
-			_, err := eventStmt.ExecContext(ctx,
-				eventID, j, opVal, si.raw, si.norm, si.templateID,
-			)
-			if err != nil {
-				return fmt.Errorf("pipeline_event entry %d seg %d: %w", i, j, err)
-			}
+func insertPipelineEventRows(ctx context.Context, stmt *sql.Stmt, eventID int64, entryIndex int, segInfos []pipelineSegmentInfo) error {
+	for j, si := range segInfos {
+		opVal := sql.NullString{}
+		if si.operator != "" {
+			opVal = sql.NullString{String: si.operator, Valid: true}
 		}
-
-		// Insert pipeline_transition rows for consecutive segments.
-		for j := 1; j < len(segInfos); j++ {
-			prevOp := segInfos[j-1].operator
-			if prevOp == "" {
-				prevOp = "|"
-			}
-			_, err := transStmt.ExecContext(ctx,
-				scopeGlobal,
-				segInfos[j-1].templateID,
-				segInfos[j].templateID,
-				prevOp,
-				ne.tsMs,
-			)
-			if err != nil {
-				return fmt.Errorf("pipeline_transition entry %d seg %d: %w", i, j, err)
-			}
+		_, err := stmt.ExecContext(ctx, eventID, j, opVal, si.raw, si.norm, si.templateID)
+		if err != nil {
+			return fmt.Errorf("pipeline_event entry %d seg %d: %w", entryIndex, j, err)
 		}
+	}
+	return nil
+}
 
-		// Insert pipeline_pattern row.
-		tids := make([]string, len(segInfos))
-		for j, si := range segInfos {
-			tids[j] = si.templateID
+func insertPipelineTransitionRows(ctx context.Context, stmt *sql.Stmt, entryIndex int, tsMs int64, segInfos []pipelineSegmentInfo) error {
+	for j := 1; j < len(segInfos); j++ {
+		prevOp := segInfos[j-1].operator
+		if prevOp == "" {
+			prevOp = "|"
 		}
-		templateChain := strings.Join(tids, "|")
-		operatorChain := buildOperatorChain(segments)
-		patternHash := computeHash(templateChain+":"+operatorChain) + "_" + scopeGlobal
-
-		_, err := patternStmt.ExecContext(ctx,
-			patternHash,
-			templateChain,
-			operatorChain,
+		_, err := stmt.ExecContext(ctx,
 			scopeGlobal,
-			ne.tsMs,
-			ne.preNorm.CmdNorm,
+			segInfos[j-1].templateID,
+			segInfos[j].templateID,
+			prevOp,
+			tsMs,
 		)
 		if err != nil {
-			return fmt.Errorf("pipeline_pattern entry %d: %w", i, err)
+			return fmt.Errorf("pipeline_transition entry %d seg %d: %w", entryIndex, j, err)
 		}
 	}
+	return nil
+}
 
+func insertPipelinePatternRow(
+	ctx context.Context,
+	stmt *sql.Stmt,
+	entryIndex int,
+	ne normalizedEntry,
+	segments []normalize.Segment,
+	segInfos []pipelineSegmentInfo,
+) error {
+	tids := make([]string, len(segInfos))
+	for j, si := range segInfos {
+		tids[j] = si.templateID
+	}
+	templateChain := strings.Join(tids, "|")
+	operatorChain := buildOperatorChain(segments)
+	patternHash := computeHash(templateChain+":"+operatorChain) + "_" + scopeGlobal
+	_, err := stmt.ExecContext(ctx,
+		patternHash,
+		templateChain,
+		operatorChain,
+		scopeGlobal,
+		ne.tsMs,
+		ne.preNorm.CmdNorm,
+	)
+	if err != nil {
+		return fmt.Errorf("pipeline_pattern entry %d: %w", entryIndex, err)
+	}
 	return nil
 }
 

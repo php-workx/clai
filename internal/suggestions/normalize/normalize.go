@@ -73,109 +73,134 @@ func NewNormalizer() *Normalizer {
 // Normalize normalizes a command string by replacing variable arguments with slots.
 // Returns the normalized command and a list of slot values extracted.
 func (n *Normalizer) Normalize(cmdRaw string) (cmdNorm string, slots []SlotValue) {
-	// Parse command using shlex
+	tokens := parseCommandTokens(cmdRaw)
+	if len(tokens) == 0 {
+		return cmdRaw, nil
+	}
+	state := n.newNormalizeState(tokens)
+	state.consumeSubcommand()
+	state.normalizeRemaining()
+	return strings.Join(state.result, " "), state.slots
+}
+
+func parseCommandTokens(cmdRaw string) []string {
 	tokens, err := shlex.Split(cmdRaw)
-	if err != nil || len(tokens) == 0 {
-		// Fall back to simple splitting on parse error
-		tokens = strings.Fields(cmdRaw)
-		if len(tokens) == 0 {
-			return cmdRaw, nil
-		}
+	if err == nil && len(tokens) > 0 {
+		return tokens
 	}
+	return strings.Fields(cmdRaw)
+}
 
-	// First token is the command
+type normalizeState struct {
+	n        *Normalizer
+	tokens   []string
+	rule     CommandRule
+	hasRule  bool
+	i        int
+	argIndex int
+	result   []string
+	slots    []SlotValue
+}
+
+func (n *Normalizer) newNormalizeState(tokens []string) *normalizeState {
 	cmd := tokens[0]
-	result := []string{cmd}
-	slots = make([]SlotValue, 0)
-
-	// Get command-specific rules
 	rule, hasRule := n.CommandRules[cmd]
-
-	// Process remaining tokens
-	i := 1
-	argIndex := 0 // Track positional argument index
-
-	// Check for subcommand (second token that matches a known subcommand pattern)
-	if hasRule && i < len(tokens) && rule.SubcommandRules != nil {
-		token := tokens[i]
-		// Check if this looks like a subcommand (not a flag, not a path-like token)
-		if !strings.HasPrefix(token, "-") && !strings.Contains(token, "/") && !strings.HasPrefix(token, ".") {
-			if subRule, ok := rule.SubcommandRules[token]; ok {
-				result = append(result, token)
-				rule = subRule
-				i++
-			} else {
-				// Even if there's no specific rule, preserve common subcommands
-				// for commands that have SubcommandRules defined (like git, npm, etc.)
-				result = append(result, token)
-				rule = CommandRule{} // Empty rule, use default behavior
-				hasRule = false
-				i++
-			}
-		}
+	return &normalizeState{
+		n:       n,
+		tokens:  tokens,
+		rule:    rule,
+		hasRule: hasRule,
+		i:       1,
+		result:  []string{cmd},
+		slots:   make([]SlotValue, 0),
 	}
+}
 
-	for i < len(tokens) {
-		token := tokens[i]
+func (s *normalizeState) consumeSubcommand() {
+	if !s.hasRule || s.i >= len(s.tokens) || s.rule.SubcommandRules == nil {
+		return
+	}
+	token := s.tokens[s.i]
+	if strings.HasPrefix(token, "-") || strings.Contains(token, "/") || strings.HasPrefix(token, ".") {
+		return
+	}
+	s.result = append(s.result, token)
+	if subRule, ok := s.rule.SubcommandRules[token]; ok {
+		s.rule = subRule
+	} else {
+		s.rule = CommandRule{}
+		s.hasRule = false
+	}
+	s.i++
+}
 
-		// Check if it's a flag
-		if strings.HasPrefix(token, "-") {
-			result = append(result, token)
-
-			// Check if flag takes a value (next token)
-			flagName := strings.TrimLeft(token, "-")
-			if hasRule && rule.FlagSlots != nil {
-				if slotType, ok := rule.FlagSlots[flagName]; ok {
-					// Flag has a known slot type, consume next token
-					if i+1 < len(tokens) {
-						i++
-						value := tokens[i]
-						slots = append(slots, SlotValue{
-							Index: len(slots),
-							Type:  slotType,
-							Value: value,
-						})
-						result = append(result, slotType)
-					}
-				}
-			}
-			i++
+func (s *normalizeState) normalizeRemaining() {
+	for s.i < len(s.tokens) {
+		if s.consumeFlagToken() || s.consumePlaceholderToken() {
 			continue
 		}
-
-		// If token is already a slot placeholder, preserve it as-is
-		// for idempotency (re-normalizing normalized output).
-		if isSlotPlaceholder(token) {
-			result = append(result, token)
-			argIndex++
-			i++
-			continue
-		}
-
-		// It's a positional argument - determine slot type
-		slotType := n.detectSlotType(token)
-
-		// Check command-specific rules for this position
-		if hasRule && rule.ArgSlots != nil {
-			if specificSlot, ok := rule.ArgSlots[argIndex]; ok {
-				slotType = specificSlot
-			} else if specificSlot, ok := rule.ArgSlots[-1]; ok {
-				// -1 means "all remaining args"
-				slotType = specificSlot
-			}
-		}
-
-		slots = append(slots, SlotValue{
-			Index: len(slots),
-			Type:  slotType,
-			Value: token,
-		})
-		result = append(result, slotType)
-		argIndex++
-		i++
+		s.consumePositionalToken()
 	}
+}
 
-	return strings.Join(result, " "), slots
+func (s *normalizeState) consumeFlagToken() bool {
+	token := s.tokens[s.i]
+	if !strings.HasPrefix(token, "-") {
+		return false
+	}
+	s.result = append(s.result, token)
+	flagName := strings.TrimLeft(token, "-")
+	if s.hasRule && s.rule.FlagSlots != nil {
+		if slotType, ok := s.rule.FlagSlots[flagName]; ok && s.i+1 < len(s.tokens) {
+			s.i++
+			s.addSlot(slotType, s.tokens[s.i])
+			s.result = append(s.result, slotType)
+		}
+	}
+	s.i++
+	return true
+}
+
+func (s *normalizeState) consumePlaceholderToken() bool {
+	token := s.tokens[s.i]
+	if !isSlotPlaceholder(token) {
+		return false
+	}
+	s.result = append(s.result, token)
+	s.argIndex++
+	s.i++
+	return true
+}
+
+func (s *normalizeState) consumePositionalToken() {
+	token := s.tokens[s.i]
+	slotType := s.selectSlotType(token)
+	s.addSlot(slotType, token)
+	s.result = append(s.result, slotType)
+	s.argIndex++
+	s.i++
+}
+
+func (s *normalizeState) selectSlotType(token string) string {
+	slotType := s.n.detectSlotType(token)
+	if !s.hasRule || s.rule.ArgSlots == nil {
+		return slotType
+	}
+	if specificSlot, ok := s.rule.ArgSlots[s.argIndex]; ok {
+		return specificSlot
+	}
+	if specificSlot, ok := s.rule.ArgSlots[-1]; ok {
+		return specificSlot
+	}
+	return slotType
+}
+
+func (s *normalizeState) addSlot(slotType, value string) {
+	s.slots = append(s.slots, SlotValue{
+		Index: len(s.slots),
+		Type:  slotType,
+		Value: value,
+	})
 }
 
 // SlotValue represents an extracted slot value from a command.

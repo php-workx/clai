@@ -133,72 +133,84 @@ func (s *AutoService) Search(ctx context.Context, query string, opts SearchOptio
 // mergeResults merges FTS and describe results, deduplicating by template.
 func (s *AutoService) mergeResults(ftsResults, descResults []SearchResult) []SearchResult {
 	mergeMap := make(map[string]*mergedResult)
-
-	ftsMax := maxScore(ftsResults)
-
-	for i := range ftsResults {
-		r := ftsResults[i]
-		key := dedupKey(r)
-
-		normalizedScore := 0.0
-		if ftsMax != 0 {
-			normalizedScore = r.Score / ftsMax
-		}
-
-		if existing, ok := mergeMap[key]; ok {
-			existing.ftsScore = normalizedScore
-			existing.hasFTS = true
-		} else {
-			mergeMap[key] = &mergedResult{
-				result:   r,
-				ftsScore: normalizedScore,
-				hasFTS:   true,
-			}
-		}
-	}
-
-	for i := range descResults {
-		r := descResults[i]
-		key := dedupKey(r)
-
-		if existing, ok := mergeMap[key]; ok {
-			existing.descScore = r.Score
-			existing.hasDescribe = true
-			if len(existing.result.Tags) == 0 {
-				existing.result.Tags = r.Tags
-			}
-			if len(existing.result.MatchedTags) == 0 {
-				existing.result.MatchedTags = r.MatchedTags
-			}
-			if existing.result.TemplateID == "" {
-				existing.result.TemplateID = r.TemplateID
-			}
-			if existing.result.CmdNorm == "" {
-				existing.result.CmdNorm = r.CmdNorm
-			}
-		} else {
-			mergeMap[key] = &mergedResult{
-				result:      r,
-				descScore:   r.Score,
-				hasDescribe: true,
-			}
-		}
-	}
-
-	results := make([]SearchResult, 0, len(mergeMap))
-	for _, m := range mergeMap {
-		m.result.Score = s.ftsWeight*m.ftsScore + s.describeWeight*m.descScore
-		m.result.Backend = BackendAuto
-		results = append(results, m.result)
-	}
-
+	s.mergeFTSResults(mergeMap, ftsResults)
+	s.mergeDescribeResults(mergeMap, descResults)
+	results := s.buildMergedResults(mergeMap)
 	sort.Slice(results, func(i, j int) bool {
 		if results[i].Score != results[j].Score {
 			return results[i].Score > results[j].Score
 		}
 		return results[i].Timestamp > results[j].Timestamp
 	})
+	return results
+}
 
+func (s *AutoService) mergeFTSResults(mergeMap map[string]*mergedResult, ftsResults []SearchResult) {
+	ftsMax := maxScore(ftsResults)
+	for i := range ftsResults {
+		r := ftsResults[i]
+		key := dedupKey(r)
+		normalizedScore := normalizeFTSScore(r.Score, ftsMax)
+		if existing, ok := mergeMap[key]; ok {
+			existing.ftsScore = normalizedScore
+			existing.hasFTS = true
+			continue
+		}
+		mergeMap[key] = &mergedResult{
+			result:   r,
+			ftsScore: normalizedScore,
+			hasFTS:   true,
+		}
+	}
+}
+
+func normalizeFTSScore(score, max float64) float64 {
+	if max == 0 {
+		return 0
+	}
+	return score / max
+}
+
+func (s *AutoService) mergeDescribeResults(mergeMap map[string]*mergedResult, descResults []SearchResult) {
+	for i := range descResults {
+		r := descResults[i]
+		key := dedupKey(r)
+		if existing, ok := mergeMap[key]; ok {
+			mergeDescribeIntoExisting(existing, r)
+			continue
+		}
+		mergeMap[key] = &mergedResult{
+			result:      r,
+			descScore:   r.Score,
+			hasDescribe: true,
+		}
+	}
+}
+
+func mergeDescribeIntoExisting(existing *mergedResult, r SearchResult) {
+	existing.descScore = r.Score
+	existing.hasDescribe = true
+	if len(existing.result.Tags) == 0 {
+		existing.result.Tags = r.Tags
+	}
+	if len(existing.result.MatchedTags) == 0 {
+		existing.result.MatchedTags = r.MatchedTags
+	}
+	if existing.result.TemplateID == "" {
+		existing.result.TemplateID = r.TemplateID
+	}
+	if existing.result.CmdNorm == "" {
+		existing.result.CmdNorm = r.CmdNorm
+	}
+}
+
+func (s *AutoService) buildMergedResults(mergeMap map[string]*mergedResult) []SearchResult {
+	results := make([]SearchResult, 0, len(mergeMap))
+	for _, m := range mergeMap {
+		m.result.Score = s.ftsWeight*m.ftsScore + s.describeWeight*m.descScore
+		m.result.Backend = BackendAuto
+		results = append(results, m.result)
+	}
 	return results
 }
 
