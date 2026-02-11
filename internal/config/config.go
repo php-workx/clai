@@ -717,48 +717,77 @@ func (c *Config) getSuggestionsField(field string) (string, error) {
 func (c *Config) setSuggestionsField(field, value string) error {
 	switch field {
 	case "enabled":
-		v, err := strconv.ParseBool(value)
-		if err != nil {
-			return fmt.Errorf("invalid value for enabled: %w", err)
-		}
-		c.Suggestions.Enabled = v
+		return c.setSuggestionsEnabled(value)
 	case "max_history":
-		v, err := strconv.Atoi(value)
-		if err != nil {
-			return fmt.Errorf("invalid value for max_history: %w", err)
-		}
-		if v < 0 {
-			return fmt.Errorf("invalid max_history: must be non-negative")
-		}
-		c.Suggestions.MaxHistory = v
+		return c.setSuggestionsMaxHistory(value)
 	case "max_ai":
-		v, err := strconv.Atoi(value)
-		if err != nil {
-			return fmt.Errorf("invalid value for max_ai: %w", err)
-		}
-		if v < 0 {
-			return fmt.Errorf("invalid max_ai: must be non-negative")
-		}
-		c.Suggestions.MaxAI = v
+		return c.setSuggestionsMaxAI(value)
 	case "show_risk_warning":
-		v, err := strconv.ParseBool(value)
-		if err != nil {
-			return fmt.Errorf("invalid value for show_risk_warning: %w", err)
-		}
-		c.Suggestions.ShowRiskWarning = v
+		return c.setSuggestionsShowRiskWarning(value)
 	case "scorer_version":
-		if !isValidScorerVersion(value) {
-			return fmt.Errorf("invalid scorer_version: %s (must be v1, v2, or blend)", value)
-		}
-		c.Suggestions.ScorerVersion = value
+		return c.setSuggestionsScorerVersion(value)
 	case "picker_view":
-		if !isValidSuggestionsPickerView(value) {
-			return fmt.Errorf("invalid picker_view: %s (must be compact or detailed)", value)
-		}
-		c.Suggestions.PickerView = value
+		return c.setSuggestionsPickerView(value)
 	default:
 		return fmt.Errorf("unknown field: suggestions.%s", field)
 	}
+}
+
+func (c *Config) setSuggestionsEnabled(value string) error {
+	v, err := strconv.ParseBool(value)
+	if err != nil {
+		return fmt.Errorf("invalid value for enabled: %w", err)
+	}
+	c.Suggestions.Enabled = v
+	return nil
+}
+
+func (c *Config) setSuggestionsMaxHistory(value string) error {
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return fmt.Errorf("invalid value for max_history: %w", err)
+	}
+	if v < 0 {
+		return fmt.Errorf("invalid max_history: must be non-negative")
+	}
+	c.Suggestions.MaxHistory = v
+	return nil
+}
+
+func (c *Config) setSuggestionsMaxAI(value string) error {
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return fmt.Errorf("invalid value for max_ai: %w", err)
+	}
+	if v < 0 {
+		return fmt.Errorf("invalid max_ai: must be non-negative")
+	}
+	c.Suggestions.MaxAI = v
+	return nil
+}
+
+func (c *Config) setSuggestionsShowRiskWarning(value string) error {
+	v, err := strconv.ParseBool(value)
+	if err != nil {
+		return fmt.Errorf("invalid value for show_risk_warning: %w", err)
+	}
+	c.Suggestions.ShowRiskWarning = v
+	return nil
+}
+
+func (c *Config) setSuggestionsScorerVersion(value string) error {
+	if !isValidScorerVersion(value) {
+		return fmt.Errorf("invalid scorer_version: %s (must be v1, v2, or blend)", value)
+	}
+	c.Suggestions.ScorerVersion = value
+	return nil
+}
+
+func (c *Config) setSuggestionsPickerView(value string) error {
+	if !isValidSuggestionsPickerView(value) {
+		return fmt.Errorf("invalid picker_view: %s (must be compact or detailed)", value)
+	}
+	c.Suggestions.PickerView = value
 	return nil
 }
 
@@ -809,60 +838,94 @@ func (c *Config) getHistoryField(field string) (string, error) {
 func (c *Config) setHistoryField(field, value string) error {
 	switch field {
 	case "picker_backend":
-		if !isValidPickerBackend(value) {
-			return fmt.Errorf("invalid picker_backend: %s (must be builtin, fzf, or clai)", value)
-		}
-		c.History.PickerBackend = value
+		return c.setHistoryPickerBackend(value)
 	case "picker_open_on_empty":
-		v, err := strconv.ParseBool(value)
-		if err != nil {
-			return fmt.Errorf("invalid value for picker_open_on_empty: %w", err)
-		}
-		c.History.PickerOpenOnEmpty = v
+		return c.setHistoryPickerOpenOnEmpty(value)
 	case "picker_page_size":
-		v, err := strconv.Atoi(value)
-		if err != nil {
-			return fmt.Errorf("invalid value for picker_page_size: %w", err)
-		}
-		if v < 20 {
-			v = 20
-		}
-		if v > 500 {
-			v = 500
-		}
-		c.History.PickerPageSize = v
+		return c.setHistoryPickerPageSize(value)
 	case "picker_case_sensitive":
-		v, err := strconv.ParseBool(value)
-		if err != nil {
-			return fmt.Errorf("invalid value for picker_case_sensitive: %w", err)
-		}
-		c.History.PickerCaseSensitive = v
+		return c.setHistoryPickerCaseSensitive(value)
 	case "up_arrow_opens_history":
-		v, err := strconv.ParseBool(value)
-		if err != nil {
-			return fmt.Errorf("invalid value for up_arrow_opens_history: %w", err)
-		}
-		c.History.UpArrowOpensHistory = v
+		return c.setHistoryUpArrowOpensHistory(value)
 	case "up_arrow_trigger":
-		if !isValidUpArrowTrigger(value) {
-			return fmt.Errorf("invalid up_arrow_trigger: %s (must be single or double)", value)
-		}
-		c.History.UpArrowTrigger = value
+		return c.setHistoryUpArrowTrigger(value)
 	case "up_arrow_double_window_ms":
-		v, err := strconv.Atoi(value)
-		if err != nil {
-			return fmt.Errorf("invalid value for up_arrow_double_window_ms: %w", err)
-		}
-		if v < 50 {
-			v = 50
-		}
-		if v > 1000 {
-			v = 1000
-		}
-		c.History.UpArrowDoubleWindowMs = v
+		return c.setHistoryUpArrowDoubleWindowMs(value)
 	default:
 		return fmt.Errorf("unknown field: history.%s", field)
 	}
+}
+
+func (c *Config) setHistoryPickerBackend(value string) error {
+	if !isValidPickerBackend(value) {
+		return fmt.Errorf("invalid picker_backend: %s (must be builtin, fzf, or clai)", value)
+	}
+	c.History.PickerBackend = value
+	return nil
+}
+
+func (c *Config) setHistoryPickerOpenOnEmpty(value string) error {
+	v, err := strconv.ParseBool(value)
+	if err != nil {
+		return fmt.Errorf("invalid value for picker_open_on_empty: %w", err)
+	}
+	c.History.PickerOpenOnEmpty = v
+	return nil
+}
+
+func (c *Config) setHistoryPickerPageSize(value string) error {
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return fmt.Errorf("invalid value for picker_page_size: %w", err)
+	}
+	if v < 20 {
+		v = 20
+	}
+	if v > 500 {
+		v = 500
+	}
+	c.History.PickerPageSize = v
+	return nil
+}
+
+func (c *Config) setHistoryPickerCaseSensitive(value string) error {
+	v, err := strconv.ParseBool(value)
+	if err != nil {
+		return fmt.Errorf("invalid value for picker_case_sensitive: %w", err)
+	}
+	c.History.PickerCaseSensitive = v
+	return nil
+}
+
+func (c *Config) setHistoryUpArrowOpensHistory(value string) error {
+	v, err := strconv.ParseBool(value)
+	if err != nil {
+		return fmt.Errorf("invalid value for up_arrow_opens_history: %w", err)
+	}
+	c.History.UpArrowOpensHistory = v
+	return nil
+}
+
+func (c *Config) setHistoryUpArrowTrigger(value string) error {
+	if !isValidUpArrowTrigger(value) {
+		return fmt.Errorf("invalid up_arrow_trigger: %s (must be single or double)", value)
+	}
+	c.History.UpArrowTrigger = value
+	return nil
+}
+
+func (c *Config) setHistoryUpArrowDoubleWindowMs(value string) error {
+	v, err := strconv.Atoi(value)
+	if err != nil {
+		return fmt.Errorf("invalid value for up_arrow_double_window_ms: %w", err)
+	}
+	if v < 50 {
+		v = 50
+	}
+	if v > 1000 {
+		v = 1000
+	}
+	c.History.UpArrowDoubleWindowMs = v
 	return nil
 }
 

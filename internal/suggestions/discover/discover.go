@@ -92,48 +92,9 @@ func (e *Engine) Discover(_ context.Context, config DiscoverConfig) []Candidate 
 	}
 
 	now := e.nowFn()
-	var candidates []Candidate
-
-	// Source 1: Playbook tasks
-	if config.PlaybookPath != "" {
-		pb, err := playbook.LoadPlaybook(config.PlaybookPath)
-		if err == nil {
-			for _, task := range pb.AllTasks() {
-				candidates = append(candidates, Candidate{
-					Command:  task.Command,
-					Source:   SourcePlaybook,
-					Priority: task.PriorityWeight(),
-					Tags:     task.Tags,
-				})
-			}
-		}
-	}
-
-	// Source 2: Project-type priors
-	for _, pt := range config.ProjectTypes {
-		priors, ok := projectTypePriors[pt]
-		if !ok {
-			continue
-		}
-		for i, cmd := range priors {
-			candidates = append(candidates, Candidate{
-				Command:  cmd,
-				Source:   SourceProjectType,
-				Priority: len(priors) - i, // Earlier entries have higher priority
-				Tags:     []string{pt},
-			})
-		}
-	}
-
-	// Source 3: Tool-common sets
-	for i, cmd := range toolCommonCommands {
-		candidates = append(candidates, Candidate{
-			Command:  cmd,
-			Source:   SourceToolCommon,
-			Priority: len(toolCommonCommands) - i,
-			Tags:     []string{"common"},
-		})
-	}
+	candidates := appendPlaybookCandidates(nil, config.PlaybookPath)
+	candidates = appendProjectTypeCandidates(candidates, config.ProjectTypes)
+	candidates = appendToolCommonCandidates(candidates)
 
 	// Deduplicate by command text, keeping highest priority / first seen source
 	candidates = dedup(candidates)
@@ -159,12 +120,57 @@ func (e *Engine) Discover(_ context.Context, config DiscoverConfig) []Candidate 
 	}
 
 	// Record cooldowns for returned candidates
-	e.mu.Lock()
-	for _, c := range candidates {
-		e.cooldowns[c.Command] = now
-	}
-	e.mu.Unlock()
+	e.recordCooldowns(candidates, now)
 
+	return candidates
+}
+
+func appendPlaybookCandidates(candidates []Candidate, playbookPath string) []Candidate {
+	if playbookPath == "" {
+		return candidates
+	}
+	pb, err := playbook.LoadPlaybook(playbookPath)
+	if err != nil {
+		return candidates
+	}
+	for _, task := range pb.AllTasks() {
+		candidates = append(candidates, Candidate{
+			Command:  task.Command,
+			Source:   SourcePlaybook,
+			Priority: task.PriorityWeight(),
+			Tags:     task.Tags,
+		})
+	}
+	return candidates
+}
+
+func appendProjectTypeCandidates(candidates []Candidate, projectTypes []string) []Candidate {
+	for _, pt := range projectTypes {
+		priors, ok := projectTypePriors[pt]
+		if !ok {
+			continue
+		}
+		for i, cmd := range priors {
+			candidates = append(candidates, Candidate{
+				Command:  cmd,
+				Source:   SourceProjectType,
+				Priority: len(priors) - i, // Earlier entries have higher priority
+				Tags:     []string{pt},
+			})
+		}
+	}
+	return candidates
+}
+
+func appendToolCommonCandidates(candidates []Candidate) []Candidate {
+	for i, cmd := range toolCommonCommands {
+		candidates = append(candidates, Candidate{
+			Command:  cmd,
+			Source:   SourceToolCommon,
+			Priority: len(toolCommonCommands) - i,
+			Tags:     []string{"common"},
+		})
+	}
 	return candidates
 }
 
@@ -189,6 +195,14 @@ func (e *Engine) applyCooldown(candidates []Candidate, cooldownMs int64, now int
 func (e *Engine) ResetCooldowns() {
 	e.mu.Lock()
 	e.cooldowns = make(map[string]int64)
+	e.mu.Unlock()
+}
+
+func (e *Engine) recordCooldowns(candidates []Candidate, now int64) {
+	e.mu.Lock()
+	for _, c := range candidates {
+		e.cooldowns[c.Command] = now
+	}
 	e.mu.Unlock()
 }
 

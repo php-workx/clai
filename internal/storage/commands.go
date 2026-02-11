@@ -17,20 +17,8 @@ const commandNormLikeClause = " AND command_norm LIKE ?"
 // CreateCommand creates a new command record.
 // It automatically normalizes the command and generates a hash.
 func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
-	if cmd == nil {
-		return errors.New("command cannot be nil")
-	}
-	if cmd.CommandID == "" {
-		return errors.New("command_id is required")
-	}
-	if cmd.SessionID == "" {
-		return errors.New("session_id is required")
-	}
-	if cmd.CWD == "" {
-		return errors.New("cwd is required")
-	}
-	if cmd.Command == "" {
-		return errors.New("command is required")
+	if err := validateCreateCommandInput(cmd); err != nil {
+		return err
 	}
 
 	// Normalize command if not already set
@@ -44,14 +32,7 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 	}
 
 	// Determine is_success value: nil = unknown (treated as success), false = failure, true = success
-	var isSuccess *int
-	if cmd.IsSuccess != nil {
-		v := 0
-		if *cmd.IsSuccess {
-			v = 1
-		}
-		isSuccess = &v
-	}
+	isSuccess := boolPtrToIntPtr(cmd.IsSuccess)
 
 	// Compute derived metadata from command text
 	cmd.IsSudo = cmdutil.IsSudo(cmd.Command)
@@ -104,6 +85,36 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 	}
 
 	return nil
+}
+
+func validateCreateCommandInput(cmd *Command) error {
+	if cmd == nil {
+		return errors.New("command cannot be nil")
+	}
+	if cmd.CommandID == "" {
+		return errors.New("command_id is required")
+	}
+	if cmd.SessionID == "" {
+		return errors.New("session_id is required")
+	}
+	if cmd.CWD == "" {
+		return errors.New("cwd is required")
+	}
+	if cmd.Command == "" {
+		return errors.New("command is required")
+	}
+	return nil
+}
+
+func boolPtrToIntPtr(b *bool) *int {
+	if b == nil {
+		return nil
+	}
+	v := 0
+	if *b {
+		v = 1
+	}
+	return &v
 }
 
 // UpdateCommandEnd updates a command's end time, duration, and exit code.

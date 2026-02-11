@@ -68,13 +68,8 @@ func (s *SQLiteStore) ImportHistory(ctx context.Context, entries []history.Impor
 	}
 
 	// Create the import session
-	// Use the oldest entry's timestamp as the session start time
-	var sessionStart int64
-	if !entries[0].Timestamp.IsZero() {
-		sessionStart = entries[0].Timestamp.UnixMilli()
-	} else {
-		sessionStart = now
-	}
+	// Use the oldest entry's timestamp as the session start time.
+	sessionStart := importSessionStart(entries[0], now)
 
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO sessions (
@@ -101,52 +96,7 @@ func (s *SQLiteStore) ImportHistory(ctx context.Context, entries []history.Impor
 	}
 	defer stmt.Close()
 
-	// Insert all entries
-	imported := 0
-	for _, entry := range entries {
-		if entry.Command == "" {
-			continue
-		}
-
-		// Use entry timestamp or fall back to current time
-		var tsStart int64
-		if !entry.Timestamp.IsZero() {
-			tsStart = entry.Timestamp.UnixMilli()
-		} else {
-			// Use now + index to preserve ordering for entries without timestamps
-			tsStart = now + int64(imported)
-		}
-
-		// Normalize and hash the command
-		norm := cmdutil.NormalizeCommand(entry.Command)
-		hash := cmdutil.HashCommand(norm)
-
-		// Compute derived metadata
-		isSudo := cmdutil.IsSudo(entry.Command)
-		pipeCount := cmdutil.CountPipes(entry.Command)
-		wordCount := cmdutil.CountWords(entry.Command)
-
-		// Generate unique command ID
-		cmdID := uuid.New().String()
-
-		_, err = stmt.ExecContext(ctx,
-			cmdID,
-			sessionID,
-			tsStart,
-			"/", // CWD unknown for imported commands
-			entry.Command,
-			norm,
-			hash,
-			boolToInt(isSudo),
-			pipeCount,
-			wordCount,
-		)
-		if err != nil {
-			// Skip individual failures (e.g., duplicate commands)
-			continue
-		}
-		imported++
-	}
+	imported := importHistoryEntries(ctx, stmt, entries, sessionID, now)
 
 	// Commit the transaction
 	if err := tx.Commit(); err != nil {
@@ -154,6 +104,53 @@ func (s *SQLiteStore) ImportHistory(ctx context.Context, entries []history.Impor
 	}
 
 	return imported, nil
+}
+
+func importSessionStart(first history.ImportEntry, now int64) int64 {
+	if !first.Timestamp.IsZero() {
+		return first.Timestamp.UnixMilli()
+	}
+	return now
+}
+
+func importHistoryEntries(ctx context.Context, stmt *sql.Stmt, entries []history.ImportEntry, sessionID string, now int64) int {
+	imported := 0
+	for _, entry := range entries {
+		if entry.Command == "" {
+			continue
+		}
+
+		tsStart := importEntryStartTs(entry, now, imported)
+		norm := cmdutil.NormalizeCommand(entry.Command)
+		hash := cmdutil.HashCommand(norm)
+
+		_, err := stmt.ExecContext(ctx,
+			uuid.New().String(),
+			sessionID,
+			tsStart,
+			"/", // CWD unknown for imported commands
+			entry.Command,
+			norm,
+			hash,
+			boolToInt(cmdutil.IsSudo(entry.Command)),
+			cmdutil.CountPipes(entry.Command),
+			cmdutil.CountWords(entry.Command),
+		)
+		if err != nil {
+			// Skip individual failures (e.g., duplicate commands)
+			continue
+		}
+		imported++
+	}
+	return imported
+}
+
+func importEntryStartTs(entry history.ImportEntry, now int64, imported int) int64 {
+	if !entry.Timestamp.IsZero() {
+		return entry.Timestamp.UnixMilli()
+	}
+	// Use now + index to preserve ordering for entries without timestamps.
+	return now + int64(imported)
 }
 
 // boolToInt converts a bool to an int (0 or 1) for SQLite storage.

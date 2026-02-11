@@ -39,6 +39,7 @@ type checkResult struct {
 }
 
 const dbCorruptionHistoryCheckName = "DB corruption history"
+const dataDirectoryCheckName = "Data directory"
 
 func runDoctor(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%sclai Doctor%s\n", colorBold, colorReset)
@@ -132,19 +133,19 @@ func checkDirectories() []checkResult {
 	// Check base directory
 	if _, err := os.Stat(paths.BaseDir); os.IsNotExist(err) {
 		results = append(results, checkResult{
-			name:    "Data directory",
+			name:    dataDirectoryCheckName,
 			status:  "warn",
 			message: fmt.Sprintf("Missing: %s (will be created when needed)", paths.BaseDir),
 		})
 	} else if err != nil {
 		results = append(results, checkResult{
-			name:    "Data directory",
+			name:    dataDirectoryCheckName,
 			status:  "error",
 			message: fmt.Sprintf("Error accessing: %s", paths.BaseDir),
 		})
 	} else {
 		results = append(results, checkResult{
-			name:    "Data directory",
+			name:    dataDirectoryCheckName,
 			status:  "ok",
 			message: paths.BaseDir,
 		})

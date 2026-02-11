@@ -23,15 +23,7 @@ func AssertSessionIsolation(t *testing.T, db *sql.DB, sessionA, sessionB string)
 
 	nowMs := time.Now().UnixMilli()
 
-	// Ensure both sessions exist
-	for _, sid := range []string{sessionA, sessionB} {
-		_, err := db.ExecContext(ctx,
-			"INSERT OR IGNORE INTO session (id, shell, started_at_ms) VALUES (?, 'bash', ?)",
-			sid, nowMs)
-		if err != nil {
-			t.Fatalf("failed to insert session %q: %v", sid, err)
-		}
-	}
+	ensureSessionsExist(t, db, []string{sessionA, sessionB}, nowMs)
 
 	// Insert command events for session A: cmd_a1 -> cmd_a2
 	insertEvent(t, db, sessionA, "cmd_a1", "cmd_a1", "tmpl_a1", nowMs)
@@ -45,45 +37,8 @@ func AssertSessionIsolation(t *testing.T, db *sql.DB, sessionA, sessionB string)
 	insertTransition(t, db, fmt.Sprintf(sessionScopeFmt, sessionA), "tmpl_a1", "tmpl_a2", nowMs)
 	insertTransition(t, db, fmt.Sprintf(sessionScopeFmt, sessionB), "tmpl_b1", "tmpl_b2", nowMs)
 
-	// Verify: session A scope should NOT contain session B transitions
-	rows, err := db.QueryContext(ctx,
-		"SELECT next_template_id FROM transition_stat WHERE scope = ?",
-		fmt.Sprintf(sessionScopeFmt, sessionA))
-	if err != nil {
-		t.Fatalf("failed to query session A transitions: %v", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var nextTmpl string
-		if err := rows.Scan(&nextTmpl); err != nil {
-			t.Fatalf("failed to scan transition: %v", err)
-		}
-		if nextTmpl == "tmpl_b2" || nextTmpl == "tmpl_b1" {
-			t.Errorf("I1 violation: session %q transitions contain session %q template %q",
-				sessionA, sessionB, nextTmpl)
-		}
-	}
-
-	// Verify: session B scope should NOT contain session A transitions
-	rows2, err := db.QueryContext(ctx,
-		"SELECT next_template_id FROM transition_stat WHERE scope = ?",
-		fmt.Sprintf(sessionScopeFmt, sessionB))
-	if err != nil {
-		t.Fatalf("failed to query session B transitions: %v", err)
-	}
-	defer rows2.Close()
-
-	for rows2.Next() {
-		var nextTmpl string
-		if err := rows2.Scan(&nextTmpl); err != nil {
-			t.Fatalf("failed to scan transition: %v", err)
-		}
-		if nextTmpl == "tmpl_a2" || nextTmpl == "tmpl_a1" {
-			t.Errorf("I1 violation: session %q transitions contain session %q template %q",
-				sessionB, sessionA, nextTmpl)
-		}
-	}
+	assertScopeExcludesTemplates(t, ctx, db, fmt.Sprintf(sessionScopeFmt, sessionA), sessionA, sessionB, "tmpl_b1", "tmpl_b2")
+	assertScopeExcludesTemplates(t, ctx, db, fmt.Sprintf(sessionScopeFmt, sessionB), sessionB, sessionA, "tmpl_a1", "tmpl_a2")
 }
 
 // AssertDeterministicRanking validates invariant I3: with identical input state,
@@ -129,104 +84,150 @@ func AssertTransactionalConsistency(t *testing.T, db *sql.DB) {
 	t.Helper()
 	ctx := context.Background()
 
+	fixture := insertTransactionalFixture(t, ctx, db)
+	assertTransactionalFixtureExists(t, ctx, db, fixture)
+	assertFixtureTimestamps(t, ctx, db, fixture)
+}
+
+type txnFixture struct {
+	eventID    int64
+	templateID string
+	scope      string
+	nowMs      int64
+}
+
+func ensureSessionsExist(t *testing.T, db *sql.DB, sessionIDs []string, nowMs int64) {
+	t.Helper()
+	ctx := context.Background()
+	for _, sid := range sessionIDs {
+		_, err := db.ExecContext(ctx,
+			"INSERT OR IGNORE INTO session (id, shell, started_at_ms) VALUES (?, 'bash', ?)",
+			sid, nowMs)
+		if err != nil {
+			t.Fatalf("failed to insert session %q: %v", sid, err)
+		}
+	}
+}
+
+func assertScopeExcludesTemplates(t *testing.T, ctx context.Context, db *sql.DB, scope, currentSession, otherSession string, forbidden ...string) {
+	t.Helper()
+	rows, err := db.QueryContext(ctx,
+		"SELECT next_template_id FROM transition_stat WHERE scope = ?",
+		scope)
+	if err != nil {
+		t.Fatalf("failed to query %s transitions: %v", currentSession, err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var nextTmpl string
+		if err := rows.Scan(&nextTmpl); err != nil {
+			t.Fatalf("failed to scan transition: %v", err)
+		}
+		for _, forbiddenTmpl := range forbidden {
+			if nextTmpl == forbiddenTmpl {
+				t.Errorf("I1 violation: session %q transitions contain session %q template %q",
+					currentSession, otherSession, nextTmpl)
+			}
+		}
+	}
+}
+
+func insertTransactionalFixture(t *testing.T, ctx context.Context, db *sql.DB) txnFixture {
+	t.Helper()
 	nowMs := time.Now().UnixMilli()
 	sessionID := "test-txn-session"
 	templateID := "tmpl_txn_test"
 	scope := "global"
 
-	// Ensure session exists
-	_, err := db.ExecContext(ctx,
-		"INSERT OR IGNORE INTO session (id, shell, started_at_ms) VALUES (?, 'bash', ?)",
-		sessionID, nowMs)
-	if err != nil {
-		t.Fatalf("failed to insert session: %v", err)
-	}
+	ensureSessionsExist(t, db, []string{sessionID}, nowMs)
 
-	// Execute a transaction that inserts into multiple tables atomically
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		t.Fatalf("failed to begin transaction: %v", err)
 	}
+	defer tx.Rollback()
 
-	// Insert command_event
 	result, err := tx.ExecContext(ctx,
 		"INSERT INTO command_event (session_id, ts_ms, cwd, cmd_raw, cmd_norm, template_id, exit_code, ephemeral) VALUES (?, ?, '/tmp', 'test cmd', 'test cmd', ?, 0, 0)",
 		sessionID, nowMs, templateID)
 	if err != nil {
-		tx.Rollback()
 		t.Fatalf("failed to insert command_event: %v", err)
 	}
 	eventID, _ := result.LastInsertId()
 
-	// Insert command_template
 	_, err = tx.ExecContext(ctx,
 		"INSERT OR REPLACE INTO command_template (template_id, cmd_norm, slot_count, first_seen_ms, last_seen_ms) VALUES (?, 'test cmd', 0, ?, ?)",
 		templateID, nowMs, nowMs)
 	if err != nil {
-		tx.Rollback()
 		t.Fatalf("failed to insert command_template: %v", err)
 	}
 
-	// Insert command_stat
 	_, err = tx.ExecContext(ctx,
 		"INSERT OR REPLACE INTO command_stat (scope, template_id, score, success_count, failure_count, last_seen_ms) VALUES (?, ?, 1.0, 1, 0, ?)",
 		scope, templateID, nowMs)
 	if err != nil {
-		tx.Rollback()
 		t.Fatalf("failed to insert command_stat: %v", err)
 	}
 
-	// Commit
 	if err := tx.Commit(); err != nil {
 		t.Fatalf("failed to commit transaction: %v", err)
 	}
 
-	// Verify all tables reflect the event
-	var ceExists bool
-	err = db.QueryRowContext(ctx,
-		"SELECT COUNT(*) > 0 FROM command_event WHERE id = ?", eventID).Scan(&ceExists)
-	if err != nil || !ceExists {
-		t.Errorf("I5 violation: command_event row %d not found after commit", eventID)
-	}
+	return txnFixture{eventID: eventID, templateID: templateID, scope: scope, nowMs: nowMs}
+}
 
-	var ctExists bool
-	err = db.QueryRowContext(ctx,
-		"SELECT COUNT(*) > 0 FROM command_template WHERE template_id = ?", templateID).Scan(&ctExists)
-	if err != nil || !ctExists {
-		t.Errorf("I5 violation: command_template %q not found after commit", templateID)
-	}
+func assertTransactionalFixtureExists(t *testing.T, ctx context.Context, db *sql.DB, fixture txnFixture) {
+	t.Helper()
+	assertExistsByID(t, ctx, db, "command_event", "id", fixture.eventID)
+	assertExistsByID(t, ctx, db, "command_template", "template_id", fixture.templateID)
+	assertCommandStatExists(t, ctx, db, fixture.scope, fixture.templateID)
+}
 
-	var csExists bool
-	err = db.QueryRowContext(ctx,
+func assertExistsByID(t *testing.T, ctx context.Context, db *sql.DB, table, col string, id any) {
+	t.Helper()
+	query := fmt.Sprintf("SELECT COUNT(*) > 0 FROM %s WHERE %s = ?", table, col)
+	var exists bool
+	if err := db.QueryRowContext(ctx, query, id).Scan(&exists); err != nil || !exists {
+		t.Errorf("I5 violation: %s row (%s=%v) not found after commit", table, col, id)
+	}
+}
+
+func assertCommandStatExists(t *testing.T, ctx context.Context, db *sql.DB, scope, templateID string) {
+	t.Helper()
+	var exists bool
+	err := db.QueryRowContext(ctx,
 		"SELECT COUNT(*) > 0 FROM command_stat WHERE scope = ? AND template_id = ?",
-		scope, templateID).Scan(&csExists)
-	if err != nil || !csExists {
-		t.Errorf("I5 violation: command_stat for scope=%q template=%q not found after commit",
-			scope, templateID)
+		scope, templateID).Scan(&exists)
+	if err != nil || !exists {
+		t.Errorf("I5 violation: command_stat for scope=%q template=%q not found after commit", scope, templateID)
 	}
+}
 
-	// Verify timestamps are consistent (all should have the same nowMs)
-	var csLastSeen int64
-	err = db.QueryRowContext(ctx,
+func assertFixtureTimestamps(t *testing.T, ctx context.Context, db *sql.DB, fixture txnFixture) {
+	t.Helper()
+	csLastSeen := queryInt64(t, ctx, db,
 		"SELECT last_seen_ms FROM command_stat WHERE scope = ? AND template_id = ?",
-		scope, templateID).Scan(&csLastSeen)
-	if err != nil {
-		t.Fatalf("failed to query command_stat last_seen_ms: %v", err)
-	}
-	if csLastSeen != nowMs {
-		t.Errorf("I5 violation: command_stat.last_seen_ms = %d, want %d", csLastSeen, nowMs)
+		fixture.scope, fixture.templateID)
+	if csLastSeen != fixture.nowMs {
+		t.Errorf("I5 violation: command_stat.last_seen_ms = %d, want %d", csLastSeen, fixture.nowMs)
 	}
 
-	var ctLastSeen int64
-	err = db.QueryRowContext(ctx,
+	ctLastSeen := queryInt64(t, ctx, db,
 		"SELECT last_seen_ms FROM command_template WHERE template_id = ?",
-		templateID).Scan(&ctLastSeen)
-	if err != nil {
-		t.Fatalf("failed to query command_template last_seen_ms: %v", err)
+		fixture.templateID)
+	if ctLastSeen != fixture.nowMs {
+		t.Errorf("I5 violation: command_template.last_seen_ms = %d, want %d", ctLastSeen, fixture.nowMs)
 	}
-	if ctLastSeen != nowMs {
-		t.Errorf("I5 violation: command_template.last_seen_ms = %d, want %d", ctLastSeen, nowMs)
+}
+
+func queryInt64(t *testing.T, ctx context.Context, db *sql.DB, query string, args ...any) int64 {
+	t.Helper()
+	var val int64
+	if err := db.QueryRowContext(ctx, query, args...).Scan(&val); err != nil {
+		t.Fatalf("failed to query int64 value: %v", err)
 	}
+	return val
 }
 
 // insertEvent inserts a command event into the database for invariant testing.
