@@ -36,7 +36,7 @@ User invokes:  clai workflow run pulumi-compliance-run
               │  7. WorkflowStepUpdate ──┼──────► │  • run state    │
               │     RPC per state change │        │  • step state   │
               │  8. LLM analysis via     │        │  • analyses     │
-              │     claudemon/provider   │        │  in SQLite      │
+              │     claude daemon        │        │  in SQLite      │
               │  9. Human prompts via    │        │                 │
               │     stdin/stdout         │        │  Serves:        │
               │ 10. WorkflowRunEnd ──────┼──────► │  • status RPCs  │
@@ -68,7 +68,7 @@ The CLI process:
 - Has direct terminal access for human interaction (func spec §4.6)
 - Supports `Ctrl+C` via `context.Context` (existing pattern)
 - Lifecycle matches the workflow run lifecycle
-- Can interact with claudemon directly (no daemon intermediary)
+- Can interact with claude daemon directly via `QueryFast()` (see `internal/claude/daemon.go`)
 
 ### 1.3 Component Responsibilities
 
@@ -77,7 +77,7 @@ The CLI process:
 | **CLI** (`clai workflow run`) | YAML parsing, expression evaluation, matrix expansion, DAG validation, step execution, output capture, LLM interaction, human prompts, terminal output |
 | **Daemon** (`claid`) | Persist run/step state in SQLite, serve status/history queries, propagate stop signals |
 | **Subprocesses** | Execute individual shell commands, produce stdout/stderr |
-| **claudemon / LLM** | Analyze step output, return structured decisions, support follow-up conversation |
+| **Claude daemon / LLM** (`internal/claude/daemon.go`) | Analyze step output, return structured decisions, support follow-up conversation |
 
 ### 1.4 Graceful Degradation
 
@@ -355,7 +355,7 @@ type HandlerDef struct {
 
 // LLMConfig represents workflow-level LLM configuration.
 type LLMConfig struct {
-    Backend    string `yaml:"backend"`     // "claudemon", "claude-cli", "api"
+    Backend    string `yaml:"backend"`     // "daemon" (default), "claude-cli", "api"
     Provider   string `yaml:"provider"`    // for API backend: "anthropic", "openai"
     Model      string `yaml:"model"`
     APIKeyEnv  string `yaml:"api_key_env"`
@@ -479,31 +479,28 @@ For v0, support only: `${{ env.NAME }}`, `${{ matrix.KEY }}`, `${{ steps.ID.outp
 
 ## 5. LLM Integration
 
-### 5.1 claudemon Protocol (func spec FR-28)
+### 5.1 Existing Claude Daemon (func spec FR-28)
 
-claudemon is a managed Claude CLI instance. clai starts it as a subprocess and communicates via stdin/stdout JSON-RPC:
+The "claudemon" concept from the functional spec is **already implemented** as the Claude daemon in `internal/claude/daemon.go`. It manages a persistent Claude CLI process (`claude --print --verbose --model haiku --input-format stream-json --output-format stream-json`) and communicates via Unix socket IPC.
+
+**Existing types (from `internal/claude/daemon.go`):**
+
+- `claudeProcess` — manages the persistent Claude CLI subprocess (cmd, stdin pipe, stdout scanner, mutex)
+- `DaemonRequest{Prompt}` / `DaemonResponse{Result, Error}` — JSON protocol over Unix socket
+- `StreamMessage` / `StreamResponse` — Claude stream-json wire format
+- `QueryViaDaemon(ctx, prompt)` — sends prompt to daemon, returns result
+- `QueryFast(ctx, prompt)` — tries daemon first, falls back to `QueryWithContext` (one-shot CLI)
+- `StartDaemonProcess()` — spawns detached background daemon, writes PID, waits up to 90s for socket
+- `RunDaemon()` — the daemon server loop (accept connections, idle timeout, handle requests)
+
+**New workflow-specific types** (to be added in `internal/workflow/llm.go`):
 
 ```go
-type ClaudemonClient struct {
-    cmd    *exec.Cmd
-    stdin  io.WriteCloser
-    stdout *bufio.Reader
-    mu     sync.Mutex
-}
-
-// AnalysisRequest is sent to claudemon via stdin.
-type AnalysisRequest struct {
-    Type    string `json:"type"`    // "analyze"
-    Prompt  string `json:"prompt"`  // analysis_prompt with expressions resolved
-    Content string `json:"content"` // step stdout (scrubbed, truncated to 100KB)
-    Context string `json:"context"` // optional: prior step context
-}
-
-// AnalysisResponse is read from claudemon's stdout.
+// AnalysisResponse is the structured decision from LLM analysis of step output.
 type AnalysisResponse struct {
-    Decision string         `json:"decision"` // "proceed", "halt", "needs_human"
+    Decision  string        `json:"decision"`  // "proceed", "halt", "needs_human"
     Reasoning string        `json:"reasoning"`
-    Flags    []FlaggedItem  `json:"flags,omitempty"`
+    Flags     []FlaggedItem `json:"flags,omitempty"`
 }
 
 type FlaggedItem struct {
@@ -513,11 +510,15 @@ type FlaggedItem struct {
 }
 ```
 
+The workflow engine builds an analysis prompt (combining `analysis_prompt` from the step definition with the scrubbed step output), sends it via `QueryFast()`, and parses the response into an `AnalysisResponse`.
+
 ### 5.2 Fallback Chain
 
-1. **claudemon** (preferred): warm session, fast response, stream-based
-2. **claude CLI**: `claude --print` with prompt via stdin (existing pattern from `internal/claude/claude.go`)
-3. **API provider**: direct Anthropic/OpenAI API call via `internal/provider/` (v1)
+`QueryFast()` in `internal/claude/daemon.go` already implements the first two levels:
+
+1. **Claude daemon** (preferred): warm session via `QueryViaDaemon()`, fast response, Unix socket IPC
+2. **claude CLI**: one-shot `claude --print` via `QueryWithContext()` (existing fallback in `QueryFast()`)
+3. **API provider**: direct Anthropic/OpenAI API call via `internal/provider/` (v1 — not yet implemented)
 
 If all backends fail, treat the analysis as `needs_human` (func spec FR-24).
 
@@ -1199,14 +1200,13 @@ CLI continues executing the workflow without state persistence. Step updates are
 - `clai workflow stop <run-id>` can mark it `cancelled`
 - Future: on daemon startup, detect orphaned runs (no PID alive) and mark `cancelled`
 
-### 11.4 claudemon Crash
+### 11.4 Claude Daemon Crash
 
-If claudemon dies during analysis:
+If the claude daemon dies during analysis (detected by `QueryViaDaemon()` returning error):
 
-1. CLI detects broken pipe on stdin/stdout
-2. Attempts to restart claudemon (once)
-3. If restart fails: fall back to claude CLI
-4. If claude CLI unavailable: treat as `needs_human` (func spec FR-24)
+1. `QueryFast()` automatically falls back to one-shot `QueryWithContext()` (claude CLI)
+2. If claude CLI also fails: treat as `needs_human` (func spec FR-24)
+3. Background: `StartDaemonProcess()` can be called to restart the daemon for subsequent steps
 
 ### 11.5 Resume from Failure (v1)
 
@@ -1240,7 +1240,7 @@ internal/workflow/
   executor_test.go
   runner.go              # Main orchestration loop
   runner_test.go
-  llm.go                 # LLM integration (claudemon, fallback)
+  llm.go                 # LLM integration (uses claude daemon via QueryFast, fallback)
   llm_test.go
   review.go              # Human review interaction
   review_test.go
@@ -1286,7 +1286,7 @@ Register in `internal/cmd/root.go` within the existing command group structure.
 | **P0-C** | Step executor (subprocess, output capture, $CLAI_OUTPUT) | `executor.go` + tests |
 | **P0-D** | Matrix expansion | `matrix.go` + tests |
 | **P0-E** | Workflow runner (sequential: matrix → steps) | `runner.go` + tests |
-| **P0-F** | LLM integration (claudemon + fallback) | `llm.go`, `scrub.go` + tests |
+| **P0-F** | LLM integration (claude daemon via `QueryFast` + fallback) | `llm.go`, `scrub.go` + tests |
 | **P0-G** | Human review (terminal prompts + follow-up) | `review.go` + tests |
 | **P0-H** | SQLite migration + gRPC extensions + daemon handlers | `storage/`, `proto/`, `daemon/` |
 | **P0-I** | CLI commands (`run`, `validate`) | `cmd/workflow.go` |
@@ -1317,7 +1317,7 @@ Register in `internal/cmd/root.go` within the existing command group structure.
 - End-to-end workflow run with `echo` commands (no LLM)
 - Matrix expansion with 3 entries
 - Step output passing ($CLAI_OUTPUT → expression resolution)
-- LLM analysis with mock claudemon (pre-recorded responses)
+- LLM analysis with mock claude daemon (pre-recorded responses via test socket)
 - Human review with simulated stdin
 - Daemon state persistence (verify SQLite rows after run)
 
@@ -1359,7 +1359,7 @@ func (m *MockClaudemon) Analyze(req *AnalysisRequest) (*AnalysisResponse, error)
 - [ ] Matrix expansion generates correct entries from `include`
 - [ ] Steps execute sequentially via `$SHELL -c` with correct environment
 - [ ] Step outputs exported via `$CLAI_OUTPUT` resolve in downstream `${{ }}` expressions
-- [ ] `analyze: true` steps send output to claudemon and receive structured response
+- [ ] `analyze: true` steps send output to claude daemon (via `QueryFast`) and receive structured response
 - [ ] Risk level decision matrix correctly determines when to prompt human
 - [ ] Human review interface presents approve/reject/inspect/follow-up options
 - [ ] Follow-up LLM conversation preserves context
@@ -1387,7 +1387,7 @@ func (m *MockClaudemon) Analyze(req *AnalysisRequest) (*AnalysisResponse, error)
 | `maxActiveSteps` | ✅ Adopted (v1) | Semaphore-bounded goroutines | Same concept |
 | Variable expansion | ✅ Adapted | `${{ }}` syntax (GHA-style, not `${VAR}` dagu-style) | Go-side evaluation for safety |
 | Preconditions | ✅ Adopted (v1) | Command, env, file checks | Same concept as dagu |
-| Chat/LLM executor | ✅ Adapted | `analyze` + `analysis_prompt` + claudemon | Dagu has generic chat; clai has structured analysis |
+| Chat/LLM executor | ✅ Adapted | `analyze` + `analysis_prompt` + claude daemon | Dagu has generic chat; clai has structured analysis via existing daemon |
 | Retry with backoff | ⏳ Deferred | v1+ | Dagu has this; not needed for v0 Pulumi use case |
 | `continueOn` | ⏳ Deferred | v1+ | Fine-grained failure control |
 | Sub-workflows | ⏳ Deferred | v2 | Dagu's child DAG pattern |
@@ -1412,5 +1412,5 @@ func (m *MockClaudemon) Analyze(req *AnalysisRequest) (*AnalysisResponse, error)
 | D3 | Output routing | (a) All through daemon (b) CLI captures, sends tails | **(b)** | Avoids routing large output through gRPC. |
 | D4 | YAML syntax | (a) Dagu-style (b) GHA-style (c) Custom | **(b)** | GHA is widely known. Matrix strategy from GHA/act is essential for multi-target use cases. |
 | D5 | Expression syntax | (a) `${VAR}` dagu-style (b) `${{ }}` GHA-style | **(b)** | GHA-style is unambiguous (no conflict with shell `$VAR`). Evaluated Go-side. |
-| D6 | LLM backend | (a) API only (b) claudemon only (c) claudemon + fallback | **(c)** | claudemon for speed (warm session). Fallback for availability. |
+| D6 | LLM backend | (a) API only (b) daemon only (c) daemon + fallback | **(c)** | Existing claude daemon (`QueryFast`) for speed (warm session). Automatic fallback to CLI via `QueryWithContext`. |
 | D7 | v0 scope | (a) Full DAG (b) Sequential only | **(b)** | Sequential is sufficient for the Pulumi use case. DAG in v1. |
