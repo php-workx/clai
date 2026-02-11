@@ -1,14 +1,40 @@
 # clai Workflow Execution — Technical Specification
 
-**Version:** 3.0
+**Version:** 4.0
 **Date:** 2026-02-11
-**Status:** RFC
-**Supersedes:** `specs/tech_workflows_v2.md` (v2)
+**Status:** Approved for Implementation
+**Supersedes:** `specs/tech_workflows_v3.md` (v3)
 **Companion:** `specs/func_workflows.md` (functional requirements)
 
 > This document specifies **how** to implement the workflow execution feature defined in `func_workflows.md`. It covers architecture, data structures, protocols, and implementation details. Reference the functional spec for *what* the system should do.
 >
 > Implementation draws inspiration from [dagu-org/dagu](https://github.com/dagu-org/dagu) — a self-contained Go workflow engine with YAML definitions, DAG-based step execution, and structured run artifacts.
+
+### Changelog from v3
+
+- **JSON path normalization (AR-A):** All file paths in RunArtifact events and LLM API payloads are normalized to forward slashes via `filepath.ToSlash()`, preventing JSON escaping issues on Windows
+- **Context cancellation precision (AR-B):** `executeMatrixParallel` defers context cleanup until after `wg.Wait()`, ensuring `FailFast=false` does not prematurely cancel sibling matrix entries
+- **UTF-8 safe truncation (AR-C):** LLM context truncation validates UTF-8 boundaries after byte slicing to prevent invalid sequences that break `json.Marshal`
+- **Stdin workflow input (MR-A):** `-` as the file argument reads workflow YAML from stdin; resume not supported for stdin-sourced workflows
+- **Log-friendly output (MR-B):** Non-TTY and `TERM=dumb` environments get log-friendly output — no `\r` overwrites, no spinners, one line per event
+- **Orphan process cleanup (MR-C):** Linux subprocess setup includes `Pdeathsig: syscall.SIGKILL` to kill children if parent receives SIGKILL
+- **Shell completion to stdout (DG-A):** Completion scripts are output to stdout for user redirection; binary never writes directly to system paths
+- **Testscript binary compilation (DG-B):** E2E test harness compiles `clai` to a temp directory and prepends it to `$PATH` before running testscript files
+
+### V3 Review Feedback Traceability
+
+Every finding from the v3 review maps to a v4 section. Nothing is dropped.
+
+| ID | Finding | V4 Section |
+|----|---------|------------|
+| AR-A | JSON path normalization (Windows backslashes in JSONL) | §12.3.1 Path Normalization |
+| AR-B | FailFast=false must not cancel sibling matrix entries | §17.1 executeMatrixParallel |
+| AR-C | UTF-8 safe truncation (byte slicing breaks multi-byte chars) | §10.6 Context Building |
+| MR-A | Stdin workflow input (`-` as alias for stdin) | §7.4 File Discovery |
+| MR-B | Dumb terminal output strategy (no spinners/`\r` in CI) | §11.5 Color and Formatting |
+| MR-C | Orphan process cleanup via `Pdeathsig` on Linux | §6.2 Unix Implementation |
+| DG-A | Shell completion should output to stdout, not write to `/etc/` | §26.1 Shell Completion |
+| DG-B | Testscript harness must compile binary to temp PATH | §23.6 CI Gates |
 
 ### Changelog from v2
 
@@ -721,7 +747,11 @@ File: `internal/workflow/process_unix.go` (build tag `//go:build !windows`)
 ```go
 // Start sets Setpgid: true to create a process group
 // (matching existing pattern in internal/ipc/spawn_unix.go).
-cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+// Pdeathsig ensures children are killed if parent receives SIGKILL (MR-C).
+cmd.SysProcAttr = &syscall.SysProcAttr{
+    Setpgid:   true,
+    Pdeathsig: syscall.SIGKILL, // Kill child if parent dies (Linux only)
+}
 
 // GracefulStop sends SIGTERM to the process group (-pgid).
 syscall.Kill(-pgid, syscall.SIGTERM)
@@ -730,6 +760,8 @@ syscall.Kill(-pgid, syscall.SIGTERM)
 // ForceKill sends SIGKILL to the process group.
 syscall.Kill(-pgid, syscall.SIGKILL)
 ```
+
+**Orphan process protection (MR-C):** `Pdeathsig: syscall.SIGKILL` ensures that if the parent CLI process receives `SIGKILL` (which cannot be caught or handled), child subprocesses are immediately terminated by the kernel. This is Linux-specific; on macOS, `Pdeathsig` is not supported and is silently ignored by the Go runtime. On Windows, the Job Object implementation (§6.3) provides equivalent orphan cleanup — the OS closes child processes when the job object handle is closed.
 
 ### 6.3 Windows Implementation
 
@@ -1049,6 +1081,11 @@ Workflows are discovered from these locations (in order):
    - `./.clai/workflows/my-workflow.yaml`
    - `~/.clai/workflows/my-workflow.yaml`
    - Additional paths from `workflows.search_paths` config
+3. Stdin (MR-A): `cat my-workflow.yaml | clai workflow run -`
+   - `-` as the file argument reads the workflow definition from stdin
+   - The YAML is read fully into memory before parsing (stdin is not seekable)
+   - `--resume` is not supported for stdin-sourced workflows (no file path to hash)
+   - Workflow name defaults to `"stdin"` when sourced from stdin
 
 ### 7.5 Filename Sanitization
 
@@ -1482,9 +1519,21 @@ func buildAnalysisContext(step *StepDef, result *StepResult, secretStore *Secret
         output = output[:maxOutputForLLM]
     }
 
+    // 3. Ensure truncation didn't split a multi-byte UTF-8 character (AR-C).
+    // Go string slicing operates on bytes, not characters. Cutting mid-rune
+    // produces invalid UTF-8 that can cause json.Marshal errors or confuse the LLM.
+    if !utf8.ValidString(output) {
+        // Trim trailing invalid bytes (at most 3 bytes for a 4-byte rune)
+        for len(output) > 0 && !utf8.ValidString(output) {
+            output = output[:len(output)-1]
+        }
+    }
+
     return output
 }
 ```
+
+**UTF-8 safety (AR-C):** After truncation, the output is validated for UTF-8 correctness. If the cut point falls within a multi-byte character (e.g., emoji, non-Latin glyph), trailing invalid bytes are trimmed rather than producing replacement characters (`\uFFFD`). This prevents `json.Marshal` errors when the truncated output is serialized for the LLM API.
 
 ### 10.7 Risk Level Decision Matrix (FR-25)
 
@@ -1747,6 +1796,14 @@ func shouldUseColor(out *os.File) bool {
 
 Color is used for: step status indicators (green checkmark / red cross), section headers, timing information. All color output uses ANSI escape codes that are stripped when color is disabled.
 
+**Log-friendly output mode (MR-B):** When `!isatty(out)` or `TERM=dumb`, the CLI automatically switches to log-friendly output in addition to disabling color:
+
+- **No carriage returns (`\r`):** Progress updates are NOT printed with `\r` overwrite. Instead, only state transitions are printed (e.g., `Step 'build' started`, `Step 'build' succeeded [3.2s]`).
+- **No spinners or dynamic timers:** CI log parsers (Jenkins, GitLab, GitHub Actions) cannot handle single-line overwrite and would produce thousands of `[progress] 1%`, `[progress] 2%` lines.
+- **One line per event:** Each output line is a complete status message, suitable for `grep` filtering and log aggregation.
+
+This is controlled by the same `shouldUseColor()` check — if color is disabled, dynamic output is also disabled. The `Runner.out` writer adapts its formatting based on this detection at startup.
+
 ---
 
 ## 12. State Management
@@ -1897,6 +1954,23 @@ func (ra *RunArtifact) WriteEvent(evt RunEvent) error {
     return ra.enc.Encode(evt)
 }
 ```
+
+#### 12.3.1 Path Normalization (AR-A)
+
+All file paths written to RunArtifact events or sent to the LLM API MUST be normalized to forward slashes (`/`) regardless of the host OS. This prevents JSON escaping issues on Windows (where `C:\foo\bar` requires `C:\\foo\\bar` in JSON) and ensures consistent path handling in downstream tools and LLM prompts.
+
+```go
+// normalizePath converts OS-specific path separators to forward slashes.
+// Applied to all path values before JSON marshaling in RunArtifact and LLM context.
+func normalizePath(p string) string {
+    return filepath.ToSlash(p)
+}
+```
+
+This normalization is applied in:
+- `RunArtifact.WriteEvent()` — all `workflow_path`, log file paths in event data
+- `buildAnalysisContext()` — file references in LLM prompts
+- `WorkflowRunStartRequest.WorkflowPath` — gRPC payload to daemon
 
 SQLite rows are **indexed projections** of this artifact -- optimized for queries but not the canonical record.
 
@@ -2307,7 +2381,7 @@ If `analyze: true` is used in any step, `claude` is automatically added to the i
 
 ### 17.1 Parallel Matrix Execution
 
-The context cancellation is created in the outer scope so that goroutines can trigger cancellation when `fail_fast` is enabled (P1-3):
+The context cancellation is created in the outer scope so that goroutines can trigger cancellation when `fail_fast` is enabled (P1-3). The `cancel()` call is deferred until after `wg.Wait()` to ensure that when `FailFast=false`, the context remains live for all goroutines until they all complete (AR-B):
 
 ```go
 func (r *Runner) executeMatrixParallel(ctx context.Context, job *JobDef, entries []MatrixEntry) error {
@@ -2316,9 +2390,11 @@ func (r *Runner) executeMatrixParallel(ctx context.Context, job *JobDef, entries
         maxP = len(entries) // unlimited
     }
 
-    // Create cancellable context in outer scope so goroutines can trigger cancellation (P1-3)
+    // Create cancellable context in outer scope so goroutines can trigger cancellation (P1-3).
+    // Note: cancel() is NOT deferred here — it is called explicitly after wg.Wait().
+    // Using defer cancel() would cancel the context before goroutines finish when
+    // FailFast=false, prematurely killing sibling matrix entries (AR-B).
     ctx, cancel := context.WithCancel(ctx)
-    defer cancel()
 
     sem := make(chan struct{}, maxP)
     var wg sync.WaitGroup
@@ -2328,7 +2404,7 @@ func (r *Runner) executeMatrixParallel(ctx context.Context, job *JobDef, entries
     for _, entry := range entries {
         select {
         case <-ctx.Done():
-            return ctx.Err()
+            break
         case sem <- struct{}{}:
         }
 
@@ -2346,16 +2422,22 @@ func (r *Runner) executeMatrixParallel(ctx context.Context, job *JobDef, entries
                 }
                 mu.Unlock()
                 if job.Strategy.FailFast == nil || *job.Strategy.FailFast {
-                    cancel() // cancel is in scope — captured from outer context.WithCancel
+                    cancel() // FailFast=true: cancel remaining entries immediately
                 }
+                // FailFast=false: do NOT cancel — let siblings run to completion
             }
         }(entry)
     }
 
     wg.Wait()
+    cancel() // Clean up context resources after all goroutines have finished
     return firstErr
 }
 ```
+
+**FailFast behavior summary (AR-B):**
+- **`fail_fast: true` (default):** First step failure calls `cancel()`, which signals all other goroutines via `ctx.Done()`. Sibling entries see `ctx.Err()` and exit early.
+- **`fail_fast: false`:** Step failures are collected but `cancel()` is never called in the goroutine. All sibling matrix entries run to completion. Errors are returned after `wg.Wait()`.
 
 ### 17.2 Shared State Ownership
 
@@ -2870,6 +2952,30 @@ stdout 'step.*success'
 ! stderr 'error'
 ```
 
+**Testscript binary setup (DG-B):** `testscript` requires the binary under test to be available on `$PATH`. The test runner compiles the current `clai` binary to a temp directory and prepends it to the testscript PATH:
+
+```go
+// TestWorkflowScripts runs all testscript-based E2E tests.
+func TestWorkflowScripts(t *testing.T) {
+    // Compile the current clai binary to a temp directory
+    binDir := t.TempDir()
+    binPath := filepath.Join(binDir, "clai")
+    cmd := exec.Command("go", "build", "-o", binPath, "./cmd/clai")
+    if err := cmd.Run(); err != nil {
+        t.Fatalf("compile clai: %v", err)
+    }
+
+    // Run all testscript files with the compiled binary on PATH
+    testscript.Run(t, testscript.Params{
+        Dir: "testdata/script",
+        Setup: func(env *testscript.Env) error {
+            env.Setenv("PATH", binDir+string(os.PathListSeparator)+env.Getenv("PATH"))
+            return nil
+        },
+    })
+}
+```
+
 Interactive prompts are tested using mock `InteractionHandler`:
 
 ```go
@@ -2913,6 +3019,10 @@ func (s *ScriptedInteractionHandler) Review(ctx context.Context, step *StepDef, 
 - [ ] Non-interactive-fail mode exits with code 5 on human decision needed
 - [ ] Ctrl+C gracefully stops subprocess and cancels remaining steps
 - [ ] Works on Linux and macOS (full daemon IPC); Windows: engine runs (argv/shell execution, LLM analysis), daemon IPC deferred to Tier 1
+- [ ] Stdin workflow input via `-` argument reads and executes YAML from stdin
+- [ ] Log-friendly output in non-TTY / `TERM=dumb` (no `\r` overwrites, no spinners, one line per event)
+- [ ] RunArtifact paths normalized to forward slashes on all platforms
+- [ ] UTF-8 safe truncation in LLM context building (no broken multi-byte sequences)
 - [ ] `clai workflow validate` checks YAML without executing
 - [ ] Strict YAML parsing rejects unknown fields
 - [ ] Output parser validates key names and handles malformed files
@@ -2964,13 +3074,13 @@ func (s *ScriptedInteractionHandler) Review(ctx context.Context, step *StepDef, 
 
 ### 26.1 Shell Completion
 
-Use cobra's built-in completion generation:
+Use cobra's built-in `completion` subcommand, which outputs completion scripts to **stdout** for the user to redirect (DG-A). The binary never writes directly to system paths:
 
 ```go
-// Auto-generated by cobra for zsh, bash, fish
-cmd.GenBashCompletionFile("completions/clai.bash")
-cmd.GenZshCompletionFile("completions/_clai")
-cmd.GenFishCompletionFile("completions/clai.fish")
+// Standard Cobra completion subcommand — outputs to stdout for user redirection.
+// clai completion bash   → outputs bash completions to stdout
+// clai completion zsh    → outputs zsh completions to stdout
+// clai completion fish   → outputs fish completions to stdout
 ```
 
 Custom completions for:
@@ -2978,11 +3088,13 @@ Custom completions for:
 - `--matrix` key completion: parses YAML and lists matrix keys
 - `--resume` run ID completion: queries daemon for recent failed runs
 
-**Installation paths (DG-2):**
-- **bash:** `clai completion bash > /etc/bash_completion.d/clai` (system) or `~/.bash_completion` (user)
-- **zsh:** `clai completion zsh > ${fpath[1]}/_clai` (requires `compinit`)
+**Installation paths (DG-2, DG-A):**
+- **bash:** `clai completion bash > ~/.local/share/bash-completion/completions/clai` (user) or with sudo: `clai completion bash | sudo tee /etc/bash_completion.d/clai`
+- **zsh:** `clai completion zsh > "${fpath[1]}/_clai"` (requires `compinit`)
 - **fish:** `clai completion fish > ~/.config/fish/completions/clai.fish`
-- **PowerShell (Tier 1):** `clai completion powershell > $PROFILE.CurrentUserAllHosts` (requires PSReadLine)
+- **PowerShell (Tier 1):** `clai completion powershell | Out-File -Append $PROFILE`
+
+> **Note:** All paths above use shell redirection (`>`). The `clai completion` subcommand only writes to stdout — it never creates files or writes to system directories. Users choose where to redirect based on their system setup.
 
 ### 26.2 Performance Budget
 
@@ -3028,3 +3140,6 @@ For workflow users:
 | D16 | Store key model | (a) int64 auto-increment (b) composite (runID, stepID, matrixKey) | **(b)** | Matches RPC identity model. Eliminates type mismatch between gRPC string IDs and store int64. (P0-4) |
 | D17 | YAML strictness | (a) Lenient (ignore unknown) (b) Strict (error on unknown) | **(b)** | Prevents silent typos in workflow files. Users get immediate feedback on misspelled keys. (P1-2) |
 | D18 | Windows daemon IPC | (a) Claim parity now (b) Defer, provide --daemon=false | **(b)** | Unix sockets don't exist on Windows. Named pipes need distinct implementation. Defer to Tier 1. (P0-5) |
+| D19 | Path normalization | (a) OS-native paths in JSON (b) Forward-slash normalized | **(b)** | Windows backslashes require double-escaping in JSON. Forward slashes work universally and simplify downstream parsing. (AR-A) |
+| D20 | Truncation safety | (a) Byte slicing (b) Rune-aware truncation | **(b)** | Byte slicing can break multi-byte UTF-8 characters, causing `json.Marshal` errors or LLM confusion. (AR-C) |
+| D21 | Stdin workflow input | (a) File-only input (b) Support `-` for stdin | **(b)** | Enables dynamic workflow generation via pipes. Resume not supported for stdin sources. (MR-A) |
