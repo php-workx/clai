@@ -113,7 +113,7 @@ func StartDaemonProcess() error {
 		logFile = nil
 	}
 
-	cmd := exec.Command(exe, "claude-daemon", "run")
+	cmd := exec.Command(exe, "claude-daemon", "run") //nolint:gosec // G204: exe is our own binary path
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil

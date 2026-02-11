@@ -424,9 +424,9 @@ func copyToClipboard(text string) tea.Cmd {
 			cmd = exec.Command("pbcopy")
 		case "linux":
 			if path, err := exec.LookPath("xclip"); err == nil {
-				cmd = exec.Command(path, "-selection", "clipboard")
+				cmd = exec.Command(path, "-selection", "clipboard") //nolint:gosec // G204: path from LookPath
 			} else if path, err := exec.LookPath("xsel"); err == nil {
-				cmd = exec.Command(path, "--clipboard", "--input")
+				cmd = exec.Command(path, "--clipboard", "--input") //nolint:gosec // G204: path from LookPath
 			} else {
 				return clipboardMsg{err: fmt.Errorf("no clipboard tool found")}
 			}

@@ -78,7 +78,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 	defer logFile.Close()
 
 	// Start daemon process
-	cmd := exec.Command(daemonPath)
+	cmd := exec.Command(daemonPath) //nolint:gosec // G204: daemonPath is our own binary
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
