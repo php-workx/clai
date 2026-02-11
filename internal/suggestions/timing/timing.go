@@ -110,6 +110,11 @@ type Machine struct {
 	lastKeystrokeMs int64
 }
 
+func (m *Machine) transitionToPaused() (State, bool) {
+	m.state = PAUSED
+	return PAUSED, true
+}
+
 // NewMachine creates a new timing state machine with the given config.
 // Zero-valued config fields are replaced with defaults.
 func NewMachine(config Config) *Machine {
@@ -136,41 +141,36 @@ func (m *Machine) OnKeystroke(nowMs int64) (State, bool) {
 	delta := nowMs - m.lastKeystrokeMs
 	m.lastKeystrokeMs = nowMs
 
-	switch m.state {
-	case IDLE:
-		// First keystroke — enter typing state, no request yet
-		m.state = TYPING
-		return TYPING, false
-
-	case TYPING:
-		if delta < m.config.FastThresholdMs {
-			m.state = FAST_TYPING
-			return FAST_TYPING, false
-		}
-		if delta > m.config.PauseThresholdMs {
-			m.state = PAUSED
-			return PAUSED, true
-		}
-		// Still in normal typing range — stay in TYPING, no request
-		return TYPING, false
-
-	case FAST_TYPING:
-		if delta > m.config.PauseThresholdMs {
-			m.state = PAUSED
-			return PAUSED, true
-		}
-		// Still fast — suppress
-		return FAST_TYPING, false
-
-	case PAUSED:
-		// Resumed typing after a pause
-		m.state = TYPING
-		return TYPING, false
-
-	default:
+	if m.state != IDLE && m.state != TYPING && m.state != FAST_TYPING && m.state != PAUSED {
 		m.state = IDLE
 		return IDLE, false
 	}
+
+	switch m.state {
+	case IDLE, PAUSED:
+		// First keystroke or resumed typing after pause.
+		m.state = TYPING
+		return TYPING, false
+
+	case TYPING, FAST_TYPING:
+		if delta > m.config.PauseThresholdMs {
+			return m.transitionToPaused()
+		}
+		if m.state == TYPING {
+			if delta < m.config.FastThresholdMs {
+				m.state = FAST_TYPING
+				return FAST_TYPING, false
+			}
+			// Still in normal typing range — stay in TYPING, no request
+			return TYPING, false
+		}
+		// Still fast typing — suppress
+		return FAST_TYPING, false
+	}
+
+	// Defensive fallback for unexpected state transitions.
+	m.state = IDLE
+	return IDLE, false
 }
 
 // OnIdle checks whether the machine should transition to IDLE due to

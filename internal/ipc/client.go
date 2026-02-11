@@ -103,7 +103,7 @@ func (c *Client) LogStart(sessionID, commandID, cwd, command string) {
 
 // LogStartWithContext logs the start of a command execution with additional context.
 // Uses fire-and-forget semantics - errors are silently ignored.
-func (c *Client) LogStartWithContext(sessionID, commandID, cwd, command string, ctx_info *CommandContext) {
+func (c *Client) LogStartWithContext(sessionID, commandID, cwd, command string, ctxInfo *CommandContext) {
 	ctx, cancel := context.WithTimeout(context.Background(), FireAndForgetTimeout)
 	defer cancel()
 
@@ -116,11 +116,11 @@ func (c *Client) LogStartWithContext(sessionID, commandID, cwd, command string, 
 	}
 
 	// Add optional context if provided
-	if ctx_info != nil {
-		req.GitBranch = ctx_info.GitBranch
-		req.GitRepoName = ctx_info.GitRepoName
-		req.GitRepoRoot = ctx_info.GitRepoRoot
-		req.PrevCommandId = ctx_info.PrevCommandID
+	if ctxInfo != nil {
+		req.GitBranch = ctxInfo.GitBranch
+		req.GitRepoName = ctxInfo.GitRepoName
+		req.GitRepoRoot = ctxInfo.GitRepoRoot
+		req.PrevCommandId = ctxInfo.PrevCommandID
 	}
 
 	// Fire and forget - ignore errors
