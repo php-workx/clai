@@ -59,7 +59,7 @@ User invokes:  clai workflow run pulumi-compliance-run
 
 The daemon (`claid`) is designed as a lightweight state tracker with idle timeout. Running long-lived workflow execution inside the daemon would:
 
-- Conflict with idle timeout behavior (daemon auto-exits after 20 min)
+- Conflict with idle timeout behavior (daemon auto-exits after 2 hours; see `defaultIdleTimeout` in `internal/claude/daemon.go`)
 - Make the daemon harder to restart/upgrade during a workflow run
 - Route potentially large output through gRPC unnecessarily
 
@@ -115,7 +115,9 @@ For v0, execution is sequential within a job. Matrix entries also run sequential
 5. Report workflow completion to daemon
 ```
 
-### 2.2 Job Dependency Resolution (v1)
+### 2.2 Job Dependency Resolution (v1 — not implemented in v0)
+
+> **v0 note:** v0 supports only a single job per workflow. This section describes the v1 multi-job DAG resolution. Skip during v0 implementation.
 
 Jobs can depend on other jobs via `needs` (func spec FR-18). When multiple jobs exist:
 
@@ -144,25 +146,34 @@ error: workflow has circular job dependencies: jobA → jobB → jobC → jobA
 ### 2.3 Step Lifecycle State Machine
 
 ```
-              ┌─────────┐
-              │ pending  │
-              └────┬─────┘
-                   │ preconditions evaluated
-                   │
-          ┌────────┴────────┐
-          │                 │
-          ▼                 ▼
-     ┌─────────┐      ┌─────────┐
-     │ running  │      │ skipped │  (precondition failed, or dependency failed
-     └────┬─────┘      └─────────┘   without continue_on)
+              ┌───────────┐
+              │  pending   │
+              └─────┬──────┘
+                    │
+          ┌─────────┴─────────┐
+          │                   │
+          ▼                   ▼
+     ┌──────────┐       ┌──────────┐
+     │ running  │       │ skipped  │  (v1: precondition failed, or
+     └────┬─────┘       └──────────┘   dependency failed w/o continue_on)
           │
-     ┌────┴────┐
-     │         │
-     ▼         ▼
-┌─────────┐ ┌────────┐
-│ success │ │ failed │
-└─────────┘ └────────┘
+     ┌────┼────────┐
+     │    │        │
+     ▼    ▼        ▼
+┌─────┐ ┌──────┐ ┌───────────┐
+│succ.│ │failed│ │ cancelled │  (SIGINT/stop signal received)
+└─────┘ └──────┘ └───────────┘
 ```
+
+**Transition rules:**
+
+| From | To | Trigger |
+|------|----|---------|
+| pending | running | Step execution starts |
+| pending | skipped | v0: prior step in same job failed (fail-fast). v1: precondition false |
+| running | success | `cmd.Run()` returns exit code 0 |
+| running | failed | `cmd.Run()` returns non-zero exit code or exec error |
+| running | cancelled | `ctx.Done()` fires (SIGINT or daemon stop signal) |
 
 State transitions are atomic and reported to the daemon via `WorkflowStepUpdate` RPC.
 
@@ -186,7 +197,32 @@ Expansion produces a `[]MatrixEntry` where each entry is a `map[string]string`. 
 
 ### 2.5 Subprocess Management
 
-Each step executes via Go's `os/exec`:
+Each step executes via Go's `os/exec`.
+
+**Supporting types:**
+
+```go
+// limitedBuffer is a ring buffer that retains the last maxSize bytes.
+// Used to capture step stdout/stderr tails for storage without unbounded memory.
+type limitedBuffer struct {
+    buf     []byte
+    maxSize int  // default: 4096 (4KB, per func spec §7.2)
+}
+
+func (lb *limitedBuffer) Write(p []byte) (int, error) { /* ring buffer write */ }
+func (lb *limitedBuffer) String() string              { return string(lb.buf) }
+
+// StepResult holds the outcome of a single step execution.
+type StepResult struct {
+    ExitCode  int
+    Stdout    string        // last 4KB via limitedBuffer
+    Stderr    string        // last 4KB via limitedBuffer
+    Duration  time.Duration
+    StartedAt time.Time
+}
+```
+
+**Step execution:**
 
 ```go
 func executeStep(ctx context.Context, step *StepDef, env []string, cwd string) (*StepResult, error) {
@@ -234,12 +270,46 @@ Steps export outputs by writing to a temporary file referenced by `$CLAI_OUTPUT`
 
 ```go
 // Before step execution:
-outputFile, _ := os.CreateTemp("", "clai-output-*")
+outputFile, err := os.CreateTemp("", "clai-output-*")
+if err != nil {
+    return nil, fmt.Errorf("step %s: create output file: %w", step.Name, err)
+}
+defer os.Remove(outputFile.Name())
+outputFile.Close()
 env = append(env, "CLAI_OUTPUT="+outputFile.Name())
 
 // After step execution:
-outputs := parseOutputFile(outputFile.Name())  // key=value per line
+outputs, err := parseOutputFile(outputFile.Name())
+if err != nil {
+    // Non-fatal: step ran but output parsing failed
+    r.logger.Warn("failed to parse output file", "step", step.Name, "err", err)
+}
 // Store in stepContext for downstream ${{ steps.ID.outputs.KEY }} resolution
+```
+
+**Output file format:** Steps write key=value pairs (one per line, dotenv-style). Lines without `=` are ignored. Values are trimmed of leading/trailing whitespace.
+
+```go
+// parseOutputFile reads a dotenv-style file written by a step to $CLAI_OUTPUT.
+func parseOutputFile(path string) (map[string]string, error) {
+    data, err := os.ReadFile(path)
+    if err != nil {
+        if os.IsNotExist(err) {
+            return nil, nil // step didn't write outputs — not an error
+        }
+        return nil, err
+    }
+    outputs := make(map[string]string)
+    for _, line := range strings.Split(string(data), "\n") {
+        line = strings.TrimSpace(line)
+        if line == "" || !strings.Contains(line, "=") {
+            continue
+        }
+        k, v, _ := strings.Cut(line, "=")
+        outputs[strings.TrimSpace(k)] = strings.TrimSpace(v)
+    }
+    return outputs, nil
+}
 ```
 
 Exported outputs are automatically inherited as environment variables by subsequent steps within the same job (func spec FR-9).
@@ -312,8 +382,8 @@ type JobDef struct {
 
 // StrategyDef represents the matrix strategy for a job.
 type StrategyDef struct {
-    Matrix   MatrixDef `yaml:"matrix"`
-    FailFast *bool     `yaml:"fail-fast"` // default: true
+    Matrix   *MatrixDef `yaml:"matrix"`
+    FailFast *bool     `yaml:"fail_fast"` // default: true
     // MaxParallel int  `yaml:"max-parallel"` // v1: parallel matrix execution
 }
 
@@ -437,16 +507,22 @@ Expressions use `${{ <expr> }}` syntax (func spec FR-37, FR-38). This is evaluat
 var exprPattern = regexp.MustCompile(`\$\{\{\s*(.+?)\s*\}\}`)
 
 func (e *ExprEvaluator) Resolve(template string, ctx *ExprContext) (string, error) {
-    return exprPattern.ReplaceAllStringFunc(template, func(match string) string {
+    var resolveErr error
+    result := exprPattern.ReplaceAllStringFunc(template, func(match string) string {
         inner := exprPattern.FindStringSubmatch(match)[1]
         val, err := e.evaluate(inner, ctx)
         if err != nil {
-            // collect errors, don't panic
-            e.errors = append(e.errors, err)
-            return match // leave unresolved
+            resolveErr = fmt.Errorf("unresolved expression %s: %w", match, err)
+            return match
         }
         return val
-    }), nil
+    })
+    if resolveErr != nil {
+        // Hard error: do NOT pass unresolved expressions to the shell.
+        // This prevents executing broken commands like: echo "${{ steps.unknown.outputs.key }}"
+        return "", resolveErr
+    }
+    return result, nil
 }
 
 // ExprContext holds all available data for expression resolution.
@@ -460,7 +536,7 @@ type ExprContext struct {
 type StepOutputs struct {
     Outputs  map[string]string  // key=value pairs from $CLAI_OUTPUT
     Outcome  string             // "success", "failure", "skipped"
-    Analysis *AnalysisResult    // if analyze=true
+    Analysis *AnalysisResponse  // if analyze=true (defined in §5.1)
 }
 ```
 
@@ -510,19 +586,42 @@ type FlaggedItem struct {
 }
 ```
 
-The workflow engine builds an analysis prompt (combining `analysis_prompt` from the step definition with the scrubbed step output), sends it via `QueryFast()`, and parses the response into an `AnalysisResponse`.
+The workflow engine builds an analysis prompt, sends it via `QueryFast()`, and parses the response into an `AnalysisResponse`.
 
-### 5.2 Fallback Chain
+### 5.2 Analysis Prompt Format
+
+The prompt sent to the LLM combines the user's `analysis_prompt` with the scrubbed step output and a response schema instruction:
+
+```go
+func buildAnalysisPrompt(step *StepDef, scrubbedOutput string) string {
+    return fmt.Sprintf(`%s
+
+--- STEP OUTPUT (stdout) ---
+%s
+--- END STEP OUTPUT ---
+
+Respond with ONLY a JSON object in this exact format:
+{
+  "decision": "proceed" | "halt" | "needs_human",
+  "reasoning": "<brief explanation>",
+  "flags": [{"item": "<what>", "severity": "info|warning|critical", "reason": "<why>"}]
+}`, step.AnalysisPrompt, scrubbedOutput)
+}
+```
+
+The `scrubbedOutput` is `result.Stdout + result.Stderr` combined (stdout first, then stderr separated by a marker), truncated and scrubbed per §5.3.
+
+### 5.3 Fallback Chain
 
 `QueryFast()` in `internal/claude/daemon.go` already implements the first two levels:
 
 1. **Claude daemon** (preferred): warm session via `QueryViaDaemon()`, fast response, Unix socket IPC
-2. **claude CLI**: one-shot `claude --print` via `QueryWithContext()` (existing fallback in `QueryFast()`)
+2. **claude CLI**: one-shot `claude --print` via `QueryWithContext()` in `internal/claude/claude.go` (existing fallback in `QueryFast()`)
 3. **API provider**: direct Anthropic/OpenAI API call via `internal/provider/` (v1 — not yet implemented)
 
 If all backends fail, treat the analysis as `needs_human` (func spec FR-24).
 
-### 5.3 Context Building & Truncation (func spec FR-27)
+### 5.4 Context Building & Truncation (func spec FR-27)
 
 ```go
 const maxOutputForLLM = 100 * 1024 // 100KB (~25k tokens)
@@ -534,22 +633,37 @@ func buildAnalysisContext(step *StepDef, result *StepResult, secrets []string) s
     output = scrubSecrets(output, secrets)
 
     // 2. Truncate with head+tail preservation
-    if len(output) > maxOutputForLLM {
+    marker := "\n\n... [truncated: middle section omitted, showing first and last portions] ...\n\n"
+    minSizeForTruncation := maxOutputForLLM + len(marker) // avoid overlap
+    if len(output) > minSizeForTruncation {
         headSize := maxOutputForLLM * 40 / 100  // 40% head
         tailSize := maxOutputForLLM * 40 / 100  // 40% tail
-        marker := "\n\n... [truncated: middle section omitted, showing first and last portions] ...\n\n"
         output = output[:headSize] + marker + output[len(output)-tailSize:]
+    } else if len(output) > maxOutputForLLM {
+        // Near the limit but too small for head+tail split — just truncate tail
+        output = output[:maxOutputForLLM]
     }
 
     return output
 }
 ```
 
-### 5.4 Structured Response Parsing
+### 5.5 Structured Response Parsing
 
 ```go
+// isValidDecision checks that the decision is one of the allowed values.
+func isValidDecision(d string) bool {
+    switch d {
+    case "proceed", "halt", "needs_human":
+        return true
+    }
+    return false
+}
+
+// parseAnalysisResponse extracts a structured decision from the LLM response.
+// Per FR-24: if the response cannot be parsed, treat as needs_human.
 func parseAnalysisResponse(raw string) (*AnalysisResponse, error) {
-    // Try JSON parsing first
+    // Try JSON parsing
     var resp AnalysisResponse
     if err := json.Unmarshal([]byte(raw), &resp); err == nil {
         if isValidDecision(resp.Decision) {
@@ -557,20 +671,15 @@ func parseAnalysisResponse(raw string) (*AnalysisResponse, error) {
         }
     }
 
-    // Fallback: scan for decision keywords in natural language
-    lower := strings.ToLower(raw)
-    switch {
-    case strings.Contains(lower, "proceed"):
-        return &AnalysisResponse{Decision: "proceed", Reasoning: raw}, nil
-    case strings.Contains(lower, "halt"):
-        return &AnalysisResponse{Decision: "halt", Reasoning: raw}, nil
-    default:
-        return &AnalysisResponse{Decision: "needs_human", Reasoning: raw}, nil
-    }
+    // FR-24: unparseable response → needs_human (never guess the decision)
+    return &AnalysisResponse{
+        Decision:  "needs_human",
+        Reasoning: raw,
+    }, nil
 }
 ```
 
-### 5.5 Risk Level Decision Matrix (func spec FR-25)
+### 5.6 Risk Level Decision Matrix (func spec FR-25)
 
 ```go
 func shouldPromptHuman(riskLevel string, decision string) bool {
@@ -587,27 +696,42 @@ func shouldPromptHuman(riskLevel string, decision string) bool {
 }
 ```
 
-### 5.6 Follow-Up Conversation (func spec FR-33)
+### 5.7 Follow-Up Conversation (func spec FR-33)
 
 During human review, the user can ask follow-up questions to the LLM:
 
 ```go
+// Message represents a single turn in an LLM conversation.
+type Message struct {
+    Role    string // "user" or "assistant"
+    Content string
+}
+
+// LLMClient abstracts LLM interaction for testability.
+// Production implementation wraps claude.QueryFast().
+type LLMClient interface {
+    // Query sends a single prompt and returns the raw response.
+    Query(ctx context.Context, prompt string) (string, error)
+    // Converse sends a multi-turn conversation and returns the parsed response.
+    Converse(ctx context.Context, transcript []Message) (*AnalysisResponse, error)
+}
+
 type ReviewSession struct {
     client     LLMClient
     transcript []Message
     stepOutput string
 }
 
-func (rs *ReviewSession) AskFollowUp(question string) (*AnalysisResponse, error) {
+func (rs *ReviewSession) AskFollowUp(ctx context.Context, question string) (*AnalysisResponse, error) {
     rs.transcript = append(rs.transcript, Message{Role: "user", Content: question})
 
     // Send conversation history + original step output
-    resp, err := rs.client.Converse(rs.transcript)
+    resp, err := rs.client.Converse(ctx, rs.transcript)
     if err != nil {
         return nil, err
     }
 
-    rs.transcript = append(rs.transcript, Message{Role: "assistant", Content: resp.Raw})
+    rs.transcript = append(rs.transcript, Message{Role: "assistant", Content: resp.Reasoning})
     return resp, nil
 }
 ```
@@ -666,12 +790,32 @@ func (hr *HumanReviewer) Review(step *StepDef, result *StepResult, analysis *Ana
         case "i":
             hr.printFullOutput(result)
         case "c":
-            hr.runAdHocCommand()
+            hr.runAdHocCommand(ctx, env, cwd)
         case "q":
             question := hr.readLine("Question: ")
             followUp, _ := hr.llm.AskFollowUp(question)
             hr.printFollowUp(followUp)
         }
+    }
+}
+
+// runAdHocCommand lets the user run an arbitrary shell command during review.
+// The command inherits the step's environment (including exported outputs from
+// prior steps) and working directory. Output is shown on the terminal but NOT
+// persisted to the workflow run state.
+func (hr *HumanReview) runAdHocCommand(ctx context.Context, env []string, cwd string) {
+    cmdStr := hr.readLine("$ ")
+    shell := os.Getenv("SHELL")
+    if shell == "" {
+        shell = "sh"
+    }
+    cmd := exec.CommandContext(ctx, shell, "-c", cmdStr)
+    cmd.Dir = cwd
+    cmd.Env = env
+    cmd.Stdout = os.Stdout
+    cmd.Stderr = os.Stderr
+    if err := cmd.Run(); err != nil {
+        fmt.Fprintf(os.Stderr, "command exited: %v\n", err)
     }
 }
 ```
@@ -680,7 +824,17 @@ func (hr *HumanReviewer) Review(step *StepDef, result *StepResult, analysis *Ana
 
 ## 7. State Management
 
-### 7.1 SQLite Schema (Migration V3)
+### 7.1 Run ID Generation
+
+Each workflow run gets a unique ID: `wfr-<unix_ms>-<random_hex>`. Example: `wfr-1707654321000-a3f8`. This provides time-sortable, human-readable IDs that are collision-free.
+
+```go
+func generateRunID() string {
+    return fmt.Sprintf("wfr-%d-%04x", time.Now().UnixMilli(), rand.Intn(0xFFFF))
+}
+```
+
+### 7.2 SQLite Schema (Migration V3)
 
 Follows the existing migration pattern from `internal/storage/db.go`:
 
@@ -765,7 +919,7 @@ migrations := []struct {
 }
 ```
 
-### 7.2 Store Interface Extensions
+### 7.3 Store Interface Extensions
 
 New methods on `storage.Store`:
 
@@ -789,7 +943,7 @@ GetWorkflowAnalyses(ctx context.Context, runID string) ([]WorkflowAnalysis, erro
 PruneWorkflowRuns(ctx context.Context, maxPerWorkflow int) (int64, error)
 ```
 
-### 7.3 Storage Types
+### 7.4 Storage Types
 
 ```go
 type WorkflowRun struct {
@@ -846,7 +1000,7 @@ type WorkflowRunQuery struct {
 }
 ```
 
-### 7.4 Log File Layout
+### 7.5 Log File Layout
 
 Full step output is written to log files (SQLite stores only 4KB tails):
 
@@ -859,7 +1013,9 @@ Full step output is written to log files (SQLite stores only 4KB tails):
 
 Log files are created by the CLI process. Pruned when corresponding `workflow_runs` rows are deleted.
 
-### 7.5 Retention
+**Path sanitization:** `<job>`, `<matrix-key>`, and `<step-id>` values are sanitized before use in file paths — replace `/`, `\`, `..`, and non-printable characters with `_` to prevent path traversal or malformed filenames.
+
+### 7.6 Retention
 
 - Default: keep last 100 runs per workflow name
 - Pruning runs in the daemon's periodic maintenance loop (same pattern as `pruneCacheLoop`)
@@ -1087,7 +1243,10 @@ run: echo "Build artifact at: ${{ steps.build.outputs.path }}"
 
 ### 9.2 Secret Scrubbing Pipeline
 
-Before sending output to the LLM:
+`scrubSecrets` is applied in **two places** (FR-35 + FR-36):
+
+1. **Before storing** `stdout_tail` / `stderr_tail` in SQLite (FR-35: "Secrets SHALL be auto-redacted in log output")
+2. **Before sending** output to the LLM for analysis (FR-36: "Secrets SHALL NOT be sent to the LLM")
 
 ```go
 func scrubSecrets(output string, secrets []string) string {
