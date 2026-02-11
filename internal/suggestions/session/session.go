@@ -198,7 +198,7 @@ func defaultSessionFilePath(pid int) string {
 
 	// Priority 2: /tmp with UID
 	uid := strconv.Itoa(os.Getuid())
-	return filepath.Join("/tmp", "clai-"+uid, fmt.Sprintf("session.%d", pid))
+	return fmt.Sprintf("/tmp/clai-%s/session.%d", uid, pid)
 }
 
 // readSessionFile reads the session ID from the session file for the given PID.
@@ -224,18 +224,18 @@ func readSessionFile(pid int) (string, error) {
 }
 
 // writeSessionFile writes the session ID to the session file for the given PID.
-// Creates the parent directory with 0700 permissions if it doesn't exist.
+// Creates the parent directory with 0o700 permissions if it doesn't exist.
 func writeSessionFile(pid int, sessionID string) error {
 	path := SessionFilePath(pid)
 
-	// Ensure parent directory exists with secure permissions (0700)
+	// Ensure parent directory exists with secure permissions (0o700)
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create session directory: %w", err)
 	}
 
-	// Write session file with secure permissions (0600)
-	if err := os.WriteFile(path, []byte(sessionID), 0600); err != nil {
+	// Write session file with secure permissions (0o600)
+	if err := os.WriteFile(path, []byte(sessionID), 0o600); err != nil {
 		return fmt.Errorf("failed to write session file: %w", err)
 	}
 

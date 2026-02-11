@@ -322,8 +322,8 @@ func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResul
 
 	// Convert to protobuf
 	pbSuggestions := make([]*pb.Suggestion, len(suggestions))
-	for i, sug := range suggestions {
-		pbSuggestions[i] = v1SuggestionToProto(sug, lastCommand, nowMs)
+	for i := range suggestions {
+		pbSuggestions[i] = v1SuggestionToProto(suggestions[i], lastCommand, nowMs)
 	}
 
 	return &pb.SuggestResponse{

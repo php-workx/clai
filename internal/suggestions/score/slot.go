@@ -270,7 +270,7 @@ func (ss *SlotStore) GetTopValuesAt(ctx context.Context, scope, cmdNorm string, 
 		// Apply decay to get current count
 		elapsed := float64(atMs - sv.LastTs)
 		decay := math.Exp(-elapsed / float64(ss.tauMs))
-		sv.Count = sv.Count * decay
+		sv.Count *= decay
 
 		results = append(results, sv)
 	}

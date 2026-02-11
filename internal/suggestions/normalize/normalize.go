@@ -260,6 +260,8 @@ func (n *Normalizer) detectSlotType(token string) string {
 }
 
 // defaultCommandRules returns the starter set of command-specific rules per spec Section 8.3.
+//
+//nolint:funlen // Declarative command-rule map intentionally defined as a single table.
 func defaultCommandRules() map[string]CommandRule {
 	return map[string]CommandRule{
 		"git": {

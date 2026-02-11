@@ -451,30 +451,13 @@ func updateTransitionStat(ctx context.Context, tx *sql.Tx, wctx *WritePathContex
 }
 
 func upsertTransitionStatInTx(ctx context.Context, tx *sql.Tx, scope, prevTemplateID, nextTemplateID string, nowMs, tauMs int64) error {
-	var currentWeight float64
-	var currentCount int
-	var lastSeenMs int64
-
-	err := tx.QueryRowContext(ctx, `
+	newWeight, newCount, err := loadDecayedTransitionWeightAndCount(ctx, tx, `
 		SELECT weight, count, last_seen_ms
 		FROM transition_stat
 		WHERE scope = ? AND prev_template_id = ? AND next_template_id = ?
-	`, scope, prevTemplateID, nextTemplateID).Scan(&currentWeight, &currentCount, &lastSeenMs)
-
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	`, []any{scope, prevTemplateID, nextTemplateID}, nowMs, tauMs)
+	if err != nil {
 		return err
-	}
-
-	var newWeight float64
-	var newCount int
-	if errors.Is(err, sql.ErrNoRows) {
-		newWeight = 1.0
-		newCount = 1
-	} else {
-		elapsed := float64(nowMs - lastSeenMs)
-		decay := math.Exp(-elapsed / float64(tauMs))
-		newWeight = currentWeight*decay + 1.0
-		newCount = currentCount + 1
 	}
 
 	_, err = tx.ExecContext(ctx, `
@@ -716,30 +699,13 @@ func upsertProjectTypeStatInTx(ctx context.Context, tx *sql.Tx, projectType, tem
 }
 
 func upsertProjectTypeTransitionInTx(ctx context.Context, tx *sql.Tx, projectType, prevTemplateID, nextTemplateID string, nowMs, tauMs int64) error {
-	var currentWeight float64
-	var currentCount int
-	var lastSeenMs int64
-
-	err := tx.QueryRowContext(ctx, `
+	newWeight, newCount, err := loadDecayedTransitionWeightAndCount(ctx, tx, `
 		SELECT weight, count, last_seen_ms
 		FROM project_type_transition
 		WHERE project_type = ? AND prev_template_id = ? AND next_template_id = ?
-	`, projectType, prevTemplateID, nextTemplateID).Scan(&currentWeight, &currentCount, &lastSeenMs)
-
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	`, []any{projectType, prevTemplateID, nextTemplateID}, nowMs, tauMs)
+	if err != nil {
 		return err
-	}
-
-	var newWeight float64
-	var newCount int
-	if errors.Is(err, sql.ErrNoRows) {
-		newWeight = 1.0
-		newCount = 1
-	} else {
-		elapsed := float64(nowMs - lastSeenMs)
-		decay := math.Exp(-elapsed / float64(tauMs))
-		newWeight = currentWeight*decay + 1.0
-		newCount = currentCount + 1
 	}
 
 	_, err = tx.ExecContext(ctx, `
@@ -754,6 +720,33 @@ func upsertProjectTypeTransitionInTx(ctx context.Context, tx *sql.Tx, projectTyp
 		newWeight, newCount, nowMs,
 	)
 	return err
+}
+
+func loadDecayedTransitionWeightAndCount(
+	ctx context.Context,
+	tx *sql.Tx,
+	query string,
+	args []any,
+	nowMs, tauMs int64,
+) (float64, int, error) {
+	var currentWeight float64
+	var currentCount int
+	var lastSeenMs int64
+
+	err := tx.QueryRowContext(ctx, query, args...).Scan(&currentWeight, &currentCount, &lastSeenMs)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return 0, 0, err
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return 1.0, 1, nil
+	}
+
+	elapsed := float64(nowMs - lastSeenMs)
+	decay := math.Exp(-elapsed / float64(tauMs))
+	newWeight := currentWeight*decay + 1.0
+	newCount := currentCount + 1
+	return newWeight, newCount, nil
 }
 
 // Step 8: Update directory-scoped aggregates
@@ -1054,7 +1047,13 @@ func classifyExitCode(exitCode int) string {
 
 // PrepareWriteContext creates a WritePathContext from a validated event.
 // This performs normalization and context enrichment before the transaction.
-func PrepareWriteContext(ev *event.CommandEvent, repoKey, branch, prevTemplateID string, prevExitCode int, prevFailed bool, aliases map[string]string) *WritePathContext {
+func PrepareWriteContext(
+	ev *event.CommandEvent,
+	repoKey, branch, prevTemplateID string,
+	prevExitCode int,
+	prevFailed bool,
+	aliases map[string]string,
+) *WritePathContext {
 	// Run pre-normalization pipeline
 	preNorm := normalize.PreNormalize(ev.CmdRaw, normalize.PreNormConfig{
 		Aliases: aliases,

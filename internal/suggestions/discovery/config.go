@@ -270,7 +270,7 @@ func validateFilePattern(index int, pattern string) error {
 
 // expandPath expands ~ to home directory.
 func expandPath(path string) string {
-	if len(path) > 0 && path[0] == '~' {
+	if path != "" && path[0] == '~' {
 		home, err := os.UserHomeDir()
 		if err == nil {
 			return filepath.Join(home, path[1:])

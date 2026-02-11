@@ -52,11 +52,11 @@ func DefaultUnixSocketPath() string {
 	}
 
 	// Priority 3: /tmp fallback
-	return filepath.Join("/tmp", "clai-"+uid, daemonSocketName)
+	return fmt.Sprintf("/tmp/clai-%s/%s", uid, daemonSocketName)
 }
 
 // Listen creates and returns a listener for the Unix socket.
-// It ensures the parent directory exists with proper permissions (0700),
+// It ensures the parent directory exists with proper permissions (0o700),
 // and cleans up any stale socket files before listening.
 func (t *UnixTransport) Listen() (net.Listener, error) {
 	t.mu.Lock()
@@ -64,7 +64,7 @@ func (t *UnixTransport) Listen() (net.Listener, error) {
 
 	// Ensure parent directory exists with secure permissions
 	dir := filepath.Dir(t.socketPath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create socket directory: %w", err)
 	}
 
@@ -80,7 +80,7 @@ func (t *UnixTransport) Listen() (net.Listener, error) {
 	}
 
 	// Set socket permissions (owner read/write only)
-	if err := os.Chmod(t.socketPath, 0600); err != nil {
+	if err := os.Chmod(t.socketPath, 0o600); err != nil {
 		listener.Close()
 		os.Remove(t.socketPath)
 		return nil, fmt.Errorf("failed to set socket permissions: %w", err)

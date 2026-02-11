@@ -30,6 +30,8 @@ type BootstrapPattern struct {
 
 // DefaultBootstrapPatterns returns the built-in set of common recovery patterns.
 // These cover the most frequent failure-recovery pairs observed in practice.
+//
+//nolint:funlen // Pattern catalog is intentionally defined inline as declarative data.
 func DefaultBootstrapPatterns() []BootstrapPattern {
 	return []BootstrapPattern{
 		// Command not found (exit 127) => suggest package installation

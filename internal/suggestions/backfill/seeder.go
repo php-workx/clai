@@ -127,7 +127,8 @@ func sortImportEntries(entries []history.ImportEntry) []history.ImportEntry {
 
 func buildTemplateAggregates(normalized []normalizedEntry) map[string]*templateInfo {
 	templates := make(map[string]*templateInfo)
-	for _, ne := range normalized {
+	for i := range normalized {
+		ne := normalized[i]
 		tid := ne.preNorm.TemplateID
 		info, exists := templates[tid]
 		if !exists {
@@ -310,7 +311,8 @@ func insertCommandEvents(ctx context.Context, tx *sql.Tx, entries []normalizedEn
 	defer stmt.Close()
 
 	ids := make([]int64, len(entries))
-	for i, ne := range entries {
+	for i := range entries {
+		ne := entries[i]
 		truncated := 0
 		if ne.preNorm.Truncated {
 			truncated = 1
@@ -460,7 +462,8 @@ func insertPipelineData(ctx context.Context, tx *sql.Tx, entries []normalizedEnt
 
 	normalizer := normalize.NewNormalizer()
 
-	for i, ne := range entries {
+	for i := range entries {
+		ne := entries[i]
 		segments := ne.preNorm.Segments
 		if len(segments) <= 1 {
 			continue

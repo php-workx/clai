@@ -262,8 +262,14 @@ func (s *Store) GetRecord(ctx context.Context, scope, contextTemplateID, dismiss
 
 	var rec PatternRecord
 	var level string
+	const getRecordQuery = `
+		SELECT scope, context_template_id, dismissed_template_id,
+		       dismissal_count, last_dismissed_ms, suppression_level
+		FROM dismissal_pattern
+		WHERE scope = ? AND context_template_id = ? AND dismissed_template_id = ?
+	`
 	err := s.db.QueryRowContext(ctx,
-		"SELECT scope, context_template_id, dismissed_template_id, dismissal_count, last_dismissed_ms, suppression_level FROM dismissal_pattern WHERE scope = ? AND context_template_id = ? AND dismissed_template_id = ?",
+		getRecordQuery,
 		scope, contextTemplateID, dismissedTemplateID).Scan(
 		&rec.Scope, &rec.ContextTemplateID, &rec.DismissedTemplateID,
 		&rec.DismissalCount, &rec.LastDismissedMs, &level)

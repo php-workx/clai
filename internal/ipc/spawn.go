@@ -123,7 +123,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 	if err := os.MkdirAll(RunDir(), 0o755); err != nil {
 		return fmt.Errorf("failed to create run dir: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(LogPath()), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(LogPath()), 0o755); err != nil {
 		return fmt.Errorf("failed to create log dir: %w", err)
 	}
 
@@ -148,7 +148,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 	// Start daemon process
 	// execabs prevents executing binaries resolved to relative paths.
 	// nosemgrep: go.lang.security.audit.os-exec.os-exec
-	cmd := execabs.Command(daemonPath)
+	cmd := execabs.Command(daemonPath) //nolint:gosec // G204: daemonPath points to clai daemon binary resolved from trusted locations
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil

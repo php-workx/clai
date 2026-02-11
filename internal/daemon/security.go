@@ -28,7 +28,7 @@ func CheckNotRoot() error {
 }
 
 // ValidateDirectoryPermissions checks that the given directory has secure permissions.
-// The directory must exist and be mode 0700 (owner-only access).
+// The directory must exist and be mode 0o700 (owner-only access).
 // Returns nil if permissions are acceptable, error otherwise.
 func ValidateDirectoryPermissions(dirPath string) error {
 	if runtime.GOOS == "windows" {
@@ -50,31 +50,31 @@ func ValidateDirectoryPermissions(dirPath string) error {
 	perm := info.Mode().Perm()
 
 	// Check for world-readable or world-writable
-	if perm&0007 != 0 {
-		return fmt.Errorf("%w: %s has mode %o (world-accessible); expected 0700",
+	if perm&0o007 != 0 {
+		return fmt.Errorf("%w: %s has mode %o (world-accessible); expected 0o700",
 			ErrInsecureDirectory, dirPath, perm)
 	}
 
 	// Check for group-readable or group-writable
-	if perm&0070 != 0 {
-		return fmt.Errorf("%w: %s has mode %o (group-accessible); expected 0700",
+	if perm&0o070 != 0 {
+		return fmt.Errorf("%w: %s has mode %o (group-accessible); expected 0o700",
 			ErrInsecureDirectory, dirPath, perm)
 	}
 
 	return nil
 }
 
-// EnsureSecureDirectory creates a directory with mode 0700 if it doesn't exist,
+// EnsureSecureDirectory creates a directory with mode 0o700 if it doesn't exist,
 // or validates permissions if it does exist.
 func EnsureSecureDirectory(dirPath string) error {
 	if runtime.GOOS == "windows" {
-		return os.MkdirAll(dirPath, 0700)
+		return os.MkdirAll(dirPath, 0o700)
 	}
 
 	info, err := os.Stat(dirPath)
 	if os.IsNotExist(err) {
 		// Create with secure permissions
-		return os.MkdirAll(dirPath, 0700)
+		return os.MkdirAll(dirPath, 0o700)
 	}
 	if err != nil {
 		return fmt.Errorf("failed to stat directory %s: %w", dirPath, err)
@@ -86,8 +86,8 @@ func EnsureSecureDirectory(dirPath string) error {
 
 	// Fix permissions if too open
 	perm := info.Mode().Perm()
-	if perm != 0700 {
-		if err := os.Chmod(dirPath, 0700); err != nil {
+	if perm != 0o700 {
+		if err := os.Chmod(dirPath, 0o700); err != nil {
 			return fmt.Errorf("failed to fix permissions on %s: %w", dirPath, err)
 		}
 	}

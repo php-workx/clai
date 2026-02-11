@@ -164,11 +164,11 @@ func (s *AutoService) mergeFTSResults(mergeMap map[string]*mergedResult, ftsResu
 	}
 }
 
-func normalizeFTSScore(score, max float64) float64 {
-	if max == 0 {
+func normalizeFTSScore(score, maxScore float64) float64 {
+	if maxScore == 0 {
 		return 0
 	}
-	return score / max
+	return score / maxScore
 }
 
 func (s *AutoService) mergeDescribeResults(mergeMap map[string]*mergedResult, descResults []SearchResult) {
@@ -228,11 +228,11 @@ func maxScore(results []SearchResult) float64 {
 		return 0
 	}
 
-	max := results[0].Score
-	for _, r := range results[1:] {
-		if r.Score < max {
-			max = r.Score
+	minScore := results[0].Score
+	for i := 1; i < len(results); i++ {
+		if results[i].Score < minScore {
+			minScore = results[i].Score
 		}
 	}
-	return max
+	return minScore
 }

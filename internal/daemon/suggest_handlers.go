@@ -131,8 +131,8 @@ func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd
 	explainCfg := explain.DefaultConfig()
 
 	pbSuggestions := make([]*pb.Suggestion, len(suggestions))
-	for i, sug := range suggestions {
-		pbSuggestions[i] = v2SuggestionToProto(sug, prevCmd, nowMs, explainCfg)
+	for i := range suggestions {
+		pbSuggestions[i] = v2SuggestionToProto(suggestions[i], prevCmd, nowMs, explainCfg)
 	}
 	return &pb.SuggestResponse{
 		Suggestions: pbSuggestions,

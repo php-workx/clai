@@ -145,7 +145,7 @@ func reExec() {
 		return
 	}
 	// syscall.Exec replaces the current process
-	_ = syscall.Exec(exe, os.Args, os.Environ())
+	_ = syscall.Exec(exe, os.Args, os.Environ()) //nolint:gosec // G204: exe is current binary path from os.Executable
 }
 
 // IsRunning checks if the daemon is currently running.

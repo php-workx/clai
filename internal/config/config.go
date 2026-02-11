@@ -276,6 +276,8 @@ func DefaultConfig() *Config {
 
 // DefaultSuggestionsConfig returns the default suggestions configuration
 // with all values matching the spec (Section 16).
+//
+//nolint:funlen // Declarative defaults table kept in one place for clarity.
 func DefaultSuggestionsConfig() SuggestionsConfig {
 	return SuggestionsConfig{
 		// Legacy fields
@@ -1203,15 +1205,15 @@ func (s *SuggestionsConfig) validateEnumFields(warn func(string, string), defaul
 	}
 }
 
-// clampIntRange clamps an integer field to [min, max], emitting a warning if adjusted.
-func clampIntRange(warn func(string, string), name string, val *int, min, max int) {
-	if *val < min {
-		warn(name, fmt.Sprintf("must be >= %d, got %d; clamping to %d", min, *val, min))
-		*val = min
+// clampIntRange clamps an integer field to [minValue, maxValue], emitting a warning if adjusted.
+func clampIntRange(warn func(string, string), name string, val *int, minValue, maxValue int) {
+	if *val < minValue {
+		warn(name, fmt.Sprintf("must be >= %d, got %d; clamping to %d", minValue, *val, minValue))
+		*val = minValue
 	}
-	if *val > max {
-		warn(name, fmt.Sprintf("must be <= %d, got %d; clamping to %d", max, *val, max))
-		*val = max
+	if *val > maxValue {
+		warn(name, fmt.Sprintf("must be <= %d, got %d; clamping to %d", maxValue, *val, maxValue))
+		*val = maxValue
 	}
 }
 

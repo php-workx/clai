@@ -160,8 +160,18 @@ func (s *Store) UpdateSlotCorrelation(ctx context.Context, scope, templateID, sl
 	if nowMs == 0 {
 		nowMs = time.Now().UnixMilli()
 	}
+	const upsertSlotCorrelationQuery = `
+		INSERT INTO slot_correlation
+			(scope, template_id, slot_key, tuple_hash, tuple_value_json, weight, count, last_seen_ms)
+		VALUES
+			(?, ?, ?, ?, ?, 1.0, 1, ?)
+		ON CONFLICT(scope, template_id, slot_key, tuple_hash) DO UPDATE SET
+			weight = weight + 1.0,
+			count = count + 1,
+			last_seen_ms = excluded.last_seen_ms
+	`
 	_, err := s.db.ExecContext(ctx,
-		"INSERT INTO slot_correlation (scope, template_id, slot_key, tuple_hash, tuple_value_json, weight, count, last_seen_ms) VALUES (?, ?, ?, ?, ?, 1.0, 1, ?) ON CONFLICT(scope, template_id, slot_key, tuple_hash) DO UPDATE SET weight = weight + 1.0, count = count + 1, last_seen_ms = excluded.last_seen_ms",
+		upsertSlotCorrelationQuery,
 		scope, templateID, slotKey, tupleHash, tupleValueJSON, nowMs)
 	if err != nil {
 		return fmt.Errorf("failed to update slot correlation: %w", err)
@@ -174,8 +184,15 @@ func (s *Store) QueryFeedback(ctx context.Context, sessionID string, limit int) 
 	if limit <= 0 {
 		limit = 100
 	}
+	const queryFeedbackBySession = `
+		SELECT id, session_id, ts_ms, prompt_prefix, suggested_text, action, executed_text, latency_ms
+		FROM suggestion_feedback
+		WHERE session_id = ?
+		ORDER BY ts_ms DESC
+		LIMIT ?
+	`
 	rows, err := s.db.QueryContext(ctx,
-		"SELECT id, session_id, ts_ms, prompt_prefix, suggested_text, action, executed_text, latency_ms FROM suggestion_feedback WHERE session_id = ? ORDER BY ts_ms DESC LIMIT ?",
+		queryFeedbackBySession,
 		sessionID, limit)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query feedback: %w", err)

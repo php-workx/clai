@@ -72,12 +72,12 @@ func ReadHeldPID(lockPath string) (pid int, held bool, err error) {
 func (l *LockFile) Acquire() error {
 	// Ensure parent directory exists
 	dir := filepath.Dir(l.path)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create lock directory: %w", err)
 	}
 
 	// Open or create the lock file
-	f, err := os.OpenFile(l.path, os.O_CREATE|os.O_RDWR, 0600)
+	f, err := os.OpenFile(l.path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to open lock file: %w", err)
 	}
@@ -125,7 +125,7 @@ func (l *LockFile) Acquire() error {
 
 // retryAcquire performs a single retry after removing a stale lock file.
 func (l *LockFile) retryAcquire() error {
-	f, err := os.OpenFile(l.path, os.O_CREATE|os.O_RDWR, 0600)
+	f, err := os.OpenFile(l.path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to open lock file on retry: %w", err)
 	}

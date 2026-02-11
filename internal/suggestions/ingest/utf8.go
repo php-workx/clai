@@ -24,24 +24,24 @@ func ToLossyUTF8(data []byte) string {
 	// Pre-allocate result buffer with same capacity as input
 	result := make([]byte, 0, len(data))
 
-	for i := 0; i < len(data); {
-		// Check for NUL byte first
-		if data[i] == 0 {
+	for len(data) > 0 {
+		// Check for NUL byte first.
+		if data[0] == 0 {
 			result = append(result, replacementChar...)
-			i++
+			data = data[1:]
 			continue
 		}
 
-		// Try to decode a valid UTF-8 rune
-		r, size := utf8.DecodeRune(data[i:])
+		// Try to decode a valid UTF-8 rune.
+		r, size := utf8.DecodeRune(data)
 		if r == utf8.RuneError && size == 1 {
 			// Invalid UTF-8 sequence - replace with U+FFFD
 			result = append(result, replacementChar...)
-			i++
+			data = data[1:]
 		} else {
-			// Valid UTF-8 sequence - copy the bytes
-			result = append(result, data[i:i+size]...)
-			i += size
+			// Valid UTF-8 sequence - copy the bytes.
+			result = append(result, data[:size]...)
+			data = data[size:]
 		}
 	}
 

@@ -133,7 +133,9 @@ func appendPlaybookCandidates(candidates []Candidate, playbookPath string) []Can
 	if err != nil {
 		return candidates
 	}
-	for _, task := range pb.AllTasks() {
+	playbookTasks := pb.AllTasks()
+	for i := range playbookTasks {
+		task := playbookTasks[i]
 		candidates = append(candidates, Candidate{
 			Command:  task.Command,
 			Source:   SourcePlaybook,

@@ -187,21 +187,23 @@ func scoreCandidates(candidates map[string]*candidate, now time.Time, lastToolPr
 			(affinityScore * weightAffinity)
 
 		reasons := make([]Reason, 0, 4)
-		reasons = append(reasons, Reason{
-			Type:         "source",
-			Description:  "", // UI already shows source; keep tags compact
-			Contribution: sourceScore * weightSource,
-		})
-		reasons = append(reasons, Reason{
-			Type:         "recency",
-			Description:  "", // human-friendly "last ..." hint is added at RPC boundary
-			Contribution: recencyScore * weightRecency,
-		})
-		reasons = append(reasons, Reason{
-			Type:         "success",
-			Description:  "", // human-friendly hint is added at RPC boundary
-			Contribution: successScore * weightSuccess,
-		})
+		reasons = append(reasons,
+			Reason{
+				Type:         "source",
+				Description:  "", // UI already shows source; keep tags compact
+				Contribution: sourceScore * weightSource,
+			},
+			Reason{
+				Type:         "recency",
+				Description:  "", // human-friendly "last ..." hint is added at RPC boundary
+				Contribution: recencyScore * weightRecency,
+			},
+			Reason{
+				Type:         "success",
+				Description:  "", // human-friendly hint is added at RPC boundary
+				Contribution: successScore * weightSuccess,
+			},
+		)
 		if affinityScore != 0 {
 			desc := ""
 			if lastToolPrefix != "" {

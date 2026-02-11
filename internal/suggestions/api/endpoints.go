@@ -213,7 +213,8 @@ func (h *Handler) HandleSuggest(w http.ResponseWriter, r *http.Request) {
 
 	// Build response
 	items := make([]SuggestionItem, len(suggestions))
-	for i, s := range suggestions {
+	for i := range suggestions {
+		s := suggestions[i]
 		items[i] = SuggestionItem{
 			Cmd:        s.Command,
 			CmdNorm:    s.Command, // cmd_norm is the same as Command in our implementation
@@ -285,7 +286,8 @@ func (h *Handler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 
 	// Build response
 	items := make([]SearchResult, len(results))
-	for i, r := range results {
+	for i := range results {
+		r := results[i]
 		items[i] = SearchResult{
 			CmdRaw:  r.CmdRaw,
 			Ts:      r.Timestamp,

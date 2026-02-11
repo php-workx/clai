@@ -140,14 +140,14 @@ func (p *SuggestProvider) fetchWithContext(ctx context.Context, req Request) (Re
 	sid, cwd, _ := suggestContextKey(req)
 
 	// Fetch a broad set so the picker can do local substring filtering.
-	max := 200
+	limit := 200
 	grpcReq := &pb.SuggestRequest{
 		SessionId:            sid,
 		Cwd:                  cwd,
 		Buffer:               "",
 		CursorPos:            0,
 		IncludeAi:            false,
-		MaxResults:           int32(max),
+		MaxResults:           int32(limit),
 		IncludeLowConfidence: true, // picker is explicit; show more options
 	}
 

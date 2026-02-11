@@ -361,18 +361,44 @@ func (s *Scorer) normalizeSuggestContext(suggestCtx SuggestContext) SuggestConte
 }
 
 func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx SuggestContext, candidates map[string]*Suggestion) {
-	s.collectTransitionCandidates(ctx, candidates, suggestCtx.RepoKey, suggestCtx.LastCmd, ReasonRepoTransition, s.cfg.Weights.RepoTransition, "repo transitions query failed")
-	s.collectTransitionCandidates(ctx, candidates, score.ScopeGlobal, suggestCtx.LastCmd, ReasonGlobalTransition, s.cfg.Weights.GlobalTransition, "global transitions query failed")
-	s.collectTransitionCandidates(ctx, candidates, suggestCtx.DirScopeKey, suggestCtx.LastCmd, ReasonDirTransition, s.cfg.Weights.DirTransition, "dir transitions query failed")
+	s.collectTransitionCandidates(
+		ctx, candidates, suggestCtx.RepoKey, suggestCtx.LastCmd,
+		ReasonRepoTransition, s.cfg.Weights.RepoTransition, "repo transitions query failed",
+	)
+	s.collectTransitionCandidates(
+		ctx, candidates, score.ScopeGlobal, suggestCtx.LastCmd,
+		ReasonGlobalTransition, s.cfg.Weights.GlobalTransition, "global transitions query failed",
+	)
+	s.collectTransitionCandidates(
+		ctx, candidates, suggestCtx.DirScopeKey, suggestCtx.LastCmd,
+		ReasonDirTransition, s.cfg.Weights.DirTransition, "dir transitions query failed",
+	)
 
-	s.collectFrequencyCandidates(ctx, candidates, suggestCtx.RepoKey, ReasonRepoFrequency, s.cfg.Weights.RepoFrequency, suggestCtx.NowMs, "repo frequency query failed")
-	s.collectFrequencyCandidates(ctx, candidates, score.ScopeGlobal, ReasonGlobalFrequency, s.cfg.Weights.GlobalFrequency, suggestCtx.NowMs, "global frequency query failed")
-	s.collectFrequencyCandidates(ctx, candidates, suggestCtx.DirScopeKey, ReasonDirFrequency, s.cfg.Weights.DirFrequency, suggestCtx.NowMs, "dir frequency query failed")
+	s.collectFrequencyCandidates(
+		ctx, candidates, suggestCtx.RepoKey, ReasonRepoFrequency,
+		s.cfg.Weights.RepoFrequency, suggestCtx.NowMs, "repo frequency query failed",
+	)
+	s.collectFrequencyCandidates(
+		ctx, candidates, score.ScopeGlobal, ReasonGlobalFrequency,
+		s.cfg.Weights.GlobalFrequency, suggestCtx.NowMs, "global frequency query failed",
+	)
+	s.collectFrequencyCandidates(
+		ctx, candidates, suggestCtx.DirScopeKey, ReasonDirFrequency,
+		s.cfg.Weights.DirFrequency, suggestCtx.NowMs, "dir frequency query failed",
+	)
 
 	s.collectProjectTasks(ctx, candidates, suggestCtx.RepoKey)
 }
 
-func (s *Scorer) collectTransitionCandidates(ctx context.Context, candidates map[string]*Suggestion, scope, lastCmd, reason string, weight float64, logMessage string) {
+func (s *Scorer) collectTransitionCandidates(
+	ctx context.Context,
+	candidates map[string]*Suggestion,
+	scope string,
+	lastCmd string,
+	reason string,
+	weight float64,
+	logMessage string,
+) {
 	if s.transitionStore == nil || scope == "" || lastCmd == "" {
 		return
 	}
@@ -388,7 +414,15 @@ func (s *Scorer) collectTransitionCandidates(ctx context.Context, candidates map
 	}
 }
 
-func (s *Scorer) collectFrequencyCandidates(ctx context.Context, candidates map[string]*Suggestion, scope, reason string, weight float64, nowMs int64, logMessage string) {
+func (s *Scorer) collectFrequencyCandidates(
+	ctx context.Context,
+	candidates map[string]*Suggestion,
+	scope string,
+	reason string,
+	weight float64,
+	nowMs int64,
+	logMessage string,
+) {
 	if s.freqStore == nil || scope == "" {
 		return
 	}
@@ -727,10 +761,10 @@ func (s *Scorer) filterByPrefix(candidates map[string]*Suggestion, prefix string
 
 // editDistance computes Levenshtein distance between two strings.
 func editDistance(a, b string) int {
-	if len(a) == 0 {
+	if a == "" {
 		return len(b)
 	}
-	if len(b) == 0 {
+	if b == "" {
 		return len(a)
 	}
 
@@ -772,7 +806,8 @@ func suppressNearDuplicates(suggestions []Suggestion) []Suggestion {
 	seen := make(map[string]int) // templateID -> index in result
 	result := make([]Suggestion, 0, len(suggestions))
 
-	for _, sug := range suggestions {
+	for i := range suggestions {
+		sug := suggestions[i]
 		// If no template ID, treat each command as unique
 		if sug.TemplateID == "" {
 			result = append(result, sug)

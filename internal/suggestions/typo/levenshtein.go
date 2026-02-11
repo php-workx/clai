@@ -4,10 +4,10 @@ package typo
 // This is the minimum number of single-character edits (insertions, deletions,
 // or substitutions) required to change one string into the other.
 func LevenshteinDistance(a, b string) int {
-	if len(a) == 0 {
+	if a == "" {
 		return len(b)
 	}
-	if len(b) == 0 {
+	if b == "" {
 		return len(a)
 	}
 
@@ -51,10 +51,10 @@ func LevenshteinDistance(a, b string) int {
 // This is like Levenshtein but also allows transpositions of two adjacent
 // characters as a single edit operation.
 func DamerauLevenshteinDistance(a, b string) int {
-	if len(a) == 0 {
+	if a == "" {
 		return len(b)
 	}
-	if len(b) == 0 {
+	if b == "" {
 		return len(a)
 	}
 

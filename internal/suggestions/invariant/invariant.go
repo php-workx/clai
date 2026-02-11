@@ -149,7 +149,10 @@ func insertTransactionalFixture(t *testing.T, ctx context.Context, db *sql.DB) t
 	defer tx.Rollback()
 
 	result, err := tx.ExecContext(ctx,
-		"INSERT INTO command_event (session_id, ts_ms, cwd, cmd_raw, cmd_norm, template_id, exit_code, ephemeral) VALUES (?, ?, '/tmp', 'test cmd', 'test cmd', ?, 0, 0)",
+		`INSERT INTO command_event
+			(session_id, ts_ms, cwd, cmd_raw, cmd_norm, template_id, exit_code, ephemeral)
+		 VALUES
+			(?, ?, '/tmp', 'test cmd', 'test cmd', ?, 0, 0)`,
 		sessionID, nowMs, templateID)
 	if err != nil {
 		t.Fatalf("failed to insert command_event: %v", err)
@@ -186,7 +189,17 @@ func assertTransactionalFixtureExists(t *testing.T, ctx context.Context, db *sql
 
 func assertExistsByID(t *testing.T, ctx context.Context, db *sql.DB, table, col string, id any) {
 	t.Helper()
-	query := fmt.Sprintf("SELECT COUNT(*) > 0 FROM %s WHERE %s = ?", table, col)
+
+	var query string
+	switch {
+	case table == "command_event" && col == "id":
+		query = "SELECT COUNT(*) > 0 FROM command_event WHERE id = ?"
+	case table == "command_template" && col == "template_id":
+		query = "SELECT COUNT(*) > 0 FROM command_template WHERE template_id = ?"
+	default:
+		t.Fatalf("unsupported assertExistsByID target: %s.%s", table, col)
+	}
+
 	var exists bool
 	if err := db.QueryRowContext(ctx, query, id).Scan(&exists); err != nil || !exists {
 		t.Errorf("I5 violation: %s row (%s=%v) not found after commit", table, col, id)

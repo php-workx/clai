@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -436,11 +435,11 @@ func escapeFTS5Query(query string) string {
 	if strings.HasPrefix(trimmed, `"`) && strings.HasSuffix(trimmed, `"`) && len(trimmed) >= 2 {
 		inner := trimmed[1 : len(trimmed)-1]
 		inner = strings.ReplaceAll(inner, `"`, `""`)
-		return fmt.Sprintf(`"%s"`, inner)
+		return `"` + inner + `"`
 	}
 
 	escaped := strings.ReplaceAll(trimmed, `"`, `""`)
-	return fmt.Sprintf(`"%s"`, escaped)
+	return `"` + escaped + `"`
 }
 
 // escapeLikePattern escapes special characters for LIKE queries.

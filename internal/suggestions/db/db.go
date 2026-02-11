@@ -106,7 +106,7 @@ func Open(ctx context.Context, opts Options) (*DB, error) {
 		return nil, err
 	}
 	dbDir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 

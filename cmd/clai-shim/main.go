@@ -105,7 +105,19 @@ func printVersion() {
 }
 
 func printUsage() {
-	fmt.Println("clai-shim - Thin client for clai daemon\n\nUsage: clai-shim <command> [flags...]\n\nCommands:\n  --persistent                                Enter persistent NDJSON stdin mode\n  session-start, session-end, log-start, log-end, suggest, text-to-command\n  import-history, ping, status, version, help\n\nEnvironment:\n  CLAI_SOCKET       Override daemon socket path\n  CLAI_DAEMON_PATH  Override daemon binary path")
+	const usage = `clai-shim - Thin client for clai daemon
+
+Usage: clai-shim <command> [flags...]
+
+Commands:
+  --persistent                                Enter persistent NDJSON stdin mode
+  session-start, session-end, log-start, log-end, suggest, text-to-command
+  import-history, ping, status, version, help
+
+Environment:
+  CLAI_SOCKET       Override daemon socket path
+  CLAI_DAEMON_PATH  Override daemon binary path`
+	fmt.Println(usage)
 }
 
 func parseFlags(args []string) map[string]string {

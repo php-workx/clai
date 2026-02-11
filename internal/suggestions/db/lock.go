@@ -55,7 +55,7 @@ func AcquireLock(dbDir string, opts LockOptions) (*LockFile, error) {
 	lockPath := LockPath(dbDir)
 
 	// Ensure the directory exists
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
+	if err := os.MkdirAll(dbDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create lock directory: %w", err)
 	}
 
@@ -95,7 +95,7 @@ func AcquireLock(dbDir string, opts LockOptions) (*LockFile, error) {
 // tryAcquireLock makes a single attempt to acquire the lock.
 func tryAcquireLock(lockPath string) (*LockFile, error) {
 	// Open or create the lock file
-	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
+	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}
@@ -170,7 +170,7 @@ func (lf *LockFile) Path() string {
 func IsLocked(dbDir string) bool {
 	lockPath := LockPath(dbDir)
 
-	file, err := os.OpenFile(lockPath, os.O_RDWR, 0644)
+	file, err := os.OpenFile(lockPath, os.O_RDWR, 0o644)
 	if err != nil {
 		return false
 	}

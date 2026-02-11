@@ -118,7 +118,7 @@ func run(args []string) int {
 	// Step 4: Ensure cache directory exists.
 	paths := defaultPathsFn()
 	cacheDir := paths.CacheDir()
-	if err := mkdirAllFn(cacheDir, 0755); err != nil {
+	if err := mkdirAllFn(cacheDir, 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: failed to create cache directory: %v\n", err)
 		return exitFallback
 	}

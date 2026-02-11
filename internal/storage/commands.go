@@ -215,49 +215,10 @@ func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
 		WHERE 1=1
 	`
 	args := make([]interface{}, 0)
-
-	if q.SessionID != nil {
-		query += " AND session_id = ?"
-		args = append(args, *q.SessionID)
-	}
-	if q.ExcludeSessionID != "" {
-		query += " AND session_id != ?"
-		args = append(args, q.ExcludeSessionID)
-	}
-	if q.CWD != nil {
-		query += " AND cwd = ?"
-		args = append(args, *q.CWD)
-	}
-	if q.Prefix != "" {
-		query += commandNormLikeClause
-		args = append(args, q.Prefix+"%")
-	}
-	if q.Substring != "" {
-		query += commandNormLikeClause
-		args = append(args, "%"+q.Substring+"%")
-	}
-	if q.SuccessOnly {
-		query += " AND is_success = 1"
-	}
-	if q.FailureOnly {
-		query += " AND is_success = 0"
-	}
+	query, args = appendCommandQueryFilters(query, args, q)
 
 	query += " GROUP BY command ORDER BY latest_ts DESC"
-
-	if q.Limit > 0 {
-		query += " LIMIT ?"
-		args = append(args, q.Limit)
-	} else {
-		query += " LIMIT 1000"
-	}
-
-	if q.Offset > 0 {
-		query += " OFFSET ?"
-		args = append(args, q.Offset)
-	} else if q.Offset < 0 {
-		q.Offset = 0
-	}
+	query, args = appendCommandQueryLimitOffset(query, args, q)
 
 	return query, args
 }
@@ -273,7 +234,15 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 		WHERE 1=1
 	`
 	args := make([]interface{}, 0)
+	query, args = appendCommandQueryFilters(query, args, q)
 
+	query += " ORDER BY ts_start_unix_ms DESC"
+	query, args = appendCommandQueryLimitOffset(query, args, q)
+
+	return query, args
+}
+
+func appendCommandQueryFilters(query string, args []interface{}, q CommandQuery) (string, []interface{}) {
 	if q.SessionID != nil {
 		query += " AND session_id = ?"
 		args = append(args, *q.SessionID)
@@ -300,9 +269,10 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	if q.FailureOnly {
 		query += " AND is_success = 0"
 	}
+	return query, args
+}
 
-	query += " ORDER BY ts_start_unix_ms DESC"
-
+func appendCommandQueryLimitOffset(query string, args []interface{}, q CommandQuery) (string, []interface{}) {
 	if q.Limit > 0 {
 		query += " LIMIT ?"
 		args = append(args, q.Limit)
@@ -313,11 +283,7 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	if q.Offset > 0 {
 		query += " OFFSET ?"
 		args = append(args, q.Offset)
-	} else if q.Offset < 0 {
-		// Defense-in-depth: clamp negative offsets to 0
-		q.Offset = 0
 	}
-
 	return query, args
 }
 

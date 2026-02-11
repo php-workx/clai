@@ -350,9 +350,7 @@ func (e *Engine) RecordRecoveryEdge(ctx context.Context, scope, failedTemplateID
 
 // currentTimeMs returns the current time in milliseconds.
 // This is a package-level function to allow test overrides if needed.
-var currentTimeMs = func() int64 {
-	return currentTimeMsImpl()
-}
+var currentTimeMs = currentTimeMsImpl
 
 func currentTimeMsImpl() int64 {
 	return time.Now().UnixMilli()

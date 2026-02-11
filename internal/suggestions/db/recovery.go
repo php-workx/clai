@@ -275,7 +275,7 @@ func recordCorruptionEvent(dbPath string, event CorruptionEvent) error {
 		return fmt.Errorf("failed to marshal corruption history: %w", err)
 	}
 
-	if err := os.WriteFile(historyPath, data, 0644); err != nil {
+	if err := os.WriteFile(historyPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write corruption history: %w", err)
 	}
 

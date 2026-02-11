@@ -269,8 +269,8 @@ func (r *Runner) setupReplayRuntime(ctx context.Context, tmpDir string, session 
 	}, finalCleanup, nil
 }
 
-func insertReplaySession(ctx context.Context, db *sql.DB, sessionID string, startedAtMs int64) error {
-	_, err := db.ExecContext(ctx, `
+func insertReplaySession(ctx context.Context, sqlDB *sql.DB, sessionID string, startedAtMs int64) error {
+	_, err := sqlDB.ExecContext(ctx, `
 		INSERT INTO session (id, shell, started_at_ms) VALUES (?, 'zsh', ?)
 	`, sessionID, startedAtMs)
 	if err != nil {
@@ -418,8 +418,8 @@ func (r *Runner) evaluateReplayExpectations(
 		return nil, fmt.Errorf("suggest after command %d: %w", cmdIdx, err)
 	}
 	got := make([]string, len(suggestions))
-	for i, s := range suggestions {
-		got[i] = s.Command
+	for i := range suggestions {
+		got[i] = suggestions[i].Command
 	}
 	diffs := make([]DiffResult, 0, len(expIndices))
 	for _, expIdx := range expIndices {

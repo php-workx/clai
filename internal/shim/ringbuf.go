@@ -23,13 +23,13 @@ type RingBuffer[T any] struct {
 
 // NewRingBuffer creates a new RingBuffer with the given capacity.
 // If cap is <= 0, DefaultRingCapacity is used.
-func NewRingBuffer[T any](cap int) *RingBuffer[T] {
-	if cap <= 0 {
-		cap = DefaultRingCapacity
+func NewRingBuffer[T any](capacity int) *RingBuffer[T] {
+	if capacity <= 0 {
+		capacity = DefaultRingCapacity
 	}
 	return &RingBuffer[T]{
-		items: make([]T, cap),
-		cap:   cap,
+		items: make([]T, capacity),
+		cap:   capacity,
 	}
 }
 
