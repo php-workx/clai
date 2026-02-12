@@ -585,6 +585,35 @@ func (m Model) viewContent() string {
 	return text
 }
 
+// renderListItem builds the styled string for a single list row.
+func renderListItem(display, query string, selected bool) string {
+	var base, hl lipgloss.Style
+	var prefix string
+	if selected {
+		base, hl, prefix = selectedStyle, matchSelectedStyle, "> "
+	} else {
+		base, hl, prefix = normalStyle, matchStyle, "  "
+	}
+
+	line := base.Render(prefix) + renderItem(display, query, base, hl)
+	if selected {
+		line += dimStyle.Render("  " + rightRefineHintLabel())
+	}
+	return line
+}
+
+// reverseAndPad reverses lines in-place and prepends empty lines so the
+// total count equals maxItems (used for LayoutBottomUp).
+func reverseAndPad(lines []string, maxItems int) []string {
+	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
+		lines[i], lines[j] = lines[j], lines[i]
+	}
+	if pad := maxItems - len(lines); pad > 0 {
+		lines = append(make([]string, pad), lines...)
+	}
+	return lines
+}
+
 // viewList renders the item list with selection marker.
 func (m Model) viewList() string {
 	maxItems := m.listHeight()
@@ -593,45 +622,19 @@ func (m Model) viewList() string {
 		n = maxItems
 	}
 
-	// Build rendered lines for visible items.
 	query := m.textInput.Value()
+	cw := m.contentWidth()
 	lines := make([]string, 0, n)
 	for i := 0; i < n; i++ {
 		display := m.items[i]
-		cw := m.contentWidth()
 		if cw > 4 {
 			display = MiddleTruncate(StripANSI(display), cw-4)
 		}
-
-		var base, hl lipgloss.Style
-		var prefix string
-		if i == m.selection {
-			base, hl, prefix = selectedStyle, matchSelectedStyle, "> "
-		} else {
-			base, hl, prefix = normalStyle, matchStyle, "  "
-		}
-
-		line := base.Render(prefix) + renderItem(display, query, base, hl)
-		if i == m.selection {
-			line += dimStyle.Render("  " + rightRefineHintLabel())
-		}
-		lines = append(lines, line)
+		lines = append(lines, renderListItem(display, query, i == m.selection))
 	}
 
 	if m.layout == LayoutBottomUp {
-		// Reverse so newest (index 0) is at bottom, closest to input.
-		for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
-			lines[i], lines[j] = lines[j], lines[i]
-		}
-		// Pad above to bottom-align items.
-		pad := maxItems - len(lines)
-		if pad > 0 {
-			padding := make([]string, pad)
-			for i := range padding {
-				padding[i] = ""
-			}
-			lines = append(padding, lines...)
-		}
+		lines = reverseAndPad(lines, maxItems)
 	}
 
 	return strings.Join(lines, "\n")

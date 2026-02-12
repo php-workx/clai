@@ -10,13 +10,16 @@ import (
 // ErrSessionNotFound is returned when a session is not found.
 var ErrSessionNotFound = errors.New("session not found")
 
+// errSessionIDRequired is the validation message for a missing session_id.
+const errSessionIDRequired = "session_id is required"
+
 // CreateSession creates a new session record.
 func (s *SQLiteStore) CreateSession(ctx context.Context, session *Session) error {
 	if session == nil {
 		return errors.New("session cannot be nil")
 	}
 	if session.SessionID == "" {
-		return errors.New("session_id is required")
+		return errors.New(errSessionIDRequired)
 	}
 	if session.Shell == "" {
 		return errors.New("shell is required")
@@ -56,7 +59,7 @@ func (s *SQLiteStore) CreateSession(ctx context.Context, session *Session) error
 // EndSession updates a session's end time.
 func (s *SQLiteStore) EndSession(ctx context.Context, sessionID string, endTime int64) error {
 	if sessionID == "" {
-		return errors.New("session_id is required")
+		return errors.New(errSessionIDRequired)
 	}
 
 	result, err := s.db.ExecContext(ctx, `
@@ -79,7 +82,7 @@ func (s *SQLiteStore) EndSession(ctx context.Context, sessionID string, endTime 
 // GetSession retrieves a session by ID.
 func (s *SQLiteStore) GetSession(ctx context.Context, sessionID string) (*Session, error) {
 	if sessionID == "" {
-		return nil, errors.New("session_id is required")
+		return nil, errors.New(errSessionIDRequired)
 	}
 
 	row := s.db.QueryRowContext(ctx, `

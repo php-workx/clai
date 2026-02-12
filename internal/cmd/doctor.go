@@ -119,6 +119,9 @@ func checkBinary() checkResult {
 	}
 }
 
+// checkNameDataDir is the label used for the data-directory health check.
+const checkNameDataDir = "Data directory"
+
 func checkDirectories() []checkResult {
 	var results []checkResult
 	paths := config.DefaultPaths()
@@ -126,19 +129,19 @@ func checkDirectories() []checkResult {
 	// Check base directory
 	if _, err := os.Stat(paths.BaseDir); os.IsNotExist(err) {
 		results = append(results, checkResult{
-			name:    "Data directory",
+			name:    checkNameDataDir,
 			status:  "warn",
 			message: fmt.Sprintf("Missing: %s (will be created when needed)", paths.BaseDir),
 		})
 	} else if err != nil {
 		results = append(results, checkResult{
-			name:    "Data directory",
+			name:    checkNameDataDir,
 			status:  "error",
 			message: fmt.Sprintf("Error accessing: %s", paths.BaseDir),
 		})
 	} else {
 		results = append(results, checkResult{
-			name:    "Data directory",
+			name:    checkNameDataDir,
 			status:  "ok",
 			message: paths.BaseDir,
 		})

@@ -68,7 +68,6 @@ func tailLogs(filename string, n int) error {
 	}
 	defer f.Close()
 
-	// Get file size
 	stat, err := f.Stat()
 	if err != nil {
 		return fmt.Errorf("failed to stat log file: %w", err)
@@ -80,59 +79,68 @@ func tailLogs(filename string, n int) error {
 		return nil
 	}
 
-	// Read from the end to find the last n lines
-	lines := make([]string, 0, n)
-	bufSize := int64(4096)
-	offset := size
-	remainder := "" // Carry partial line fragment between chunks
+	lines := collectTailLines(f, size, n)
 
-	for len(lines) < n && offset > 0 {
-		// Calculate read position
-		readSize := bufSize
-		if offset < bufSize {
-			readSize = offset
-		}
-		offset -= readSize
-
-		// Read chunk
-		buf := make([]byte, readSize)
-		_, err := f.ReadAt(buf, offset)
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("failed to read log file: %w", err)
-		}
-
-		// Parse lines from chunk (in reverse order)
-		// Prepend remainder from previous chunk to handle lines spanning chunks
-		chunk := string(buf) + remainder
-		chunkLines := splitLines(chunk)
-
-		// The first element may be a partial line if we're not at file start
-		if offset > 0 && len(chunkLines) > 0 {
-			remainder = chunkLines[0]
-			chunkLines = chunkLines[1:]
-		} else {
-			remainder = ""
-		}
-
-		// Prepend lines
-		for i := len(chunkLines) - 1; i >= 0 && len(lines) < n; i-- {
-			if chunkLines[i] != "" || len(lines) > 0 {
-				lines = append([]string{chunkLines[i]}, lines...)
-			}
-		}
-	}
-
-	// Include remainder if we have room and it's not empty
-	if remainder != "" && len(lines) < n {
-		lines = append([]string{remainder}, lines...)
-	}
-
-	// Print lines
 	for _, line := range lines {
 		fmt.Println(line)
 	}
 
 	return nil
+}
+
+// collectTailLines reads the last n lines from f whose total size is fileSize.
+func collectTailLines(f *os.File, fileSize int64, n int) []string {
+	lines := make([]string, 0, n)
+	bufSize := int64(4096)
+	offset := fileSize
+	remainder := "" // Carry partial line fragment between chunks
+
+	for len(lines) < n && offset > 0 {
+		chunkLines, newRemainder := readChunkLines(f, &offset, bufSize, remainder)
+		remainder = newRemainder
+		lines = prependLines(lines, chunkLines, n)
+	}
+
+	// Include remainder if we have room and it's not empty.
+	if remainder != "" && len(lines) < n {
+		lines = append([]string{remainder}, lines...)
+	}
+
+	return lines
+}
+
+// readChunkLines reads one chunk ending at *offset, splits it into lines, and
+// returns the full lines plus any leading partial-line remainder.
+// *offset is decremented by the bytes read.
+func readChunkLines(f *os.File, offset *int64, bufSize int64, prevRemainder string) (fullLines []string, remainder string) {
+	readSize := bufSize
+	if *offset < bufSize {
+		readSize = *offset
+	}
+	*offset -= readSize
+
+	buf := make([]byte, readSize)
+	_, _ = f.ReadAt(buf, *offset) // io.EOF is expected at file boundaries
+
+	chunk := string(buf) + prevRemainder
+	chunkLines := splitLines(chunk)
+
+	if *offset > 0 && len(chunkLines) > 0 {
+		remainder = chunkLines[0]
+		chunkLines = chunkLines[1:]
+	}
+
+	return chunkLines, remainder
+}
+
+// prependLines collects lines from chunkLines (in reverse) into dst until cap n is reached.
+func prependLines(dst, chunkLines []string, n int) []string {
+	for i := len(chunkLines) - 1; i >= 0 && len(dst) < n; i-- {
+		if chunkLines[i] != "" || len(dst) > 0 {
+			dst = append([]string{chunkLines[i]}, dst...)
+		}
+	}
+	return dst
 }
 
 func splitLines(s string) []string {
