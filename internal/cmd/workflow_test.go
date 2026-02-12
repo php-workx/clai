@@ -2,11 +2,14 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -108,6 +111,79 @@ func TestValidateWorkflow_InvalidYAML(t *testing.T) {
 	assert.Contains(t, err.Error(), "parsing workflow")
 }
 
+func TestWorkflowExitError_Error(t *testing.T) {
+	err := &WorkflowExitError{Code: ExitValidationError, Message: "boom"}
+	assert.Equal(t, "boom", err.Error())
+}
+
+func TestLoadWorkflow_SuccessFromFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workflow.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(validWorkflowYAML), 0644))
+
+	def, data, err := loadWorkflow(path)
+	require.NoError(t, err)
+	require.NotNil(t, def)
+	assert.Equal(t, "test-workflow", def.Name)
+	assert.NotEmpty(t, data)
+}
+
+func TestLoadWorkflow_SuccessFromStdin(t *testing.T) {
+	oldStdin := os.Stdin
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+
+	_, _ = w.WriteString(validWorkflowYAML)
+	_ = w.Close()
+	os.Stdin = r
+	t.Cleanup(func() {
+		os.Stdin = oldStdin
+		_ = r.Close()
+	})
+
+	def, data, loadErr := loadWorkflow("-")
+	require.NoError(t, loadErr)
+	require.NotNil(t, def)
+	assert.Equal(t, "test-workflow", def.Name)
+	assert.NotEmpty(t, data)
+}
+
+func TestLoadWorkflow_ValidationError(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workflow.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(invalidWorkflowYAML), 0644))
+
+	_, _, err := loadWorkflow(path)
+	require.Error(t, err)
+
+	var exitErr *WorkflowExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, ExitValidationError, exitErr.Code)
+}
+
+func TestSetupRunContext_NoDaemon(t *testing.T) {
+	def, err := workflow.ParseWorkflow([]byte(validWorkflowYAML))
+	require.NoError(t, err)
+
+	cmd := &cobra.Command{Use: "run"}
+	cmd.Flags().Bool("no-daemon", true, "")
+	cmd.Flags().String("mode", "unattended", "")
+	require.NoError(t, cmd.Flags().Set("no-daemon", "true"))
+	require.NoError(t, cmd.Flags().Set("mode", "unattended"))
+
+	rc, cancel, err := setupRunContext(cmd, def, []byte(validWorkflowYAML), "workflow.yaml")
+	require.NoError(t, err)
+	require.NotNil(t, cancel)
+	defer cancel()
+	require.NotNil(t, rc)
+	assert.True(t, rc.noDaemon)
+	assert.NotEmpty(t, rc.runID)
+	assert.Equal(t, ".", rc.workDir)
+
+	_, isNonInteractive := rc.handler.(*workflow.NonInteractiveHandler)
+	assert.True(t, isNonInteractive)
+}
+
 func TestParseVarFlags(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -152,6 +228,153 @@ func TestParseVarFlags(t *testing.T) {
 			assert.Equal(t, tc.expect, result)
 		})
 	}
+}
+
+func TestRunWorkflow_Success(t *testing.T) {
+	t.Setenv("CLAI_SOCKET", filepath.Join(t.TempDir(), "missing.sock"))
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "workflow.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(validWorkflowYAML), 0644))
+
+	cmd := &cobra.Command{Use: "run"}
+	cmd.Flags().String("mode", "auto", "")
+	cmd.Flags().StringSlice("var", nil, "")
+	cmd.Flags().Bool("no-daemon", false, "")
+	require.NoError(t, cmd.Flags().Set("mode", "unattended"))
+
+	err := runWorkflow(cmd, []string{path})
+	require.NoError(t, err)
+}
+
+func TestExecuteJob_InvalidLayout(t *testing.T) {
+	cmd := &cobra.Command{Use: "run"}
+	cmd.Flags().StringSlice("var", nil, "")
+
+	rc := &workflowRunContext{
+		runID:    "run-test",
+		workDir:  ".",
+		display:  workflow.NewDisplay(new(bytes.Buffer), workflow.DisplayPlain),
+		noDaemon: true,
+	}
+	def := &workflow.WorkflowDef{Name: "broken", Jobs: map[string]*workflow.JobDef{}}
+
+	result := executeJob(cmd, rc, def)
+	require.NotNil(t, result)
+	assert.True(t, result.validationErr)
+	assert.Equal(t, string(workflow.RunFailed), result.overallStatus)
+}
+
+func TestHandleAnalysis_Reject(t *testing.T) {
+	t.Setenv("CLAI_SOCKET", filepath.Join(t.TempDir(), "missing.sock"))
+
+	rc := &workflowRunContext{
+		runID:    "run-test",
+		workDir:  ".",
+		display:  workflow.NewDisplay(new(bytes.Buffer), workflow.DisplayPlain),
+		noDaemon: true,
+		handler: workflow.NewScriptedHandler(&workflow.ReviewDecision{
+			Action: string(workflow.ActionReject),
+		}),
+		transport: workflow.NewAnalysisTransport(
+			workflow.NewAnalyzer(nil),
+			func(_ context.Context, _ string) (string, error) {
+				return `{"decision":"halt","reasoning":"needs review"}`, nil
+			},
+		),
+	}
+
+	sr := &workflow.StepResult{
+		StepID:     "s1",
+		Name:       "Run tests",
+		StdoutTail: "output",
+		StderrTail: "",
+	}
+	step := &workflow.StepDef{
+		ID:        "s1",
+		Name:      "Run tests",
+		Analyze:   true,
+		RiskLevel: string(workflow.RiskLow),
+	}
+
+	rejected := rc.handleAnalysis(context.Background(), sr, step, "os=linux")
+	assert.True(t, rejected)
+}
+
+func TestHandleAnalysis_QuestionThenApprove(t *testing.T) {
+	t.Setenv("CLAI_SOCKET", filepath.Join(t.TempDir(), "missing.sock"))
+
+	calls := 0
+	var prompts []string
+	transport := workflow.NewAnalysisTransport(
+		workflow.NewAnalyzer(nil),
+		func(_ context.Context, prompt string) (string, error) {
+			calls++
+			prompts = append(prompts, prompt)
+			return `{"decision":"halt","reasoning":"more context needed"}`, nil
+		},
+	)
+
+	rc := &workflowRunContext{
+		runID:     "run-test",
+		workDir:   ".",
+		display:   workflow.NewDisplay(new(bytes.Buffer), workflow.DisplayPlain),
+		noDaemon:  true,
+		transport: transport,
+		handler: workflow.NewScriptedHandler(
+			&workflow.ReviewDecision{Action: string(workflow.ActionQuestion), Input: "what failed?"},
+			&workflow.ReviewDecision{Action: string(workflow.ActionApprove)},
+		),
+	}
+
+	sr := &workflow.StepResult{
+		StepID:     "s1",
+		Name:       "Analyze",
+		StdoutTail: "stdout tail",
+		StderrTail: "stderr tail",
+	}
+	step := &workflow.StepDef{
+		ID:             "s1",
+		Name:           "Analyze",
+		Analyze:        true,
+		RiskLevel:      string(workflow.RiskHigh),
+		AnalysisPrompt: "Look for regressions.",
+	}
+
+	rejected := rc.handleAnalysis(context.Background(), sr, step, "")
+	assert.False(t, rejected)
+	assert.Equal(t, 2, calls)
+	require.Len(t, prompts, 2)
+	assert.Contains(t, prompts[1], "Follow-up question from reviewer: what failed?")
+}
+
+func TestRunAdHocCommand(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	t.Run("success", func(t *testing.T) {
+		var command string
+		if runtime.GOOS == "windows" {
+			command = "echo ok"
+		} else {
+			command = "echo ok"
+		}
+
+		err := runAdHocCommand(ctx, command, t.TempDir(), nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("failure", func(t *testing.T) {
+		var command string
+		if runtime.GOOS == "windows" {
+			command = "nonexistent_command_12345"
+		} else {
+			command = "command_that_does_not_exist_12345"
+		}
+
+		err := runAdHocCommand(ctx, command, t.TempDir(), nil)
+		assert.Error(t, err)
+	})
 }
 
 func TestExpandMatrix_NoMatrix(t *testing.T) {
@@ -374,6 +597,59 @@ func TestReportResults_CancelledExitCode(t *testing.T) {
 	var exitErr *WorkflowExitError
 	require.True(t, errors.As(err, &exitErr))
 	assert.Equal(t, ExitCancelled, exitErr.Code)
+}
+
+func TestReportResults_HumanRejectedExitCode(t *testing.T) {
+	rc := &workflowRunContext{
+		runID:    "run-test",
+		display:  workflow.NewDisplay(new(bytes.Buffer), workflow.DisplayPlain),
+		noDaemon: true,
+	}
+	result := &jobExecutionResult{
+		overallStatus: string(workflow.RunFailed),
+		humanRejected: true,
+	}
+
+	err := reportResults(rc, result)
+	require.Error(t, err)
+	var exitErr *WorkflowExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, ExitHumanReject, exitErr.Code)
+}
+
+func TestReportResults_ValidationExitCode(t *testing.T) {
+	rc := &workflowRunContext{
+		runID:    "run-test",
+		display:  workflow.NewDisplay(new(bytes.Buffer), workflow.DisplayPlain),
+		noDaemon: true,
+	}
+	result := &jobExecutionResult{
+		overallStatus: string(workflow.RunFailed),
+		validationErr: true,
+	}
+
+	err := reportResults(rc, result)
+	require.Error(t, err)
+	var exitErr *WorkflowExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, ExitValidationError, exitErr.Code)
+}
+
+func TestReportResults_Success(t *testing.T) {
+	rc := &workflowRunContext{
+		runID:    "run-test",
+		display:  workflow.NewDisplay(new(bytes.Buffer), workflow.DisplayPlain),
+		noDaemon: true,
+	}
+	result := &jobExecutionResult{
+		overallStatus: string(workflow.RunPassed),
+		allStepResults: []*workflow.StepResult{
+			{Name: "step-1", Status: string(workflow.StepPassed), DurationMs: 1},
+		},
+	}
+
+	err := reportResults(rc, result)
+	assert.NoError(t, err)
 }
 
 func TestWorkflowCmd_HasSubcommands(t *testing.T) {
