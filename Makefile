@@ -1,5 +1,8 @@
 # Makefile for clai
 
+# Ensure Rust toolchain is discoverable (cargo, rustc, etc.)
+export PATH := $(HOME)/.cargo/bin:$(PATH)
+
 BINARY_NAME=clai
 VERSION?=$(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 GIT_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -86,8 +89,6 @@ test-rust:
 		echo "Running clai-wrap Rust tests..."; \
 		if command -v cargo >/dev/null 2>&1; then \
 			cargo test --manifest-path clai-wrap/Cargo.toml; \
-		elif [ -x "$$HOME/.cargo/bin/cargo" ]; then \
-			$$HOME/.cargo/bin/cargo test --manifest-path clai-wrap/Cargo.toml; \
 		else \
 			echo "Skipping Rust tests (cargo not found)"; \
 		fi \
