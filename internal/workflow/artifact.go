@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -95,7 +96,7 @@ type RunArtifact struct {
 // The file is created at <logDir>/<sanitized-run-id>.jsonl.
 // Uses config.DefaultPaths().WorkflowLogDir() as the default log directory.
 func NewRunArtifact(runID string) (*RunArtifact, error) {
-	return NewRunArtifactWithDir(runID, config.DefaultPaths().WorkflowLogDir())
+	return NewRunArtifactWithDir(runID, config.DefaultPaths().WorkflowLogDir(context.Background()))
 }
 
 // NewRunArtifactWithDir creates a new artifact writer with a custom log directory.

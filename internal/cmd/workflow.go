@@ -379,7 +379,8 @@ func analyzeStepWithQuestion(
 }
 
 func runAdHocCommand(ctx context.Context, command, workDir string, env []string) error {
-	fmt.Fprintf(os.Stderr, "warning: executing reviewer-provided shell command: %q\n", command)
+	fmt.Fprintf(os.Stderr, "warning: executing reviewer-provided shell command via shell: %q\n", command)
+	fmt.Fprintln(os.Stderr, "warning: this runs with shell parsing/expansion (pipes, redirects, substitutions); review carefully before execution")
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {

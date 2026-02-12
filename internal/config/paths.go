@@ -2,6 +2,7 @@
 package config
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -79,7 +80,7 @@ func (p *Paths) HooksDir() string {
 
 // WorkflowLogDir returns the path to the workflow log directory.
 // Creates the directory if it doesn't exist.
-func (p *Paths) WorkflowLogDir() string {
+func (p *Paths) WorkflowLogDir(ctx context.Context) string {
 	dir := filepath.Join(p.BaseDir, "workflow-logs")
 	_ = os.MkdirAll(dir, 0o755)
 	return dir
