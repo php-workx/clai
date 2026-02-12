@@ -31,8 +31,7 @@ func TestValidateWorkflow_MissingName(t *testing.T) {
 	wf.Name = ""
 	errs := ValidateWorkflow(wf)
 	require.NotEmpty(t, errs)
-	assert.Equal(t, "name", errs[0].Field)
-	assert.Contains(t, errs[0].Message, "required")
+	assertFieldError(t, errs, "name", "required")
 }
 
 func TestValidateWorkflow_NoJobs(t *testing.T) {
@@ -120,10 +119,18 @@ func TestValidateWorkflow_InvalidRiskLevel(t *testing.T) {
 }
 
 func TestValidateWorkflow_ValidRiskLevels(t *testing.T) {
-	for _, level := range []string{"", "low", "medium", "high"} {
-		t.Run(level, func(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		level string
+	}{
+		{name: "empty", level: ""},
+		{name: "low", level: "low"},
+		{name: "medium", level: "medium"},
+		{name: "high", level: "high"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			wf := validWorkflow()
-			wf.Jobs["build"].Steps[0].RiskLevel = level
+			wf.Jobs["build"].Steps[0].RiskLevel = tc.level
 			errs := ValidateWorkflow(wf)
 			assert.Empty(t, errs)
 		})
@@ -156,10 +163,23 @@ func TestValidateWorkflow_InvalidShell(t *testing.T) {
 }
 
 func TestValidateWorkflow_ValidShells(t *testing.T) {
-	for _, sh := range []string{"", "true", "false", "sh", "bash", "zsh", "fish", "pwsh", "cmd"} {
-		t.Run(sh, func(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		shell string
+	}{
+		{name: "empty", shell: ""},
+		{name: "true", shell: "true"},
+		{name: "false", shell: "false"},
+		{name: "sh", shell: "sh"},
+		{name: "bash", shell: "bash"},
+		{name: "zsh", shell: "zsh"},
+		{name: "fish", shell: "fish"},
+		{name: "pwsh", shell: "pwsh"},
+		{name: "cmd", shell: "cmd"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			wf := validWorkflow()
-			wf.Jobs["build"].Steps[0].Shell = sh
+			wf.Jobs["build"].Steps[0].Shell = tc.shell
 			errs := ValidateWorkflow(wf)
 			assert.Empty(t, errs)
 		})

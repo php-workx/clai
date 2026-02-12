@@ -111,6 +111,30 @@ func TestValidateWorkflow_InvalidYAML(t *testing.T) {
 	assert.Contains(t, err.Error(), "parsing workflow")
 }
 
+func TestValidateWorkflow_FromStdin(t *testing.T) {
+	oldStdin := os.Stdin
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+
+	_, _ = w.WriteString(validWorkflowYAML)
+	_ = w.Close()
+	os.Stdin = r
+	t.Cleanup(func() {
+		os.Stdin = oldStdin
+		_ = r.Close()
+	})
+
+	cmd := &cobra.Command{Use: "validate", RunE: validateWorkflow, Args: cobra.ExactArgs(1)}
+	cmd.SetArgs([]string{"-"})
+
+	out := captureStdout(t, func() {
+		execErr := cmd.Execute()
+		assert.NoError(t, execErr)
+	})
+
+	assert.Contains(t, out, "test-workflow is valid")
+}
+
 func TestWorkflowExitError_Error(t *testing.T) {
 	err := &WorkflowExitError{Code: ExitValidationError, Message: "boom"}
 	assert.Equal(t, "boom", err.Error())

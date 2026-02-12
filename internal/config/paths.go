@@ -81,8 +81,12 @@ func (p *Paths) HooksDir() string {
 // WorkflowLogDir returns the path to the workflow log directory.
 // Creates the directory if it doesn't exist.
 func (p *Paths) WorkflowLogDir(ctx context.Context) string {
+	_ = ctx // Reserved for future context-aware path resolution.
 	dir := filepath.Join(p.BaseDir, "workflow-logs")
-	_ = os.MkdirAll(dir, 0o755)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		// Best-effort creation; callers may still use the returned path.
+		_ = err
+	}
 	return dir
 }
 

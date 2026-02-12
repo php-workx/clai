@@ -121,17 +121,9 @@ func runWorkflow(cmd *cobra.Command, args []string) error {
 
 // loadWorkflow reads, parses, and validates a workflow file.
 func loadWorkflow(path string) (*workflow.WorkflowDef, []byte, error) {
-	var (
-		data []byte
-		err  error
-	)
-	if path == "-" {
-		data, err = io.ReadAll(os.Stdin)
-	} else {
-		data, err = os.ReadFile(path)
-	}
+	data, err := readWorkflowBytes(path)
 	if err != nil {
-		return nil, nil, fmt.Errorf("reading workflow file: %w", err)
+		return nil, nil, err
 	}
 
 	def, err := workflow.ParseWorkflow(data)
@@ -169,7 +161,10 @@ func setupRunContext(cmd *cobra.Command, def *workflow.WorkflowDef, data []byte,
 		slog.Warn("failed to create run artifact", "error", err)
 	}
 
-	absPath, _ := filepath.Abs(workflowPath)
+	absPath, err := filepath.Abs(workflowPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("resolve workflow path: %w", err)
+	}
 	normalizedPath := workflow.NormalizePath(absPath)
 
 	if artifact != nil {
@@ -471,9 +466,9 @@ func reportResults(rc *workflowRunContext, result *jobExecutionResult) error {
 }
 
 func validateWorkflow(_ *cobra.Command, args []string) error {
-	data, err := os.ReadFile(args[0])
+	data, err := readWorkflowBytes(args[0])
 	if err != nil {
-		return fmt.Errorf("reading workflow file: %w", err)
+		return err
 	}
 
 	def, err := workflow.ParseWorkflow(data)
@@ -491,6 +486,22 @@ func validateWorkflow(_ *cobra.Command, args []string) error {
 
 	fmt.Printf("  \u2713 %s is valid (%d jobs, %d total steps)\n", def.Name, len(def.Jobs), countSteps(def))
 	return nil
+}
+
+func readWorkflowBytes(path string) ([]byte, error) {
+	var (
+		data []byte
+		err  error
+	)
+	if path == "-" {
+		data, err = io.ReadAll(os.Stdin)
+	} else {
+		data, err = os.ReadFile(path)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("reading workflow file: %w", err)
+	}
+	return data, nil
 }
 
 // --- Helper functions ---

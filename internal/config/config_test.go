@@ -855,6 +855,20 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if loaded.History.PickerCaseSensitive != true {
 		t.Errorf("History.PickerCaseSensitive: got %v, want true", loaded.History.PickerCaseSensitive)
 	}
+
+	// Verify Workflows values round-trip.
+	if loaded.Workflows.Enabled != true {
+		t.Errorf("Workflows.Enabled: got %v, want true", loaded.Workflows.Enabled)
+	}
+	if loaded.Workflows.StrictPermissions != true {
+		t.Errorf("Workflows.StrictPermissions: got %v, want true", loaded.Workflows.StrictPermissions)
+	}
+	if loaded.Workflows.DefaultMode != "interactive" {
+		t.Errorf("Workflows.DefaultMode: got %s, want interactive", loaded.Workflows.DefaultMode)
+	}
+	if loaded.Workflows.RetainRuns != 50 {
+		t.Errorf("Workflows.RetainRuns: got %d, want 50", loaded.Workflows.RetainRuns)
+	}
 }
 
 // ============================================================================

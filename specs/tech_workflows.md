@@ -332,17 +332,36 @@ func (r *Runner) Run(ctx context.Context, wf *WorkflowDef) error {
 }
 
 func (r *Runner) gracefulKill(cmd *exec.Cmd) {
-    cmd.Process.Signal(syscall.SIGTERM)
-    done := make(chan struct{})
+    if cmd == nil || cmd.Process == nil {
+        return
+    }
+
+    done := make(chan error, 1)
     go func() {
-        cmd.Wait()
-        close(done)
+        done <- cmd.Wait() // single waiter; avoids double Wait races
     }()
+
+    if err := cmd.Process.Signal(syscall.SIGTERM); err != nil {
+        // Ignore "already exited" style errors; log others.
+        if !isNoChildProcess(err) {
+            r.logger.Warn("graceful stop signal failed", "error", err)
+        }
+    }
+
     select {
-    case <-done:
+    case err := <-done:
+        if err != nil && !isNoChildProcess(err) {
+            r.logger.Warn("process wait after SIGTERM failed", "error", err)
+        }
         return
     case <-time.After(5 * time.Second):
-        cmd.Process.Kill()
+        if err := cmd.Process.Kill(); err != nil && !isNoChildProcess(err) {
+            r.logger.Warn("force kill failed", "error", err)
+        }
+        // Always reap after kill.
+        if err := <-done; err != nil && !isNoChildProcess(err) {
+            r.logger.Warn("process reap after kill failed", "error", err)
+        }
     }
 }
 ```
