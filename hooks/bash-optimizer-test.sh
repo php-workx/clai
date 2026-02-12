@@ -76,15 +76,23 @@ assert_allow() {
     printf "  FAIL  %-45s  malformed JSON output\n" "$test_name"
     printf "        raw: %s\n" "$(printf '%s' "$output" | head -c 200)"
     ((FAIL++))
-  elif [[ "$exit_code" == "0" && "$decision" != "deny" ]]; then
-    printf "  PASS  %-45s  (allow)\n" "$test_name"
-    ((PASS++))
   else
-    printf "  FAIL  %-45s  exit=%d decision=%s\n" "$test_name" "$exit_code" "$decision"
-    if [[ -n "$output" ]]; then
+    if [[ -z "$output" ]]; then
+      if [[ "$exit_code" == "0" ]]; then
+        printf "  PASS  %-45s  (allow)\n" "$test_name"
+        ((PASS++))
+      else
+        printf "  FAIL  %-45s  exit=%d (empty output)\n" "$test_name" "$exit_code"
+        ((FAIL++))
+      fi
+    elif [[ "$exit_code" == "0" && "$decision" == "allow" ]]; then
+      printf "  PASS  %-45s  (allow)\n" "$test_name"
+      ((PASS++))
+    else
+      printf "  FAIL  %-45s  exit=%d decision=%s\n" "$test_name" "$exit_code" "$decision"
       printf "        output: %s\n" "$(printf '%s' "$output" | head -c 200)"
+      ((FAIL++))
     fi
-    ((FAIL++))
   fi
 }
 

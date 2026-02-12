@@ -719,10 +719,10 @@ func TestApplyEnvOverrides_LogLevelInvalid(t *testing.T) {
 
 func TestApplyEnvOverrides_SocketPath(t *testing.T) {
 	cfg := DefaultConfig()
-	t.Setenv("CLAI_SOCKET_PATH", "/tmp/custom.sock")
+	t.Setenv("CLAI_SOCKET", "/tmp/custom.sock")
 	cfg.ApplyEnvOverrides()
 	if cfg.Daemon.SocketPath != "/tmp/custom.sock" {
-		t.Errorf("CLAI_SOCKET_PATH: SocketPath = %q, want /tmp/custom.sock", cfg.Daemon.SocketPath)
+		t.Errorf("CLAI_SOCKET: SocketPath = %q, want /tmp/custom.sock", cfg.Daemon.SocketPath)
 	}
 }
 
@@ -740,7 +740,7 @@ func TestApplyEnvOverrides_DebugAndLogLevel(t *testing.T) {
 func TestApplyEnvOverrides_NoEnvVarsSet(t *testing.T) {
 	cfg := DefaultConfig()
 	// Unset all env vars
-	for _, env := range []string{"CLAI_SUGGESTIONS_ENABLED", "CLAI_DEBUG", "CLAI_LOG_LEVEL", "CLAI_SOCKET_PATH"} {
+	for _, env := range []string{"CLAI_SUGGESTIONS_ENABLED", "CLAI_DEBUG", "CLAI_LOG_LEVEL", "CLAI_SOCKET"} {
 		t.Setenv(env, "")
 		os.Unsetenv(env)
 	}
@@ -815,7 +815,7 @@ func TestLoadFromFile_AppliesEnvOverrides(t *testing.T) {
 }
 
 func TestLoadFromFile_NonExistentAppliesEnvOverrides(t *testing.T) {
-	t.Setenv("CLAI_SOCKET_PATH", "/env/socket.sock")
+	t.Setenv("CLAI_SOCKET", "/env/socket.sock")
 
 	cfg, err := LoadFromFile("/nonexistent/path/config.yaml")
 	if err != nil {

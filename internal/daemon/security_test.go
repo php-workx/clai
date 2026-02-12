@@ -16,7 +16,7 @@ func TestCheckNotRoot_NotRoot(t *testing.T) {
 	}
 
 	// Test process should not be running as root in CI
-	if os.Getuid() == 0 {
+	if os.Geteuid() == 0 {
 		t.Skip("test is running as root - skipping non-root check")
 	}
 
@@ -35,7 +35,7 @@ func TestCheckNotRoot_ReturnsCorrectError(t *testing.T) {
 
 	// We can only test the error type, not the actual root check
 	// since tests shouldn't run as root
-	if os.Getuid() == 0 {
+	if os.Geteuid() == 0 {
 		err := CheckNotRoot()
 		if !errors.Is(err, ErrRunningAsRoot) {
 			t.Errorf("expected ErrRunningAsRoot, got: %v", err)

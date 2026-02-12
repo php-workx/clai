@@ -574,9 +574,10 @@ func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 		return exitFallback
 	}
 
-	if result != "" {
-		fmt.Fprintln(os.Stdout, result)
+	if result == "" {
+		return exitCancelled
 	}
+	fmt.Fprintln(os.Stdout, result)
 
 	return exitSuccess
 }

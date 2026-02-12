@@ -1046,7 +1046,7 @@ func (c *Config) ApplyEnvOverrides() {
 			c.Daemon.LogLevel = v
 		}
 	}
-	if v := os.Getenv("CLAI_SOCKET_PATH"); v != "" {
+	if v := os.Getenv("CLAI_SOCKET"); v != "" {
 		c.Daemon.SocketPath = v
 	}
 }

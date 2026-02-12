@@ -115,21 +115,21 @@ func (m *mockStore) QueryCommands(ctx context.Context, q storage.CommandQuery) (
 }
 
 func (m *mockStore) QueryHistoryCommands(ctx context.Context, q storage.CommandQuery) ([]storage.HistoryRow, error) {
-	// Collect commands, dedup by command_norm
+	// Collect commands, dedup by exact command text.
 	seen := make(map[string]storage.HistoryRow)
 	for _, c := range m.commands {
-		norm := strings.ToLower(c.Command)
+		commandNorm := strings.ToLower(c.Command)
 		// Substring filter
-		if q.Substring != "" && !strings.Contains(norm, q.Substring) {
+		if q.Substring != "" && !strings.Contains(commandNorm, strings.ToLower(q.Substring)) {
 			continue
 		}
 		// Session filter
 		if q.SessionID != nil && c.SessionID != *q.SessionID {
 			continue
 		}
-		existing, ok := seen[norm]
+		existing, ok := seen[c.Command]
 		if !ok || c.TsStartUnixMs > existing.TimestampMs {
-			seen[norm] = storage.HistoryRow{
+			seen[c.Command] = storage.HistoryRow{
 				Command:     c.Command,
 				TimestampMs: c.TsStartUnixMs,
 			}

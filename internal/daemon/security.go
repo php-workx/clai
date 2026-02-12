@@ -12,15 +12,15 @@ var ErrRunningAsRoot = fmt.Errorf("refusing to run as root (UID 0): running the 
 // ErrInsecureDirectory is returned when a runtime directory has insecure permissions.
 var ErrInsecureDirectory = fmt.Errorf("runtime directory has insecure permissions")
 
-// CheckNotRoot verifies the daemon is not running as root (UID 0).
-// Returns nil if not root, ErrRunningAsRoot if running as root.
+// CheckNotRoot verifies the daemon is not running as root (effective UID 0).
+// Returns nil if not root, ErrRunningAsRoot if running with effective root privileges.
 // On Windows, this check is skipped.
 func CheckNotRoot() error {
 	if runtime.GOOS == "windows" {
 		return nil
 	}
 
-	if os.Getuid() == 0 {
+	if os.Geteuid() == 0 {
 		return ErrRunningAsRoot
 	}
 

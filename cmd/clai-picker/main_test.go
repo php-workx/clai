@@ -817,6 +817,17 @@ func TestDispatchFzf_CoversBranches(t *testing.T) {
 	if got := dispatchFzf(cfg, opts); got != exitCancelled {
 		t.Fatalf("expected exitCancelled on fzf no-match, got %d", got)
 	}
+
+	// Empty output from backend means no selection, treat as cancel.
+	runFzfCommandOutputFn = func(_ []string, _ string) ([]byte, error) { return []byte(""), nil }
+	newHistoryProviderFn = func(string) picker.Provider {
+		return &fakeHistoryProvider{
+			resp: []picker.Response{{Items: []picker.Item{{Value: "git status"}}, AtEnd: true}},
+		}
+	}
+	if got := dispatchFzf(cfg, opts); got != exitCancelled {
+		t.Fatalf("expected exitCancelled on empty fzf selection, got %d", got)
+	}
 }
 
 type fakeHistoryProvider struct {
