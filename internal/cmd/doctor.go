@@ -10,7 +10,6 @@ import (
 
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/daemon"
-	"github.com/runger/clai/internal/suggestions/db"
 )
 
 var doctorCmd = &cobra.Command{
@@ -38,9 +37,6 @@ type checkResult struct {
 	message string
 }
 
-const dbCorruptionHistoryCheckName = "DB corruption history"
-const dataDirectoryCheckName = "Data directory"
-
 func runDoctor(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%sclai Doctor%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
@@ -55,9 +51,6 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	results = append(results, checkShellIntegrationDoctor())
 	results = append(results, checkDaemon())
 	results = append(results, checkAIProviders()...)
-
-	// Check corruption history
-	results = append(results, checkCorruptionHistory()...)
 
 	// Print results
 	hasErrors := false
@@ -116,6 +109,9 @@ func checkBinary() checkResult {
 	}
 }
 
+// checkNameDataDir is the label used for the data-directory health check.
+const checkNameDataDir = "Data directory"
+
 func checkDirectories() []checkResult {
 	var results []checkResult
 	paths := config.DefaultPaths()
@@ -123,19 +119,19 @@ func checkDirectories() []checkResult {
 	// Check base directory
 	if _, err := os.Stat(paths.BaseDir); os.IsNotExist(err) {
 		results = append(results, checkResult{
-			name:    dataDirectoryCheckName,
+			name:    checkNameDataDir,
 			status:  "warn",
 			message: fmt.Sprintf("Missing: %s (will be created when needed)", paths.BaseDir),
 		})
 	} else if err != nil {
 		results = append(results, checkResult{
-			name:    dataDirectoryCheckName,
+			name:    checkNameDataDir,
 			status:  "error",
 			message: fmt.Sprintf("Error accessing: %s", paths.BaseDir),
 		})
 	} else {
 		results = append(results, checkResult{
-			name:    dataDirectoryCheckName,
+			name:    checkNameDataDir,
 			status:  "ok",
 			message: paths.BaseDir,
 		})
@@ -232,58 +228,6 @@ func checkAIProviders() []checkResult {
 			message: claudePath,
 		})
 	}
-
-	return results
-}
-
-func checkCorruptionHistory() []checkResult {
-	var results []checkResult
-
-	historyPath, err := db.CorruptionHistoryPath()
-	if err != nil {
-		results = append(results, checkResult{
-			name:    dbCorruptionHistoryCheckName,
-			status:  "warn",
-			message: fmt.Sprintf("Could not determine history path: %v", err),
-		})
-		return results
-	}
-
-	history, err := db.LoadCorruptionHistory(historyPath)
-	if err != nil {
-		results = append(results, checkResult{
-			name:    dbCorruptionHistoryCheckName,
-			status:  "warn",
-			message: fmt.Sprintf("Could not load history: %v", err),
-		})
-		return results
-	}
-
-	if len(history.Events) == 0 {
-		results = append(results, checkResult{
-			name:    dbCorruptionHistoryCheckName,
-			status:  "ok",
-			message: "No corruption events recorded",
-		})
-		return results
-	}
-
-	// Report the most recent event
-	latest := history.Events[len(history.Events)-1]
-	statusStr := "warn"
-	if !latest.RecoverySuccess {
-		statusStr = "error"
-	}
-
-	results = append(results, checkResult{
-		name:   dbCorruptionHistoryCheckName,
-		status: statusStr,
-		message: fmt.Sprintf("%d event(s); latest: %s (%s)",
-			len(history.Events),
-			latest.Timestamp.Format("2006-01-02 15:04:05"),
-			latest.Reason,
-		),
-	})
 
 	return results
 }

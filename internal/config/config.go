@@ -22,6 +22,7 @@ type Config struct {
 	Suggestions SuggestionsConfig `yaml:"suggestions"`
 	Privacy     PrivacyConfig     `yaml:"privacy"`
 	History     HistoryConfig     `yaml:"history"`
+	Workflows   WorkflowsConfig   `yaml:"workflows"`
 }
 
 // DaemonConfig holds daemon-related settings.
@@ -221,6 +222,18 @@ type TabDef struct {
 	Args     map[string]string `yaml:"args"`
 }
 
+// WorkflowsConfig holds workflow execution settings.
+type WorkflowsConfig struct {
+	Enabled           bool     `yaml:"enabled"`            // Tier 0: master enable/disable
+	DefaultMode       string   `yaml:"default_mode"`       // Tier 0: "interactive" or "non-interactive-fail"
+	DefaultShell      string   `yaml:"default_shell"`      // Tier 0: default shell for steps
+	LogDir            string   `yaml:"log_dir"`            // Tier 0: workflow log directory
+	SearchPaths       []string `yaml:"search_paths"`       // Tier 1: workflow file search paths
+	RetainRuns        int      `yaml:"retain_runs"`        // Tier 1: max runs to keep
+	StrictPermissions bool     `yaml:"strict_permissions"` // Tier 1: enforce file permissions
+	SecretFile        string   `yaml:"secret_file"`        // Tier 1: path to .secrets file
+}
+
 // HistoryConfig holds history picker settings.
 type HistoryConfig struct {
 	PickerBackend         string   `yaml:"picker_backend"`            // builtin, fzf, or clai
@@ -258,6 +271,13 @@ func DefaultConfig() *Config {
 		Suggestions: DefaultSuggestionsConfig(),
 		Privacy: PrivacyConfig{
 			SanitizeAICalls: true,
+		},
+		Workflows: WorkflowsConfig{
+			Enabled:      false,
+			DefaultMode:  "interactive",
+			DefaultShell: "",
+			LogDir:       "",
+			RetainRuns:   100,
 		},
 		History: HistoryConfig{
 			PickerBackend:         "builtin",
@@ -521,6 +541,8 @@ func (c *Config) Get(key string) (string, error) {
 		return c.getPrivacyField(field)
 	case "history":
 		return c.getHistoryField(field)
+	case "workflows":
+		return c.getWorkflowsField(field)
 	default:
 		return "", fmt.Errorf("unknown section: %s", section)
 	}
@@ -548,6 +570,8 @@ func (c *Config) Set(key, value string) error {
 		return c.setPrivacyField(field, value)
 	case "history":
 		return c.setHistoryField(field, value)
+	case "workflows":
+		return c.setWorkflowsField(field, value)
 	default:
 		return fmt.Errorf("unknown section: %s", section)
 	}
@@ -942,6 +966,75 @@ func (c *Config) setHistoryUpArrowDoubleWindowMs(value string) error {
 	return nil
 }
 
+func (c *Config) getWorkflowsField(field string) (string, error) {
+	switch field {
+	case "enabled":
+		return strconv.FormatBool(c.Workflows.Enabled), nil
+	case "default_mode":
+		return c.Workflows.DefaultMode, nil
+	case "default_shell":
+		return c.Workflows.DefaultShell, nil
+	case "log_dir":
+		return c.Workflows.LogDir, nil
+	case "search_paths":
+		return strings.Join(c.Workflows.SearchPaths, ","), nil
+	case "retain_runs":
+		return strconv.Itoa(c.Workflows.RetainRuns), nil
+	case "strict_permissions":
+		return strconv.FormatBool(c.Workflows.StrictPermissions), nil
+	case "secret_file":
+		return c.Workflows.SecretFile, nil
+	default:
+		return "", fmt.Errorf("unknown field: workflows.%s", field)
+	}
+}
+
+func (c *Config) setWorkflowsField(field, value string) error {
+	switch field {
+	case "enabled":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for enabled: %w", err)
+		}
+		c.Workflows.Enabled = v
+	case "default_mode":
+		if !isValidWorkflowMode(value) {
+			return fmt.Errorf("invalid default_mode: %s (must be interactive or non-interactive-fail)", value)
+		}
+		c.Workflows.DefaultMode = value
+	case "default_shell":
+		c.Workflows.DefaultShell = value
+	case "log_dir":
+		c.Workflows.LogDir = value
+	case "search_paths":
+		if value == "" {
+			c.Workflows.SearchPaths = nil
+		} else {
+			c.Workflows.SearchPaths = strings.Split(value, ",")
+		}
+	case "retain_runs":
+		v, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for retain_runs: %w", err)
+		}
+		if v <= 0 {
+			return fmt.Errorf("invalid retain_runs: must be > 0")
+		}
+		c.Workflows.RetainRuns = v
+	case "strict_permissions":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for strict_permissions: %w", err)
+		}
+		c.Workflows.StrictPermissions = v
+	case "secret_file":
+		c.Workflows.SecretFile = value
+	default:
+		return fmt.Errorf("unknown field: workflows.%s", field)
+	}
+	return nil
+}
+
 // Validate validates the configuration.
 func (c *Config) Validate() error {
 	if c.Daemon.IdleTimeoutMins < 0 {
@@ -1000,6 +1093,13 @@ func (c *Config) Validate() error {
 		c.History.UpArrowDoubleWindowMs = 1000
 	}
 
+	if c.Workflows.DefaultMode == "" || !isValidWorkflowMode(c.Workflows.DefaultMode) {
+		return fmt.Errorf("workflows.default_mode must be \"interactive\" or \"non-interactive-fail\" (got: %q)", c.Workflows.DefaultMode)
+	}
+	if c.Workflows.RetainRuns <= 0 {
+		return errors.New("invalid retain_runs: must be > 0")
+	}
+
 	return nil
 }
 
@@ -1033,6 +1133,15 @@ func isValidPickerBackend(backend string) bool {
 func isValidUpArrowTrigger(v string) bool {
 	switch v {
 	case "single", "double":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidWorkflowMode(mode string) bool {
+	switch mode {
+	case "interactive", "non-interactive-fail":
 		return true
 	default:
 		return false

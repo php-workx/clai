@@ -189,6 +189,42 @@ func (m *mockStore) Close() error {
 	return nil
 }
 
+func (m *mockStore) CreateWorkflowRun(ctx context.Context, run *storage.WorkflowRun) error {
+	return nil
+}
+
+func (m *mockStore) UpdateWorkflowRun(ctx context.Context, runID string, status string, endedAt int64, durationMs int64) error {
+	return nil
+}
+
+func (m *mockStore) GetWorkflowRun(ctx context.Context, runID string) (*storage.WorkflowRun, error) {
+	return nil, nil
+}
+
+func (m *mockStore) QueryWorkflowRuns(ctx context.Context, q storage.WorkflowRunQuery) ([]storage.WorkflowRun, error) {
+	return nil, nil
+}
+
+func (m *mockStore) CreateWorkflowStep(ctx context.Context, step *storage.WorkflowStep) error {
+	return nil
+}
+
+func (m *mockStore) UpdateWorkflowStep(ctx context.Context, update *storage.WorkflowStepUpdate) error {
+	return nil
+}
+
+func (m *mockStore) GetWorkflowStep(ctx context.Context, runID, stepID, matrixKey string) (*storage.WorkflowStep, error) {
+	return nil, nil
+}
+
+func (m *mockStore) CreateWorkflowAnalysis(ctx context.Context, analysis *storage.WorkflowAnalysis) error {
+	return nil
+}
+
+func (m *mockStore) GetWorkflowAnalyses(ctx context.Context, runID, stepID, matrixKey string) ([]storage.WorkflowAnalysisRecord, error) {
+	return nil, nil
+}
+
 // mockRanker implements suggest.Ranker for testing.
 type mockRanker struct {
 	suggestions []suggest.Suggestion

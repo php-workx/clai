@@ -2,3 +2,4 @@
 {"step":"implement","timestamp":"2026-02-03T13:23:46.353269+01:00","output":"commit:0032045df77e09d16d78a2c63c1f0d6c9bbd4a59","locked":true,"tier":1}
 {"step":"crank","timestamp":"2026-02-03T15:23:40.087438+01:00","output":"epic:ai-terminal-b0k","locked":true}
 {"step":"vibe","timestamp":"2026-02-03T15:23:48.825878+01:00","output":".agents/vibe/2026-02-03-recent.md","locked":true}
+{"step":"vibe","timestamp":"2026-02-11T21:34:00.616302+01:00","output":".agents/vibe/2026-02-11-workflow-tier0.md","locked":true}

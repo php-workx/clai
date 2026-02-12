@@ -32,6 +32,17 @@ type Store interface {
 	HasImportedHistory(ctx context.Context, shell string) (bool, error)
 	ImportHistory(ctx context.Context, entries []history.ImportEntry, shell string) (int, error)
 
+	// Workflow methods
+	CreateWorkflowRun(ctx context.Context, run *WorkflowRun) error
+	UpdateWorkflowRun(ctx context.Context, runID string, status string, endedAt int64, durationMs int64) error
+	GetWorkflowRun(ctx context.Context, runID string) (*WorkflowRun, error)
+	QueryWorkflowRuns(ctx context.Context, q WorkflowRunQuery) ([]WorkflowRun, error)
+	CreateWorkflowStep(ctx context.Context, step *WorkflowStep) error
+	UpdateWorkflowStep(ctx context.Context, update *WorkflowStepUpdate) error
+	GetWorkflowStep(ctx context.Context, runID, stepID, matrixKey string) (*WorkflowStep, error)
+	CreateWorkflowAnalysis(ctx context.Context, analysis *WorkflowAnalysis) error
+	GetWorkflowAnalyses(ctx context.Context, runID, stepID, matrixKey string) ([]WorkflowAnalysisRecord, error)
+
 	// Lifecycle
 	Close() error
 }
@@ -105,4 +116,82 @@ type CacheEntry struct {
 	CreatedAtUnixMs int64
 	ExpiresAtUnixMs int64
 	HitCount        int64
+}
+
+// WorkflowRun represents a workflow execution run.
+type WorkflowRun struct {
+	RunID        string
+	WorkflowName string
+	WorkflowHash string
+	WorkflowPath string
+	Status       string // "running", "passed", "failed", "cancelled"
+	StartedAt    int64  // unix ms
+	EndedAt      int64  // unix ms
+	DurationMs   int64
+}
+
+// WorkflowStep represents a single step within a workflow run.
+type WorkflowStep struct {
+	RunID       string
+	StepID      string
+	MatrixKey   string // Composite key per D16
+	Status      string // "running", "passed", "failed", "skipped"
+	Command     string
+	ExitCode    int
+	DurationMs  int64
+	StdoutTail  string
+	StderrTail  string
+	OutputsJSON string
+}
+
+// WorkflowStepUpdate contains fields for updating a workflow step.
+type WorkflowStepUpdate struct {
+	RunID       string
+	StepID      string
+	MatrixKey   string
+	Status      string
+	Command     string
+	ExitCode    int
+	DurationMs  int64
+	StdoutTail  string
+	StderrTail  string
+	OutputsJSON string
+}
+
+// WorkflowAnalysis represents an AI analysis of a workflow step.
+type WorkflowAnalysis struct {
+	RunID       string
+	StepID      string
+	MatrixKey   string
+	Decision    string // "approve", "reject", "needs_human", "error"
+	Reasoning   string
+	FlagsJSON   string
+	Prompt      string
+	RawResponse string
+	DurationMs  int64
+	AnalyzedAt  int64 // unix ms
+}
+
+// WorkflowAnalysisRecord is a stored analysis record with an auto-generated ID.
+type WorkflowAnalysisRecord struct {
+	ID          int64
+	RunID       string
+	StepID      string
+	MatrixKey   string
+	Decision    string
+	Reasoning   string
+	FlagsJSON   string
+	Prompt      string
+	RawResponse string
+	DurationMs  int64
+	AnalyzedAt  int64
+}
+
+// WorkflowRunQuery defines parameters for querying workflow runs.
+type WorkflowRunQuery struct {
+	RunID        string
+	WorkflowName string
+	Status       string
+	Limit        int
+	Offset       int
 }

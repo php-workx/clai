@@ -31,6 +31,11 @@ import (
 // Version is set at build time
 var Version = "dev"
 
+// LLMQuerier abstracts LLM queries for testability.
+type LLMQuerier interface {
+	Query(ctx context.Context, prompt string) (string, error)
+}
+
 // Server is the main daemon server that handles all gRPC requests.
 type Server struct {
 	pb.UnimplementedClaiServiceServer
@@ -40,6 +45,7 @@ type Server struct {
 	v2db     *suggestdb.DB // V2 suggestions database (optional, enables V2 features)
 	ranker   suggest.Ranker
 	registry *provider.Registry
+	llm      LLMQuerier
 
 	// Server state
 	grpcServer     *grpc.Server
@@ -90,6 +96,9 @@ type ServerConfig struct {
 
 	// Registry is the provider registry (optional, created if nil)
 	Registry *provider.Registry
+
+	// LLM is the LLM querier for workflow analysis (optional).
+	LLM LLMQuerier
 
 	// Paths is the path configuration (optional, uses defaults if nil)
 	Paths *config.Paths
@@ -165,6 +174,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		v2db:              cfg.V2DB,
 		ranker:            ranker,
 		registry:          registry,
+		llm:               cfg.LLM,
 		paths:             paths,
 		logger:            logger,
 		sessionManager:    NewSessionManager(),

@@ -38,6 +38,7 @@ func init() {
 	rootCmd.AddCommand(historyCmd)
 	rootCmd.AddCommand(onCmd)
 	rootCmd.AddCommand(offCmd)
+	rootCmd.AddCommand(workflowCmd)
 
 	// Setup commands
 	rootCmd.AddCommand(statusCmd)

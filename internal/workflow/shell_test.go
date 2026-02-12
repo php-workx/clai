@@ -1,0 +1,188 @@
+package workflow
+
+import (
+	"context"
+	"runtime"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestNewShellAdapter(t *testing.T) {
+	adapter := NewShellAdapter()
+	assert.NotNil(t, adapter)
+}
+
+func assertShellArgs(t *testing.T, cmdArgs []string, script string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		assert.Equal(t, []string{"cmd.exe", "/C", script}, cmdArgs)
+		return
+	}
+	assert.Equal(t, []string{"/bin/sh", "-c", script}, cmdArgs)
+}
+
+func TestBuildCommand_ArgvMode(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "echo hello world",
+		Shell: "false", // explicit argv mode
+	}
+	env := []string{"FOO=bar"}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", env, "/tmp/output.txt")
+	require.NoError(t, err)
+
+	assert.True(t, strings.HasSuffix(cmd.Path, "echo"), "expected path to end with echo, got %q", cmd.Path)
+	assert.Equal(t, []string{"echo", "hello", "world"}, cmd.Args)
+	assert.Equal(t, "/tmp", cmd.Dir)
+}
+
+func TestBuildCommand_ArgvMode_QuotedArgs(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   `pulumi stack ls --json`,
+		Shell: "false",
+	}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"pulumi", "stack", "ls", "--json"}, cmd.Args)
+}
+
+func TestBuildCommand_ArgvMode_QuotedString(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   `myapp --name "hello world"`,
+		Shell: "false",
+	}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"myapp", "--name", "hello world"}, cmd.Args)
+}
+
+func TestBuildCommand_ShellModeTrue(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "echo hello | grep hello",
+		Shell: "true",
+	}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
+	require.NoError(t, err)
+
+	assertShellArgs(t, cmd.Args, "echo hello | grep hello")
+	assert.Equal(t, "/tmp", cmd.Dir)
+}
+
+func TestBuildCommand_ShellModeOmittedDefaultsToShell(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "echo hello | grep hello",
+		Shell: "",
+	}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
+	require.NoError(t, err)
+
+	assertShellArgs(t, cmd.Args, "echo hello | grep hello")
+}
+
+func TestBuildCommand_ExplicitShell(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "echo hello",
+		Shell: "bash",
+	}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"bash", "-c", "echo hello"}, cmd.Args)
+}
+
+func TestBuildCommand_CLAIOutputEnv(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "echo test",
+		Shell: "false",
+	}
+	env := []string{"PATH=/usr/bin"}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", env, "/tmp/step-output.txt")
+	require.NoError(t, err)
+
+	assert.Contains(t, cmd.Env, "PATH=/usr/bin")
+	assert.Contains(t, cmd.Env, "CLAI_OUTPUT=/tmp/step-output.txt")
+}
+
+func TestBuildCommand_EnvMerging(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "myapp",
+		Shell: "false",
+	}
+	env := []string{"FOO=bar", "BAZ=qux", "HOME=/home/test"}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", env, "/tmp/output.txt")
+	require.NoError(t, err)
+
+	assert.Contains(t, cmd.Env, "FOO=bar")
+	assert.Contains(t, cmd.Env, "BAZ=qux")
+	assert.Contains(t, cmd.Env, "HOME=/home/test")
+	assert.Contains(t, cmd.Env, "CLAI_OUTPUT=/tmp/output.txt")
+}
+
+func TestBuildCommand_EmptyRun(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "",
+		Shell: "false",
+	}
+	_, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "empty")
+}
+
+func TestBuildCommand_WorkDir(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "ls",
+		Shell: "false",
+	}
+	cmd, err := adapter.BuildCommand(ctx, step, "/var/data", nil, "/tmp/output.txt")
+	require.NoError(t, err)
+	assert.Equal(t, "/var/data", cmd.Dir)
+}
+
+func TestBuildCommand_NilEnv(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "echo test",
+		Shell: "false",
+	}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
+	require.NoError(t, err)
+
+	// Even with nil env, CLAI_OUTPUT should be set.
+	assert.Contains(t, cmd.Env, "CLAI_OUTPUT=/tmp/output.txt")
+}

@@ -1958,6 +1958,574 @@ func (x *StatusResponse) GetCommandsLogged() int64 {
 	return 0
 }
 
+type WorkflowRunStartRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RunId           string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	WorkflowName    string                 `protobuf:"bytes,2,opt,name=workflow_name,json=workflowName,proto3" json:"workflow_name,omitempty"`
+	WorkflowHash    string                 `protobuf:"bytes,3,opt,name=workflow_hash,json=workflowHash,proto3" json:"workflow_hash,omitempty"` // SHA-256 of YAML content (M12)
+	WorkflowPath    string                 `protobuf:"bytes,4,opt,name=workflow_path,json=workflowPath,proto3" json:"workflow_path,omitempty"`
+	StartedAtUnixMs int64                  `protobuf:"varint,5,opt,name=started_at_unix_ms,json=startedAtUnixMs,proto3" json:"started_at_unix_ms,omitempty"` // Client-provided timestamp (M18)
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *WorkflowRunStartRequest) Reset() {
+	*x = WorkflowRunStartRequest{}
+	mi := &file_clai_v1_clai_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkflowRunStartRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkflowRunStartRequest) ProtoMessage() {}
+
+func (x *WorkflowRunStartRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkflowRunStartRequest.ProtoReflect.Descriptor instead.
+func (*WorkflowRunStartRequest) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *WorkflowRunStartRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *WorkflowRunStartRequest) GetWorkflowName() string {
+	if x != nil {
+		return x.WorkflowName
+	}
+	return ""
+}
+
+func (x *WorkflowRunStartRequest) GetWorkflowHash() string {
+	if x != nil {
+		return x.WorkflowHash
+	}
+	return ""
+}
+
+func (x *WorkflowRunStartRequest) GetWorkflowPath() string {
+	if x != nil {
+		return x.WorkflowPath
+	}
+	return ""
+}
+
+func (x *WorkflowRunStartRequest) GetStartedAtUnixMs() int64 {
+	if x != nil {
+		return x.StartedAtUnixMs
+	}
+	return 0
+}
+
+type WorkflowRunStartResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkflowRunStartResponse) Reset() {
+	*x = WorkflowRunStartResponse{}
+	mi := &file_clai_v1_clai_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkflowRunStartResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkflowRunStartResponse) ProtoMessage() {}
+
+func (x *WorkflowRunStartResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkflowRunStartResponse.ProtoReflect.Descriptor instead.
+func (*WorkflowRunStartResponse) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *WorkflowRunStartResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *WorkflowRunStartResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type WorkflowRunEndRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"` // "passed", "failed", "cancelled"
+	EndedAtUnixMs int64                  `protobuf:"varint,3,opt,name=ended_at_unix_ms,json=endedAtUnixMs,proto3" json:"ended_at_unix_ms,omitempty"`
+	DurationMs    int64                  `protobuf:"varint,4,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkflowRunEndRequest) Reset() {
+	*x = WorkflowRunEndRequest{}
+	mi := &file_clai_v1_clai_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkflowRunEndRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkflowRunEndRequest) ProtoMessage() {}
+
+func (x *WorkflowRunEndRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkflowRunEndRequest.ProtoReflect.Descriptor instead.
+func (*WorkflowRunEndRequest) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *WorkflowRunEndRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *WorkflowRunEndRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *WorkflowRunEndRequest) GetEndedAtUnixMs() int64 {
+	if x != nil {
+		return x.EndedAtUnixMs
+	}
+	return 0
+}
+
+func (x *WorkflowRunEndRequest) GetDurationMs() int64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+type WorkflowRunEndResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkflowRunEndResponse) Reset() {
+	*x = WorkflowRunEndResponse{}
+	mi := &file_clai_v1_clai_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkflowRunEndResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkflowRunEndResponse) ProtoMessage() {}
+
+func (x *WorkflowRunEndResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkflowRunEndResponse.ProtoReflect.Descriptor instead.
+func (*WorkflowRunEndResponse) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *WorkflowRunEndResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *WorkflowRunEndResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type WorkflowStepUpdateRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	StepId        string                 `protobuf:"bytes,2,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
+	MatrixKey     string                 `protobuf:"bytes,3,opt,name=matrix_key,json=matrixKey,proto3" json:"matrix_key,omitempty"` // Composite key per D16
+	Status        string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                        // "running", "passed", "failed", "skipped"
+	Command       string                 `protobuf:"bytes,5,opt,name=command,proto3" json:"command,omitempty"`
+	ExitCode      int32                  `protobuf:"varint,6,opt,name=exit_code,json=exitCode,proto3" json:"exit_code,omitempty"`
+	DurationMs    int64                  `protobuf:"varint,7,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	StdoutTail    string                 `protobuf:"bytes,8,opt,name=stdout_tail,json=stdoutTail,proto3" json:"stdout_tail,omitempty"`     // Last 4KB
+	StderrTail    string                 `protobuf:"bytes,9,opt,name=stderr_tail,json=stderrTail,proto3" json:"stderr_tail,omitempty"`     // Last 4KB
+	OutputsJson   string                 `protobuf:"bytes,10,opt,name=outputs_json,json=outputsJson,proto3" json:"outputs_json,omitempty"` // JSON-encoded step outputs
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkflowStepUpdateRequest) Reset() {
+	*x = WorkflowStepUpdateRequest{}
+	mi := &file_clai_v1_clai_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkflowStepUpdateRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkflowStepUpdateRequest) ProtoMessage() {}
+
+func (x *WorkflowStepUpdateRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkflowStepUpdateRequest.ProtoReflect.Descriptor instead.
+func (*WorkflowStepUpdateRequest) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *WorkflowStepUpdateRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *WorkflowStepUpdateRequest) GetStepId() string {
+	if x != nil {
+		return x.StepId
+	}
+	return ""
+}
+
+func (x *WorkflowStepUpdateRequest) GetMatrixKey() string {
+	if x != nil {
+		return x.MatrixKey
+	}
+	return ""
+}
+
+func (x *WorkflowStepUpdateRequest) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *WorkflowStepUpdateRequest) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *WorkflowStepUpdateRequest) GetExitCode() int32 {
+	if x != nil {
+		return x.ExitCode
+	}
+	return 0
+}
+
+func (x *WorkflowStepUpdateRequest) GetDurationMs() int64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *WorkflowStepUpdateRequest) GetStdoutTail() string {
+	if x != nil {
+		return x.StdoutTail
+	}
+	return ""
+}
+
+func (x *WorkflowStepUpdateRequest) GetStderrTail() string {
+	if x != nil {
+		return x.StderrTail
+	}
+	return ""
+}
+
+func (x *WorkflowStepUpdateRequest) GetOutputsJson() string {
+	if x != nil {
+		return x.OutputsJson
+	}
+	return ""
+}
+
+type WorkflowStepUpdateResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WorkflowStepUpdateResponse) Reset() {
+	*x = WorkflowStepUpdateResponse{}
+	mi := &file_clai_v1_clai_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WorkflowStepUpdateResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WorkflowStepUpdateResponse) ProtoMessage() {}
+
+func (x *WorkflowStepUpdateResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WorkflowStepUpdateResponse.ProtoReflect.Descriptor instead.
+func (*WorkflowStepUpdateResponse) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *WorkflowStepUpdateResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *WorkflowStepUpdateResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type AnalyzeStepOutputRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RunId          string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	StepId         string                 `protobuf:"bytes,2,opt,name=step_id,json=stepId,proto3" json:"step_id,omitempty"`
+	MatrixKey      string                 `protobuf:"bytes,3,opt,name=matrix_key,json=matrixKey,proto3" json:"matrix_key,omitempty"`
+	StepName       string                 `protobuf:"bytes,4,opt,name=step_name,json=stepName,proto3" json:"step_name,omitempty"`
+	RiskLevel      string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`                // "low", "medium", "high"
+	ScrubbedOutput string                 `protobuf:"bytes,6,opt,name=scrubbed_output,json=scrubbedOutput,proto3" json:"scrubbed_output,omitempty"` // ≤100KB scrubbed context (C5)
+	AnalysisPrompt string                 `protobuf:"bytes,7,opt,name=analysis_prompt,json=analysisPrompt,proto3" json:"analysis_prompt,omitempty"` // Optional custom prompt
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *AnalyzeStepOutputRequest) Reset() {
+	*x = AnalyzeStepOutputRequest{}
+	mi := &file_clai_v1_clai_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AnalyzeStepOutputRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AnalyzeStepOutputRequest) ProtoMessage() {}
+
+func (x *AnalyzeStepOutputRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AnalyzeStepOutputRequest.ProtoReflect.Descriptor instead.
+func (*AnalyzeStepOutputRequest) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *AnalyzeStepOutputRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *AnalyzeStepOutputRequest) GetStepId() string {
+	if x != nil {
+		return x.StepId
+	}
+	return ""
+}
+
+func (x *AnalyzeStepOutputRequest) GetMatrixKey() string {
+	if x != nil {
+		return x.MatrixKey
+	}
+	return ""
+}
+
+func (x *AnalyzeStepOutputRequest) GetStepName() string {
+	if x != nil {
+		return x.StepName
+	}
+	return ""
+}
+
+func (x *AnalyzeStepOutputRequest) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *AnalyzeStepOutputRequest) GetScrubbedOutput() string {
+	if x != nil {
+		return x.ScrubbedOutput
+	}
+	return ""
+}
+
+func (x *AnalyzeStepOutputRequest) GetAnalysisPrompt() string {
+	if x != nil {
+		return x.AnalysisPrompt
+	}
+	return ""
+}
+
+type AnalyzeStepOutputResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Decision      string                 `protobuf:"bytes,1,opt,name=decision,proto3" json:"decision,omitempty"` // "approve", "reject", "needs_human", "error"
+	Reasoning     string                 `protobuf:"bytes,2,opt,name=reasoning,proto3" json:"reasoning,omitempty"`
+	FlagsJson     string                 `protobuf:"bytes,3,opt,name=flags_json,json=flagsJson,proto3" json:"flags_json,omitempty"` // JSON-encoded flags
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AnalyzeStepOutputResponse) Reset() {
+	*x = AnalyzeStepOutputResponse{}
+	mi := &file_clai_v1_clai_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AnalyzeStepOutputResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AnalyzeStepOutputResponse) ProtoMessage() {}
+
+func (x *AnalyzeStepOutputResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AnalyzeStepOutputResponse.ProtoReflect.Descriptor instead.
+func (*AnalyzeStepOutputResponse) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *AnalyzeStepOutputResponse) GetDecision() string {
+	if x != nil {
+		return x.Decision
+	}
+	return ""
+}
+
+func (x *AnalyzeStepOutputResponse) GetReasoning() string {
+	if x != nil {
+		return x.Reasoning
+	}
+	return ""
+}
+
+func (x *AnalyzeStepOutputResponse) GetFlagsJson() string {
+	if x != nil {
+		return x.FlagsJson
+	}
+	return ""
+}
+
 var File_clai_v1_clai_proto protoreflect.FileDescriptor
 
 const file_clai_v1_clai_proto_rawDesc = "" +
@@ -2137,14 +2705,67 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12'\n" +
 	"\x0factive_sessions\x18\x02 \x01(\x05R\x0eactiveSessions\x12%\n" +
 	"\x0euptime_seconds\x18\x03 \x01(\x03R\ruptimeSeconds\x12'\n" +
-	"\x0fcommands_logged\x18\x04 \x01(\x03R\x0ecommandsLogged*\x86\x01\n" +
+	"\x0fcommands_logged\x18\x04 \x01(\x03R\x0ecommandsLogged\"\xcc\x01\n" +
+	"\x17WorkflowRunStartRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12#\n" +
+	"\rworkflow_name\x18\x02 \x01(\tR\fworkflowName\x12#\n" +
+	"\rworkflow_hash\x18\x03 \x01(\tR\fworkflowHash\x12#\n" +
+	"\rworkflow_path\x18\x04 \x01(\tR\fworkflowPath\x12+\n" +
+	"\x12started_at_unix_ms\x18\x05 \x01(\x03R\x0fstartedAtUnixMs\"@\n" +
+	"\x18WorkflowRunStartResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\x90\x01\n" +
+	"\x15WorkflowRunEndRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12'\n" +
+	"\x10ended_at_unix_ms\x18\x03 \x01(\x03R\rendedAtUnixMs\x12\x1f\n" +
+	"\vduration_ms\x18\x04 \x01(\x03R\n" +
+	"durationMs\">\n" +
+	"\x16WorkflowRunEndResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\xbf\x02\n" +
+	"\x19WorkflowStepUpdateRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x17\n" +
+	"\astep_id\x18\x02 \x01(\tR\x06stepId\x12\x1d\n" +
+	"\n" +
+	"matrix_key\x18\x03 \x01(\tR\tmatrixKey\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12\x18\n" +
+	"\acommand\x18\x05 \x01(\tR\acommand\x12\x1b\n" +
+	"\texit_code\x18\x06 \x01(\x05R\bexitCode\x12\x1f\n" +
+	"\vduration_ms\x18\a \x01(\x03R\n" +
+	"durationMs\x12\x1f\n" +
+	"\vstdout_tail\x18\b \x01(\tR\n" +
+	"stdoutTail\x12\x1f\n" +
+	"\vstderr_tail\x18\t \x01(\tR\n" +
+	"stderrTail\x12!\n" +
+	"\foutputs_json\x18\n" +
+	" \x01(\tR\voutputsJson\"B\n" +
+	"\x1aWorkflowStepUpdateResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\xf7\x01\n" +
+	"\x18AnalyzeStepOutputRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12\x17\n" +
+	"\astep_id\x18\x02 \x01(\tR\x06stepId\x12\x1d\n" +
+	"\n" +
+	"matrix_key\x18\x03 \x01(\tR\tmatrixKey\x12\x1b\n" +
+	"\tstep_name\x18\x04 \x01(\tR\bstepName\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\x05 \x01(\tR\triskLevel\x12'\n" +
+	"\x0fscrubbed_output\x18\x06 \x01(\tR\x0escrubbedOutput\x12'\n" +
+	"\x0fanalysis_prompt\x18\a \x01(\tR\x0eanalysisPrompt\"t\n" +
+	"\x19AnalyzeStepOutputResponse\x12\x1a\n" +
+	"\bdecision\x18\x01 \x01(\tR\bdecision\x12\x1c\n" +
+	"\treasoning\x18\x02 \x01(\tR\treasoning\x12\x1d\n" +
+	"\n" +
+	"flags_json\x18\x03 \x01(\tR\tflagsJson*\x86\x01\n" +
 	"\n" +
 	"SearchMode\x12\x1b\n" +
 	"\x17SEARCH_MODE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSEARCH_MODE_FTS\x10\x01\x12\x16\n" +
 	"\x12SEARCH_MODE_PREFIX\x10\x02\x12\x18\n" +
 	"\x14SEARCH_MODE_DESCRIBE\x10\x03\x12\x14\n" +
-	"\x10SEARCH_MODE_AUTO\x10\x042\xa5\a\n" +
+	"\x10SEARCH_MODE_AUTO\x10\x042\x8c\n" +
+	"\n" +
 	"\vClaiService\x12:\n" +
 	"\fSessionStart\x12\x1c.clai.v1.SessionStartRequest\x1a\f.clai.v1.Ack\x126\n" +
 	"\n" +
@@ -2160,7 +2781,11 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\fFetchHistory\x12\x1c.clai.v1.HistoryFetchRequest\x1a\x1d.clai.v1.HistoryFetchResponse\x12N\n" +
 	"\rImportHistory\x12\x1d.clai.v1.HistoryImportRequest\x1a\x1e.clai.v1.HistoryImportResponse\x12\"\n" +
 	"\x04Ping\x12\f.clai.v1.Ack\x1a\f.clai.v1.Ack\x122\n" +
-	"\tGetStatus\x12\f.clai.v1.Ack\x1a\x17.clai.v1.StatusResponseB+Z)github.com/runger/clai/gen/clai/v1;claiv1b\x06proto3"
+	"\tGetStatus\x12\f.clai.v1.Ack\x1a\x17.clai.v1.StatusResponse\x12W\n" +
+	"\x10WorkflowRunStart\x12 .clai.v1.WorkflowRunStartRequest\x1a!.clai.v1.WorkflowRunStartResponse\x12Q\n" +
+	"\x0eWorkflowRunEnd\x12\x1e.clai.v1.WorkflowRunEndRequest\x1a\x1f.clai.v1.WorkflowRunEndResponse\x12]\n" +
+	"\x12WorkflowStepUpdate\x12\".clai.v1.WorkflowStepUpdateRequest\x1a#.clai.v1.WorkflowStepUpdateResponse\x12Z\n" +
+	"\x11AnalyzeStepOutput\x12!.clai.v1.AnalyzeStepOutputRequest\x1a\".clai.v1.AnalyzeStepOutputResponseB+Z)github.com/runger/clai/gen/clai/v1;claiv1b\x06proto3"
 
 var (
 	file_clai_v1_clai_proto_rawDescOnce sync.Once
@@ -2175,35 +2800,43 @@ func file_clai_v1_clai_proto_rawDescGZIP() []byte {
 }
 
 var file_clai_v1_clai_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_clai_v1_clai_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
+var file_clai_v1_clai_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_clai_v1_clai_proto_goTypes = []any{
-	(SearchMode)(0),                // 0: clai.v1.SearchMode
-	(*ClientInfo)(nil),             // 1: clai.v1.ClientInfo
-	(*Ack)(nil),                    // 2: clai.v1.Ack
-	(*ApiError)(nil),               // 3: clai.v1.ApiError
-	(*SessionStartRequest)(nil),    // 4: clai.v1.SessionStartRequest
-	(*SessionEndRequest)(nil),      // 5: clai.v1.SessionEndRequest
-	(*CommandStartRequest)(nil),    // 6: clai.v1.CommandStartRequest
-	(*CommandEndRequest)(nil),      // 7: clai.v1.CommandEndRequest
-	(*SuggestRequest)(nil),         // 8: clai.v1.SuggestRequest
-	(*Suggestion)(nil),             // 9: clai.v1.Suggestion
-	(*SuggestionReason)(nil),       // 10: clai.v1.SuggestionReason
-	(*TimingHint)(nil),             // 11: clai.v1.TimingHint
-	(*SuggestResponse)(nil),        // 12: clai.v1.SuggestResponse
-	(*RecordFeedbackRequest)(nil),  // 13: clai.v1.RecordFeedbackRequest
-	(*RecordFeedbackResponse)(nil), // 14: clai.v1.RecordFeedbackResponse
-	(*TextToCommandRequest)(nil),   // 15: clai.v1.TextToCommandRequest
-	(*TextToCommandResponse)(nil),  // 16: clai.v1.TextToCommandResponse
-	(*NextStepRequest)(nil),        // 17: clai.v1.NextStepRequest
-	(*NextStepResponse)(nil),       // 18: clai.v1.NextStepResponse
-	(*DiagnoseRequest)(nil),        // 19: clai.v1.DiagnoseRequest
-	(*DiagnoseResponse)(nil),       // 20: clai.v1.DiagnoseResponse
-	(*HistoryFetchRequest)(nil),    // 21: clai.v1.HistoryFetchRequest
-	(*HistoryFetchResponse)(nil),   // 22: clai.v1.HistoryFetchResponse
-	(*HistoryItem)(nil),            // 23: clai.v1.HistoryItem
-	(*HistoryImportRequest)(nil),   // 24: clai.v1.HistoryImportRequest
-	(*HistoryImportResponse)(nil),  // 25: clai.v1.HistoryImportResponse
-	(*StatusResponse)(nil),         // 26: clai.v1.StatusResponse
+	(SearchMode)(0),                    // 0: clai.v1.SearchMode
+	(*ClientInfo)(nil),                 // 1: clai.v1.ClientInfo
+	(*Ack)(nil),                        // 2: clai.v1.Ack
+	(*ApiError)(nil),                   // 3: clai.v1.ApiError
+	(*SessionStartRequest)(nil),        // 4: clai.v1.SessionStartRequest
+	(*SessionEndRequest)(nil),          // 5: clai.v1.SessionEndRequest
+	(*CommandStartRequest)(nil),        // 6: clai.v1.CommandStartRequest
+	(*CommandEndRequest)(nil),          // 7: clai.v1.CommandEndRequest
+	(*SuggestRequest)(nil),             // 8: clai.v1.SuggestRequest
+	(*Suggestion)(nil),                 // 9: clai.v1.Suggestion
+	(*SuggestionReason)(nil),           // 10: clai.v1.SuggestionReason
+	(*TimingHint)(nil),                 // 11: clai.v1.TimingHint
+	(*SuggestResponse)(nil),            // 12: clai.v1.SuggestResponse
+	(*RecordFeedbackRequest)(nil),      // 13: clai.v1.RecordFeedbackRequest
+	(*RecordFeedbackResponse)(nil),     // 14: clai.v1.RecordFeedbackResponse
+	(*TextToCommandRequest)(nil),       // 15: clai.v1.TextToCommandRequest
+	(*TextToCommandResponse)(nil),      // 16: clai.v1.TextToCommandResponse
+	(*NextStepRequest)(nil),            // 17: clai.v1.NextStepRequest
+	(*NextStepResponse)(nil),           // 18: clai.v1.NextStepResponse
+	(*DiagnoseRequest)(nil),            // 19: clai.v1.DiagnoseRequest
+	(*DiagnoseResponse)(nil),           // 20: clai.v1.DiagnoseResponse
+	(*HistoryFetchRequest)(nil),        // 21: clai.v1.HistoryFetchRequest
+	(*HistoryFetchResponse)(nil),       // 22: clai.v1.HistoryFetchResponse
+	(*HistoryItem)(nil),                // 23: clai.v1.HistoryItem
+	(*HistoryImportRequest)(nil),       // 24: clai.v1.HistoryImportRequest
+	(*HistoryImportResponse)(nil),      // 25: clai.v1.HistoryImportResponse
+	(*StatusResponse)(nil),             // 26: clai.v1.StatusResponse
+	(*WorkflowRunStartRequest)(nil),    // 27: clai.v1.WorkflowRunStartRequest
+	(*WorkflowRunStartResponse)(nil),   // 28: clai.v1.WorkflowRunStartResponse
+	(*WorkflowRunEndRequest)(nil),      // 29: clai.v1.WorkflowRunEndRequest
+	(*WorkflowRunEndResponse)(nil),     // 30: clai.v1.WorkflowRunEndResponse
+	(*WorkflowStepUpdateRequest)(nil),  // 31: clai.v1.WorkflowStepUpdateRequest
+	(*WorkflowStepUpdateResponse)(nil), // 32: clai.v1.WorkflowStepUpdateResponse
+	(*AnalyzeStepOutputRequest)(nil),   // 33: clai.v1.AnalyzeStepOutputRequest
+	(*AnalyzeStepOutputResponse)(nil),  // 34: clai.v1.AnalyzeStepOutputResponse
 }
 var file_clai_v1_clai_proto_depIdxs = []int32{
 	1,  // 0: clai.v1.SessionStartRequest.client:type_name -> clai.v1.ClientInfo
@@ -2230,22 +2863,30 @@ var file_clai_v1_clai_proto_depIdxs = []int32{
 	24, // 21: clai.v1.ClaiService.ImportHistory:input_type -> clai.v1.HistoryImportRequest
 	2,  // 22: clai.v1.ClaiService.Ping:input_type -> clai.v1.Ack
 	2,  // 23: clai.v1.ClaiService.GetStatus:input_type -> clai.v1.Ack
-	2,  // 24: clai.v1.ClaiService.SessionStart:output_type -> clai.v1.Ack
-	2,  // 25: clai.v1.ClaiService.SessionEnd:output_type -> clai.v1.Ack
-	2,  // 26: clai.v1.ClaiService.CommandStarted:output_type -> clai.v1.Ack
-	2,  // 27: clai.v1.ClaiService.CommandEnded:output_type -> clai.v1.Ack
-	12, // 28: clai.v1.ClaiService.Suggest:output_type -> clai.v1.SuggestResponse
-	16, // 29: clai.v1.ClaiService.TextToCommand:output_type -> clai.v1.TextToCommandResponse
-	18, // 30: clai.v1.ClaiService.NextStep:output_type -> clai.v1.NextStepResponse
-	20, // 31: clai.v1.ClaiService.Diagnose:output_type -> clai.v1.DiagnoseResponse
-	14, // 32: clai.v1.ClaiService.RecordFeedback:output_type -> clai.v1.RecordFeedbackResponse
-	14, // 33: clai.v1.ClaiService.SuggestFeedback:output_type -> clai.v1.RecordFeedbackResponse
-	22, // 34: clai.v1.ClaiService.FetchHistory:output_type -> clai.v1.HistoryFetchResponse
-	25, // 35: clai.v1.ClaiService.ImportHistory:output_type -> clai.v1.HistoryImportResponse
-	2,  // 36: clai.v1.ClaiService.Ping:output_type -> clai.v1.Ack
-	26, // 37: clai.v1.ClaiService.GetStatus:output_type -> clai.v1.StatusResponse
-	24, // [24:38] is the sub-list for method output_type
-	10, // [10:24] is the sub-list for method input_type
+	27, // 24: clai.v1.ClaiService.WorkflowRunStart:input_type -> clai.v1.WorkflowRunStartRequest
+	29, // 25: clai.v1.ClaiService.WorkflowRunEnd:input_type -> clai.v1.WorkflowRunEndRequest
+	31, // 26: clai.v1.ClaiService.WorkflowStepUpdate:input_type -> clai.v1.WorkflowStepUpdateRequest
+	33, // 27: clai.v1.ClaiService.AnalyzeStepOutput:input_type -> clai.v1.AnalyzeStepOutputRequest
+	2,  // 28: clai.v1.ClaiService.SessionStart:output_type -> clai.v1.Ack
+	2,  // 29: clai.v1.ClaiService.SessionEnd:output_type -> clai.v1.Ack
+	2,  // 30: clai.v1.ClaiService.CommandStarted:output_type -> clai.v1.Ack
+	2,  // 31: clai.v1.ClaiService.CommandEnded:output_type -> clai.v1.Ack
+	12, // 32: clai.v1.ClaiService.Suggest:output_type -> clai.v1.SuggestResponse
+	16, // 33: clai.v1.ClaiService.TextToCommand:output_type -> clai.v1.TextToCommandResponse
+	18, // 34: clai.v1.ClaiService.NextStep:output_type -> clai.v1.NextStepResponse
+	20, // 35: clai.v1.ClaiService.Diagnose:output_type -> clai.v1.DiagnoseResponse
+	14, // 36: clai.v1.ClaiService.RecordFeedback:output_type -> clai.v1.RecordFeedbackResponse
+	14, // 37: clai.v1.ClaiService.SuggestFeedback:output_type -> clai.v1.RecordFeedbackResponse
+	22, // 38: clai.v1.ClaiService.FetchHistory:output_type -> clai.v1.HistoryFetchResponse
+	25, // 39: clai.v1.ClaiService.ImportHistory:output_type -> clai.v1.HistoryImportResponse
+	2,  // 40: clai.v1.ClaiService.Ping:output_type -> clai.v1.Ack
+	26, // 41: clai.v1.ClaiService.GetStatus:output_type -> clai.v1.StatusResponse
+	28, // 42: clai.v1.ClaiService.WorkflowRunStart:output_type -> clai.v1.WorkflowRunStartResponse
+	30, // 43: clai.v1.ClaiService.WorkflowRunEnd:output_type -> clai.v1.WorkflowRunEndResponse
+	32, // 44: clai.v1.ClaiService.WorkflowStepUpdate:output_type -> clai.v1.WorkflowStepUpdateResponse
+	34, // 45: clai.v1.ClaiService.AnalyzeStepOutput:output_type -> clai.v1.AnalyzeStepOutputResponse
+	28, // [28:46] is the sub-list for method output_type
+	10, // [10:28] is the sub-list for method input_type
 	10, // [10:10] is the sub-list for extension type_name
 	10, // [10:10] is the sub-list for extension extendee
 	0,  // [0:10] is the sub-list for field type_name
@@ -2262,7 +2903,7 @@ func file_clai_v1_clai_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_clai_v1_clai_proto_rawDesc), len(file_clai_v1_clai_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   26,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -844,6 +845,16 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		Privacy: PrivacyConfig{
 			SanitizeAICalls: false,
 		},
+		Workflows: WorkflowsConfig{
+			Enabled:           true,
+			DefaultMode:       "interactive",
+			DefaultShell:      "bash",
+			LogDir:            "/custom/workflows/logs",
+			SearchPaths:       []string{"./.clai/workflows", "./.github/workflows"},
+			RetainRuns:        50,
+			StrictPermissions: true,
+			SecretFile:        "/custom/workflows/.secrets",
+		},
 		History: HistoryConfig{
 			PickerBackend:         "fzf",
 			PickerOpenOnEmpty:     true,
@@ -947,6 +958,33 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	}
 	if loaded.History.UpArrowDoubleWindowMs != 300 {
 		t.Errorf("History.UpArrowDoubleWindowMs: got %d, want 300", loaded.History.UpArrowDoubleWindowMs)
+	}
+
+	// Verify Workflows values
+	if loaded.Workflows.Enabled != true {
+		t.Errorf("Workflows.Enabled: got %v, want true", loaded.Workflows.Enabled)
+	}
+	if loaded.Workflows.DefaultMode != "interactive" {
+		t.Errorf("Workflows.DefaultMode: got %s, want interactive", loaded.Workflows.DefaultMode)
+	}
+	if loaded.Workflows.DefaultShell != "bash" {
+		t.Errorf("Workflows.DefaultShell: got %s, want bash", loaded.Workflows.DefaultShell)
+	}
+	if loaded.Workflows.LogDir != "/custom/workflows/logs" {
+		t.Errorf("Workflows.LogDir: got %s, want /custom/workflows/logs", loaded.Workflows.LogDir)
+	}
+	if loaded.Workflows.RetainRuns != 50 {
+		t.Errorf("Workflows.RetainRuns: got %d, want 50", loaded.Workflows.RetainRuns)
+	}
+	if loaded.Workflows.StrictPermissions != true {
+		t.Errorf("Workflows.StrictPermissions: got %v, want true", loaded.Workflows.StrictPermissions)
+	}
+	if loaded.Workflows.SecretFile != "/custom/workflows/.secrets" {
+		t.Errorf("Workflows.SecretFile: got %s, want /custom/workflows/.secrets", loaded.Workflows.SecretFile)
+	}
+	wantSearchPaths := []string{"./.clai/workflows", "./.github/workflows"}
+	if !reflect.DeepEqual(loaded.Workflows.SearchPaths, wantSearchPaths) {
+		t.Errorf("Workflows.SearchPaths: got %v, want %v", loaded.Workflows.SearchPaths, wantSearchPaths)
 	}
 }
 
