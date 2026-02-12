@@ -28,6 +28,11 @@ const (
 	EventRunEnd        = "run_end"
 )
 
+// NormalizePath applies D19 path normalization (forward slashes on all platforms).
+func NormalizePath(p string) string {
+	return filepath.ToSlash(p)
+}
+
 // RunStartData is the payload for run_start events.
 type RunStartData struct {
 	RunID        string `json:"run_id"`
@@ -134,6 +139,41 @@ func (a *RunArtifact) WriteEvent(eventType string, data interface{}) {
 
 	if _, err := a.file.Write(line); err != nil {
 		slog.Warn("artifact: write event", "error", err, "type", eventType)
+	}
+}
+
+// WriteStepLog writes per-step stdout and stderr to individual log files
+// in a steps/ subdirectory under the run's log directory.
+// Files are named <sanitized-step-id>.stdout and <sanitized-step-id>.stderr.
+// Errors are logged but do NOT halt execution.
+func (a *RunArtifact) WriteStepLog(stepID, stdout, stderr string) {
+	if stdout == "" && stderr == "" {
+		return
+	}
+
+	stepsDir := filepath.Join(a.logDir, sanitizePathComponent(a.runID)+"-steps")
+	if err := os.MkdirAll(stepsDir, 0755); err != nil {
+		slog.Warn("artifact: create steps dir", "error", err)
+		return
+	}
+
+	safeID := sanitizePathComponent(stepID)
+	if safeID == "" {
+		safeID = "unnamed"
+	}
+
+	if stdout != "" {
+		stdoutPath := filepath.Join(stepsDir, safeID+".stdout")
+		if err := os.WriteFile(stdoutPath, []byte(stdout), 0644); err != nil {
+			slog.Warn("artifact: write step stdout", "error", err, "step", stepID)
+		}
+	}
+
+	if stderr != "" {
+		stderrPath := filepath.Join(stepsDir, safeID+".stderr")
+		if err := os.WriteFile(stderrPath, []byte(stderr), 0644); err != nil {
+			slog.Warn("artifact: write step stderr", "error", err, "step", stepID)
+		}
 	}
 }
 

@@ -42,6 +42,10 @@ type RunnerConfig struct {
 	MatrixVars map[string]string // matrix combination
 	Secrets    []SecretDef
 	BufferSize int // 0 = DefaultBufferSize
+
+	// Optional DI overrides. If nil, platform defaults are used.
+	Shell   ShellAdapter      // custom shell adapter
+	Process ProcessController // custom process controller
 }
 
 // Runner executes a job's steps sequentially.
@@ -53,6 +57,7 @@ type Runner struct {
 }
 
 // NewRunner creates a runner with the given config.
+// If cfg.Shell or cfg.Process are nil, platform defaults are used.
 func NewRunner(cfg RunnerConfig) *Runner {
 	bufSize := cfg.BufferSize
 	if bufSize <= 0 {
@@ -60,9 +65,18 @@ func NewRunner(cfg RunnerConfig) *Runner {
 	}
 	cfg.BufferSize = bufSize
 
+	shell := cfg.Shell
+	if shell == nil {
+		shell = NewShellAdapter()
+	}
+	process := cfg.Process
+	if process == nil {
+		process = NewProcessController()
+	}
+
 	return &Runner{
-		shell:   NewShellAdapter(),
-		process: NewProcessController(),
+		shell:   shell,
+		process: process,
 		masker:  NewSecretMasker(cfg.Secrets),
 		config:  cfg,
 	}

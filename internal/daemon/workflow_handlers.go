@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -53,7 +54,7 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 
 	// Check if the step already exists
 	existing, err := s.store.GetWorkflowStep(ctx, req.RunId, req.StepId, req.MatrixKey)
-	if err != nil {
+	if err != nil && !errors.Is(err, storage.ErrWorkflowStepNotFound) {
 		s.logger.Warn("failed to get workflow step",
 			"run_id", req.RunId,
 			"step_id", req.StepId,
@@ -62,7 +63,7 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 		return &pb.WorkflowStepUpdateResponse{Ok: false, Error: err.Error()}, nil
 	}
 
-	if existing == nil {
+	if existing == nil || errors.Is(err, storage.ErrWorkflowStepNotFound) {
 		// Create new step
 		step := &storage.WorkflowStep{
 			RunID:       req.RunId,
@@ -248,7 +249,7 @@ func buildAnalysisPrompt(req *pb.AnalyzeStepOutputRequest) string {
 	b.WriteString(fmt.Sprintf("Risk Level: %s\n", req.RiskLevel))
 	b.WriteString(fmt.Sprintf("Output:\n%s\n\n", req.ScrubbedOutput))
 	b.WriteString("Respond with a JSON object containing:\n")
-	b.WriteString(`- "decision": one of "approve", "reject", "needs_human"` + "\n")
+	b.WriteString(`- "decision": one of "proceed", "halt", "needs_human"` + "\n")
 	b.WriteString(`- "reasoning": brief explanation of your decision` + "\n")
 	b.WriteString(`- "flags": array of flag strings (e.g. ["flaky_test", "timeout"])` + "\n")
 	return b.String()

@@ -128,7 +128,7 @@ func TestParseAnalysisResponse_ValidJSON(t *testing.T) {
 	result := ParseAnalysisResponse(raw)
 
 	require.NotNil(t, result)
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision) // approve normalized to proceed
 	assert.Equal(t, "All tests passed", result.Reasoning)
 	assert.Equal(t, "95%", result.Flags["coverage"])
 }
@@ -138,7 +138,7 @@ func TestParseAnalysisResponse_ValidJSON_Reject(t *testing.T) {
 	result := ParseAnalysisResponse(raw)
 
 	require.NotNil(t, result)
-	assert.Equal(t, "reject", result.Decision)
+	assert.Equal(t, "halt", result.Decision) // reject normalized to halt
 	assert.Equal(t, "Build failed", result.Reasoning)
 }
 
@@ -155,7 +155,7 @@ func TestParseAnalysisResponse_JSONWithSurroundingText(t *testing.T) {
 	result := ParseAnalysisResponse(raw)
 
 	require.NotNil(t, result)
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision) // approve normalized to proceed
 }
 
 func TestParseAnalysisResponse_JSONInCodeBlock(t *testing.T) {
@@ -163,7 +163,7 @@ func TestParseAnalysisResponse_JSONInCodeBlock(t *testing.T) {
 	result := ParseAnalysisResponse(raw)
 
 	require.NotNil(t, result)
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision) // approve normalized to proceed
 	assert.Equal(t, "all clear", result.Reasoning)
 }
 
@@ -172,7 +172,7 @@ func TestParseAnalysisResponse_PlainTextDecision(t *testing.T) {
 	result := ParseAnalysisResponse(raw)
 
 	require.NotNil(t, result)
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision) // approve normalized to proceed
 }
 
 func TestParseAnalysisResponse_PlainTextDecisionReject(t *testing.T) {
@@ -180,7 +180,7 @@ func TestParseAnalysisResponse_PlainTextDecisionReject(t *testing.T) {
 	result := ParseAnalysisResponse(raw)
 
 	require.NotNil(t, result)
-	assert.Equal(t, "reject", result.Decision)
+	assert.Equal(t, "halt", result.Decision) // reject normalized to halt
 }
 
 func TestParseAnalysisResponse_GarbageInput(t *testing.T) {
@@ -214,7 +214,7 @@ func TestParseAnalysisResponse_CaseInsensitive(t *testing.T) {
 	result := ParseAnalysisResponse(raw)
 
 	require.NotNil(t, result)
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision) // APPROVE normalized to proceed
 }
 
 func TestParseAnalysisResponse_ErrorDecision(t *testing.T) {
@@ -225,28 +225,28 @@ func TestParseAnalysisResponse_ErrorDecision(t *testing.T) {
 	assert.Equal(t, "error", result.Decision)
 }
 
-func TestShouldPromptHuman_ApproveLow(t *testing.T) {
-	assert.False(t, ShouldPromptHuman("approve", "low"))
+func TestShouldPromptHuman_ProceedLow(t *testing.T) {
+	assert.False(t, ShouldPromptHuman("proceed", "low"))
 }
 
-func TestShouldPromptHuman_ApproveMedium(t *testing.T) {
-	assert.False(t, ShouldPromptHuman("approve", "medium"))
+func TestShouldPromptHuman_ProceedMedium(t *testing.T) {
+	assert.False(t, ShouldPromptHuman("proceed", "medium"))
 }
 
-func TestShouldPromptHuman_ApproveHigh(t *testing.T) {
-	assert.True(t, ShouldPromptHuman("approve", "high"))
+func TestShouldPromptHuman_ProceedHigh(t *testing.T) {
+	assert.True(t, ShouldPromptHuman("proceed", "high"))
 }
 
-func TestShouldPromptHuman_RejectLow(t *testing.T) {
-	assert.True(t, ShouldPromptHuman("reject", "low"))
+func TestShouldPromptHuman_HaltLow(t *testing.T) {
+	assert.True(t, ShouldPromptHuman("halt", "low"))
 }
 
-func TestShouldPromptHuman_RejectMedium(t *testing.T) {
-	assert.True(t, ShouldPromptHuman("reject", "medium"))
+func TestShouldPromptHuman_HaltMedium(t *testing.T) {
+	assert.True(t, ShouldPromptHuman("halt", "medium"))
 }
 
-func TestShouldPromptHuman_RejectHigh(t *testing.T) {
-	assert.True(t, ShouldPromptHuman("reject", "high"))
+func TestShouldPromptHuman_HaltHigh(t *testing.T) {
+	assert.True(t, ShouldPromptHuman("halt", "high"))
 }
 
 func TestShouldPromptHuman_NeedsHumanLow(t *testing.T) {
@@ -279,8 +279,8 @@ func TestShouldPromptHuman_UnknownDecision(t *testing.T) {
 
 func TestShouldPromptHuman_DefaultRiskLevel(t *testing.T) {
 	// Empty risk level defaults to "medium".
-	assert.False(t, ShouldPromptHuman("approve", ""))
-	assert.True(t, ShouldPromptHuman("reject", ""))
+	assert.False(t, ShouldPromptHuman("proceed", ""))
+	assert.True(t, ShouldPromptHuman("halt", ""))
 }
 
 func TestRuneSliceBytes_NoTruncation(t *testing.T) {

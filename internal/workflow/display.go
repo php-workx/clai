@@ -51,10 +51,14 @@ func NewDisplay(writer io.Writer, mode DisplayMode) *Display {
 	}
 }
 
-// DetectMode returns DisplayTTY if stdout is a TTY and TERM != "dumb",
-// otherwise DisplayPlain.
+// DetectMode returns DisplayTTY if stdout is a TTY, TERM != "dumb",
+// and NO_COLOR is not set (SS11.5); otherwise DisplayPlain.
 func DetectMode() DisplayMode {
 	if os.Getenv("TERM") == "dumb" {
+		return DisplayPlain
+	}
+	// SS11.5: Respect NO_COLOR (https://no-color.org/).
+	if _, ok := os.LookupEnv("NO_COLOR"); ok {
 		return DisplayPlain
 	}
 	fi, err := os.Stdout.Stat()
@@ -199,12 +203,12 @@ func formatSummary(passed, failed, skipped int) string {
 
 // iconForDecision returns the appropriate icon for an analysis decision.
 func iconForDecision(decision string) string {
-	switch decision {
-	case "approve":
+	switch Decision(decision) {
+	case DecisionProceed:
 		return iconPassed
-	case "reject":
+	case DecisionHalt:
 		return iconFailed
-	case "needs_human":
+	case DecisionNeedsHuman:
 		return iconPending
 	default:
 		return iconPending

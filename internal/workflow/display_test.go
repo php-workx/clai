@@ -90,26 +90,26 @@ func TestDisplay_TTY_AnalysisStart(t *testing.T) {
 	assert.Contains(t, out, "Analyzing: build")
 }
 
-func TestDisplay_TTY_AnalysisEnd_Approve(t *testing.T) {
+func TestDisplay_TTY_AnalysisEnd_Proceed(t *testing.T) {
 	var buf bytes.Buffer
 	d := NewDisplay(&buf, DisplayTTY)
 
-	d.AnalysisEnd("build", "approve")
+	d.AnalysisEnd("build", "proceed")
 
 	out := buf.String()
-	assert.Contains(t, out, "\u2713") // ✓ approved
-	assert.Contains(t, out, "Analysis: build -> approve")
+	assert.Contains(t, out, "\u2713") // ✓ proceed
+	assert.Contains(t, out, "Analysis: build -> proceed")
 }
 
-func TestDisplay_TTY_AnalysisEnd_Reject(t *testing.T) {
+func TestDisplay_TTY_AnalysisEnd_Halt(t *testing.T) {
 	var buf bytes.Buffer
 	d := NewDisplay(&buf, DisplayTTY)
 
-	d.AnalysisEnd("build", "reject")
+	d.AnalysisEnd("build", "halt")
 
 	out := buf.String()
-	assert.Contains(t, out, "\u2717") // ✗ rejected
-	assert.Contains(t, out, "Analysis: build -> reject")
+	assert.Contains(t, out, "\u2717") // ✗ halt
+	assert.Contains(t, out, "Analysis: build -> halt")
 }
 
 func TestDisplay_TTY_ReviewPrompt(t *testing.T) {
@@ -369,8 +369,8 @@ func TestCountStatuses(t *testing.T) {
 }
 
 func TestIconForDecision(t *testing.T) {
-	assert.Equal(t, iconPassed, iconForDecision("approve"))
-	assert.Equal(t, iconFailed, iconForDecision("reject"))
+	assert.Equal(t, iconPassed, iconForDecision("proceed"))
+	assert.Equal(t, iconFailed, iconForDecision("halt"))
 	assert.Equal(t, iconPending, iconForDecision("needs_human"))
 	assert.Equal(t, iconPending, iconForDecision("unknown"))
 }

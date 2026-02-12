@@ -6,6 +6,58 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// StepStatus represents the status of a step execution.
+type StepStatus string
+
+// Step status constants.
+const (
+	StepPassed  StepStatus = "passed"
+	StepFailed  StepStatus = "failed"
+	StepSkipped StepStatus = "skipped"
+)
+
+// RunStatus represents the overall status of a workflow run.
+type RunStatus string
+
+// Run status constants.
+const (
+	RunPassed RunStatus = "passed"
+	RunFailed RunStatus = "failed"
+)
+
+// Decision represents an LLM analysis decision (spec SS10.3).
+type Decision string
+
+// Decision constants aligned with spec (proceed/halt/needs_human).
+const (
+	DecisionProceed    Decision = "proceed"
+	DecisionHalt       Decision = "halt"
+	DecisionNeedsHuman Decision = "needs_human"
+	DecisionError      Decision = "error"
+)
+
+// RiskLevel represents the risk level of a step.
+type RiskLevel string
+
+// Risk level constants.
+const (
+	RiskLow    RiskLevel = "low"
+	RiskMedium RiskLevel = "medium"
+	RiskHigh   RiskLevel = "high"
+)
+
+// ReviewAction represents a human review action.
+type ReviewAction string
+
+// Review action constants.
+const (
+	ActionApprove  ReviewAction = "approve"
+	ActionReject   ReviewAction = "reject"
+	ActionInspect  ReviewAction = "inspect"
+	ActionCommand  ReviewAction = "command"
+	ActionQuestion ReviewAction = "question"
+)
+
 // WorkflowDef is the top-level workflow file.
 type WorkflowDef struct {
 	Name     string             `yaml:"name"`
@@ -64,10 +116,17 @@ type StepDef struct {
 // knownStepFields is the set of YAML keys accepted in a step mapping.
 // Used for unknown field detection since KnownFields(true) does not
 // propagate into custom UnmarshalYAML implementations (risk M5/m16).
+// Includes Tier 1 fields that are ignored but not rejected, so that
+// valid YAML with future fields doesn't produce parse errors.
 var knownStepFields = map[string]bool{
+	// Tier 0 fields.
 	"id": true, "name": true, "run": true, "env": true,
 	"shell": true, "analyze": true, "analysis_prompt": true,
 	"risk_level": true,
+	// Tier 1 fields (ignored but tolerated).
+	"if": true, "timeout_minutes": true, "retry": true,
+	"continue_on_error": true, "working_directory": true,
+	"outputs": true,
 }
 
 // stepFields is used for decoding all StepDef fields including Shell.

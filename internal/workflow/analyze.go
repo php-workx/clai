@@ -12,7 +12,7 @@ const DefaultMaxBytes = 100 * 1024
 
 // AnalysisResult holds the parsed LLM analysis.
 type AnalysisResult struct {
-	Decision  string            `json:"decision"` // "approve", "reject", "needs_human", "error"
+	Decision  string            `json:"decision"` // "proceed", "halt", "needs_human", "error"
 	Reasoning string            `json:"reasoning"`
 	Flags     map[string]string `json:"flags,omitempty"`
 }
@@ -124,8 +124,8 @@ func (a *Analyzer) BuildPrompt(stepName, riskLevel, context, customPrompt string
 	b.WriteString(context)
 	b.WriteString("\n```\n\n")
 
-	b.WriteString("Respond with a JSON object: {\"decision\": \"approve|reject|needs_human\", \"reasoning\": \"...\", \"flags\": {}}\n")
-	b.WriteString("Valid decisions: approve, reject, needs_human\n")
+	b.WriteString("Respond with a JSON object: {\"decision\": \"proceed|halt|needs_human\", \"reasoning\": \"...\", \"flags\": {}}\n")
+	b.WriteString("Valid decisions: proceed, halt, needs_human\n")
 
 	return b.String()
 }
@@ -150,17 +150,32 @@ func ParseAnalysisResponse(raw string) *AnalysisResult {
 
 	// FR-24: nothing parseable -> needs_human.
 	return &AnalysisResult{
-		Decision:  "needs_human",
+		Decision:  string(DecisionNeedsHuman),
 		Reasoning: "could not parse LLM response",
 	}
 }
 
-// validDecisions is the set of recognized decision values.
-var validDecisions = map[string]bool{
-	"approve":     true,
-	"reject":      true,
-	"needs_human": true,
-	"error":       true,
+// ValidDecisions is the set of recognized decision values.
+var ValidDecisions = map[string]bool{
+	string(DecisionProceed):    true,
+	string(DecisionHalt):       true,
+	string(DecisionNeedsHuman): true,
+	string(DecisionError):      true,
+	// Legacy aliases for backward compatibility with existing LLM responses.
+	"approve": true,
+	"reject":  true,
+}
+
+// normalizeDecision maps legacy decision values to spec-aligned values.
+func normalizeDecision(d string) string {
+	switch d {
+	case "approve":
+		return string(DecisionProceed)
+	case "reject":
+		return string(DecisionHalt)
+	default:
+		return d
+	}
 }
 
 func parseJSON(raw string) *AnalysisResult {
@@ -180,9 +195,10 @@ func parseJSON(raw string) *AnalysisResult {
 	}
 
 	result.Decision = strings.ToLower(strings.TrimSpace(result.Decision))
-	if !validDecisions[result.Decision] {
+	if !ValidDecisions[result.Decision] {
 		return nil
 	}
+	result.Decision = normalizeDecision(result.Decision)
 
 	return &result
 }
@@ -223,9 +239,9 @@ func parsePlainText(raw string) *AnalysisResult {
 			continue
 		}
 		decision := strings.ToLower(strings.Trim(word[0], `"',.:;`))
-		if validDecisions[decision] {
+		if ValidDecisions[decision] {
 			return &AnalysisResult{
-				Decision:  decision,
+				Decision:  normalizeDecision(decision),
 				Reasoning: strings.TrimSpace(raw),
 			}
 		}
@@ -233,18 +249,18 @@ func parsePlainText(raw string) *AnalysisResult {
 	return nil
 }
 
-// ShouldPromptHuman applies the risk matrix (section 10.7).
+// ShouldPromptHuman applies the risk matrix (spec SS10.7).
 // Returns true if human review is needed based on decision + risk level.
 func ShouldPromptHuman(decision, riskLevel string) bool {
 	if riskLevel == "" {
-		riskLevel = "medium"
+		riskLevel = string(RiskMedium)
 	}
 
-	switch decision {
-	case "approve":
-		// approve + high -> true; approve + low/medium -> false
-		return riskLevel == "high"
-	case "reject", "needs_human", "error":
+	switch Decision(decision) {
+	case DecisionProceed:
+		// proceed + high -> true; proceed + low/medium -> false
+		return riskLevel == string(RiskHigh)
+	case DecisionHalt, DecisionNeedsHuman, DecisionError:
 		// always require human review
 		return true
 	default:

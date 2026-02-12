@@ -13,6 +13,9 @@ import (
 	"google.golang.org/grpc"
 )
 
+// DefaultMaxRetries is the default number of retry attempts for LLM calls.
+const DefaultMaxRetries = 2
+
 // AnalysisTransport manages LLM analysis via daemon RPC or direct fallback.
 type AnalysisTransport struct {
 	analyzer *Analyzer
@@ -21,14 +24,17 @@ type AnalysisTransport struct {
 	directLLM func(ctx context.Context, prompt string) (string, error)
 	// dialFunc allows overriding ipc.Dial for testing.
 	dialFunc func(timeout time.Duration) (*grpc.ClientConn, error)
+	// maxRetries controls how many times to retry failed LLM calls (default: DefaultMaxRetries).
+	maxRetries int
 }
 
 // NewAnalysisTransport creates a transport with the given analyzer and optional direct LLM fallback.
 func NewAnalysisTransport(analyzer *Analyzer, directLLM func(ctx context.Context, prompt string) (string, error)) *AnalysisTransport {
 	return &AnalysisTransport{
-		analyzer:  analyzer,
-		directLLM: directLLM,
-		dialFunc:  ipc.Dial,
+		analyzer:   analyzer,
+		directLLM:  directLLM,
+		dialFunc:   ipc.Dial,
+		maxRetries: DefaultMaxRetries,
 	}
 }
 
@@ -106,24 +112,47 @@ func protoToResult(resp *pb.AnalyzeStepOutputResponse) *AnalysisResult {
 }
 
 // analyzeViaDirect uses the direct LLM fallback when daemon is unavailable.
+// Retries transient failures with exponential backoff (up to maxRetries attempts).
 func (t *AnalysisTransport) analyzeViaDirect(ctx context.Context, req *AnalysisRequest, scrubbedOutput string) (*AnalysisResult, error) {
 	if t.directLLM == nil {
 		return &AnalysisResult{
-			Decision:  "needs_human",
+			Decision:  string(DecisionNeedsHuman),
 			Reasoning: "daemon unavailable and no direct LLM configured",
 		}, nil
 	}
 
 	prompt := t.analyzer.BuildPrompt(req.StepName, req.RiskLevel, scrubbedOutput, req.AnalysisPrompt)
 
-	response, llmErr := t.directLLM(ctx, prompt)
-	if llmErr != nil {
-		//nolint:nilerr // Intentional: error is captured in AnalysisResult, not propagated as Go error.
-		return &AnalysisResult{
-			Decision:  "needs_human",
-			Reasoning: "all analysis paths failed: " + llmErr.Error(),
-		}, nil
+	maxAttempts := t.maxRetries + 1
+	var lastErr error
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		if attempt > 0 {
+			// Exponential backoff: 1s, 2s, 4s, ...
+			backoff := time.Duration(1<<uint(attempt-1)) * time.Second
+			slog.Info("retrying LLM analysis", "attempt", attempt+1, "backoff", backoff)
+			select {
+			case <-ctx.Done():
+				return &AnalysisResult{
+					Decision:  string(DecisionNeedsHuman),
+					Reasoning: "analysis cancelled during retry: " + ctx.Err().Error(),
+				}, nil
+			case <-time.After(backoff):
+			}
+		}
+
+		response, llmErr := t.directLLM(ctx, prompt)
+		if llmErr != nil {
+			lastErr = llmErr
+			slog.Warn("LLM analysis attempt failed", "attempt", attempt+1, "error", llmErr)
+			continue
+		}
+
+		return ParseAnalysisResponse(response), nil
 	}
 
-	return ParseAnalysisResponse(response), nil
+	//nolint:nilerr // Intentional: error is captured in AnalysisResult, not propagated as Go error.
+	return &AnalysisResult{
+		Decision:  string(DecisionNeedsHuman),
+		Reasoning: "all analysis paths failed: " + lastErr.Error(),
+	}, nil
 }

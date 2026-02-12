@@ -2,11 +2,11 @@ package workflow
 
 import "sync"
 
-// limitedBuffer is a fixed-capacity ring buffer that implements io.Writer.
+// LimitedBuffer is a fixed-capacity ring buffer that implements io.Writer.
 // It retains the last N bytes written, discarding oldest bytes when full.
 // Thread-safe with sync.Mutex.
 // Default capacity: 4096 bytes (4KB per FR-7).
-type limitedBuffer struct {
+type LimitedBuffer struct {
 	mu       sync.Mutex
 	buf      []byte
 	capacity int
@@ -17,18 +17,18 @@ type limitedBuffer struct {
 }
 
 // NewLimitedBuffer creates a buffer with the given capacity.
-func NewLimitedBuffer(capacity int) *limitedBuffer {
+func NewLimitedBuffer(capacity int) *LimitedBuffer {
 	if capacity <= 0 {
 		capacity = DefaultBufferSize
 	}
-	return &limitedBuffer{
+	return &LimitedBuffer{
 		buf:      make([]byte, capacity),
 		capacity: capacity,
 	}
 }
 
 // Write implements io.Writer. Always returns len(p), nil.
-func (b *limitedBuffer) Write(p []byte) (int, error) {
+func (b *LimitedBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -64,7 +64,7 @@ func (b *limitedBuffer) Write(p []byte) (int, error) {
 }
 
 // Bytes returns a copy of the current buffer contents.
-func (b *limitedBuffer) Bytes() []byte {
+func (b *LimitedBuffer) Bytes() []byte {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -74,19 +74,19 @@ func (b *limitedBuffer) Bytes() []byte {
 }
 
 // String returns the current buffer contents as a string.
-func (b *limitedBuffer) String() string {
+func (b *LimitedBuffer) String() string {
 	return string(b.Bytes())
 }
 
 // Len returns the number of bytes currently in the buffer.
-func (b *limitedBuffer) Len() int {
+func (b *LimitedBuffer) Len() int {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.size
 }
 
 // Reset clears the buffer.
-func (b *limitedBuffer) Reset() {
+func (b *LimitedBuffer) Reset() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.size = 0

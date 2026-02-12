@@ -38,7 +38,7 @@ func TestTransport_DaemonUnavailable_FallbackLLM(t *testing.T) {
 	result, err := transport.Analyze(context.Background(), req)
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision) // approve normalized to proceed
 	assert.Equal(t, "all tests passed", result.Reasoning)
 	assert.Equal(t, "92%", result.Flags["coverage"])
 }
@@ -141,7 +141,7 @@ func TestTransport_FallbackReceivesCorrectPrompt(t *testing.T) {
 
 	result, err := transport.Analyze(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision) // approve normalized to proceed
 
 	// Verify the prompt was constructed correctly.
 	assert.Contains(t, capturedPrompt, "Step: integration-tests")
@@ -177,7 +177,7 @@ func TestTransport_FallbackWithSecretMasking(t *testing.T) {
 
 	result, err := transport.Analyze(context.Background(), req)
 	require.NoError(t, err)
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision) // approve normalized to proceed
 
 	// Secret should be masked in the prompt sent to the LLM.
 	assert.NotContains(t, capturedPrompt, "mytoken123")

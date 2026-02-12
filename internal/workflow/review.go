@@ -59,9 +59,9 @@ func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, an
 		choice := strings.TrimSpace(scanner.Text())
 		switch choice {
 		case "a":
-			return &ReviewDecision{Action: "approve"}, nil
+			return &ReviewDecision{Action: string(ActionApprove)}, nil
 		case "r":
-			return &ReviewDecision{Action: "reject"}, nil
+			return &ReviewDecision{Action: string(ActionReject)}, nil
 		case "i":
 			fmt.Fprintf(t.writer, "\n%s\n\n", output)
 			continue
@@ -73,7 +73,7 @@ func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, an
 				}
 				return nil, io.ErrUnexpectedEOF
 			}
-			return &ReviewDecision{Action: "command", Input: scanner.Text()}, nil
+			return &ReviewDecision{Action: string(ActionCommand), Input: scanner.Text()}, nil
 		case "q":
 			fmt.Fprint(t.writer, "Question: ")
 			if !scanner.Scan() {
@@ -82,7 +82,7 @@ func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, an
 				}
 				return nil, io.ErrUnexpectedEOF
 			}
-			return &ReviewDecision{Action: "question", Input: scanner.Text()}, nil
+			return &ReviewDecision{Action: string(ActionQuestion), Input: scanner.Text()}, nil
 		default:
 			continue
 		}
@@ -97,7 +97,7 @@ type NonInteractiveHandler struct{}
 
 // PromptReview always returns a reject decision with an error indicating non-interactive mode.
 func (n *NonInteractiveHandler) PromptReview(_ context.Context, _ string, _ *AnalysisResult, _ string) (*ReviewDecision, error) {
-	return &ReviewDecision{Action: "reject"}, ErrNonInteractive
+	return &ReviewDecision{Action: string(ActionReject)}, ErrNonInteractive
 }
 
 // ErrScriptedExhausted indicates that the scripted handler has no more decisions.
