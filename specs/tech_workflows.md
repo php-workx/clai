@@ -145,7 +145,7 @@ error: workflow has circular job dependencies: jobA → jobB → jobC → jobA
 
 ### 2.3 Step Lifecycle State Machine
 
-```
+```text
               ┌───────────┐
               │  pending   │
               └─────┬──────┘
@@ -636,8 +636,9 @@ func buildAnalysisContext(step *StepDef, result *StepResult, secrets []string) s
     marker := "\n\n... [truncated: middle section omitted, showing first and last portions] ...\n\n"
     minSizeForTruncation := maxOutputForLLM + len(marker) // avoid overlap
     if len(output) > minSizeForTruncation {
-        headSize := maxOutputForLLM * 40 / 100  // 40% head
-        tailSize := maxOutputForLLM * 40 / 100  // 40% tail
+        headSize := maxOutputForLLM * 40 / 100  // 40KB head (40% of 100KB budget)
+        tailSize := maxOutputForLLM * 40 / 100  // 40KB tail (40% of 100KB budget)
+        // Total sent: 80KB content + marker; remaining budget is intentional slack.
         output = output[:headSize] + marker + output[len(output)-tailSize:]
     } else if len(output) > maxOutputForLLM {
         // Near the limit but too small for head+tail split — just truncate tail
@@ -903,6 +904,8 @@ CREATE TABLE IF NOT EXISTS workflow_analyses (
 
 CREATE INDEX IF NOT EXISTS idx_wf_analyses_run
   ON workflow_analyses(run_id);
+CREATE INDEX IF NOT EXISTS idx_wf_analyses_run_step
+  ON workflow_analyses(run_id, step_id);
 `
 ```
 

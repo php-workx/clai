@@ -1,6 +1,7 @@
 package workflow
 
 import (
+	"bytes"
 	"os"
 	"sort"
 	"strings"
@@ -71,8 +72,9 @@ func (m *SecretMasker) MaskBytes(input []byte) []byte {
 	if m == nil || len(m.values) == 0 {
 		return input
 	}
+	mask := []byte("***")
 	for _, v := range m.values {
-		input = []byte(strings.ReplaceAll(string(input), v, "***"))
+		input = bytes.ReplaceAll(input, []byte(v), mask)
 	}
 	return input
 }

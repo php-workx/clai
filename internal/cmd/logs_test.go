@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestReadChunkLines_ReadsActualBytesOnShortRead(t *testing.T) {
+func TestReadChunkLines_NoNulBytesInOutput(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "test.log")
 	err := os.WriteFile(path, []byte("line1\nline2\n"), 0o644)
@@ -20,7 +20,11 @@ func TestReadChunkLines_ReadsActualBytesOnShortRead(t *testing.T) {
 	}
 	defer f.Close()
 
-	var offset int64 = 11
+	stat, err := f.Stat()
+	if err != nil {
+		t.Fatalf("stat test file: %v", err)
+	}
+	offset := stat.Size()
 	lines, _, readErr := readChunkLines(f, &offset, 4096, "")
 	if readErr != nil {
 		t.Fatalf("readChunkLines returned error: %v", readErr)

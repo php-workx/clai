@@ -89,6 +89,13 @@ func ValidateWorkflow(wf *WorkflowDef) []ValidationError {
 }
 
 func validateJob(field, jobName string, job *JobDef) []ValidationError {
+	if job == nil {
+		return []ValidationError{{
+			Field:   field,
+			Message: "job definition is nil",
+		}}
+	}
+
 	var errs []ValidationError
 
 	// Job must have at least one step.
@@ -112,6 +119,13 @@ func validateJob(field, jobName string, job *JobDef) []ValidationError {
 }
 
 func validateStep(field string, step *StepDef, seenIDs map[string]bool) []ValidationError {
+	if step == nil {
+		return []ValidationError{{
+			Field:   field,
+			Message: "step definition is nil",
+		}}
+	}
+
 	var errs []ValidationError
 
 	// Step must have a run field.
@@ -169,6 +183,9 @@ func validateNeeds(wf *WorkflowDef) []ValidationError {
 	var errs []ValidationError
 
 	for jobName, job := range wf.Jobs {
+		if job == nil {
+			continue
+		}
 		for i, dep := range job.Needs {
 			field := fmt.Sprintf("jobs.%s.needs[%d]", jobName, i)
 			if dep == "" {
@@ -178,7 +195,7 @@ func validateNeeds(wf *WorkflowDef) []ValidationError {
 				})
 				continue
 			}
-			if _, ok := wf.Jobs[dep]; !ok {
+			if depJob, ok := wf.Jobs[dep]; !ok || depJob == nil {
 				errs = append(errs, ValidationError{
 					Field:   field,
 					Message: fmt.Sprintf("job %q depends on unknown job %q", jobName, dep),
@@ -202,11 +219,18 @@ func validateDependencyCycles(wf *WorkflowDef) []ValidationError {
 		state[job] = 1
 		stack = append(stack, job)
 
-		for _, dep := range wf.Jobs[job].Needs {
+		jobDef := wf.Jobs[job]
+		if jobDef == nil {
+			stack = stack[:len(stack)-1]
+			state[job] = 2
+			return false
+		}
+
+		for _, dep := range jobDef.Needs {
 			if dep == "" {
 				continue
 			}
-			if _, ok := wf.Jobs[dep]; !ok {
+			if depJob, ok := wf.Jobs[dep]; !ok || depJob == nil {
 				continue
 			}
 			switch state[dep] {

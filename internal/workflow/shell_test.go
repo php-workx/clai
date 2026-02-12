@@ -15,6 +15,15 @@ func TestNewShellAdapter(t *testing.T) {
 	assert.NotNil(t, adapter)
 }
 
+func assertShellArgs(t *testing.T, cmdArgs []string, script string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		assert.Equal(t, []string{"cmd.exe", "/C", script}, cmdArgs)
+		return
+	}
+	assert.Equal(t, []string{"/bin/sh", "-c", script}, cmdArgs)
+}
+
 func TestBuildCommand_ArgvMode(t *testing.T) {
 	adapter := NewShellAdapter()
 	ctx := context.Background()
@@ -71,11 +80,7 @@ func TestBuildCommand_ShellModeTrue(t *testing.T) {
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
 	require.NoError(t, err)
 
-	if runtime.GOOS == "windows" {
-		assert.Equal(t, []string{"cmd.exe", "/C", "echo hello | grep hello"}, cmd.Args)
-	} else {
-		assert.Equal(t, []string{"/bin/sh", "-c", "echo hello | grep hello"}, cmd.Args)
-	}
+	assertShellArgs(t, cmd.Args, "echo hello | grep hello")
 	assert.Equal(t, "/tmp", cmd.Dir)
 }
 
@@ -90,11 +95,7 @@ func TestBuildCommand_ShellModeOmittedDefaultsToShell(t *testing.T) {
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
 	require.NoError(t, err)
 
-	if runtime.GOOS == "windows" {
-		assert.Equal(t, []string{"cmd.exe", "/C", "echo hello | grep hello"}, cmd.Args)
-	} else {
-		assert.Equal(t, []string{"/bin/sh", "-c", "echo hello | grep hello"}, cmd.Args)
-	}
+	assertShellArgs(t, cmd.Args, "echo hello | grep hello")
 }
 
 func TestBuildCommand_ExplicitShell(t *testing.T) {

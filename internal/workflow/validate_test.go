@@ -247,6 +247,34 @@ func TestValidateWorkflow_NilWorkflow(t *testing.T) {
 	assertFieldError(t, errs, "workflow", "required")
 }
 
+func TestValidateWorkflow_NilJobDefinition(t *testing.T) {
+	wf := &WorkflowDef{
+		Name: "nil-job",
+		Jobs: map[string]*JobDef{
+			"build": nil,
+		},
+	}
+
+	errs := ValidateWorkflow(wf)
+	require.NotEmpty(t, errs)
+	assertFieldError(t, errs, "jobs.build", "job definition is nil")
+}
+
+func TestValidateWorkflow_NilStepDefinition(t *testing.T) {
+	wf := &WorkflowDef{
+		Name: "nil-step",
+		Jobs: map[string]*JobDef{
+			"build": {
+				Steps: []*StepDef{nil},
+			},
+		},
+	}
+
+	errs := ValidateWorkflow(wf)
+	require.NotEmpty(t, errs)
+	assertFieldError(t, errs, "jobs.build.steps[0]", "step definition is nil")
+}
+
 func TestValidateWorkflow_UnknownNeed(t *testing.T) {
 	wf := validWorkflow()
 	wf.Jobs["build"].Needs = []string{"deploy"}
