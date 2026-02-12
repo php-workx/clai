@@ -118,15 +118,35 @@ bin/linux:
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/clai-shim ./cmd/clai-shim
 	GOOS=linux GOARCH=amd64 go build $(PICKER_LDFLAGS) -o bin/linux/clai-picker ./cmd/clai-picker
 	GOOS=linux GOARCH=amd64 go test -c -o bin/linux/expect.test ./tests/expect
+	@tmpdir=$$(mktemp -d) && \
+		cd "$$tmpdir" && \
+		go mod init temp && \
+		go get gotest.tools/gotestsum@latest && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(CURDIR)/bin/linux/gotestsum gotest.tools/gotestsum && \
+		rm -rf "$$tmpdir"
 
-## test-docker: Run interactive tests in Docker containers (Alpine, Ubuntu, Debian)
+## test-docker: Run interactive tests in Docker containers (Alpine, Ubuntu, Debian, Fedora) sequentially
 test-docker: bin/linux
-	@if command -v docker-compose >/dev/null 2>&1; then \
-		docker-compose -f tests/docker/docker-compose.yml build && \
-		docker-compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
-	elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
+	@if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
 		docker compose -f tests/docker/docker-compose.yml build && \
-		docker compose -f tests/docker/docker-compose.yml up --abort-on-container-exit; \
+		echo "=== Running Alpine tests ===" && \
+		docker compose -f tests/docker/docker-compose.yml run --rm alpine && \
+		echo "=== Running Ubuntu tests ===" && \
+		docker compose -f tests/docker/docker-compose.yml run --rm ubuntu && \
+		echo "=== Running Debian tests ===" && \
+		docker compose -f tests/docker/docker-compose.yml run --rm debian && \
+		echo "=== Running Fedora tests ===" && \
+		docker compose -f tests/docker/docker-compose.yml run --rm fedora; \
+	elif command -v docker-compose >/dev/null 2>&1; then \
+		docker-compose -f tests/docker/docker-compose.yml build && \
+		echo "=== Running Alpine tests ===" && \
+		docker-compose -f tests/docker/docker-compose.yml run --rm alpine && \
+		echo "=== Running Ubuntu tests ===" && \
+		docker-compose -f tests/docker/docker-compose.yml run --rm ubuntu && \
+		echo "=== Running Debian tests ===" && \
+		docker-compose -f tests/docker/docker-compose.yml run --rm debian && \
+		echo "=== Running Fedora tests ===" && \
+		docker-compose -f tests/docker/docker-compose.yml run --rm fedora; \
 	else \
 		echo "Error: docker-compose or docker compose not found"; \
 		exit 1; \

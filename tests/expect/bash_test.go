@@ -11,6 +11,7 @@ import (
 // TestBash_SourceWithoutError verifies the bash script sources without errors.
 func TestBash_SourceWithoutError(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -48,6 +49,7 @@ func TestBash_SourceWithoutError(t *testing.T) {
 // TestBash_TabCompletionIntegration verifies tab completion is registered.
 func TestBash_TabCompletionIntegration(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -80,6 +82,7 @@ func TestBash_TabCompletionIntegration(t *testing.T) {
 // TestBash_AcceptCommandWorks verifies the accept command works.
 func TestBash_AcceptCommandWorks(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -112,6 +115,7 @@ func TestBash_AcceptCommandWorks(t *testing.T) {
 // TestBash_ClearSuggestionWorks verifies the clear-suggestion command works.
 func TestBash_ClearSuggestionWorks(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -144,6 +148,7 @@ func TestBash_ClearSuggestionWorks(t *testing.T) {
 // TestBash_NaturalLanguagePrefix verifies ? prefix handling.
 func TestBash_NaturalLanguagePrefix(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -175,6 +180,7 @@ func TestBash_NaturalLanguagePrefix(t *testing.T) {
 // TestBash_RunWrapperExists verifies the run wrapper function exists.
 func TestBash_RunWrapperExists(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -207,6 +213,7 @@ func TestBash_RunWrapperExists(t *testing.T) {
 // TestBash_AIFixFunctionExists verifies the ai-fix function exists.
 func TestBash_AIFixFunctionExists(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -239,6 +246,7 @@ func TestBash_AIFixFunctionExists(t *testing.T) {
 // TestBash_AIFunctionExists verifies the ai function exists.
 func TestBash_AIFunctionExists(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -271,6 +279,7 @@ func TestBash_AIFunctionExists(t *testing.T) {
 // TestBash_VoiceFunctionExists verifies the voice function exists.
 func TestBash_VoiceFunctionExists(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -303,6 +312,7 @@ func TestBash_VoiceFunctionExists(t *testing.T) {
 // TestBash_PromptCommandSet verifies PROMPT_COMMAND is configured.
 func TestBash_PromptCommandSet(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -335,6 +345,7 @@ func TestBash_PromptCommandSet(t *testing.T) {
 // TestBash_DoctorShowsCorrectShell verifies clai doctor detects bash correctly.
 func TestBash_DoctorShowsCorrectShell(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -375,6 +386,7 @@ func TestBash_DoctorShowsCorrectShell(t *testing.T) {
 // even without CLAI_CURRENT_SHELL set (simulating fresh install after brew).
 func TestBash_InstallDetectsShell(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -406,6 +418,7 @@ func TestBash_InstallDetectsShell(t *testing.T) {
 // TestBash_StatusShowsCorrectShell verifies clai status detects bash correctly.
 func TestBash_StatusShowsCorrectShell(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -441,6 +454,7 @@ func TestBash_StatusShowsCorrectShell(t *testing.T) {
 // TestBash_HistoryFallbackWhenDisabled verifies Up/Down history works when clai is disabled.
 func TestBash_HistoryFallbackWhenDisabled(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}

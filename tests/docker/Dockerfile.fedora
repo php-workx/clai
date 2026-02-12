@@ -1,8 +1,12 @@
-# Dockerfile for Alpine Linux interactive shell tests
-FROM alpine:3.19
+# Dockerfile for Fedora interactive shell tests (rpm-based)
+FROM fedora:39
 
-# Install shells and Go (for test2json)
-RUN apk add --no-cache zsh bash fish go
+# Install shells
+RUN dnf install -y \
+    zsh \
+    fish \
+    golang \
+    && dnf clean all
 
 WORKDIR /app
 
