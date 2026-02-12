@@ -226,11 +226,14 @@ type claudeProcess struct {
 	mu      sync.Mutex
 }
 
-// startClaudeProcess starts the Claude CLI and waits for initialization
-func startClaudeProcess() (*claudeProcess, error) {
+// startClaudeProcess starts the Claude CLI and waits for initialization.
+// The provided context controls the lifetime of the subprocess: if the
+// context is cancelled the process is killed automatically via
+// exec.CommandContext.
+func startClaudeProcess(ctx context.Context) (*claudeProcess, error) {
 	fmt.Println("Starting Claude process...")
 
-	cmd := exec.Command("claude",
+	cmd := exec.CommandContext(ctx, "claude",
 		"--print",
 		"--verbose",
 		"--model", "haiku",
@@ -338,13 +341,20 @@ func waitForResult(scanner *bufio.Scanner) error {
 	return scanner.Err()
 }
 
-// handleDaemonConn handles a single client connection to the daemon
-func handleDaemonConn(c net.Conn, claude *claudeProcess, activityMu *sync.Mutex, lastActivity *time.Time) {
+// handleDaemonConn handles a single client connection to the daemon.
+// The parent context allows the daemon to cancel in-flight requests
+// during shutdown.
+func handleDaemonConn(ctx context.Context, c net.Conn, claude *claudeProcess, activityMu *sync.Mutex, lastActivity *time.Time) {
 	defer c.Close()
 
 	activityMu.Lock()
 	*lastActivity = time.Now()
 	activityMu.Unlock()
+
+	// Derive a per-connection context with a 60-second timeout so a
+	// single slow query cannot block the daemon indefinitely.
+	connCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 
 	var req DaemonRequest
 	if err := json.NewDecoder(c).Decode(&req); err != nil {
@@ -358,7 +368,7 @@ func handleDaemonConn(c net.Conn, claude *claudeProcess, activityMu *sync.Mutex,
 	}
 	fmt.Printf("Received request: %s\n", logPrompt)
 
-	result, err := claude.query(req.Prompt)
+	result, err := claude.query(connCtx, req.Prompt)
 	if err != nil {
 		json.NewEncoder(c).Encode(DaemonResponse{Error: err.Error()})
 		return
@@ -373,11 +383,13 @@ func handleDaemonConn(c net.Conn, claude *claudeProcess, activityMu *sync.Mutex,
 	json.NewEncoder(c).Encode(DaemonResponse{Result: result})
 }
 
-// RunDaemon runs the daemon server (called by "daemon run" command)
-func RunDaemon() error {
+// RunDaemon runs the daemon server (called by "daemon run" command).
+// The provided context controls the daemon lifetime: cancelling it will
+// stop the Claude subprocess and reject new connections.
+func RunDaemon(ctx context.Context) error {
 	os.Remove(socketPath())
 
-	claude, err := startClaudeProcess()
+	claude, err := startClaudeProcess(ctx)
 	if err != nil {
 		return err
 	}
@@ -417,7 +429,7 @@ func RunDaemon() error {
 			return nil
 		}
 
-		go handleDaemonConn(conn, claude, &activityMu, &lastActivity)
+		go handleDaemonConn(ctx, conn, claude, &activityMu, &lastActivity)
 	}
 }
 
@@ -432,10 +444,17 @@ func extractResponseText(resp StreamResponse) string {
 	return text
 }
 
-// query sends a prompt to Claude and returns the response
-func (c *claudeProcess) query(prompt string) (string, error) {
+// query sends a prompt to Claude and returns the response.
+// The context allows the caller to cancel or timeout the query; if the
+// context is done the method returns immediately with the context error.
+func (c *claudeProcess) query(ctx context.Context, prompt string) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Check context before starting work.
+	if err := ctx.Err(); err != nil {
+		return "", fmt.Errorf("query cancelled before send: %w", err)
+	}
 
 	msg := StreamMessage{Type: "user"}
 	msg.Message.Role = "user"
@@ -450,28 +469,44 @@ func (c *claudeProcess) query(prompt string) (string, error) {
 		return "", fmt.Errorf("failed to write to claude: %w", err)
 	}
 
-	var result string
-	for c.scanner.Scan() {
-		var resp StreamResponse
-		if err := json.Unmarshal([]byte(c.scanner.Text()), &resp); err != nil {
-			continue
-		}
+	// Read responses in a goroutine so we can select on context cancellation.
+	type scanResult struct {
+		text string
+		err  error
+	}
+	ch := make(chan scanResult, 1)
 
-		if resp.Type == "assistant" {
-			result += extractResponseText(resp)
-		}
-
-		if resp.Type == "result" {
-			if resp.Result != "" {
-				result = resp.Result
+	go func() {
+		var result string
+		for c.scanner.Scan() {
+			var resp StreamResponse
+			if err := json.Unmarshal([]byte(c.scanner.Text()), &resp); err != nil {
+				continue
 			}
-			break
+
+			if resp.Type == "assistant" {
+				result += extractResponseText(resp)
+			}
+
+			if resp.Type == "result" {
+				if resp.Result != "" {
+					result = resp.Result
+				}
+				ch <- scanResult{text: strings.TrimSpace(result)}
+				return
+			}
 		}
-	}
+		if err := c.scanner.Err(); err != nil {
+			ch <- scanResult{err: fmt.Errorf("scanner error: %w", err)}
+		} else {
+			ch <- scanResult{text: strings.TrimSpace(result)}
+		}
+	}()
 
-	if err := c.scanner.Err(); err != nil {
-		return "", fmt.Errorf("scanner error: %w", err)
+	select {
+	case <-ctx.Done():
+		return "", fmt.Errorf("query cancelled: %w", ctx.Err())
+	case res := <-ch:
+		return res.text, res.err
 	}
-
-	return strings.TrimSpace(result), nil
 }

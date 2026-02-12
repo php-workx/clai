@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -21,7 +22,7 @@ func TestIntegration_BuildPickerBinary(t *testing.T) {
 	}
 
 	// Build the binary to a temp location.
-	binPath := t.TempDir() + "/clai-picker"
+	binPath := filepath.Join(t.TempDir(), "clai-picker")
 	cmd := exec.Command("go", "build", "-o", binPath, ".")
 	cmd.Dir = findPickerCmdDir(t)
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
@@ -128,7 +129,7 @@ func TestIntegration_GoBuildCompiles(t *testing.T) {
 func findPickerCmdDir(t *testing.T) string {
 	t.Helper()
 	root := findModuleRoot(t)
-	return root + "/cmd/clai-picker"
+	return filepath.Join(root, "cmd", "clai-picker")
 }
 
 // findModuleRoot finds the Go module root by looking for go.mod.
@@ -139,10 +140,10 @@ func findModuleRoot(t *testing.T) string {
 		t.Fatalf("cannot get working directory: %v", err)
 	}
 	for {
-		if _, err := os.Stat(dir + "/go.mod"); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
 			return dir
 		}
-		parent := dir[:strings.LastIndex(dir, "/")]
+		parent := filepath.Dir(dir)
 		if parent == dir {
 			t.Fatal("cannot find go.mod in any parent directory")
 		}

@@ -264,6 +264,7 @@ bindkey '\e[1;3C' _ai_accept_token
 _ai_clear_suggestion() {
     _AI_CURRENT_SUGGESTION=""
     POSTDISPLAY=""
+    region_highlight=()
     > "$_AI_SUGGEST_FILE"
     zle reset-prompt
 }
@@ -970,6 +971,9 @@ ai-daemon() {
 # ============================================
 
 # Cleanup function for shell exit
+# NOTE: Fire-and-forget (&!) means the notification may be lost if the shell
+# exits immediately (e.g., quick close, exec, or SIGHUP). This is acceptable
+# since the daemon handles stale sessions gracefully on its own.
 _clai_cleanup() {
     # Notify daemon session is ending
     clai-shim session-end --session-id="$CLAI_SESSION_ID" >/dev/null 2>&1 &!

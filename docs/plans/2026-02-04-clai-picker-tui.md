@@ -10,7 +10,7 @@
 
 ---
 
-### Task 1: Config schema + defaults for history picker
+## Task 1: Config schema + defaults for history picker
 
 **Files:**
 - Modify: `internal/config/config.go`
@@ -66,7 +66,7 @@ git commit -m "feat: add history picker config defaults"
 
 ---
 
-### Task 2: clai-picker binary skeleton + TTY open
+## Task 2: clai-picker binary skeleton + TTY open
 
 **Files:**
 - Create: `cmd/clai-picker/main.go`
@@ -108,7 +108,7 @@ git commit -m "feat: add clai-picker tty open"
 
 ---
 
-### Task 3: Bubble Tea model + UI with search input
+## Task 3: Bubble Tea model + UI with search input
 
 **Files:**
 - Create: `internal/picker/model.go`
@@ -159,7 +159,7 @@ git commit -m "feat: add picker model and ui"
 
 ---
 
-### Task 4: Provider interface + history provider (server-side filtering)
+## Task 4: Provider interface + history provider (server-side filtering)
 
 **Files:**
 - Create: `internal/picker/provider.go`
@@ -206,7 +206,7 @@ git commit -m "feat: add history provider with server-side filtering"
 
 ---
 
-### Task 5: IO routing + signals
+## Task 5: IO routing + signals
 
 **Files:**
 - Modify: `cmd/clai-picker/main.go`
@@ -250,7 +250,7 @@ git commit -m "feat: harden picker io and signals"
 
 ---
 
-### Task 6: Shell glue integration (zsh/bash/fish)
+## Task 6: Shell glue integration (zsh/bash/fish)
 
 **Files:**
 - Modify: `internal/cmd/shell/zsh/clai.zsh`
@@ -292,7 +292,7 @@ git commit -m "feat: integrate clai-picker shell glue"
 
 ---
 
-### Task 7: Backend dispatcher + docs
+## Task 7: Backend dispatcher + docs
 
 **Files:**
 - Modify: `cmd/clai-picker/main.go`

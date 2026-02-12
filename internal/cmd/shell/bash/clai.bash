@@ -352,7 +352,10 @@ _clai_history_up() {
     # Try TUI picker first (when inline picker is not already active)
     if [[ "$_CLAI_PICKER_ACTIVE" != "true" ]] && _clai_has_tui_picker; then
         _clai_tui_picker_open
-        return 0
+        case $? in
+            0|1) return 0 ;;   # selected or cancelled
+            2) _clai_fallback_history_up; return 0 ;;  # fallback to native history
+        esac
     fi
     if [[ "$_CLAI_FALLBACK_ACTIVE" == "true" ]]; then
         _clai_fallback_reset
@@ -486,6 +489,9 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
             return 0
         fi
         _clai_tui_picker_open
+        if [[ $? -eq 2 ]]; then
+            _clai_fallback_history_up
+        fi
     }
     bind '"\e[A": "\C-x\C-p"'
     bind -x '"\C-x\C-p": _clai_up_arrow'

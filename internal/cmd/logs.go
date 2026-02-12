@@ -96,14 +96,14 @@ func tailLogs(filename string, n int) error {
 
 		// Read chunk
 		buf := make([]byte, readSize)
-		_, err := f.ReadAt(buf, offset)
+		n, err := f.ReadAt(buf, offset)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("failed to read log file: %w", err)
 		}
 
 		// Parse lines from chunk (in reverse order)
 		// Prepend remainder from previous chunk to handle lines spanning chunks
-		chunk := string(buf) + remainder
+		chunk := string(buf[:n]) + remainder
 		chunkLines := splitLines(chunk)
 
 		// The first element may be a partial line if we're not at file start
