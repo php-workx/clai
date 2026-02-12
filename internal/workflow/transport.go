@@ -60,15 +60,7 @@ func (t *AnalysisTransport) Analyze(ctx context.Context, req *AnalysisRequest) (
 	if t.analyzer != nil {
 		scrubbedOutput = t.analyzer.BuildAnalysisContext(req.StdoutTail, req.StderrTail, 0)
 	} else {
-		slog.Warn("analysis transport analyzer is nil; using unsanitized output tails")
-		scrubbedOutput = req.StdoutTail
-		if req.StderrTail != "" {
-			if scrubbedOutput == "" {
-				scrubbedOutput = req.StderrTail
-			} else {
-				scrubbedOutput += "\n" + req.StderrTail
-			}
-		}
+		slog.Warn("analysis transport analyzer is nil; sanitized output unavailable")
 	}
 
 	// 1. Try daemon RPC.
@@ -145,6 +137,13 @@ func parseFlagsJSON(raw string) (map[string]string, bool) {
 // analyzeViaDirect uses the direct LLM fallback when daemon is unavailable.
 // Retries transient failures with exponential backoff (up to maxRetries attempts).
 func (t *AnalysisTransport) analyzeViaDirect(ctx context.Context, req *AnalysisRequest, scrubbedOutput string) (*AnalysisResult, error) {
+	if t.analyzer == nil {
+		return &AnalysisResult{
+			Decision:  string(DecisionNeedsHuman),
+			Reasoning: "daemon unavailable and no sanitizer available for direct LLM fallback",
+		}, nil
+	}
+
 	if t.directLLM == nil {
 		return &AnalysisResult{
 			Decision:  string(DecisionNeedsHuman),

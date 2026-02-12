@@ -19,8 +19,11 @@ func NewSecretMasker(secrets []SecretDef) *SecretMasker {
 		return &SecretMasker{}
 	}
 
-	values := make([]string, 0, len(secrets))
-	names := make([]string, 0, len(secrets))
+	type secretEntry struct {
+		value string
+		name  string
+	}
+	entries := make([]secretEntry, 0, len(secrets))
 
 	for _, s := range secrets {
 		if s.From != "env" {
@@ -30,15 +33,21 @@ func NewSecretMasker(secrets []SecretDef) *SecretMasker {
 		if val == "" {
 			continue
 		}
-		values = append(values, val)
-		names = append(names, s.Name)
+		entries = append(entries, secretEntry{value: val, name: s.Name})
 	}
 
 	// Sort longest-first so longer secrets mask before shorter ones
 	// that may be substrings.
-	sort.Slice(values, func(i, j int) bool {
-		return len(values[i]) > len(values[j])
+	sort.SliceStable(entries, func(i, j int) bool {
+		return len(entries[i].value) > len(entries[j].value)
 	})
+
+	values := make([]string, 0, len(entries))
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		values = append(values, entry.value)
+		names = append(names, entry.name)
+	}
 
 	return &SecretMasker{
 		values: values,

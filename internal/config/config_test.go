@@ -762,6 +762,12 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 				{ID: "session", Label: "Session", Provider: "history", Args: map[string]string{"session": "$CLAI_SESSION_ID"}},
 			},
 		},
+		Workflows: WorkflowsConfig{
+			Enabled:           true,
+			StrictPermissions: true,
+			DefaultMode:       "interactive",
+			RetainRuns:        50,
+		},
 	}
 
 	// Save
@@ -1138,12 +1144,17 @@ func TestWorkflowsConfigValidation(t *testing.T) {
 		{
 			name:    "rejects_non_interactive_auto",
 			modify:  func(c *Config) { c.Workflows.DefaultMode = "non-interactive-auto" },
-			wantErr: "workflows.default_mode must be interactive or non-interactive-fail",
+			wantErr: "workflows.default_mode must be \"interactive\" or \"non-interactive-fail\"",
 		},
 		{
 			name:    "rejects_invalid_mode",
 			modify:  func(c *Config) { c.Workflows.DefaultMode = "batch" },
-			wantErr: "workflows.default_mode must be interactive or non-interactive-fail",
+			wantErr: "workflows.default_mode must be \"interactive\" or \"non-interactive-fail\"",
+		},
+		{
+			name:    "rejects_empty_mode",
+			modify:  func(c *Config) { c.Workflows.DefaultMode = "" },
+			wantErr: "workflows.default_mode must be \"interactive\" or \"non-interactive-fail\"",
 		},
 		{
 			name:    "rejects_negative_retain_runs",

@@ -153,6 +153,27 @@ func TestSecretMasker_SecretNames(t *testing.T) {
 	}
 }
 
+func TestSecretMasker_SortedValuesKeepNameAlignment(t *testing.T) {
+	t.Setenv("SHORT_SECRET", "abc")
+	t.Setenv("LONG_SECRET", "abcdefgh")
+
+	m := NewSecretMasker([]SecretDef{
+		{Name: "SHORT_SECRET", From: "env"},
+		{Name: "LONG_SECRET", From: "env"},
+	})
+
+	if len(m.values) != 2 || len(m.names) != 2 {
+		t.Fatalf("unexpected masker entries: values=%d names=%d", len(m.values), len(m.names))
+	}
+
+	if m.values[0] != "abcdefgh" || m.names[0] != "LONG_SECRET" {
+		t.Fatalf("entry 0 misaligned: value=%q name=%q", m.values[0], m.names[0])
+	}
+	if m.values[1] != "abc" || m.names[1] != "SHORT_SECRET" {
+		t.Fatalf("entry 1 misaligned: value=%q name=%q", m.values[1], m.names[1])
+	}
+}
+
 func TestSecretMasker_UnsetEnvSkipped(t *testing.T) {
 	// Use a name extremely unlikely to be set in any environment.
 	m := NewSecretMasker([]SecretDef{

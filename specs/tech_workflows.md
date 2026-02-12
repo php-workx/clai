@@ -135,13 +135,13 @@ func resolveJobOrder(jobs map[string]*JobDef) ([][]string, error) {
     // 5. If unprocessed jobs remain → cycle detected → error
     // Returns: [][]string — each inner slice is a wave of parallelizable jobs
 }
-```text
+```
 
 **Cycle detection:** If the algorithm terminates with unprocessed jobs, report the cycle:
 
 ```
 error: workflow has circular job dependencies: jobA → jobB → jobC → jobA
-```text
+```
 
 ### 2.3 Step Lifecycle State Machine
 
@@ -163,7 +163,7 @@ error: workflow has circular job dependencies: jobA → jobB → jobC → jobA
 ┌─────┐ ┌──────┐ ┌───────────┐
 │succ.│ │failed│ │ cancelled │  (SIGINT/stop signal received)
 └─────┘ └──────┘ └───────────┘
-```text
+```
 
 **Transition rules:**
 
@@ -220,7 +220,7 @@ type StepResult struct {
     Duration  time.Duration
     StartedAt time.Time
 }
-```text
+```
 
 **Step execution:**
 
@@ -285,7 +285,7 @@ if err != nil {
     r.logger.Warn("failed to parse output file", "step", step.Name, "err", err)
 }
 // Store in stepContext for downstream ${{ steps.ID.outputs.KEY }} resolution
-```text
+```
 
 **Output file format:** Steps write key=value pairs (one per line, dotenv-style). Lines without `=` are ignored. Values are trimmed of leading/trailing whitespace.
 
@@ -345,7 +345,7 @@ func (r *Runner) gracefulKill(cmd *exec.Cmd) {
         cmd.Process.Kill()
     }
 }
-```text
+```
 
 ---
 
@@ -479,7 +479,7 @@ type WorkflowFile struct {
     Path   string // absolute path
     Source string // "local" or "global"
 }
-```text
+```
 
 ---
 
@@ -584,7 +584,7 @@ type FlaggedItem struct {
     Severity string `json:"severity"` // "info", "warning", "critical"
     Reason   string `json:"reason"`
 }
-```text
+```
 
 The workflow engine builds an analysis prompt, sends it via `QueryFast()`, and parses the response into an `AnalysisResponse`.
 
@@ -646,7 +646,7 @@ func buildAnalysisContext(step *StepDef, result *StepResult, secrets []string) s
 
     return output
 }
-```text
+```
 
 ### 5.5 Structured Response Parsing
 
@@ -694,7 +694,7 @@ func shouldPromptHuman(riskLevel string, decision string) bool {
         return decision != "proceed"  // default to medium behavior
     }
 }
-```text
+```
 
 ### 5.7 Follow-Up Conversation (func spec FR-33)
 
@@ -803,7 +803,7 @@ func (hr *HumanReviewer) Review(step *StepDef, result *StepResult, analysis *Ana
 // The command inherits the step's environment (including exported outputs from
 // prior steps) and working directory. Output is shown on the terminal but NOT
 // persisted to the workflow run state.
-func (hr *HumanReview) runAdHocCommand(ctx context.Context, env []string, cwd string) {
+func (hr *HumanReviewer) runAdHocCommand(ctx context.Context, env []string, cwd string) {
     cmdStr := hr.readLine("$ ")
     shell := os.Getenv("SHELL")
     if shell == "" {
@@ -818,7 +818,7 @@ func (hr *HumanReview) runAdHocCommand(ctx context.Context, env []string, cwd st
         fmt.Fprintf(os.Stderr, "command exited: %v\n", err)
     }
 }
-```text
+```
 
 ---
 
@@ -904,7 +904,7 @@ CREATE TABLE IF NOT EXISTS workflow_analyses (
 CREATE INDEX IF NOT EXISTS idx_wf_analyses_run
   ON workflow_analyses(run_id);
 `
-```text
+```
 
 Register in the migration list:
 
@@ -941,7 +941,7 @@ GetWorkflowAnalyses(ctx context.Context, runID string) ([]WorkflowAnalysis, erro
 
 // Retention
 PruneWorkflowRuns(ctx context.Context, maxPerWorkflow int) (int64, error)
-```text
+```
 
 ### 7.4 Storage Types
 
@@ -1126,7 +1126,7 @@ message WorkflowRunSummary {
 message WorkflowStopRequest {
   string run_id = 1;
 }
-```text
+```
 
 ### 8.2 New RPC Methods
 
@@ -1181,7 +1181,7 @@ func (s *Server) WorkflowRunStart(ctx context.Context, req *pb.WorkflowRunStartR
 
     return &pb.Ack{Ok: true}, nil
 }
-```text
+```
 
 ### 8.4 Stop Signal Mechanism
 
@@ -1232,7 +1232,7 @@ cmd := exec.Command("sh", "-c", resolvedCmd)
 
 // UNSAFE (never do this):
 // cmd := exec.Command("sh", "-c", step.Run)  // ${{ }} left for shell
-```text
+```
 
 Step outputs referenced in expressions may contain shell metacharacters. Since Go resolves them before the shell sees the string, and they're embedded within a string already passed to `sh -c`, standard shell quoting within the `run` field handles this:
 
@@ -1258,7 +1258,7 @@ func scrubSecrets(output string, secrets []string) string {
     // Also apply existing sanitize.Sanitizer patterns (API keys, tokens, etc.)
     return sanitize.SanitizeText(output)
 }
-```text
+```
 
 Secrets are collected from:
 
@@ -1307,7 +1307,7 @@ type WorkflowsConfig struct {
     RetainRuns        int      `yaml:"retain_runs"`         // Max runs per workflow (default: 100)
     StrictPermissions bool     `yaml:"strict_permissions"`  // Error on insecure file perms
 }
-```text
+```
 
 Added to the top-level `Config` struct:
 
@@ -1333,7 +1333,7 @@ Workflows: WorkflowsConfig{
     RetainRuns:        100,
     StrictPermissions: false,
 },
-```text
+```
 
 ### 10.3 Config Getter/Setter
 
@@ -1432,7 +1432,7 @@ func newWorkflowCmd() *cobra.Command {
     )
     return cmd
 }
-```text
+```
 
 Register in `internal/cmd/root.go` within the existing command group structure.
 
@@ -1491,7 +1491,7 @@ testdata/workflows/
   invalid-schema.yaml        # Missing required fields
   invalid-cycle.yaml         # Circular job dependencies (v1)
   pulumi-example.yaml        # The motivating use case from func spec §6
-```text
+```
 
 ### 13.4 Mock LLM
 

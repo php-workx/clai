@@ -395,13 +395,38 @@ func runAdHocCommand(ctx context.Context, command, workDir string, env []string)
 	}
 
 	cmd.Dir = workDir
-	if len(env) > 0 {
-		cmd.Env = env
-	}
+	cmd.Env = mergeCommandEnv(os.Environ(), env)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func mergeCommandEnv(base, overrides []string) []string {
+	merged := make([]string, 0, len(base)+len(overrides))
+	indexByKey := make(map[string]int, len(base)+len(overrides))
+
+	appendOrReplace := func(entry string) {
+		key := entry
+		if idx := strings.Index(entry, "="); idx >= 0 {
+			key = entry[:idx]
+		}
+		if idx, exists := indexByKey[key]; exists {
+			merged[idx] = entry
+			return
+		}
+		indexByKey[key] = len(merged)
+		merged = append(merged, entry)
+	}
+
+	for _, entry := range base {
+		appendOrReplace(entry)
+	}
+	for _, entry := range overrides {
+		appendOrReplace(entry)
+	}
+
+	return merged
 }
 
 // reportResults displays the final summary and returns the appropriate exit error.

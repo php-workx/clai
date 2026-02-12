@@ -377,6 +377,33 @@ func TestRunAdHocCommand(t *testing.T) {
 	})
 }
 
+func TestMergeCommandEnv(t *testing.T) {
+	base := []string{
+		"PATH=/usr/bin:/bin",
+		"HOME=/tmp/home",
+		"DUP=base",
+	}
+	overrides := []string{
+		"DUP=override",
+		"CUSTOM=value",
+	}
+
+	merged := mergeCommandEnv(base, overrides)
+	envMap := make(map[string]string, len(merged))
+	for _, entry := range merged {
+		key, value, hasValue := strings.Cut(entry, "=")
+		if !hasValue {
+			t.Fatalf("merged env entry is malformed: %q", entry)
+		}
+		envMap[key] = value
+	}
+
+	assert.Equal(t, "/usr/bin:/bin", envMap["PATH"])
+	assert.Equal(t, "/tmp/home", envMap["HOME"])
+	assert.Equal(t, "override", envMap["DUP"])
+	assert.Equal(t, "value", envMap["CUSTOM"])
+}
+
 func TestExpandMatrix_NoMatrix(t *testing.T) {
 	job := &workflow.JobDef{
 		Steps: []*workflow.StepDef{{Name: "test", Run: "echo hi"}},

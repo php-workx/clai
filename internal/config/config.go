@@ -657,8 +657,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("history.picker_backend must be builtin, fzf, or clai (got: %s)", c.History.PickerBackend)
 	}
 
-	if c.Workflows.DefaultMode != "" && !isValidWorkflowMode(c.Workflows.DefaultMode) {
-		return fmt.Errorf("workflows.default_mode must be interactive or non-interactive-fail (got: %s)", c.Workflows.DefaultMode)
+	if c.Workflows.DefaultMode == "" || !isValidWorkflowMode(c.Workflows.DefaultMode) {
+		return fmt.Errorf("workflows.default_mode must be \"interactive\" or \"non-interactive-fail\" (got: %q)", c.Workflows.DefaultMode)
 	}
 
 	if c.Workflows.RetainRuns < 0 {

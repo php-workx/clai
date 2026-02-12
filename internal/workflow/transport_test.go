@@ -80,6 +80,31 @@ func TestTransport_DaemonUnavailable_NilAnalyzer(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 	assert.Equal(t, string(DecisionNeedsHuman), result.Decision)
+	assert.Contains(t, result.Reasoning, "no sanitizer available")
+}
+
+func TestTransport_DaemonUnavailable_NilAnalyzer_DoesNotCallDirectLLM(t *testing.T) {
+	called := false
+	transport := NewAnalysisTransport(nil, func(_ context.Context, _ string) (string, error) {
+		called = true
+		return `{"decision":"proceed","reasoning":"should not be called"}`, nil
+	})
+	transport.dialFunc = failDial
+
+	req := &AnalysisRequest{
+		RunID:      "run-nil-analyzer-direct",
+		StepID:     "step",
+		StepName:   "lint",
+		RiskLevel:  "medium",
+		StdoutTail: "sensitive output",
+	}
+
+	result, err := transport.Analyze(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.False(t, called, "directLLM must not be called without analyzer sanitization")
+	assert.Equal(t, string(DecisionNeedsHuman), result.Decision)
+	assert.Contains(t, result.Reasoning, "no sanitizer available")
 }
 
 func TestTransport_DirectLLMFailure(t *testing.T) {
