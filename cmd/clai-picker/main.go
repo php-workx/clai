@@ -134,12 +134,21 @@ func run(args []string) int {
 
 	// Step 6: Parse subcommand and flags.
 	cmd, opts, exitCode, showUsage, parseErr := parseRunInputs(args)
+	if errors.Is(parseErr, flag.ErrHelp) {
+		if showUsage {
+			printUsage()
+		}
+		return exitSuccess
+	}
 	if parseErr != nil {
 		fmt.Fprintf(os.Stderr, pickerErrorFmt, parseErr)
 		if showUsage {
 			printUsage()
 		}
 		return exitFallback
+	}
+	if exitCode == exitSuccess && cmd == cmdUnknown {
+		return exitSuccess
 	}
 	if exitCode != 0 {
 		if showUsage {

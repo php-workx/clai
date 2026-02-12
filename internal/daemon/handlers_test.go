@@ -2991,10 +2991,12 @@ func TestCommandEnded_FeedsV2(t *testing.T) {
 	}
 
 	// CommandEnded should enqueue to V2 batch writer
+	endTs := time.Now().Add(-2 * time.Minute).UnixMilli()
 	resp, err := server.CommandEnded(ctx, &pb.CommandEndRequest{
 		SessionId:  "v2-session",
 		CommandId:  "v2-cmd-1",
 		ExitCode:   0,
+		TsUnixMs:   endTs,
 		DurationMs: 250,
 	})
 	if err != nil {
@@ -3021,13 +3023,14 @@ func TestCommandEnded_FeedsV2(t *testing.T) {
 		t.Errorf("expected 1 command_event row in V2 DB, got %d", v2Count)
 	}
 
-	// Verify exit code and duration in the V2 row
+	// Verify exit code, duration, and timestamp in the V2 row
 	var exitCode int
 	var durationMs int64
+	var ts int64
 	err = v2db.DB().QueryRowContext(ctx,
-		`SELECT exit_code, duration_ms FROM command_event WHERE session_id = ? AND cmd_raw = ?`,
+		`SELECT exit_code, duration_ms, ts_ms FROM command_event WHERE session_id = ? AND cmd_raw = ?`,
 		"v2-session", "make build",
-	).Scan(&exitCode, &durationMs)
+	).Scan(&exitCode, &durationMs, &ts)
 	if err != nil {
 		t.Fatalf("failed to query V2 event details: %v", err)
 	}
@@ -3037,6 +3040,9 @@ func TestCommandEnded_FeedsV2(t *testing.T) {
 	}
 	if durationMs != 250 {
 		t.Errorf("expected duration_ms=250, got %d", durationMs)
+	}
+	if ts != endTs {
+		t.Errorf("expected ts=%d from request, got %d", endTs, ts)
 	}
 }
 

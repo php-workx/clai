@@ -28,7 +28,8 @@ func CheckNotRoot() error {
 }
 
 // ValidateDirectoryPermissions checks that the given directory has secure permissions.
-// The directory must exist and be mode 0o700 (owner-only access).
+// On Unix-like systems, the directory must exist and be exactly mode 0o700
+// (owner read/write/execute only).
 // Returns nil if permissions are acceptable, error otherwise.
 func ValidateDirectoryPermissions(dirPath string) error {
 	if runtime.GOOS == "windows" {
@@ -48,16 +49,8 @@ func ValidateDirectoryPermissions(dirPath string) error {
 	}
 
 	perm := info.Mode().Perm()
-
-	// Check for world-readable or world-writable
-	if perm&0o007 != 0 {
-		return fmt.Errorf("%w: %s has mode %o (world-accessible); expected 0o700",
-			ErrInsecureDirectory, dirPath, perm)
-	}
-
-	// Check for group-readable or group-writable
-	if perm&0o070 != 0 {
-		return fmt.Errorf("%w: %s has mode %o (group-accessible); expected 0o700",
+	if perm != 0o700 {
+		return fmt.Errorf("%w: %s has mode %o; expected exactly 0700",
 			ErrInsecureDirectory, dirPath, perm)
 	}
 

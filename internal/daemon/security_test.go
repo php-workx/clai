@@ -286,6 +286,7 @@ func TestValidateDirectoryPermissions_ModeTable(t *testing.T) {
 		wantErr bool
 	}{
 		{"0700 (secure)", 0700, false},
+		{"0600 (missing owner execute)", 0600, true},
 		{"0755 (group+world read/exec)", 0755, true},
 		{"0750 (group read/exec)", 0750, true},
 		{"0701 (world exec)", 0701, true},

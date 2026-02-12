@@ -899,6 +899,36 @@ func TestRun_CoversEarlyFailureAndSuccessPath(t *testing.T) {
 	}
 }
 
+func TestRun_HelpPathsReturnSuccess(t *testing.T) {
+	restore := restoreMainHooks()
+	defer restore()
+
+	checkTTYFn = func() error { return nil }
+	checkTERMFn = func() error { return nil }
+	checkTermWidthFn = func() error { return nil }
+	mkdirAllFn = func(string, os.FileMode) error { return nil }
+	defaultPathsFn = config.DefaultPaths
+	acquireLockFn = func(string) (int, error) { return -1, nil }
+	releaseLockFn = func(int) {}
+	loadConfigFn = func() (*config.Config, error) {
+		t.Fatal("loadConfigFn should not be called for help/version early exits")
+		return nil, errors.New("unexpected call")
+	}
+
+	if got := run([]string{"--help"}); got != exitSuccess {
+		t.Fatalf("run(--help) = %d, want %d", got, exitSuccess)
+	}
+	if got := run([]string{"--version"}); got != exitSuccess {
+		t.Fatalf("run(--version) = %d, want %d", got, exitSuccess)
+	}
+	if got := run([]string{"history", "-h"}); got != exitSuccess {
+		t.Fatalf("run(history -h) = %d, want %d", got, exitSuccess)
+	}
+	if got := run([]string{"suggest", "--help"}); got != exitSuccess {
+		t.Fatalf("run(suggest --help) = %d, want %d", got, exitSuccess)
+	}
+}
+
 func TestDebugLogPrintUsageAndPrintVersion(t *testing.T) {
 	restore := restoreMainHooks()
 	defer restore()

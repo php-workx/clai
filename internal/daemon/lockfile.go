@@ -85,6 +85,11 @@ func (l *LockFile) Acquire() error {
 	// Try to acquire exclusive non-blocking lock
 	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
 	if err != nil {
+		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
+			f.Close()
+			return fmt.Errorf("failed to acquire lock on %s: %w", l.path, err)
+		}
+
 		// Lock is held by another process - check for stale PID
 		stalePID := l.readPIDFromFile(f)
 		f.Close()

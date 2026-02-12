@@ -260,7 +260,7 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 				Branch:     info.LastGitBranch,
 				ExitCode:   int(req.ExitCode),
 				DurationMs: &durationMs,
-				Ts:         time.Now().UnixMilli(),
+				Ts:         tsEnd.UnixMilli(),
 			}
 			s.batchWriter.Enqueue(ev)
 		}
