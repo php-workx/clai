@@ -661,12 +661,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("workflows.default_mode must be \"interactive\" or \"non-interactive-fail\" (got: %q)", c.Workflows.DefaultMode)
 	}
 
-	if c.Workflows.RetainRuns < 0 {
-		return errors.New("workflows.retain_runs must be >= 0")
-	}
-	if c.Workflows.RetainRuns == 0 {
-		// Zero value from YAML unmarshal means not set; apply default
-		c.Workflows.RetainRuns = 100
+	if c.Workflows.RetainRuns <= 0 {
+		return errors.New("invalid retain_runs: must be > 0")
 	}
 
 	return nil

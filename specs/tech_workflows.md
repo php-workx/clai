@@ -628,6 +628,13 @@ const maxOutputForLLM = 100 * 1024 // 100KB (~25k tokens)
 
 func buildAnalysisContext(step *StepDef, result *StepResult, secrets []string) string {
     output := result.Stdout
+    if result.Stderr != "" {
+        if output == "" {
+            output = result.Stderr
+        } else {
+            output = output + "\n\n--- STDERR ---\n\n" + result.Stderr
+        }
+    }
 
     // 1. Scrub secrets
     output = scrubSecrets(output, secrets)

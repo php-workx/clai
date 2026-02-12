@@ -72,9 +72,15 @@ func (m *SecretMasker) MaskBytes(input []byte) []byte {
 	if m == nil || len(m.values) == 0 {
 		return input
 	}
-	mask := []byte("***")
+
+	secretBytes := make([][]byte, 0, len(m.values))
 	for _, v := range m.values {
-		input = bytes.ReplaceAll(input, []byte(v), mask)
+		secretBytes = append(secretBytes, []byte(v))
+	}
+
+	mask := []byte("***")
+	for _, secret := range secretBytes {
+		input = bytes.ReplaceAll(input, secret, mask)
 	}
 	return input
 }

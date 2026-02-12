@@ -1159,14 +1159,14 @@ func TestWorkflowsConfigValidation(t *testing.T) {
 		{
 			name:    "rejects_negative_retain_runs",
 			modify:  func(c *Config) { c.Workflows.RetainRuns = -1 },
-			wantErr: "workflows.retain_runs must be >= 0",
+			wantErr: "invalid retain_runs: must be > 0",
 		},
 		{
-			name: "zero_retain_runs_gets_default",
+			name: "rejects_zero_retain_runs",
 			modify: func(c *Config) {
 				c.Workflows.RetainRuns = 0
 			},
-			wantErr: "",
+			wantErr: "invalid retain_runs: must be > 0",
 		},
 	}
 
@@ -1269,9 +1269,9 @@ workflows:
 	if !cfg.Workflows.Enabled {
 		t.Error("Expected workflows.enabled=true")
 	}
-	// RetainRuns zero value gets defaulted by Validate
+	// retain_runs is inherited from DefaultConfig because it is omitted in YAML.
 	if cfg.Workflows.RetainRuns != 100 {
-		t.Errorf("Expected retain_runs defaulted to 100, got %d", cfg.Workflows.RetainRuns)
+		t.Errorf("Expected retain_runs inherited as 100, got %d", cfg.Workflows.RetainRuns)
 	}
 }
 
