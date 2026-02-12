@@ -146,7 +146,7 @@ func (s *Server) Start(ctx context.Context) error {
 	s.listener = listener
 
 	// Set socket permissions (readable/writable by owner only)
-	if err := os.Chmod(socketPath, 0600); err != nil {
+	if err := os.Chmod(socketPath, 0o600); err != nil {
 		listener.Close()
 		return fmt.Errorf("failed to set socket permissions: %w", err)
 	}
@@ -243,7 +243,7 @@ func (s *Server) cleanup() {
 func (s *Server) writePIDFile() error {
 	pidPath := s.paths.PIDFile()
 	pid := os.Getpid()
-	return os.WriteFile(pidPath, []byte(fmt.Sprintf("%d\n", pid)), 0600)
+	return os.WriteFile(pidPath, []byte(fmt.Sprintf("%d\n", pid)), 0o600)
 }
 
 // touchActivity updates the last activity timestamp.

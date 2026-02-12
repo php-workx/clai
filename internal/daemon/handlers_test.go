@@ -16,16 +16,18 @@ import (
 
 // mockStore implements storage.Store for testing.
 type mockStore struct {
-	sessions map[string]*storage.Session
-	commands map[string]*storage.Command
-	cache    map[string]*storage.CacheEntry
+	sessions       map[string]*storage.Session
+	commands       map[string]*storage.Command
+	cache          map[string]*storage.CacheEntry
+	importedShells map[string]bool
 }
 
 func newMockStore() *mockStore {
 	return &mockStore{
-		sessions: make(map[string]*storage.Session),
-		commands: make(map[string]*storage.Command),
-		cache:    make(map[string]*storage.CacheEntry),
+		sessions:       make(map[string]*storage.Session),
+		commands:       make(map[string]*storage.Command),
+		cache:          make(map[string]*storage.CacheEntry),
+		importedShells: make(map[string]bool),
 	}
 }
 

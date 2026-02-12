@@ -99,7 +99,7 @@ func StartDaemonProcess() error {
 	}
 
 	// Ensure directory exists
-	os.MkdirAll(daemonDir(), 0755)
+	os.MkdirAll(daemonDir(), 0o755)
 
 	// Start daemon process
 	exe, err := os.Executable()
@@ -108,12 +108,12 @@ func StartDaemonProcess() error {
 	}
 
 	// Create log file for daemon output
-	logFile, err := os.OpenFile(logPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	logFile, err := os.OpenFile(logPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 	if err != nil {
 		logFile = nil
 	}
 
-	cmd := exec.Command(exe, "daemon", "run")
+	cmd := exec.Command(exe, "claude-daemon", "run") //nolint:gosec // G204: exe is our own binary path
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
@@ -129,9 +129,14 @@ func StartDaemonProcess() error {
 		}
 		return fmt.Errorf("failed to start daemon: %w", err)
 	}
+	if logFile != nil {
+		// Child inherited the descriptor; close parent's copy to avoid leaking fds
+		// across repeated start attempts.
+		logFile.Close()
+	}
 
 	// Write PID file
-	os.WriteFile(pidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0644)
+	os.WriteFile(pidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o644)
 
 	// Wait for socket to be available (up to 90 seconds for Claude init with hooks)
 	for i := 0; i < 900; i++ {

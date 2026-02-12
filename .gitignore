@@ -1,6 +1,7 @@
 .DS_Store
 .agents
 .idea
+.DS_Store
 firebase-debug.log
 bin/
 
@@ -12,3 +13,13 @@ bin/
 # Test coverage
 coverage.out
 coverage.html
+
+# Beads export state (machine-specific paths)
+.beads/export-state
+.beads/.jsonl.lock
+.scannerwork
+.sonarqube
+.sonarqube-autofix
+
+# Auto Claude data directory
+.auto-claude/

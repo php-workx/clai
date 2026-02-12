@@ -15,11 +15,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/runger/clai/internal/ipc"
 )
+
+func signalAwareContext() (context.Context, context.CancelFunc) {
+	return signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+}
 
 // Version info - injected at build time via ldflags
 var (
@@ -59,7 +65,7 @@ func main() {
 
 	if len(os.Args) < 2 {
 		printUsage()
-		os.Exit(0)
+		return
 	}
 
 	cmd := os.Args[1]
@@ -91,8 +97,8 @@ func main() {
 		printUsage()
 	}
 
-	// Always exit 0 for silent failure
-	os.Exit(0)
+	// Always exit 0 for silent failure (defer above is only for panic recovery)
+	os.Exit(0) //nolint:gocritic // exitAfterDefer: defer is for panic recovery only
 }
 
 func printVersion() {
@@ -129,7 +135,7 @@ Environment:
 func parseFlags(args []string) map[string]string {
 	result := make(map[string]string)
 	for i := 0; i < len(args); i++ {
-		arg := args[i]
+		arg := args[i] //nolint:gosec // G602: bounds checked by loop condition
 		if strings.HasPrefix(arg, "--") {
 			key := strings.TrimPrefix(arg, "--")
 			if idx := strings.Index(key, "="); idx >= 0 {
@@ -305,7 +311,10 @@ func runSuggest() {
 	}
 	defer client.Close()
 
-	suggestions := client.Suggest(context.Background(), sessionID, cwd, buffer, cursorPos, false, limit)
+	ctx, stop := signalAwareContext()
+	defer stop()
+
+	suggestions := client.Suggest(ctx, sessionID, cwd, buffer, cursorPos, false, limit)
 	if len(suggestions) == 0 {
 		return
 	}
@@ -348,7 +357,10 @@ func runTextToCommand() {
 	}
 	defer client.Close()
 
-	resp, err := client.TextToCommand(context.Background(), sessionID, prompt, cwd, 3)
+	ctx, stop := signalAwareContext()
+	defer stop()
+
+	resp, err := client.TextToCommand(ctx, sessionID, prompt, cwd, 3)
 	if err != nil || resp == nil || len(resp.Suggestions) == 0 {
 		return
 	}

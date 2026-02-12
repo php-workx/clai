@@ -40,28 +40,15 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("%sclai status%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
 
-	checks := make([]statusCheck, 0, 7)
-
-	// Check on/off state
-	checks = append(checks, checkOnOff())
-
-	// Check Claude CLI
-	checks = append(checks, checkClaudeCLI())
-
-	// Check shell integration
-	checks = append(checks, checkShellStatus(paths))
-
-	// Check session ID
-	checks = append(checks, checkSessionID())
-
-	// Check daemon
-	checks = append(checks, checkDaemonStatus())
-
-	// Check storage
-	checks = append(checks, checkStorage(paths))
-
-	// Check configuration
-	checks = append(checks, checkConfig(paths))
+	checks := []statusCheck{
+		checkOnOff(),            // on/off state
+		checkClaudeCLI(),        // Claude CLI
+		checkShellStatus(paths), // shell integration
+		checkSessionID(),        // session ID
+		checkDaemonStatus(),     // daemon
+		checkStorage(paths),     // storage
+		checkConfig(paths),      // configuration
+	}
 
 	// Print results
 	hasErrors := false

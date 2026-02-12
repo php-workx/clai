@@ -73,7 +73,9 @@ function _ai_accept_suggestion
 end
 
 # Bind Alt+Enter to accept suggestion (Tab is used for completions in Fish)
-bind \e\r _ai_accept_suggestion
+for mode in default insert visual
+    bind -M $mode \e\r _ai_accept_suggestion
+end
 
 # Clear suggestion with Escape
 function _ai_clear_suggestion
@@ -90,7 +92,9 @@ function _clai_escape
         _ai_clear_suggestion
     end
 end
-bind \e _clai_escape
+for mode in default insert visual
+    bind -M $mode \e _clai_escape
+end
 
 # ============================================
 # Feature 2a: TUI Picker (clai-picker)
@@ -700,10 +704,13 @@ function _clai_disable
     set -gx CLAI_OFF 1
 
     # Restore default keybindings
-    bind \t complete
-    bind \e\[A history-search-backward
-    bind \e\[B history-search-forward
-    bind \r execute
+    for mode in default insert visual
+        bind -M $mode \t complete
+        bind -M $mode \e\[A history-search-backward
+        bind -M $mode \eOA history-search-backward
+        bind -M $mode \e\[B history-search-forward
+        bind -M $mode \eOB history-search-forward
+        bind -M $mode \r execute
 
     # Remove custom keybindings
     bind \e ''
@@ -711,9 +718,6 @@ function _clai_disable
     bind \eh ''
     bind ˙ ''
     bind \cx\cv ''
-    bind \cx\cs ''
-    bind \cx\cd ''
-    bind \cx\cg ''
 
     # Restore native autosuggestions to their prior state
     if set -q _clai_prev_autosuggestion

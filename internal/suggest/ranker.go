@@ -95,13 +95,14 @@ func aggregateCandidates(results []*QueryResult) map[string]*candidate {
 	candidates := make(map[string]*candidate)
 
 	for _, result := range results {
-		for _, cmd := range result.Commands {
+		for i := range result.Commands {
+			cmd := &result.Commands[i]
 			key := DeduplicateKey(cmd.CommandNorm)
 			existing, ok := candidates[key]
 			if !ok {
-				candidates[key] = newCandidate(cmd, result.Source)
+				candidates[key] = newCandidate(*cmd, result.Source)
 			} else {
-				updateCandidate(existing, cmd, result.Source)
+				updateCandidate(existing, *cmd, result.Source)
 			}
 		}
 	}

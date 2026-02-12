@@ -34,8 +34,10 @@ var Patterns = []Pattern{
 	{
 		// Pattern 2: Common install/run commands
 		// Matches: pip install requests, npm install, brew install, cargo install, go install, etc.
-		Name:    "install",
-		Regex:   regexp.MustCompile(`(?i)(pip3?|python3? -m pip|npm|yarn|pnpm|brew|cargo|go|apt-get|apt|dnf|pacman -S)\s+install\s+[a-zA-Z0-9_@/.:=-]+(\s+[a-zA-Z0-9_@/.:=-]+)*`),
+		Name: "install",
+		Regex: regexp.MustCompile(
+			`(?i)(pip3?|python3? -m pip|npm|yarn|pnpm|brew|cargo|go|apt-get|apt|dnf|pacman -S)` +
+				`\s+install\s+[a-zA-Z0-9_@/.:=-]+(\s+[a-zA-Z0-9_@/.:=-]+)*`),
 		Process: func(s string) string { return s },
 	},
 	{

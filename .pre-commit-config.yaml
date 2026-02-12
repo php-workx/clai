@@ -1,6 +1,8 @@
 # Pre-commit hooks: https://pre-commit.com
 # Install: make install-dev
 
+exclude: ^\.agents/
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
@@ -44,6 +46,12 @@ repos:
       - id: govulncheck
         name: govulncheck
         entry: govulncheck ./...
+        language: system
+        pass_filenames: false
+        types: [go]
+      - id: deadcode
+        name: deadcode
+        entry: deadcode ./...
         language: system
         pass_filenames: false
         types: [go]

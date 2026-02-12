@@ -5,9 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/runger/clai/internal/cmdutil"
 )
+
+const commandNormLikeClause = " AND command_norm LIKE ? ESCAPE '\\'"
 
 // ErrCommandNotFound is returned when a command is not found.
 var ErrCommandNotFound = errors.New("command not found")
@@ -15,20 +18,8 @@ var ErrCommandNotFound = errors.New("command not found")
 // CreateCommand creates a new command record.
 // It automatically normalizes the command and generates a hash.
 func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
-	if cmd == nil {
-		return errors.New("command cannot be nil")
-	}
-	if cmd.CommandID == "" {
-		return errors.New("command_id is required")
-	}
-	if cmd.SessionID == "" {
-		return errors.New("session_id is required")
-	}
-	if cmd.CWD == "" {
-		return errors.New("cwd is required")
-	}
-	if cmd.Command == "" {
-		return errors.New("command is required")
+	if err := validateCommandForCreate(cmd); err != nil {
+		return err
 	}
 
 	// Normalize command if not already set
@@ -42,14 +33,7 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 	}
 
 	// Determine is_success value: nil = unknown (treated as success), false = failure, true = success
-	var isSuccess *int
-	if cmd.IsSuccess != nil {
-		v := 0
-		if *cmd.IsSuccess {
-			v = 1
-		}
-		isSuccess = &v
-	}
+	isSuccess := optionalBoolToInt(cmd.IsSuccess)
 
 	// Compute derived metadata from command text
 	cmd.IsSudo = cmdutil.IsSudo(cmd.Command)
@@ -102,6 +86,34 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 	}
 
 	return nil
+}
+
+func validateCommandForCreate(cmd *Command) error {
+	switch {
+	case cmd == nil:
+		return errors.New("command cannot be nil")
+	case cmd.CommandID == "":
+		return errors.New("command_id is required")
+	case cmd.SessionID == "":
+		return errors.New("session_id is required")
+	case cmd.CWD == "":
+		return errors.New("cwd is required")
+	case cmd.Command == "":
+		return errors.New("command is required")
+	default:
+		return nil
+	}
+}
+
+func optionalBoolToInt(v *bool) *int {
+	if v == nil {
+		return nil
+	}
+	n := 0
+	if *v {
+		n = 1
+	}
+	return &n
 }
 
 // UpdateCommandEnd updates a command's end time, duration, and exit code.
@@ -266,8 +278,12 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 		args = append(args, *q.CWD)
 	}
 	if q.Prefix != "" {
-		query += " AND command_norm LIKE ?"
-		args = append(args, q.Prefix+"%")
+		query += commandNormLikeClause
+		args = append(args, escapeLikePattern(q.Prefix)+"%")
+	}
+	if q.Substring != "" {
+		query += commandNormLikeClause
+		args = append(args, "%"+escapeLikePattern(q.Substring)+"%")
 	}
 	if q.Substring != "" {
 		query += " AND command_norm LIKE ?"
@@ -298,6 +314,13 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	}
 
 	return query, args
+}
+
+func escapeLikePattern(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `%`, `\%`)
+	escaped = strings.ReplaceAll(escaped, `_`, `\_`)
+	return escaped
 }
 
 func scanCommandRow(rows *sql.Rows) (Command, error) {

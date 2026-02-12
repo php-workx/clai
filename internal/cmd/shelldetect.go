@@ -72,7 +72,7 @@ func detectParentShell() string {
 	}
 
 	// Fall back to ps command (macOS, BSD)
-	cmd := exec.Command("ps", "-p", fmt.Sprintf("%d", ppid), "-o", "comm=")
+	cmd := exec.Command("ps", "-p", fmt.Sprintf("%d", ppid), "-o", "comm=") //nolint:gosec // G204: ppid is from os.Getppid()
 	if output, err := cmd.Output(); err == nil {
 		name := strings.TrimSpace(string(output))
 		if shell := extractShellName(name); shell != "" {

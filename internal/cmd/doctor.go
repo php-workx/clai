@@ -42,24 +42,14 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	fmt.Println(strings.Repeat("-", 40))
 	fmt.Println()
 
+	// Collect all check results (separate appends for readability with mixed single/slice returns)
 	results := make([]checkResult, 0, 16)
-
-	// Check binary
 	results = append(results, checkBinary())
-
-	// Check directories
 	results = append(results, checkDirectories()...)
-
-	// Check configuration
+	//nolint:gocritic // appendCombine: separate appends intentional for mixed single/slice returns
 	results = append(results, checkConfiguration())
-
-	// Check shell integration
 	results = append(results, checkShellIntegrationDoctor())
-
-	// Check daemon
 	results = append(results, checkDaemon())
-
-	// Check AI providers
 	results = append(results, checkAIProviders()...)
 
 	// Print results

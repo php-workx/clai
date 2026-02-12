@@ -11,6 +11,8 @@ import (
 	"github.com/runger/clai/internal/ipc"
 )
 
+const daemonFailedFmt = " %sfailed%s\n"
+
 var daemonCmd = &cobra.Command{
 	Use:    "daemon",
 	Short:  "Manage the clai background daemon",
@@ -39,7 +41,7 @@ var daemonStartCmd = &cobra.Command{
 		fmt.Print("Starting daemon...")
 		err := ipc.SpawnAndWait(5 * time.Second)
 		if err != nil {
-			fmt.Printf(" %sfailed%s\n", colorRed, colorReset)
+			fmt.Printf(daemonFailedFmt, colorRed, colorReset)
 			return err
 		}
 		fmt.Printf(" %srunning%s\n", colorGreen, colorReset)
