@@ -21,6 +21,7 @@ func (a *unixShellAdapter) BuildCommand(ctx context.Context, step *StepDef, work
 		return nil, fmt.Errorf("step run field is empty")
 	}
 
+	env = append([]string(nil), env...)
 	env = append(env, "CLAI_OUTPUT="+outputFile)
 
 	var cmd *exec.Cmd
@@ -33,6 +34,7 @@ func (a *unixShellAdapter) BuildCommand(ctx context.Context, step *StepDef, work
 		if len(argv) == 0 {
 			return nil, fmt.Errorf("command produced empty argv")
 		}
+		// #nosec G204 -- commands originate from trusted workflow definitions.
 		cmd = exec.CommandContext(ctx, argv[0], argv[1:]...)
 	} else {
 		// Shell mode: wrap in shell interpreter.
@@ -40,6 +42,7 @@ func (a *unixShellAdapter) BuildCommand(ctx context.Context, step *StepDef, work
 		if step.Shell != "" && step.Shell != "true" {
 			shellPath = step.Shell
 		}
+		// #nosec G204 -- commands originate from trusted workflow definitions.
 		cmd = exec.CommandContext(ctx, shellPath, "-c", step.Run)
 	}
 

@@ -56,7 +56,20 @@ type AnalysisRequest struct {
 // If both fail, returns AnalysisResult{Decision: "needs_human"}.
 func (t *AnalysisTransport) Analyze(ctx context.Context, req *AnalysisRequest) (*AnalysisResult, error) {
 	// Build scrubbed output once -- used by both paths.
-	scrubbedOutput := t.analyzer.BuildAnalysisContext(req.StdoutTail, req.StderrTail, 0)
+	scrubbedOutput := ""
+	if t.analyzer != nil {
+		scrubbedOutput = t.analyzer.BuildAnalysisContext(req.StdoutTail, req.StderrTail, 0)
+	} else {
+		slog.Warn("analysis transport analyzer is nil; using unsanitized output tails")
+		scrubbedOutput = req.StdoutTail
+		if req.StderrTail != "" {
+			if scrubbedOutput == "" {
+				scrubbedOutput = req.StderrTail
+			} else {
+				scrubbedOutput += "\n" + req.StderrTail
+			}
+		}
+	}
 
 	// 1. Try daemon RPC.
 	result, err := t.analyzeViaDaemon(ctx, req, scrubbedOutput)
@@ -139,9 +152,12 @@ func (t *AnalysisTransport) analyzeViaDirect(ctx context.Context, req *AnalysisR
 		}, nil
 	}
 
-	prompt := t.analyzer.BuildPrompt(req.StepName, req.RiskLevel, scrubbedOutput, req.AnalysisPrompt)
+	prompt := buildFallbackPrompt(t.analyzer, req, scrubbedOutput)
 
 	maxAttempts := t.maxRetries + 1
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
 	var lastErr error
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if attempt > 0 {
@@ -169,8 +185,37 @@ func (t *AnalysisTransport) analyzeViaDirect(ctx context.Context, req *AnalysisR
 	}
 
 	//nolint:nilerr // Intentional: error is captured in AnalysisResult, not propagated as Go error.
+	reason := "all analysis paths failed"
+	if lastErr != nil {
+		reason += ": " + lastErr.Error()
+	}
 	return &AnalysisResult{
 		Decision:  string(DecisionNeedsHuman),
-		Reasoning: "all analysis paths failed: " + lastErr.Error(),
+		Reasoning: reason,
 	}, nil
+}
+
+func buildFallbackPrompt(analyzer *Analyzer, req *AnalysisRequest, scrubbedOutput string) string {
+	if analyzer != nil {
+		return analyzer.BuildPrompt(req.StepName, req.RiskLevel, scrubbedOutput, req.AnalysisPrompt)
+	}
+
+	risk := req.RiskLevel
+	if risk == "" {
+		risk = "medium"
+	}
+
+	var b strings.Builder
+	b.WriteString("You are analyzing the output of a workflow step.\n\n")
+	fmt.Fprintf(&b, "Step: %s\n", req.StepName)
+	fmt.Fprintf(&b, "Risk level: %s\n\n", risk)
+	if req.AnalysisPrompt != "" {
+		fmt.Fprintf(&b, "Analysis instructions: %s\n\n", req.AnalysisPrompt)
+	}
+	b.WriteString("Output:\n```\n")
+	b.WriteString(scrubbedOutput)
+	b.WriteString("\n```\n\n")
+	b.WriteString("Respond with a JSON object: {\"decision\": \"proceed|halt|needs_human\", \"reasoning\": \"...\", \"flags\": {}}\n")
+	b.WriteString("Valid decisions: proceed, halt, needs_human\n")
+	return b.String()
 }

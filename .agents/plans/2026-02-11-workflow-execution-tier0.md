@@ -59,7 +59,7 @@ Extend the existing SQLite store per §12.2-12.5. Tables use composite key `(run
 - `validShellValues` includes `sh` (m11)
 - Matrix `include` entries expand correctly
 - Validator checks: step IDs unique, required fields present, risk_level valid (low/medium/high)
-- Expression reference validation (`${{ steps.X }}` verifies step X exists) deferred to Issue 7 (expression engine)
+- Expression reference validation (`${{ steps.X }}` verifies step X exists) deferred to Issue 9 (expression engine)
 - `sanitizePathComponent()` (SS7.5)
 - Spike yaml.v3 `KnownFields(true)` + `inline` + custom `UnmarshalYAML` interaction first (M5)
 - Unit tests for parse + validation rules
@@ -206,7 +206,7 @@ Per §10 (core). The analysis engine without transport concerns. Builds context,
 - `[i]nspect` shows full output
 - `[c]ommand` runs ad-hoc shell command
 - Non-interactive-fail mode: returns reject with exit code 5 when human review needed
-- `ModeNonInteractiveAuto` rejected with error in Tier 0 (§4.1)
+- `ModeNonInteractiveAuto` is rejected with error in Tier 0 (§4.1)
 - Unit tests with scripted stdin
 **Description:**
 Per §11, FR-30-32. Moved to Wave 2 per D32 — only needs analysis result types (decision enum, reasoning string, flags map), not the full LLM integration. The review interface presents LLM analysis results and available options. Uses `InteractionHandler` interface for testability with `ScriptedInteractionHandler`.

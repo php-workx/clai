@@ -233,9 +233,18 @@ func TestValidateWorkflow_CollectsAllErrors(t *testing.T) {
 		},
 	}
 	errs := ValidateWorkflow(wf)
-	// Should have errors for: name, secrets[0].name, secrets[0].from,
-	// steps[0].run, steps[0].risk_level, steps[1].id (duplicate)
-	assert.GreaterOrEqual(t, len(errs), 5)
+	assertFieldError(t, errs, "name", "required")
+	assertFieldError(t, errs, "secrets[0].name", "required")
+	assertFieldError(t, errs, "secrets[0].from", "invalid secret source")
+	assertFieldError(t, errs, "jobs.build.steps[0].run", "required")
+	assertFieldError(t, errs, "jobs.build.steps[0].risk_level", "invalid")
+	assertFieldError(t, errs, "jobs.build.steps[1].id", "duplicate")
+}
+
+func TestValidateWorkflow_NilWorkflow(t *testing.T) {
+	errs := ValidateWorkflow(nil)
+	require.NotEmpty(t, errs)
+	assertFieldError(t, errs, "workflow", "required")
 }
 
 func TestValidateWorkflow_UnknownNeed(t *testing.T) {

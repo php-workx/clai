@@ -21,6 +21,7 @@ func (a *windowsShellAdapter) BuildCommand(ctx context.Context, step *StepDef, w
 		return nil, fmt.Errorf("step run field is empty")
 	}
 
+	env = append([]string(nil), env...)
 	env = append(env, "CLAI_OUTPUT="+outputFile)
 
 	var cmd *exec.Cmd

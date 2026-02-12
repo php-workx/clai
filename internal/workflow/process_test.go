@@ -8,6 +8,13 @@ import (
 	"time"
 )
 
+func longRunningCmd() *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		return exec.Command("cmd", "/c", "ping", "-n", "60", "127.0.0.1")
+	}
+	return exec.Command("sleep", "60")
+}
+
 func TestNewProcessController(t *testing.T) {
 	pc := NewProcessController()
 	if pc == nil {
@@ -17,7 +24,7 @@ func TestNewProcessController(t *testing.T) {
 
 func TestStartConfiguresProcessGroup(t *testing.T) {
 	pc := NewProcessController()
-	cmd := exec.Command("sleep", "60")
+	cmd := longRunningCmd()
 	if err := pc.Start(cmd); err != nil {
 		t.Fatalf("Start failed: %v", err)
 	}
@@ -55,7 +62,7 @@ func TestWaitNormalCompletion(t *testing.T) {
 
 func TestWaitContextCancellation(t *testing.T) {
 	pc := NewProcessController()
-	cmd := exec.Command("sleep", "60")
+	cmd := longRunningCmd()
 
 	if err := pc.Start(cmd); err != nil {
 		t.Fatalf("Start failed: %v", err)
@@ -86,7 +93,7 @@ func TestWaitContextCancellation(t *testing.T) {
 
 func TestInterruptWithoutStart(t *testing.T) {
 	pc := NewProcessController()
-	cmd := exec.Command("sleep", "60")
+	cmd := longRunningCmd()
 	// Don't start the command.
 	err := pc.Interrupt(cmd)
 	if err == nil {
@@ -96,7 +103,7 @@ func TestInterruptWithoutStart(t *testing.T) {
 
 func TestKillWithoutStart(t *testing.T) {
 	pc := NewProcessController()
-	cmd := exec.Command("sleep", "60")
+	cmd := longRunningCmd()
 	err := pc.Kill(cmd)
 	if err == nil {
 		t.Fatal("Kill on unstarted process should return an error")
@@ -105,7 +112,7 @@ func TestKillWithoutStart(t *testing.T) {
 
 func TestWaitWithoutStart(t *testing.T) {
 	pc := NewProcessController()
-	cmd := exec.Command("sleep", "60")
+	cmd := longRunningCmd()
 	err := pc.Wait(context.Background(), cmd, DefaultGracePeriod)
 	if err == nil {
 		t.Fatal("Wait on unstarted process should return an error")
@@ -114,7 +121,7 @@ func TestWaitWithoutStart(t *testing.T) {
 
 func TestKillTerminatesProcess(t *testing.T) {
 	pc := NewProcessController()
-	cmd := exec.Command("sleep", "60")
+	cmd := longRunningCmd()
 
 	if err := pc.Start(cmd); err != nil {
 		t.Fatalf("Start failed: %v", err)

@@ -388,7 +388,7 @@ func (c *Config) setAIField(field, value string) error {
 	case "auto_diagnose":
 		v, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("invalid value for auto_diagnose: %w", err)
+			return fmt.Errorf(invalidBoolValueFmt, "auto_diagnose", err)
 		}
 		c.AI.AutoDiagnose = v
 	case "cache_ttl_hours":
@@ -450,7 +450,7 @@ func (c *Config) setSuggestionsField(field, value string) error {
 	case "show_risk_warning":
 		v, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("invalid value for show_risk_warning: %w", err)
+			return fmt.Errorf(invalidBoolValueFmt, "show_risk_warning", err)
 		}
 		c.Suggestions.ShowRiskWarning = v
 	default:
@@ -600,7 +600,7 @@ func (c *Config) setWorkflowsField(field, value string) error {
 	case "strict_permissions":
 		v, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("invalid value for strict_permissions: %w", err)
+			return fmt.Errorf(invalidBoolValueFmt, "strict_permissions", err)
 		}
 		c.Workflows.StrictPermissions = v
 	case "secret_file":
@@ -662,7 +662,7 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Workflows.RetainRuns < 0 {
-		return errors.New("workflows.retain_runs must be > 0")
+		return errors.New("workflows.retain_runs must be >= 0")
 	}
 	if c.Workflows.RetainRuns == 0 {
 		// Zero value from YAML unmarshal means not set; apply default

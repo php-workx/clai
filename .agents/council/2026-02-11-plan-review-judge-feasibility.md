@@ -123,7 +123,7 @@ Issue 12 describes "LLM analysis integration" as a single issue. In reality, D24
 
 **Path B (direct fallback):** CLI imports `internal/claude` and calls `QueryFast()` directly. Must construct the same prompt, parse the same response format, apply the same risk matrix. Error handling: Claude daemon socket errors, Claude CLI not found, subprocess timeout.
 
-Both paths must produce identical `AnalysisResponse` structs. Both must handle the same edge cases (empty response, malformed JSON, timeout). Both must log/persist differently (Path A persists in SQLite via the daemon; Path B does NOT persist -- the plan's risk note says "LLM analysis not persisted to SQLite").
+Both paths must produce identical `AnalysisResponse` structs and handle the same edge cases (empty response, malformed JSON, timeout). However, they log/persist differently (Path A persists in SQLite via the daemon; Path B does NOT persist -- the plan's risk note says "LLM analysis not persisted to SQLite").
 
 Testing this requires at minimum 6 test cases: claid-up+LLM-ok, claid-up+LLM-fail, claid-up+LLM-unparseable, claid-down+fallback-ok, claid-down+fallback-fail, claid-down+fallback-unparseable. Each with 3 risk levels = 18 matrix combinations for the full decision path.
 

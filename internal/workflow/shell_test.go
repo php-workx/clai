@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,7 +27,7 @@ func TestBuildCommand_ArgvMode(t *testing.T) {
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", env, "/tmp/output.txt")
 	require.NoError(t, err)
 
-	assert.Equal(t, "echo", cmd.Path[len(cmd.Path)-4:]) // ends with "echo" (full path resolved by exec)
+	assert.True(t, strings.HasSuffix(cmd.Path, "echo"), "expected path to end with echo, got %q", cmd.Path)
 	assert.Equal(t, []string{"echo", "hello", "world"}, cmd.Args)
 	assert.Equal(t, "/tmp", cmd.Dir)
 }
@@ -107,11 +108,7 @@ func TestBuildCommand_ExplicitShell(t *testing.T) {
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
 	require.NoError(t, err)
 
-	if runtime.GOOS == "windows" {
-		assert.Equal(t, []string{"bash", "-c", "echo hello"}, cmd.Args)
-	} else {
-		assert.Equal(t, []string{"bash", "-c", "echo hello"}, cmd.Args)
-	}
+	assert.Equal(t, []string{"bash", "-c", "echo hello"}, cmd.Args)
 }
 
 func TestBuildCommand_CLAIOutputEnv(t *testing.T) {

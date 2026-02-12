@@ -2,7 +2,7 @@ package workflow
 
 import "sync"
 
-// LimitedBuffer is a fixed-capacity ring buffer that implements io.Writer.
+// LimitedBuffer is a fixed-capacity tail buffer that implements io.Writer.
 // It retains the last N bytes written, discarding oldest bytes when full.
 // Thread-safe with sync.Mutex.
 // Default capacity: 4096 bytes (4KB per FR-7).

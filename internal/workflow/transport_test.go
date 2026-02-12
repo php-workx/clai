@@ -64,6 +64,24 @@ func TestTransport_DaemonUnavailable_NoFallback(t *testing.T) {
 	assert.Equal(t, "daemon unavailable and no direct LLM configured", result.Reasoning)
 }
 
+func TestTransport_DaemonUnavailable_NilAnalyzer(t *testing.T) {
+	transport := NewAnalysisTransport(nil, nil)
+	transport.dialFunc = failDial
+
+	req := &AnalysisRequest{
+		RunID:      "run-nil-analyzer",
+		StepID:     "step",
+		StepName:   "lint",
+		RiskLevel:  "low",
+		StdoutTail: "ok",
+	}
+
+	result, err := transport.Analyze(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, string(DecisionNeedsHuman), result.Decision)
+}
+
 func TestTransport_DirectLLMFailure(t *testing.T) {
 	analyzer := NewAnalyzer(nil)
 	directLLM := func(_ context.Context, _ string) (string, error) {
@@ -88,6 +106,29 @@ func TestTransport_DirectLLMFailure(t *testing.T) {
 	assert.Equal(t, "needs_human", result.Decision)
 	assert.Contains(t, result.Reasoning, "all analysis paths failed")
 	assert.Contains(t, result.Reasoning, "LLM service unavailable")
+}
+
+func TestTransport_DirectLLMFailure_NegativeRetries(t *testing.T) {
+	analyzer := NewAnalyzer(nil)
+	directLLM := func(_ context.Context, _ string) (string, error) {
+		return "", errors.New("LLM unavailable")
+	}
+
+	transport := NewAnalysisTransport(analyzer, directLLM)
+	transport.dialFunc = failDial
+	transport.maxRetries = -1
+
+	req := &AnalysisRequest{
+		RunID:    "run-negative-retries",
+		StepID:   "step",
+		StepName: "build",
+	}
+
+	result, err := transport.Analyze(context.Background(), req)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, string(DecisionNeedsHuman), result.Decision)
+	assert.Contains(t, result.Reasoning, "all analysis paths failed")
 }
 
 func TestTransport_DaemonUnavailable_FallbackParseError(t *testing.T) {

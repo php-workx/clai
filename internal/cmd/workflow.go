@@ -86,6 +86,7 @@ type workflowRunContext struct {
 	workflowHash   string
 	normalizedPath string
 	workDir        string
+	ctx            context.Context
 	def            *workflow.WorkflowDef
 	display        *workflow.Display
 	artifact       *workflow.RunArtifact
@@ -195,6 +196,7 @@ func setupRunContext(cmd *cobra.Command, def *workflow.WorkflowDef, data []byte,
 		workflowHash:   workflowHash,
 		normalizedPath: normalizedPath,
 		workDir:        ".",
+		ctx:            ctx,
 		def:            def,
 		display:        display,
 		artifact:       artifact,
@@ -203,8 +205,6 @@ func setupRunContext(cmd *cobra.Command, def *workflow.WorkflowDef, data []byte,
 		noDaemon:       noDaemon,
 	}
 
-	// Store ctx on cancel so callers can use it; we return cancel for defer.
-	_ = ctx
 	return rc, cancel, nil
 }
 
@@ -233,10 +233,6 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 
 	matrixCombinations := expandMatrix(job)
 
-	// Setup signal handling context for execution.
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer cancel()
-
 	runStart := time.Now()
 	result := &jobExecutionResult{
 		overallStatus: string(workflow.RunPassed),
@@ -252,10 +248,10 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 		}
 
 		runner := workflow.NewRunner(cfg)
-		runResult := runner.Run(ctx, job.Steps)
+		runResult := runner.Run(rc.ctx, job.Steps)
 		matrixKey := matrixKeyString(matrixVars)
 
-		rejected := rc.processStepResults(ctx, runResult.Steps, job.Steps, matrixKey)
+		rejected := rc.processStepResults(rc.ctx, runResult.Steps, job.Steps, matrixKey)
 		result.allStepResults = append(result.allStepResults, runResult.Steps...)
 
 		if rejected {
@@ -383,6 +379,8 @@ func analyzeStepWithQuestion(
 }
 
 func runAdHocCommand(ctx context.Context, command, workDir string, env []string) error {
+	fmt.Fprintf(os.Stderr, "warning: executing reviewer-provided shell command: %q\n", command)
+
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		// #nosec G204 -- command is explicitly provided by the human reviewer at runtime.
@@ -553,7 +551,14 @@ func findStepDef(steps []*workflow.StepDef, stepID string) *workflow.StepDef {
 	return nil
 }
 
-func analyzeStep(ctx context.Context, transport *workflow.AnalysisTransport, runID string, sr *workflow.StepResult, step *workflow.StepDef, matrixKey string) *workflow.AnalysisResult {
+func analyzeStep(
+	ctx context.Context,
+	transport *workflow.AnalysisTransport,
+	runID string,
+	sr *workflow.StepResult,
+	step *workflow.StepDef,
+	matrixKey string,
+) *workflow.AnalysisResult {
 	result, err := transport.Analyze(ctx, &workflow.AnalysisRequest{
 		RunID:          runID,
 		StepID:         sr.StepID,
@@ -588,8 +593,11 @@ func notifyDaemonRunStart(ctx context.Context, runID, name, hash, path string) {
 	}
 	defer conn.Close()
 
+	rpcCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	client := pb.NewClaiServiceClient(conn)
-	_, _ = client.WorkflowRunStart(ctx, &pb.WorkflowRunStartRequest{
+	_, _ = client.WorkflowRunStart(rpcCtx, &pb.WorkflowRunStartRequest{
 		RunId:           runID,
 		WorkflowName:    name,
 		WorkflowHash:    hash,
@@ -605,6 +613,9 @@ func notifyDaemonStepUpdate(ctx context.Context, runID string, sr *workflow.Step
 	}
 	defer conn.Close()
 
+	rpcCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	// Convert outputs to JSON string for the proto field.
 	var outputsJSON string
 	if len(sr.Outputs) > 0 {
@@ -614,7 +625,7 @@ func notifyDaemonStepUpdate(ctx context.Context, runID string, sr *workflow.Step
 	}
 
 	client := pb.NewClaiServiceClient(conn)
-	_, _ = client.WorkflowStepUpdate(ctx, &pb.WorkflowStepUpdateRequest{
+	_, _ = client.WorkflowStepUpdate(rpcCtx, &pb.WorkflowStepUpdateRequest{
 		RunId:       runID,
 		StepId:      sr.StepID,
 		MatrixKey:   matrixKey,
@@ -635,8 +646,11 @@ func notifyDaemonRunEnd(ctx context.Context, runID, status string, duration time
 	}
 	defer conn.Close()
 
+	rpcCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
 	client := pb.NewClaiServiceClient(conn)
-	_, _ = client.WorkflowRunEnd(ctx, &pb.WorkflowRunEndRequest{
+	_, _ = client.WorkflowRunEnd(rpcCtx, &pb.WorkflowRunEndRequest{
 		RunId:         runID,
 		Status:        status,
 		DurationMs:    duration.Milliseconds(),

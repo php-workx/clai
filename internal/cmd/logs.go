@@ -79,7 +79,10 @@ func tailLogs(filename string, n int) error {
 		return nil
 	}
 
-	lines := collectTailLines(f, size, n)
+	lines, err := collectTailLines(f, size, n)
+	if err != nil {
+		return fmt.Errorf("failed to read log tail: %w", err)
+	}
 
 	for _, line := range lines {
 		fmt.Println(line)
@@ -89,14 +92,17 @@ func tailLogs(filename string, n int) error {
 }
 
 // collectTailLines reads the last n lines from f whose total size is fileSize.
-func collectTailLines(f *os.File, fileSize int64, n int) []string {
+func collectTailLines(f *os.File, fileSize int64, n int) ([]string, error) {
 	lines := make([]string, 0, n)
 	bufSize := int64(4096)
 	offset := fileSize
 	remainder := "" // Carry partial line fragment between chunks
 
 	for len(lines) < n && offset > 0 {
-		chunkLines, newRemainder := readChunkLines(f, &offset, bufSize, remainder)
+		chunkLines, newRemainder, err := readChunkLines(f, &offset, bufSize, remainder)
+		if err != nil {
+			return nil, err
+		}
 		remainder = newRemainder
 		lines = prependLines(lines, chunkLines, n)
 	}
@@ -106,13 +112,13 @@ func collectTailLines(f *os.File, fileSize int64, n int) []string {
 		lines = append([]string{remainder}, lines...)
 	}
 
-	return lines
+	return lines, nil
 }
 
 // readChunkLines reads one chunk ending at *offset, splits it into lines, and
 // returns the full lines plus any leading partial-line remainder.
 // *offset is decremented by the bytes read.
-func readChunkLines(f *os.File, offset *int64, bufSize int64, prevRemainder string) (fullLines []string, remainder string) {
+func readChunkLines(f *os.File, offset *int64, bufSize int64, prevRemainder string) (fullLines []string, remainder string, err error) {
 	readSize := bufSize
 	if *offset < bufSize {
 		readSize = *offset
@@ -120,7 +126,11 @@ func readChunkLines(f *os.File, offset *int64, bufSize int64, prevRemainder stri
 	*offset -= readSize
 
 	buf := make([]byte, readSize)
-	_, _ = f.ReadAt(buf, *offset) // io.EOF is expected at file boundaries
+	n, readErr := f.ReadAt(buf, *offset)
+	if readErr != nil && readErr != io.EOF {
+		return nil, "", fmt.Errorf("read log chunk: %w", readErr)
+	}
+	buf = buf[:n]
 
 	chunk := string(buf) + prevRemainder
 	chunkLines := splitLines(chunk)
@@ -130,7 +140,7 @@ func readChunkLines(f *os.File, offset *int64, bufSize int64, prevRemainder stri
 		chunkLines = chunkLines[1:]
 	}
 
-	return chunkLines, remainder
+	return chunkLines, remainder, nil
 }
 
 // prependLines collects lines from chunkLines (in reverse) into dst until cap n is reached.

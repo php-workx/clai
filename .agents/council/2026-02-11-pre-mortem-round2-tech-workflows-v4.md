@@ -122,7 +122,7 @@ The scope judge provided the most aggressive cut list. Key recommendations:
 | Claude Opus (Scope) | opus | 4 weeks (minimal) / 6-8 weeks (current spec) |
 | Spec estimate | — | 6-8 weeks |
 
-**Consensus:** 6-8 weeks for the current Tier 0 scope. Could be 4-5 weeks with the scope judge's cut list applied. The feasibility judges consistently estimated higher (8-10 weeks) due to AnalyzeStepOutput integration complexity.
+**Consensus:** 6-8 weeks for the current Tier 0 scope. The timeline could be 4-5 weeks with the scope judge's cut list applied. The feasibility judges consistently estimated higher (8-10 weeks) due to AnalyzeStepOutput integration complexity.
 
 ---
 

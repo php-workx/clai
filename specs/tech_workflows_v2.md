@@ -10,7 +10,7 @@
 >
 > Implementation draws inspiration from [dagu-org/dagu](https://github.com/dagu-org/dagu) — a self-contained Go workflow engine with YAML definitions, DAG-based step execution, and structured run artifacts.
 
-### Changelog from v1
+## Changelog from v1
 
 - **Cross-platform execution:** Shell-specific `$SHELL -c` replaced with `ShellAdapter` abstraction; argv execution by default, shell mode opt-in (CB-2, CB-4)
 - **Security hardening:** Secret lifecycle management, masked command logging, `/proc`-safe execution (CB-5, AR-7)
@@ -197,7 +197,7 @@ Deferred beyond this specification:
 
 The workflow system uses a **hybrid** model: the CLI process orchestrates execution, the daemon tracks state, and steps run as subprocesses.
 
-```
+```text
 User invokes:  clai workflow run pulumi-compliance-run
                         │
                         ▼
@@ -253,7 +253,7 @@ type Runner struct {
     artifact    *RunArtifact    // structured event log
     // ...
 }
-```
+```text
 
 This ensures:
 - CI/headless execution works without modification
@@ -347,7 +347,7 @@ Priority order:
 type TTYDetector interface {
     IsInteractive() bool
 }
-```
+```text
 
 **Unix implementation** (file: `internal/workflow/tty_unix.go`, build tag `//go:build !windows`):
 - Check `os.Stdin.Stat()` for `ModeCharDevice`
@@ -389,7 +389,7 @@ For pre-vetted workflows where auto-approval is acceptable:
 
 ```bash
 clai workflow run --mode non-interactive-auto --env RISK_OVERRIDE=accepted ...
-```
+```text
 
 ---
 
@@ -458,7 +458,7 @@ type StepResult struct {
     Duration  time.Duration
     StartedAt time.Time
 }
-```
+```text
 
 ### 5.3 Platform Implementations
 
@@ -479,7 +479,7 @@ type StepResult struct {
 //            for cmd → exec.CommandContext(ctx, "cmd", "/C", command)
 // DefaultShell: "pwsh" (PowerShell Core), fallback to "cmd"
 // SplitCommand: CommandLineToArgvW semantics
-```
+```text
 
 ### 5.4 Cross-Platform Execution Matrix
 
@@ -552,7 +552,7 @@ type ProcessHandle interface {
     Wait() error
     Pid() int
 }
-```
+```text
 
 ### 6.2 Unix Implementation
 
@@ -588,7 +588,7 @@ cmd.SysProcAttr = &syscall.SysProcAttr{
 
 // ForceKill terminates the job object (kills entire process tree).
 windows.TerminateJobObject(jobHandle, 1)
-```
+```text
 
 ### 6.4 Ctrl+C Behavior Matrix
 
@@ -730,7 +730,7 @@ type LLMConfig struct {
     Model     string `yaml:"model"`
     APIKeyEnv string `yaml:"api_key_env"`
 }
-```
+```text
 
 ### 7.2 Parsing Pipeline
 
@@ -795,7 +795,7 @@ func sanitizePathComponent(s string) string {
     // Truncate to 200 characters
     // Platform-aware via runtime.GOOS for additional restrictions
 }
-```
+```text
 
 ---
 
@@ -814,7 +814,7 @@ Workflow YAML          SecretStore           Process Env        DB / Logs
                              │                                     ▲
                              │ Mask()                               │
                              └────────3────────────────────────────┘
-```
+```text
 
 1. **Load:** Secrets loaded from sources (env, file, interactive) into `SecretStore`
 2. **Inject:** Secret values set as env vars for subprocess execution
@@ -892,7 +892,7 @@ func (ss *SecretStore) EnvVars() []string {
 
 Dotenv format, loaded from the workflow file's directory:
 
-```
+```text
 # Comments start with #
 AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
 DEPLOY_TOKEN=your-deploy-token-here
@@ -973,7 +973,7 @@ type StepOutputs struct {
     Outcome  string              // "success", "failure", "skipped"
     Analysis *AnalysisResponse   // if analyze=true (defined in §10.3)
 }
-```
+```text
 
 ### 9.4 Expression Safety
 
@@ -997,7 +997,7 @@ line 1
 line 2
 line 3
 EOF
-```
+```text
 
 ```go
 // parseOutputFile reads a dotenv-style file with heredoc support for multiline values.
@@ -1079,7 +1079,7 @@ Respond with ONLY a JSON object in this exact format:
   "flags": [{"item": "<what>", "severity": "info|warning|critical", "reason": "<why>"}]
 }`, step.AnalysisPrompt, scrubbedOutput)
 }
-```
+```text
 
 ### 10.3 Workflow-Specific Types
 
@@ -1134,7 +1134,7 @@ func parseAnalysisResponse(raw string) (*AnalysisResponse, error) {
         Reasoning: raw,
     }, nil
 }
-```
+```text
 
 ### 10.6 Context Building and Truncation (FR-27)
 
@@ -1186,7 +1186,7 @@ func shouldPromptHuman(riskLevel string, decision string) bool {
         return decision != "proceed"
     }
 }
-```
+```text
 
 ### 10.8 LLM Client Interface
 
@@ -1223,7 +1223,7 @@ func (rs *ReviewSession) AskFollowUp(ctx context.Context, question string) (*Ana
     rs.transcript = append(rs.transcript, Message{Role: "assistant", Content: resp.Reasoning})
     return resp, nil
 }
-```
+```text
 
 ---
 
@@ -1300,7 +1300,7 @@ func (hr *TerminalReviewer) runAdHocCommand(ctx context.Context) {
     // Uses ShellAdapter.ExecShell (always shell mode for ad-hoc commands)
     // Stdout/Stderr go directly to hr.out
 }
-```
+```text
 
 ### 11.3 Non-Interactive Implementation
 
@@ -1349,7 +1349,7 @@ This is set per-step by the runner based on the current execution mode.
 func generateRunID() string {
     return fmt.Sprintf("wfr-%d-%04x", time.Now().UnixMilli(), rand.Intn(0xFFFF))
 }
-```
+```text
 
 Example: `wfr-1707654321000-a3f8`
 
@@ -1463,7 +1463,7 @@ func (ra *RunArtifact) WriteEvent(evt RunEvent) error {
     // Mask all string values in evt.Data through SecretStore
     return ra.enc.Encode(evt)
 }
-```
+```text
 
 SQLite rows are **indexed projections** of this artifact — optimized for queries but not the canonical record.
 
@@ -1495,7 +1495,7 @@ PruneWorkflowRuns(ctx context.Context, maxPerWorkflow int) (int64, error)
 
 Full step output is written to log files (SQLite stores only 4KB tails):
 
-```
+```text
 ~/.clai/workflow-logs/
   <run-id>/
     run.jsonl                                    -- structured event log (FR-40)
@@ -1530,7 +1530,7 @@ func (r *Runner) watchStopSignal(ctx context.Context, cancel context.CancelFunc)
         }
     }
 }
-```
+```text
 
 ### 12.7 Retention
 
@@ -1690,7 +1690,7 @@ service ClaiService {
   // Workflow history
   rpc WorkflowHistory(WorkflowHistoryRequest) returns (WorkflowHistoryResponse);
 }
-```
+```text
 
 ### 13.3 Daemon Handler Pattern
 
@@ -1731,7 +1731,7 @@ type WorkflowsConfig struct {
     StrictPermissions bool     `yaml:"strict_permissions"`   // error on insecure file perms
     SecretFile        string   `yaml:"secret_file"`          // default: ".secrets"
 }
-```
+```text
 
 ### 14.2 Defaults
 
@@ -1784,7 +1784,7 @@ const (
     ExitDependencyMissing  = 8
     ExitTimeout            = 124  // Standard timeout exit code (from dagu/coreutils)
 )
-```
+```text
 
 ---
 
@@ -1817,7 +1817,7 @@ func CheckDependencies(requires []string) []MissingDep {
     }
     return missing
 }
-```
+```text
 
 ### 16.3 Auto-Detection
 
@@ -1904,7 +1904,7 @@ func resolveJobOrder(jobs map[string]*JobDef) ([][]string, error) {
     // 5. If unprocessed jobs remain → cycle detected → error
     // Returns: [][]string — each inner slice is a wave of parallelizable jobs
 }
-```
+```text
 
 ### 17.4 Deterministic Output Merge
 
@@ -1989,7 +1989,7 @@ resolvedCmd := exprEval.Resolve(step.Run, exprCtx)
 cmd := exec.Command("bash", "-c", resolvedCmd)
 
 // NEVER DONE: Passing unresolved expressions to any execution context
-```
+```text
 
 ### 19.3 Secret Protection Summary
 
@@ -2025,7 +2025,7 @@ func checkFilePermissions(path string) error {
     // Future: use windows.GetSecurityInfo for ACL verification.
     return nil
 }
-```
+```text
 
 In Tier 0 this is a **warning**. In Tier 1 with `workflows.strict_permissions: true`, it's an error.
 
@@ -2051,7 +2051,7 @@ For each matrix entry (sequential):
       9. If step fails → stop (implicit fail-fast)
    c. Report matrix entry completion
 Report run completion
-```
+```text
 
 ### 20.2 Step Lifecycle State Machine
 
@@ -2073,7 +2073,7 @@ Report run completion
 ┌─────┐ ┌──────┐ ┌───────────┐
 │succ.│ │failed│ │ cancelled │  (SIGINT/stop signal)
 └─────┘ └──────┘ └───────────┘
-```
+```text
 
 | From | To | Trigger |
 |------|----|---------|
@@ -2107,7 +2107,7 @@ Expansion produces `[]MatrixEntry` where each entry is `map[string]string`. For 
 
 ### 21.1 New Package: `internal/workflow/`
 
-```
+```text
 internal/workflow/
   schema.go              # WorkflowDef, JobDef, StepDef types + YAML parsing
   validate.go            # Validation rules (multi-error collection)
@@ -2167,7 +2167,7 @@ func newWorkflowCmd() *cobra.Command {
     )
     return cmd
 }
-```
+```text
 
 ---
 
@@ -2190,7 +2190,7 @@ Flags:
   --require-deps               Fail (exit 8) if required tools missing
   --skip-dep-check             Skip dependency detection
   --verbose                    Verbose output (step commands, timing details)
-```
+```text
 
 ### 22.2 `--matrix` Parsing
 
@@ -2210,7 +2210,7 @@ clai workflow history [--workflow <name>] [-n] # Show run history               
 clai workflow stop <run-id>                    # Send stop signal to a running workflow   [Tier 1]
 clai workflow logs <run-id> [--step <id>]      # View run logs (from RunArtifact)         [Tier 1]
     --format json|text                         # Output format (default: text)
-```
+```text
 
 ---
 
@@ -2258,7 +2258,7 @@ testdata/workflows/
   secrets-env.yaml           # Workflow with secrets from env
   invalid-cycle.yaml         # Circular job dependencies (should fail validation)
   requires-tools.yaml        # requires: block with known and unknown tools
-```
+```text
 
 ### 23.5 Mock LLM
 
@@ -2359,7 +2359,7 @@ Use cobra's built-in completion generation:
 cmd.GenBashCompletionFile("completions/clai.bash")
 cmd.GenZshCompletionFile("completions/_clai")
 cmd.GenFishCompletionFile("completions/clai.fish")
-```
+```text
 
 Custom completions for:
 - Workflow name completion: reads from discovery directories

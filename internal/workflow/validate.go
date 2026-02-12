@@ -19,6 +19,13 @@ func (e ValidationError) Error() string {
 // ValidateWorkflow checks a parsed WorkflowDef for structural errors.
 // It returns all errors found, not just the first.
 func ValidateWorkflow(wf *WorkflowDef) []ValidationError {
+	if wf == nil {
+		return []ValidationError{{
+			Field:   "workflow",
+			Message: "workflow definition is required",
+		}}
+	}
+
 	var errs []ValidationError
 
 	// Workflow must have a name.

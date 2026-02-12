@@ -30,6 +30,9 @@ func ResolveExpressions(input string, ctx *ExpressionContext) (string, error) {
 	if !strings.Contains(input, "${{") {
 		return input, nil
 	}
+	if ctx == nil {
+		return "", fmt.Errorf("nil ExpressionContext provided for expressions")
+	}
 
 	var resolveErr error
 	result := exprPattern.ReplaceAllStringFunc(input, func(match string) string {

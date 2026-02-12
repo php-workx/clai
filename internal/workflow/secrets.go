@@ -19,8 +19,8 @@ func NewSecretMasker(secrets []SecretDef) *SecretMasker {
 		return &SecretMasker{}
 	}
 
-	var values []string
-	var names []string
+	values := make([]string, 0, len(secrets))
+	names := make([]string, 0, len(secrets))
 
 	for _, s := range secrets {
 		if s.From != "env" {

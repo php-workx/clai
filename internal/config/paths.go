@@ -81,7 +81,7 @@ func (p *Paths) HooksDir() string {
 // Creates the directory if it doesn't exist.
 func (p *Paths) WorkflowLogDir() string {
 	dir := filepath.Join(p.BaseDir, "workflow-logs")
-	_ = os.MkdirAll(dir, 0755)
+	_ = os.MkdirAll(dir, 0o755)
 	return dir
 }
 

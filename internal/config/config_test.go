@@ -1148,7 +1148,7 @@ func TestWorkflowsConfigValidation(t *testing.T) {
 		{
 			name:    "rejects_negative_retain_runs",
 			modify:  func(c *Config) { c.Workflows.RetainRuns = -1 },
-			wantErr: "workflows.retain_runs must be > 0",
+			wantErr: "workflows.retain_runs must be >= 0",
 		},
 		{
 			name: "zero_retain_runs_gets_default",

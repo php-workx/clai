@@ -101,14 +101,14 @@ func NewRunArtifact(runID string) (*RunArtifact, error) {
 // NewRunArtifactWithDir creates a new artifact writer with a custom log directory.
 // Useful for testing.
 func NewRunArtifactWithDir(runID, logDir string) (*RunArtifact, error) {
-	if err := os.MkdirAll(logDir, 0755); err != nil {
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create log dir: %w", err)
 	}
 
 	safeName := sanitizePathComponent(runID)
 	path := filepath.Join(logDir, safeName+".jsonl")
 
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("open artifact file: %w", err)
 	}
@@ -152,7 +152,7 @@ func (a *RunArtifact) WriteStepLog(stepID, stdout, stderr string) {
 	}
 
 	stepsDir := filepath.Join(a.logDir, sanitizePathComponent(a.runID)+"-steps")
-	if err := os.MkdirAll(stepsDir, 0755); err != nil {
+	if err := os.MkdirAll(stepsDir, 0o755); err != nil {
 		slog.Warn("artifact: create steps dir", "error", err)
 		return
 	}
@@ -164,14 +164,14 @@ func (a *RunArtifact) WriteStepLog(stepID, stdout, stderr string) {
 
 	if stdout != "" {
 		stdoutPath := filepath.Join(stepsDir, safeID+".stdout")
-		if err := os.WriteFile(stdoutPath, []byte(stdout), 0644); err != nil {
+		if err := os.WriteFile(stdoutPath, []byte(stdout), 0o644); err != nil {
 			slog.Warn("artifact: write step stdout", "error", err, "step", stepID)
 		}
 	}
 
 	if stderr != "" {
 		stderrPath := filepath.Join(stepsDir, safeID+".stderr")
-		if err := os.WriteFile(stderrPath, []byte(stderr), 0644); err != nil {
+		if err := os.WriteFile(stderrPath, []byte(stderr), 0o644); err != nil {
 			slog.Warn("artifact: write step stderr", "error", err, "step", stepID)
 		}
 	}

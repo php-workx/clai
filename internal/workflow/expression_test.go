@@ -110,6 +110,13 @@ func TestExpressionNoExpressions(t *testing.T) {
 	}
 }
 
+func TestExpressionNilContextWithExpressions(t *testing.T) {
+	_, err := ResolveExpressions("${{ env.NAME }}", nil)
+	if err == nil {
+		t.Fatal("expected error for nil expression context")
+	}
+}
+
 func TestExpressionWhitespaceHandling(t *testing.T) {
 	ctx := &ExpressionContext{
 		Env: map[string]string{"NAME": "trimmed"},
