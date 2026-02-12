@@ -2,10 +2,8 @@ package expect
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 	"testing"
 	"time"
 
@@ -84,6 +82,7 @@ func measureShellStartup(t *testing.T, shell string, withClai bool) time.Duratio
 // TestPerformance_ZshIntegrationOverhead measures zsh startup overhead from clai.
 func TestPerformance_ZshIntegrationOverhead(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -109,6 +108,7 @@ func TestPerformance_ZshIntegrationOverhead(t *testing.T) {
 // TestPerformance_BashIntegrationOverhead measures bash startup overhead from clai.
 func TestPerformance_BashIntegrationOverhead(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -136,6 +136,7 @@ func TestPerformance_BashIntegrationOverhead(t *testing.T) {
 // of comparing baseline vs with-clai, which requires reliable prompt detection.
 func TestPerformance_FishIntegrationOverhead(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -178,6 +179,8 @@ func TestPerformance_FishIntegrationOverhead(t *testing.T) {
 // TestPerformance_InitCommandFast verifies clai init command completes quickly.
 // This is critical because `eval "$(clai init zsh)"` runs synchronously in shell startup.
 func TestPerformance_InitCommandFast(t *testing.T) {
+	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
 	}
@@ -185,7 +188,7 @@ func TestPerformance_InitCommandFast(t *testing.T) {
 	// Skip in containers - absolute timing is meaningless due to container overhead.
 	// The relative overhead tests (IntegrationOverhead, SourceScriptFast) still run
 	// and catch real performance issues since container overhead cancels out.
-	if isRunningInContainer() {
+	if IsRunningInContainer() {
 		t.Skip("skipping absolute timing test in container - use relative overhead tests instead")
 	}
 
@@ -230,28 +233,19 @@ func TestPerformance_InitCommandFast(t *testing.T) {
 	}
 }
 
-// isRunningInContainer detects if we're running inside a Docker container.
-func isRunningInContainer() bool {
-	// Check for /.dockerenv file (Docker-specific)
-	if _, err := os.Stat("/.dockerenv"); err == nil {
-		return true
-	}
-	// Check cgroup for docker/lxc indicators
-	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
-		content := string(data)
-		if strings.Contains(content, "docker") || strings.Contains(content, "lxc") {
-			return true
-		}
-	}
-	return false
-}
-
 // TestPerformance_SourceScriptFast measures time to source the shell script directly.
 // This isolates the shell parsing overhead from the clai binary execution.
 func TestPerformance_SourceScriptFast(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
+	}
+
+	// Skip on Alpine - musl libc has different performance characteristics
+	// that make absolute timing thresholds unreliable
+	if IsRunningOnAlpine() {
+		t.Skip("skipping absolute timing test on Alpine (musl libc)")
 	}
 
 	// Test zsh and bash which have reliable prompt detection
@@ -344,8 +338,15 @@ func TestPerformance_SourceScriptFast(t *testing.T) {
 // The shell script should background all clai-shim calls.
 func TestPerformance_NoBlockingIPCOnStartup(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping performance test in short mode")
+	}
+
+	// Skip on Alpine - musl libc has different performance characteristics
+	// that make timing variance thresholds unreliable
+	if IsRunningOnAlpine() {
+		t.Skip("skipping timing variance test on Alpine (musl libc)")
 	}
 
 	// This test verifies that even if the daemon is not running,

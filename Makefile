@@ -102,8 +102,14 @@ bin/linux:
 	GOOS=linux GOARCH=amd64 go build $(LDFLAGS) -o bin/linux/clai-shim ./cmd/clai-shim
 	GOOS=linux GOARCH=amd64 go build $(PICKER_LDFLAGS) -o bin/linux/clai-picker ./cmd/clai-picker
 	GOOS=linux GOARCH=amd64 go test -c -o bin/linux/expect.test ./tests/expect
+	@tmpdir=$$(mktemp -d) && \
+		cd "$$tmpdir" && \
+		go mod init temp && \
+		go get gotest.tools/gotestsum@latest && \
+		GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o $(CURDIR)/bin/linux/gotestsum gotest.tools/gotestsum && \
+		rm -rf "$$tmpdir"
 
-## test-docker: Run interactive tests in Docker containers (Alpine, Ubuntu, Debian)
+## test-docker: Run interactive tests in Docker containers (Alpine, Ubuntu, Debian, Fedora) sequentially
 test-docker: bin/linux
 	@set -e; \
 	if command -v docker-compose >/dev/null 2>&1; then \
@@ -115,7 +121,7 @@ test-docker: bin/linux
 		exit 1; \
 	fi; \
 	$$compose_cmd build; \
-	for svc in alpine ubuntu debian; do \
+	for svc in alpine ubuntu debian fedora; do \
 		echo "==> Running docker expect tests in $$svc"; \
 		$$compose_cmd run --rm $$svc expect.test -test.v -test.parallel=1; \
 	done

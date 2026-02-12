@@ -11,10 +11,52 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"testing"
 	"time"
 
 	expect "github.com/Netflix/go-expect"
 )
+
+// ContainerTestSem limits concurrent tests in containers to reduce resource contention.
+// In container environments (Docker), running all tests in parallel causes CPU contention
+// that leads to timing-related test failures. This semaphore limits concurrency to 2.
+var ContainerTestSem = make(chan struct{}, 2)
+
+// AcquireTestSlot limits parallelism in container environments.
+// Call this after t.Parallel() in tests that are timing-sensitive.
+// In containers, this blocks until a slot is available (max 2 concurrent tests).
+// On local machines, this is a no-op.
+func AcquireTestSlot(t *testing.T) {
+	if IsRunningInContainer() {
+		ContainerTestSem <- struct{}{}
+		t.Cleanup(func() { <-ContainerTestSem })
+	}
+}
+
+// IsRunningInContainer detects if we're running inside a Docker container.
+func IsRunningInContainer() bool {
+	// Check for /.dockerenv file (Docker-specific)
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return true
+	}
+	// Check cgroup for docker/lxc indicators
+	if data, err := os.ReadFile("/proc/1/cgroup"); err == nil {
+		content := string(data)
+		if strings.Contains(content, "docker") || strings.Contains(content, "lxc") {
+			return true
+		}
+	}
+	return false
+}
+
+// IsRunningOnAlpine detects if we're running on Alpine Linux (musl libc).
+// Alpine has different performance characteristics due to musl vs glibc.
+func IsRunningOnAlpine() bool {
+	if _, err := os.Stat("/etc/alpine-release"); err == nil {
+		return true
+	}
+	return false
+}
 
 // Key constants for special keys (ANSI escape sequences)
 const (
