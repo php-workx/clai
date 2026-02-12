@@ -1,11 +1,11 @@
 # Dockerfile for Alpine Linux interactive shell tests
-# Minimal image with shells only - binaries mounted at runtime
 FROM alpine:3.19
 
-# Install shells
-RUN apk add --no-cache zsh bash fish
+# Install shells and Go (for test2json)
+RUN apk add --no-cache zsh bash fish go
 
 WORKDIR /app
 
 # Binaries mounted to /usr/local/bin at runtime via docker-compose
-CMD ["expect.test", "-test.v"]
+# Use gotestsum with test2json for consistent formatting
+CMD ["sh", "-c", "gotestsum --format testdox --raw-command -- go tool test2json -t -p expect /usr/local/bin/expect.test -test.v"]
