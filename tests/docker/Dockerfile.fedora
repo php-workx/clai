@@ -1,0 +1,15 @@
+# Dockerfile for Fedora interactive shell tests (rpm-based)
+FROM fedora:39
+
+# Install shells
+RUN dnf install -y \
+    zsh \
+    fish \
+    golang \
+    && dnf clean all
+
+WORKDIR /app
+
+# Binaries mounted to /usr/local/bin at runtime via docker-compose
+# Use gotestsum with test2json for consistent formatting
+CMD ["sh", "-c", "gotestsum --format testdox --raw-command -- go tool test2json -t -p expect /usr/local/bin/expect.test -test.v"]

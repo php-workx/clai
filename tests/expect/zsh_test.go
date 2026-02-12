@@ -12,6 +12,7 @@ import (
 // TestZsh_SourceWithoutError verifies the zsh script sources without ZLE errors.
 func TestZsh_SourceWithoutError(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -49,6 +50,7 @@ func TestZsh_SourceWithoutError(t *testing.T) {
 // content at once before executing any of it.
 func TestZsh_EvalWithHistoryAlias(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -87,6 +89,7 @@ func TestZsh_EvalWithHistoryAlias(t *testing.T) {
 // TestZsh_SuggestionAppearsInRightPrompt verifies suggestions appear in the right prompt.
 func TestZsh_SuggestionAppearsInRightPrompt(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -127,6 +130,7 @@ func TestZsh_SuggestionAppearsInRightPrompt(t *testing.T) {
 // TestZsh_LongSuggestionTruncated verifies long suggestions are truncated with ellipsis.
 func TestZsh_LongSuggestionTruncated(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -156,6 +160,7 @@ func TestZsh_LongSuggestionTruncated(t *testing.T) {
 // TestZsh_RightArrowAcceptsSuggestion verifies right arrow accepts the current suggestion.
 func TestZsh_RightArrowAcceptsSuggestion(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -196,6 +201,7 @@ func TestZsh_RightArrowAcceptsSuggestion(t *testing.T) {
 // TestZsh_EscapeNotBound verifies clai does not bind bare Escape in zsh.
 func TestZsh_EscapeNotBound(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -230,6 +236,7 @@ func TestZsh_EscapeNotBound(t *testing.T) {
 // TestZsh_WorksWithExistingRPS1 verifies clai works when there's already an RPS1 set.
 func TestZsh_WorksWithExistingRPS1(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -264,6 +271,7 @@ func TestZsh_WorksWithExistingRPS1(t *testing.T) {
 // TestZsh_NaturalLanguagePrefix verifies ? prefix triggers natural language to command conversion.
 func TestZsh_NaturalLanguagePrefix(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -302,6 +310,7 @@ func TestZsh_NaturalLanguagePrefix(t *testing.T) {
 // TestZsh_CtrlSpaceShowsMenu verifies Ctrl+Space shows the suggestion menu.
 func TestZsh_CtrlSpaceShowsMenu(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -343,6 +352,7 @@ func TestZsh_CtrlSpaceShowsMenu(t *testing.T) {
 // TestZsh_DoctorShowsCorrectShell verifies clai doctor detects zsh correctly.
 func TestZsh_DoctorShowsCorrectShell(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -381,6 +391,7 @@ func TestZsh_DoctorShowsCorrectShell(t *testing.T) {
 // TestZsh_StatusShowsCorrectShell verifies clai status detects zsh correctly.
 func TestZsh_StatusShowsCorrectShell(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -418,6 +429,7 @@ func TestZsh_StatusShowsCorrectShell(t *testing.T) {
 // even without CLAI_CURRENT_SHELL set (simulating fresh install after brew).
 func TestZsh_InstallDetectsShell(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -451,6 +463,7 @@ func TestZsh_InstallDetectsShell(t *testing.T) {
 // TestZsh_ZLEResetPromptWithWidgetGuard verifies zle reset-prompt is guarded.
 func TestZsh_ZLEResetPromptWithWidgetGuard(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
@@ -484,6 +497,7 @@ func TestZsh_ZLEResetPromptWithWidgetGuard(t *testing.T) {
 // TestZsh_HistoryFallbackWhenDisabled verifies Up arrow uses default history when clai is disabled.
 func TestZsh_HistoryFallbackWhenDisabled(t *testing.T) {
 	t.Parallel()
+	AcquireTestSlot(t)
 	if testing.Short() {
 		t.Skip("skipping interactive test in short mode")
 	}
