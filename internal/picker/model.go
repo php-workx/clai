@@ -379,10 +379,10 @@ func copyToClipboard(text string) tea.Cmd {
 		case "darwin":
 			cmd = exec.Command("pbcopy")
 		case "linux":
-			if path, err := exec.LookPath("xclip"); err == nil {
-				cmd = exec.Command(path, "-selection", "clipboard")
-			} else if path, err := exec.LookPath("xsel"); err == nil {
-				cmd = exec.Command(path, "--clipboard", "--input")
+			if clipPath, err := exec.LookPath("xclip"); err == nil {
+				cmd = exec.Command(clipPath, "-selection", "clipboard") //nolint:gosec // clipPath is from LookPath, not user input
+			} else if clipPath, err := exec.LookPath("xsel"); err == nil {
+				cmd = exec.Command(clipPath, "--clipboard", "--input") //nolint:gosec // clipPath is from LookPath, not user input
 			} else {
 				return clipboardMsg{err: fmt.Errorf("no clipboard tool found")}
 			}

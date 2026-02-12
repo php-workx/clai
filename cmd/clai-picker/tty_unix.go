@@ -62,7 +62,7 @@ func checkTermWidth() error {
 // acquireLock acquires an advisory file lock using flock.
 // Returns the file descriptor (kept open for the duration of the process).
 func acquireLock(path string) (int, error) {
-	fd, err := syscall.Open(path, syscall.O_CREAT|syscall.O_RDWR, 0600)
+	fd, err := syscall.Open(path, syscall.O_CREAT|syscall.O_RDWR, 0o600)
 	if err != nil {
 		return -1, fmt.Errorf("cannot open lock file: %w", err)
 	}
