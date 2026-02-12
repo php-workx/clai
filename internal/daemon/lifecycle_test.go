@@ -381,7 +381,7 @@ func TestWaitForProcessExit(t *testing.T) {
 		_, _ = cmd.Process.Wait()
 	}()
 
-	if err := waitForProcessExit(cmd.Process, 500*time.Millisecond); err != nil {
+	if err := waitForProcessExit(cmd.Process, 100*time.Millisecond); err != nil {
 		t.Fatalf("waitForProcessExit() error = %v", err)
 	}
 }
