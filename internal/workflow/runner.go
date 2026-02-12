@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -15,20 +16,22 @@ const DefaultBufferSize = 4096
 
 // StepResult holds the outcome of a single step execution.
 type StepResult struct {
-	StepID     string
-	Name       string
-	Status     string // "passed", "failed", "skipped"
-	ExitCode   int
-	DurationMs int64
-	StdoutTail string
-	StderrTail string
-	Outputs    map[string]string // from $CLAI_OUTPUT file
-	Error      error
+	StepID      string
+	Name        string
+	Status      string // "passed", "failed", "skipped", "cancelled"
+	Command     string
+	ResolvedEnv []string
+	ExitCode    int
+	DurationMs  int64
+	StdoutTail  string
+	StderrTail  string
+	Outputs     map[string]string // from $CLAI_OUTPUT file
+	Error       error
 }
 
 // RunResult holds the outcome of a complete job run.
 type RunResult struct {
-	Status     string // "passed", "failed"
+	Status     string // "passed", "failed", "cancelled"
 	Steps      []*StepResult
 	DurationMs int64
 	Error      error
@@ -94,6 +97,8 @@ func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
 
 	// Track step outputs for expression resolution.
 	stepOutputs := make(map[string]map[string]string)
+	// Exported outputs are inherited as environment variables by later steps.
+	stepOutputEnv := make(map[string]string)
 	failed := false
 
 	for i, step := range steps {
@@ -108,7 +113,7 @@ func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
 					Status: "skipped",
 				})
 			}
-			result.Status = "failed"
+			result.Status = string(RunCancelled)
 			result.DurationMs = time.Since(runStart).Milliseconds()
 			result.Error = ctx.Err()
 			return result
@@ -125,17 +130,27 @@ func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
 			continue
 		}
 
-		stepResult := r.executeStep(ctx, step, stepOutputs)
+		stepResult := r.executeStep(ctx, step, stepOutputs, stepOutputEnv)
 		result.Steps = append(result.Steps, stepResult)
 
 		// Store outputs for expression resolution in subsequent steps.
-		if step.ID != "" && stepResult.Outputs != nil {
+		if step.ID != "" && len(stepResult.Outputs) > 0 {
 			stepOutputs[step.ID] = stepResult.Outputs
 		}
+		// Export outputs to downstream process environment.
+		for k, v := range stepResult.Outputs {
+			stepOutputEnv[k] = v
+		}
 
-		if stepResult.Status == "failed" {
+		if stepResult.Status == string(StepCancelled) {
 			failed = true
-			result.Status = "failed"
+			result.Status = string(RunCancelled)
+			result.Error = stepResult.Error
+			continue
+		}
+		if stepResult.Status == string(StepFailed) {
+			failed = true
+			result.Status = string(RunFailed)
 		}
 	}
 
@@ -144,7 +159,7 @@ func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
 }
 
 // executeStep runs a single step and returns the result.
-func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map[string]map[string]string) *StepResult {
+func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map[string]map[string]string, stepOutputEnv map[string]string) *StepResult {
 	stepStart := time.Now()
 	sr := &StepResult{
 		StepID:  step.ID,
@@ -167,7 +182,7 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 
 	// Build expression context for resolving ${{ }} expressions.
 	exprCtx := &ExpressionContext{
-		Env:    r.buildExprEnv(step),
+		Env:    r.buildExprEnv(step, stepOutputEnv),
 		Matrix: r.config.MatrixVars,
 		Steps:  stepOutputs,
 	}
@@ -205,9 +220,11 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 	// Create a modified step with the resolved command.
 	resolvedStep := *step
 	resolvedStep.Run = resolvedRun
+	sr.Command = resolvedRun
 
-	// Merge environment: workflow -> job -> step precedence.
-	env := mergeEnv(r.config.Env, r.config.JobEnv, resolvedStepEnv, r.config.MatrixVars)
+	// Merge environment: OS -> output exports -> workflow -> job -> step -> matrix.
+	env := mergeEnv(stepOutputEnv, r.config.Env, r.config.JobEnv, resolvedStepEnv, r.config.MatrixVars)
+	sr.ResolvedEnv = append([]string(nil), env...)
 
 	// Build command via ShellAdapter.
 	cmd, err := r.shell.BuildCommand(ctx, &resolvedStep, r.config.WorkDir, env, outputPath)
@@ -246,21 +263,27 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 	// Parse the CLAI_OUTPUT file for step outputs.
 	outputs, parseErr := ParseOutputFile(outputPath)
 	if parseErr != nil {
-		sr.Status = "failed"
-		sr.ExitCode = 1
-		sr.Error = fmt.Errorf("parsing output file: %w", parseErr)
-		return sr
+		slog.Warn("failed to parse step output file", "step", step.Name, "error", parseErr)
+		outputs = map[string]string{}
 	}
 	sr.Outputs = outputs
 
 	// Determine exit code and status.
-	if waitErr != nil {
+	if ctx.Err() != nil {
 		sr.ExitCode = exitCodeFromError(waitErr)
-		sr.Status = "failed"
+		if sr.ExitCode == 0 {
+			// Conventional code for interrupted command.
+			sr.ExitCode = 130
+		}
+		sr.Status = string(StepCancelled)
+		sr.Error = ctx.Err()
+	} else if waitErr != nil {
+		sr.ExitCode = exitCodeFromError(waitErr)
+		sr.Status = string(StepFailed)
 		sr.Error = waitErr
 	} else {
 		sr.ExitCode = 0
-		sr.Status = "passed"
+		sr.Status = string(StepPassed)
 	}
 
 	return sr
@@ -268,9 +291,13 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 
 // buildExprEnv builds the env map for expression resolution.
 // This includes all environment layers (workflow, job, step) merged with proper precedence.
-func (r *Runner) buildExprEnv(step *StepDef) map[string]string {
+func (r *Runner) buildExprEnv(step *StepDef, outputEnv map[string]string) map[string]string {
 	env := make(map[string]string)
 
+	// Exported outputs from prior steps are inherited as env.
+	for k, v := range outputEnv {
+		env[k] = v
+	}
 	// Workflow env.
 	for k, v := range r.config.Env {
 		env[k] = v
@@ -292,9 +319,9 @@ func (r *Runner) buildExprEnv(step *StepDef) map[string]string {
 }
 
 // mergeEnv merges environment variables with proper precedence:
-// OS env < workflow < job < step. Matrix vars are also included.
+// OS env < output exports < workflow < job < step. Matrix vars are also included.
 // Returns a []string in "KEY=value" format suitable for exec.Cmd.Env.
-func mergeEnv(workflow, job, step map[string]string, matrix map[string]string) []string {
+func mergeEnv(outputs, workflow, job, step map[string]string, matrix map[string]string) []string {
 	merged := make(map[string]string)
 
 	// Start with OS environment.
@@ -305,6 +332,10 @@ func mergeEnv(workflow, job, step map[string]string, matrix map[string]string) [
 		}
 	}
 
+	// Layer exported outputs from prior steps.
+	for k, v := range outputs {
+		merged[k] = v
+	}
 	// Layer workflow env.
 	for k, v := range workflow {
 		merged[k] = v

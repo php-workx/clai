@@ -236,11 +236,12 @@ func (s *SQLiteStore) UpdateWorkflowStep(ctx context.Context, update *WorkflowSt
 
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE workflow_steps
-		SET status = ?, exit_code = ?, duration_ms = ?,
+		SET status = ?, command = ?, exit_code = ?, duration_ms = ?,
 		    stdout_tail = ?, stderr_tail = ?, outputs_json = ?
 		WHERE run_id = ? AND step_id = ? AND matrix_key = ?
 	`,
 		update.Status,
+		update.Command,
 		update.ExitCode,
 		update.DurationMs,
 		update.StdoutTail,

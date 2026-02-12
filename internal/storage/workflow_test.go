@@ -511,6 +511,7 @@ func TestUpdateWorkflowStep_Success(t *testing.T) {
 		StepID:      "step-1",
 		MatrixKey:   "",
 		Status:      "passed",
+		Command:     "make test -run TestFast",
 		ExitCode:    0,
 		DurationMs:  5000,
 		StdoutTail:  "PASS",
@@ -534,6 +535,9 @@ func TestUpdateWorkflowStep_Success(t *testing.T) {
 	}
 	if got.StdoutTail != "PASS" {
 		t.Errorf("StdoutTail = %s, want PASS", got.StdoutTail)
+	}
+	if got.Command != "make test -run TestFast" {
+		t.Errorf("Command = %s, want make test -run TestFast", got.Command)
 	}
 	if got.OutputsJSON != `{"result":"ok"}` {
 		t.Errorf("OutputsJSON = %s, want {\"result\":\"ok\"}", got.OutputsJSON)

@@ -11,9 +11,10 @@ type StepStatus string
 
 // Step status constants.
 const (
-	StepPassed  StepStatus = "passed"
-	StepFailed  StepStatus = "failed"
-	StepSkipped StepStatus = "skipped"
+	StepPassed    StepStatus = "passed"
+	StepFailed    StepStatus = "failed"
+	StepSkipped   StepStatus = "skipped"
+	StepCancelled StepStatus = "cancelled"
 )
 
 // RunStatus represents the overall status of a workflow run.
@@ -21,8 +22,9 @@ type RunStatus string
 
 // Run status constants.
 const (
-	RunPassed RunStatus = "passed"
-	RunFailed RunStatus = "failed"
+	RunPassed    RunStatus = "passed"
+	RunFailed    RunStatus = "failed"
+	RunCancelled RunStatus = "cancelled"
 )
 
 // Decision represents an LLM analysis decision (spec SS10.3).
@@ -147,8 +149,9 @@ type stepFields struct {
 // top-level decoder does not propagate through custom unmarshalers.
 //
 //	shell: true  -> "true" (use default shell)
+//	shell: false -> "false" (explicit argv mode, no shell)
 //	shell: bash  -> "bash" (explicit shell)
-//	shell: (omitted) -> "" (argv mode, no shell)
+//	shell: (omitted) -> "" (use default shell)
 func (s *StepDef) UnmarshalYAML(value *yaml.Node) error {
 	// Check for unknown fields in the mapping node.
 	if value.Kind == yaml.MappingNode {
@@ -177,8 +180,9 @@ func (s *StepDef) UnmarshalYAML(value *yaml.Node) error {
 	case bool:
 		if v {
 			s.Shell = "true"
+		} else {
+			s.Shell = "false"
 		}
-		// false -> "" (same as omitted)
 	case string:
 		s.Shell = v
 	case nil:
@@ -192,10 +196,10 @@ func (s *StepDef) UnmarshalYAML(value *yaml.Node) error {
 
 // ShellMode returns the effective shell execution mode.
 func (s *StepDef) ShellMode() string {
-	if s.Shell == "" {
-		return "" // argv mode
+	if s.Shell == "false" {
+		return "argv" // explicit argv mode
 	}
-	if s.Shell == "true" {
+	if s.Shell == "" || s.Shell == "true" {
 		return "default" // use platform default shell
 	}
 	return s.Shell // explicit shell name
@@ -203,14 +207,15 @@ func (s *StepDef) ShellMode() string {
 
 // validShellValues defines the allowed values for Shell fields.
 var validShellValues = map[string]bool{
-	"":     true,
-	"true": true,
-	"sh":   true,
-	"bash": true,
-	"zsh":  true,
-	"fish": true,
-	"pwsh": true,
-	"cmd":  true,
+	"":      true,
+	"true":  true,
+	"false": true,
+	"sh":    true,
+	"bash":  true,
+	"zsh":   true,
+	"fish":  true,
+	"pwsh":  true,
+	"cmd":   true,
 }
 
 // validSecretSources defines allowed values for SecretDef.From.

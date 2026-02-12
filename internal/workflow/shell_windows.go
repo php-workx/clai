@@ -24,8 +24,8 @@ func (a *windowsShellAdapter) BuildCommand(ctx context.Context, step *StepDef, w
 	env = append(env, "CLAI_OUTPUT="+outputFile)
 
 	var cmd *exec.Cmd
-	if step.Shell == "" {
-		// Argv mode (default): split using shlex, no shell involved (D8).
+	if step.Shell == "false" {
+		// Explicit argv mode: split using shlex, no shell involved (D8).
 		argv, err := shlex.Split(step.Run)
 		if err != nil {
 			return nil, fmt.Errorf("splitting command: %w", err)
@@ -37,7 +37,7 @@ func (a *windowsShellAdapter) BuildCommand(ctx context.Context, step *StepDef, w
 	} else {
 		// Shell mode: wrap in shell interpreter.
 		switch step.Shell {
-		case "true", "cmd":
+		case "", "true", "cmd":
 			cmd = exec.CommandContext(ctx, "cmd.exe", "/C", step.Run)
 		default:
 			// Explicit shell (e.g. "pwsh", "bash")

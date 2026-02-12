@@ -13,7 +13,7 @@ func validWorkflow() *WorkflowDef {
 		Jobs: map[string]*JobDef{
 			"build": {
 				Steps: []*StepDef{
-					{Name: "step one", Run: "echo hello"},
+					{ID: "step-one", Name: "step one", Run: "echo hello"},
 				},
 			},
 		},
@@ -65,6 +65,14 @@ func TestValidateWorkflow_StepMissingRun(t *testing.T) {
 	assertFieldError(t, errs, "jobs.build.steps[0].run", "required")
 }
 
+func TestValidateWorkflow_StepMissingID(t *testing.T) {
+	wf := validWorkflow()
+	wf.Jobs["build"].Steps[0].ID = ""
+	errs := ValidateWorkflow(wf)
+	require.NotEmpty(t, errs)
+	assertFieldError(t, errs, "jobs.build.steps[0].id", "required")
+}
+
 func TestValidateWorkflow_DuplicateStepIDs(t *testing.T) {
 	wf := &WorkflowDef{
 		Name: "dup-ids",
@@ -82,10 +90,9 @@ func TestValidateWorkflow_DuplicateStepIDs(t *testing.T) {
 	assertFieldError(t, errs, "jobs.build.steps[1].id", "duplicate")
 }
 
-func TestValidateWorkflow_StepIDsUniqueAcrossJobs(t *testing.T) {
-	// Same step ID in different jobs should NOT cause an error.
+func TestValidateWorkflow_MultiJobNotSupportedInV0(t *testing.T) {
 	wf := &WorkflowDef{
-		Name: "cross-job-ids",
+		Name: "multi-job",
 		Jobs: map[string]*JobDef{
 			"job-a": {
 				Steps: []*StepDef{
@@ -100,7 +107,8 @@ func TestValidateWorkflow_StepIDsUniqueAcrossJobs(t *testing.T) {
 		},
 	}
 	errs := ValidateWorkflow(wf)
-	assert.Empty(t, errs)
+	require.NotEmpty(t, errs)
+	assertFieldError(t, errs, "jobs", "exactly one job")
 }
 
 func TestValidateWorkflow_InvalidRiskLevel(t *testing.T) {
@@ -148,7 +156,7 @@ func TestValidateWorkflow_InvalidShell(t *testing.T) {
 }
 
 func TestValidateWorkflow_ValidShells(t *testing.T) {
-	for _, sh := range []string{"", "true", "sh", "bash", "zsh", "fish", "pwsh", "cmd"} {
+	for _, sh := range []string{"", "true", "false", "sh", "bash", "zsh", "fish", "pwsh", "cmd"} {
 		t.Run(sh, func(t *testing.T) {
 			wf := validWorkflow()
 			wf.Jobs["build"].Steps[0].Shell = sh
@@ -228,6 +236,46 @@ func TestValidateWorkflow_CollectsAllErrors(t *testing.T) {
 	// Should have errors for: name, secrets[0].name, secrets[0].from,
 	// steps[0].run, steps[0].risk_level, steps[1].id (duplicate)
 	assert.GreaterOrEqual(t, len(errs), 5)
+}
+
+func TestValidateWorkflow_UnknownNeed(t *testing.T) {
+	wf := validWorkflow()
+	wf.Jobs["build"].Needs = []string{"deploy"}
+	errs := ValidateWorkflow(wf)
+	require.NotEmpty(t, errs)
+	assertFieldError(t, errs, "jobs.build.needs[0]", "unknown job")
+}
+
+func TestValidateWorkflow_DependencyCycle(t *testing.T) {
+	wf := &WorkflowDef{
+		Name: "cycle",
+		Jobs: map[string]*JobDef{
+			"build": {
+				Needs: []string{"build"},
+				Steps: []*StepDef{
+					{ID: "s1", Name: "step", Run: "echo hi"},
+				},
+			},
+		},
+	}
+	errs := ValidateWorkflow(wf)
+	require.NotEmpty(t, errs)
+	assertFieldError(t, errs, "jobs", "circular dependency")
+}
+
+func TestValidateWorkflow_MatrixIncludeKeysMustMatch(t *testing.T) {
+	wf := validWorkflow()
+	wf.Jobs["build"].Strategy = &StrategyDef{
+		Matrix: &MatrixDef{
+			Include: []map[string]string{
+				{"os": "linux", "go": "1.22"},
+				{"os": "darwin"},
+			},
+		},
+	}
+	errs := ValidateWorkflow(wf)
+	require.NotEmpty(t, errs)
+	assertFieldError(t, errs, "jobs.build.strategy.matrix.include[1]", "inconsistent keys")
 }
 
 // assertFieldError checks that at least one error matches the given field and contains the message substring.

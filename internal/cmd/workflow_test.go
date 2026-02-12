@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,8 @@ const validWorkflowYAML = `name: test-workflow
 jobs:
   build:
     steps:
-      - name: Run tests
+      - id: run-tests
+        name: Run tests
         run: echo hello
 `
 
@@ -27,7 +29,8 @@ jobs:
 const invalidWorkflowYAML = `jobs:
   build:
     steps:
-      - name: Run tests
+      - id: run-tests
+        name: Run tests
         run: echo hello
 `
 
@@ -36,13 +39,16 @@ const multiJobWorkflowYAML = `name: multi-job
 jobs:
   build:
     steps:
-      - name: Step 1
+      - id: step-1
+        name: Step 1
         run: echo one
-      - name: Step 2
+      - id: step-2
+        name: Step 2
         run: echo two
   test:
     steps:
-      - name: Step 3
+      - id: step-3
+        name: Step 3
         run: echo three
 `
 
@@ -307,7 +313,7 @@ func TestFindStepDef(t *testing.T) {
 	steps := []*workflow.StepDef{
 		{ID: "s1", Name: "Step 1", Run: "echo one"},
 		{ID: "s2", Name: "Step 2", Run: "echo two"},
-		{ID: "", Name: "Step 3", Run: "echo three"},
+		{ID: "s3", Name: "Step 3", Run: "echo three"},
 	}
 
 	t.Run("found", func(t *testing.T) {
@@ -321,11 +327,6 @@ func TestFindStepDef(t *testing.T) {
 		assert.Nil(t, s)
 	})
 
-	t.Run("empty ID", func(t *testing.T) {
-		s := findStepDef(steps, "")
-		require.NotNil(t, s)
-		assert.Equal(t, "Step 3", s.Name)
-	})
 }
 
 func TestCountSteps(t *testing.T) {
@@ -340,6 +341,39 @@ func TestCountSteps(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 3, countSteps(def))
 	})
+}
+
+func TestGetSingleJob(t *testing.T) {
+	def, err := workflow.ParseWorkflow([]byte(validWorkflowYAML))
+	require.NoError(t, err)
+	job, err := getSingleJob(def)
+	require.NoError(t, err)
+	require.NotNil(t, job)
+}
+
+func TestGetSingleJob_MultipleJobsError(t *testing.T) {
+	def, err := workflow.ParseWorkflow([]byte(multiJobWorkflowYAML))
+	require.NoError(t, err)
+	_, err = getSingleJob(def)
+	require.Error(t, err)
+}
+
+func TestReportResults_CancelledExitCode(t *testing.T) {
+	rc := &workflowRunContext{
+		runID:    "run-test",
+		display:  workflow.NewDisplay(new(bytes.Buffer), workflow.DisplayPlain),
+		noDaemon: true,
+	}
+	result := &jobExecutionResult{
+		overallStatus: string(workflow.RunCancelled),
+		cancelled:     true,
+	}
+
+	err := reportResults(rc, result)
+	require.Error(t, err)
+	var exitErr *WorkflowExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, ExitCancelled, exitErr.Code)
 }
 
 func TestWorkflowCmd_HasSubcommands(t *testing.T) {

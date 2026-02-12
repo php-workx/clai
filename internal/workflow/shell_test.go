@@ -20,7 +20,7 @@ func TestBuildCommand_ArgvMode(t *testing.T) {
 
 	step := &StepDef{
 		Run:   "echo hello world",
-		Shell: "", // argv mode
+		Shell: "false", // explicit argv mode
 	}
 	env := []string{"FOO=bar"}
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", env, "/tmp/output.txt")
@@ -37,7 +37,7 @@ func TestBuildCommand_ArgvMode_QuotedArgs(t *testing.T) {
 
 	step := &StepDef{
 		Run:   `pulumi stack ls --json`,
-		Shell: "",
+		Shell: "false",
 	}
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
 	require.NoError(t, err)
@@ -51,7 +51,7 @@ func TestBuildCommand_ArgvMode_QuotedString(t *testing.T) {
 
 	step := &StepDef{
 		Run:   `myapp --name "hello world"`,
-		Shell: "",
+		Shell: "false",
 	}
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
 	require.NoError(t, err)
@@ -78,6 +78,24 @@ func TestBuildCommand_ShellModeTrue(t *testing.T) {
 	assert.Equal(t, "/tmp", cmd.Dir)
 }
 
+func TestBuildCommand_ShellModeOmittedDefaultsToShell(t *testing.T) {
+	adapter := NewShellAdapter()
+	ctx := context.Background()
+
+	step := &StepDef{
+		Run:   "echo hello | grep hello",
+		Shell: "",
+	}
+	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
+	require.NoError(t, err)
+
+	if runtime.GOOS == "windows" {
+		assert.Equal(t, []string{"cmd.exe", "/C", "echo hello | grep hello"}, cmd.Args)
+	} else {
+		assert.Equal(t, []string{"/bin/sh", "-c", "echo hello | grep hello"}, cmd.Args)
+	}
+}
+
 func TestBuildCommand_ExplicitShell(t *testing.T) {
 	adapter := NewShellAdapter()
 	ctx := context.Background()
@@ -102,7 +120,7 @@ func TestBuildCommand_CLAIOutputEnv(t *testing.T) {
 
 	step := &StepDef{
 		Run:   "echo test",
-		Shell: "",
+		Shell: "false",
 	}
 	env := []string{"PATH=/usr/bin"}
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", env, "/tmp/step-output.txt")
@@ -118,7 +136,7 @@ func TestBuildCommand_EnvMerging(t *testing.T) {
 
 	step := &StepDef{
 		Run:   "myapp",
-		Shell: "",
+		Shell: "false",
 	}
 	env := []string{"FOO=bar", "BAZ=qux", "HOME=/home/test"}
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", env, "/tmp/output.txt")
@@ -136,7 +154,7 @@ func TestBuildCommand_EmptyRun(t *testing.T) {
 
 	step := &StepDef{
 		Run:   "",
-		Shell: "",
+		Shell: "false",
 	}
 	_, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
 	assert.Error(t, err)
@@ -149,7 +167,7 @@ func TestBuildCommand_WorkDir(t *testing.T) {
 
 	step := &StepDef{
 		Run:   "ls",
-		Shell: "",
+		Shell: "false",
 	}
 	cmd, err := adapter.BuildCommand(ctx, step, "/var/data", nil, "/tmp/output.txt")
 	require.NoError(t, err)
@@ -162,7 +180,7 @@ func TestBuildCommand_NilEnv(t *testing.T) {
 
 	step := &StepDef{
 		Run:   "echo test",
-		Shell: "",
+		Shell: "false",
 	}
 	cmd, err := adapter.BuildCommand(ctx, step, "/tmp", nil, "/tmp/output.txt")
 	require.NoError(t, err)

@@ -98,13 +98,16 @@ name: failure-test
 jobs:
   build:
     steps:
-      - name: Pass
+      - id: pass
+        name: Pass
         run: echo ok
         shell: true
-      - name: Fail
+      - id: fail
+        name: Fail
         run: exit 1
         shell: true
-      - name: Should Skip
+      - id: skipped
+        name: Should Skip
         run: echo should-not-run
         shell: true
 `
@@ -151,7 +154,8 @@ jobs:
           - os: linux
           - os: darwin
     steps:
-      - name: Show OS
+      - id: show-os
+        name: Show OS
         run: echo "Building for ${{ matrix.os }}"
         shell: true
 `
@@ -234,11 +238,12 @@ jobs:
 	// Should complete well before the sleep would finish.
 	assert.Less(t, elapsed, 15*time.Second, "run should not wait for full sleep")
 
-	// Overall run should be failed due to cancellation.
-	assert.Equal(t, "failed", result.Status)
+	// Overall run should be cancelled due to cancellation.
+	assert.Equal(t, "cancelled", result.Status)
 
 	// All steps should have results.
 	require.Len(t, result.Steps, 2)
+	assert.Equal(t, "cancelled", result.Steps[0].Status)
 
 	// The second step should be skipped.
 	assert.Equal(t, "skipped", result.Steps[1].Status)
@@ -257,10 +262,12 @@ secrets:
 jobs:
   deploy:
     steps:
-      - name: validate
+      - id: validate
+        name: validate
         run: echo "checking..."
         shell: true
-      - name: deploy
+      - id: deploy
+        name: deploy
         run: echo "deploying to ${{ env.REGION }}"
         shell: true
         analyze: true

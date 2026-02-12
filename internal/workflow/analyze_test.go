@@ -250,7 +250,7 @@ func TestShouldPromptHuman_HaltHigh(t *testing.T) {
 }
 
 func TestShouldPromptHuman_NeedsHumanLow(t *testing.T) {
-	assert.True(t, ShouldPromptHuman("needs_human", "low"))
+	assert.False(t, ShouldPromptHuman("needs_human", "low"))
 }
 
 func TestShouldPromptHuman_NeedsHumanMedium(t *testing.T) {
@@ -262,7 +262,7 @@ func TestShouldPromptHuman_NeedsHumanHigh(t *testing.T) {
 }
 
 func TestShouldPromptHuman_ErrorLow(t *testing.T) {
-	assert.True(t, ShouldPromptHuman("error", "low"))
+	assert.False(t, ShouldPromptHuman("error", "low"))
 }
 
 func TestShouldPromptHuman_ErrorMedium(t *testing.T) {
@@ -274,7 +274,8 @@ func TestShouldPromptHuman_ErrorHigh(t *testing.T) {
 }
 
 func TestShouldPromptHuman_UnknownDecision(t *testing.T) {
-	assert.True(t, ShouldPromptHuman("unknown", "low"))
+	assert.False(t, ShouldPromptHuman("unknown", "low"))
+	assert.True(t, ShouldPromptHuman("unknown", "medium"))
 }
 
 func TestShouldPromptHuman_DefaultRiskLevel(t *testing.T) {

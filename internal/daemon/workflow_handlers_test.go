@@ -75,6 +75,7 @@ func (m *workflowMockStore) UpdateWorkflowStep(ctx context.Context, update *stor
 	key := stepKey(update.RunID, update.StepID, update.MatrixKey)
 	if step, ok := m.steps[key]; ok {
 		step.Status = update.Status
+		step.Command = update.Command
 		step.ExitCode = update.ExitCode
 		step.DurationMs = update.DurationMs
 		step.StdoutTail = update.StdoutTail
@@ -262,6 +263,7 @@ func TestHandler_WorkflowStepUpdate_UpdateExisting(t *testing.T) {
 		StepId:     "step-1",
 		MatrixKey:  "go1.21",
 		Status:     "passed",
+		Command:    "go test ./... -run TestFast",
 		ExitCode:   0,
 		DurationMs: 5000,
 		StdoutTail: "ok  ./...",
@@ -288,6 +290,9 @@ func TestHandler_WorkflowStepUpdate_UpdateExisting(t *testing.T) {
 	}
 	if step.StdoutTail != "ok  ./..." {
 		t.Errorf("expected stdout_tail 'ok  ./...', got %q", step.StdoutTail)
+	}
+	if step.Command != "go test ./... -run TestFast" {
+		t.Errorf("expected updated command, got %q", step.Command)
 	}
 }
 
@@ -437,7 +442,7 @@ func TestHandler_AnalyzeStepOutput_Success(t *testing.T) {
 	t.Parallel()
 
 	llm := &mockLLMQuerier{
-		response: `{"decision": "approve", "reasoning": "All tests passed", "flags": []}`,
+		response: `{"decision": "approve", "reasoning": "All tests passed", "flags": {}}`,
 	}
 	server, store := createWorkflowTestServer(t, llm)
 	ctx := context.Background()
@@ -456,8 +461,8 @@ func TestHandler_AnalyzeStepOutput_Success(t *testing.T) {
 		t.Fatalf("AnalyzeStepOutput failed: %v", err)
 	}
 
-	if resp.Decision != "approve" {
-		t.Errorf("expected decision 'approve', got %q", resp.Decision)
+	if resp.Decision != "proceed" {
+		t.Errorf("expected decision 'proceed', got %q", resp.Decision)
 	}
 	if resp.Reasoning != "All tests passed" {
 		t.Errorf("expected reasoning 'All tests passed', got %q", resp.Reasoning)
@@ -469,8 +474,8 @@ func TestHandler_AnalyzeStepOutput_Success(t *testing.T) {
 	}
 
 	a := store.analyses[0]
-	if a.Decision != "approve" {
-		t.Errorf("stored decision should be 'approve', got %q", a.Decision)
+	if a.Decision != "proceed" {
+		t.Errorf("stored decision should be 'proceed', got %q", a.Decision)
 	}
 	if a.RunID != "run-001" {
 		t.Errorf("stored run_id should be 'run-001', got %q", a.RunID)
@@ -502,11 +507,11 @@ func TestHandler_AnalyzeStepOutput_Reject(t *testing.T) {
 		t.Fatalf("AnalyzeStepOutput failed: %v", err)
 	}
 
-	if resp.Decision != "reject" {
-		t.Errorf("expected decision 'reject', got %q", resp.Decision)
+	if resp.Decision != "halt" {
+		t.Errorf("expected decision 'halt', got %q", resp.Decision)
 	}
-	if resp.FlagsJson != `["test_failure"]` {
-		t.Errorf("expected flags_json '[\"test_failure\"]', got %q", resp.FlagsJson)
+	if resp.FlagsJson != `{"test_failure":"true"}` {
+		t.Errorf("expected flags_json '{\"test_failure\":\"true\"}', got %q", resp.FlagsJson)
 	}
 }
 
@@ -587,8 +592,8 @@ func TestHandler_AnalyzeStepOutput_CustomPrompt(t *testing.T) {
 		t.Fatalf("AnalyzeStepOutput failed: %v", err)
 	}
 
-	if resp.Decision != "approve" {
-		t.Errorf("expected decision 'approve', got %q", resp.Decision)
+	if resp.Decision != "proceed" {
+		t.Errorf("expected decision 'proceed', got %q", resp.Decision)
 	}
 
 	// Verify the custom prompt was used (stored in analysis)
@@ -651,11 +656,11 @@ func TestHandler_AnalyzeStepOutput_JSONInCodeBlock(t *testing.T) {
 		t.Fatalf("AnalyzeStepOutput failed: %v", err)
 	}
 
-	if resp.Decision != "approve" {
-		t.Errorf("expected decision 'approve', got %q", resp.Decision)
+	if resp.Decision != "proceed" {
+		t.Errorf("expected decision 'proceed', got %q", resp.Decision)
 	}
-	if resp.FlagsJson != `["clean"]` {
-		t.Errorf("expected flags_json '[\"clean\"]', got %q", resp.FlagsJson)
+	if resp.FlagsJson != `{"clean":"true"}` {
+		t.Errorf("expected flags_json '{\"clean\":\"true\"}', got %q", resp.FlagsJson)
 	}
 }
 
@@ -668,14 +673,14 @@ func TestParseAnalysisResponse_ValidJSON(t *testing.T) {
 		`{"decision": "approve", "reasoning": "Tests passed", "flags": ["clean"]}`,
 	)
 
-	if decision != "approve" {
-		t.Errorf("expected decision 'approve', got %q", decision)
+	if decision != "proceed" {
+		t.Errorf("expected decision 'proceed', got %q", decision)
 	}
 	if reasoning != "Tests passed" {
 		t.Errorf("expected reasoning 'Tests passed', got %q", reasoning)
 	}
-	if flagsJSON != `["clean"]` {
-		t.Errorf("expected flags '[\"clean\"]', got %q", flagsJSON)
+	if flagsJSON != `{"clean":"true"}` {
+		t.Errorf("expected flags '{\"clean\":\"true\"}', got %q", flagsJSON)
 	}
 }
 
@@ -686,8 +691,8 @@ func TestParseAnalysisResponse_NoFlags(t *testing.T) {
 		`{"decision": "reject", "reasoning": "Build failed"}`,
 	)
 
-	if decision != "reject" {
-		t.Errorf("expected decision 'reject', got %q", decision)
+	if decision != "halt" {
+		t.Errorf("expected decision 'halt', got %q", decision)
 	}
 	if reasoning != "Build failed" {
 		t.Errorf("expected reasoning 'Build failed', got %q", reasoning)

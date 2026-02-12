@@ -25,6 +25,7 @@ const (
 	iconPassed    = "\u2713" // ✓
 	iconFailed    = "\u2717" // ✗
 	iconSkipped   = "\u2298" // ⊘
+	iconCancelled = "\u25D1" // ◑
 	iconAnalyzing = "\u2026" // …
 )
 
@@ -37,7 +38,7 @@ type Display struct {
 // StepSummary is a minimal step result for display purposes.
 type StepSummary struct {
 	Name     string
-	Status   string // "passed", "failed", "skipped"
+	Status   string // "passed", "failed", "skipped", "cancelled"
 	Duration time.Duration
 }
 
@@ -100,6 +101,8 @@ func (d *Display) StepEnd(stepName string, matrixKey string, status string, dura
 			fmt.Fprintf(d.writer, "%s Step: %s FAILED (%s)\n", iconFailed, label, durStr)
 		case "skipped":
 			fmt.Fprintf(d.writer, "%s Step: %s (skipped)\n", iconSkipped, label)
+		case "cancelled":
+			fmt.Fprintf(d.writer, "%s Step: %s (cancelled)\n", iconCancelled, label)
 		default:
 			fmt.Fprintf(d.writer, "%s Step: %s %s (%s)\n", iconPending, label, status, durStr)
 		}
@@ -107,6 +110,8 @@ func (d *Display) StepEnd(stepName string, matrixKey string, status string, dura
 		switch status {
 		case "skipped":
 			fmt.Fprintf(d.writer, "[step_skip] %s\n", label)
+		case "cancelled":
+			fmt.Fprintf(d.writer, "[step_cancelled] %s\n", label)
 		default:
 			fmt.Fprintf(d.writer, "[step_end] %s %s %s\n", label, status, durStr)
 		}
@@ -143,9 +148,9 @@ func (d *Display) ReviewPrompt(stepName string) {
 
 // RunEnd prints the final run summary.
 func (d *Display) RunEnd(status string, totalDuration time.Duration, steps []StepSummary) {
-	passed, failed, skipped := countStatuses(steps)
+	passed, failed, skipped, cancelled := countStatuses(steps)
 	durStr := formatDuration(totalDuration)
-	summary := formatSummary(passed, failed, skipped)
+	summary := formatSummary(passed, failed, skipped, cancelled)
 
 	if d.mode == DisplayTTY {
 		statusUpper := strings.ToUpper(status)
@@ -169,7 +174,7 @@ func formatDuration(d time.Duration) string {
 }
 
 // countStatuses tallies step results by status.
-func countStatuses(steps []StepSummary) (passed, failed, skipped int) {
+func countStatuses(steps []StepSummary) (passed, failed, skipped, cancelled int) {
 	for _, s := range steps {
 		switch s.Status {
 		case "passed":
@@ -178,13 +183,15 @@ func countStatuses(steps []StepSummary) (passed, failed, skipped int) {
 			failed++
 		case "skipped":
 			skipped++
+		case "cancelled":
+			cancelled++
 		}
 	}
 	return
 }
 
 // formatSummary builds a human-readable summary string like "1 passed, 1 failed, 1 skipped".
-func formatSummary(passed, failed, skipped int) string {
+func formatSummary(passed, failed, skipped, cancelled int) string {
 	var parts []string
 	if passed > 0 {
 		parts = append(parts, fmt.Sprintf("%d passed", passed))
@@ -194,6 +201,9 @@ func formatSummary(passed, failed, skipped int) string {
 	}
 	if skipped > 0 {
 		parts = append(parts, fmt.Sprintf("%d skipped", skipped))
+	}
+	if cancelled > 0 {
+		parts = append(parts, fmt.Sprintf("%d cancelled", cancelled))
 	}
 	if len(parts) == 0 {
 		return "0 passed"

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
@@ -97,18 +98,35 @@ func (t *AnalysisTransport) analyzeViaDaemon(ctx context.Context, req *AnalysisR
 // protoToResult converts a protobuf AnalyzeStepOutputResponse to an AnalysisResult.
 func protoToResult(resp *pb.AnalyzeStepOutputResponse) *AnalysisResult {
 	result := &AnalysisResult{
-		Decision:  resp.GetDecision(),
+		Decision:  normalizeDecision(strings.ToLower(strings.TrimSpace(resp.GetDecision()))),
 		Reasoning: resp.GetReasoning(),
 	}
 
 	if flagsJSON := resp.GetFlagsJson(); flagsJSON != "" {
-		var flags map[string]string
-		if err := json.Unmarshal([]byte(flagsJSON), &flags); err == nil {
+		if flags, ok := parseFlagsJSON(flagsJSON); ok {
 			result.Flags = flags
 		}
 	}
 
 	return result
+}
+
+func parseFlagsJSON(raw string) (map[string]string, bool) {
+	var flagsMap map[string]string
+	if err := json.Unmarshal([]byte(raw), &flagsMap); err == nil {
+		return flagsMap, true
+	}
+
+	var legacyFlags []string
+	if err := json.Unmarshal([]byte(raw), &legacyFlags); err == nil {
+		flagsMap = make(map[string]string, len(legacyFlags))
+		for _, flag := range legacyFlags {
+			flagsMap[flag] = "true"
+		}
+		return flagsMap, true
+	}
+
+	return nil, false
 }
 
 // analyzeViaDirect uses the direct LLM fallback when daemon is unavailable.

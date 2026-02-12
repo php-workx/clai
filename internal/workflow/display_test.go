@@ -336,20 +336,21 @@ func TestFormatDuration(t *testing.T) {
 
 func TestFormatSummary(t *testing.T) {
 	tests := []struct {
-		passed, failed, skipped int
-		expected                string
+		passed, failed, skipped, cancelled int
+		expected                           string
 	}{
-		{0, 0, 0, "0 passed"},
-		{3, 0, 0, "3 passed"},
-		{1, 1, 0, "1 passed, 1 failed"},
-		{1, 1, 1, "1 passed, 1 failed, 1 skipped"},
-		{0, 1, 0, "1 failed"},
-		{0, 0, 2, "2 skipped"},
+		{0, 0, 0, 0, "0 passed"},
+		{3, 0, 0, 0, "3 passed"},
+		{1, 1, 0, 0, "1 passed, 1 failed"},
+		{1, 1, 1, 0, "1 passed, 1 failed, 1 skipped"},
+		{0, 1, 0, 0, "1 failed"},
+		{0, 0, 2, 0, "2 skipped"},
+		{0, 0, 0, 1, "1 cancelled"},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.expected, func(t *testing.T) {
-			assert.Equal(t, tc.expected, formatSummary(tc.passed, tc.failed, tc.skipped))
+			assert.Equal(t, tc.expected, formatSummary(tc.passed, tc.failed, tc.skipped, tc.cancelled))
 		})
 	}
 }
@@ -360,12 +361,14 @@ func TestCountStatuses(t *testing.T) {
 		{Status: "passed"},
 		{Status: "failed"},
 		{Status: "skipped"},
+		{Status: "cancelled"},
 		{Status: "passed"},
 	}
-	passed, failed, skipped := countStatuses(steps)
+	passed, failed, skipped, cancelled := countStatuses(steps)
 	assert.Equal(t, 3, passed)
 	assert.Equal(t, 1, failed)
 	assert.Equal(t, 1, skipped)
+	assert.Equal(t, 1, cancelled)
 }
 
 func TestIconForDecision(t *testing.T) {

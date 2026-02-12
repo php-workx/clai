@@ -150,6 +150,7 @@ type WorkflowStepUpdate struct {
 	StepID      string
 	MatrixKey   string
 	Status      string
+	Command     string
 	ExitCode    int
 	DurationMs  int64
 	StdoutTail  string

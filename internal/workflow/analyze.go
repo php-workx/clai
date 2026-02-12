@@ -256,15 +256,14 @@ func ShouldPromptHuman(decision, riskLevel string) bool {
 		riskLevel = string(RiskMedium)
 	}
 
-	switch Decision(decision) {
-	case DecisionProceed:
-		// proceed + high -> true; proceed + low/medium -> false
-		return riskLevel == string(RiskHigh)
-	case DecisionHalt, DecisionNeedsHuman, DecisionError:
-		// always require human review
+	switch RiskLevel(riskLevel) {
+	case RiskHigh:
 		return true
+	case RiskLow:
+		return normalizeDecision(decision) == string(DecisionHalt)
+	case RiskMedium:
+		fallthrough
 	default:
-		// unknown decision -> require human review
-		return true
+		return normalizeDecision(decision) != string(DecisionProceed)
 	}
 }

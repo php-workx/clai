@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
@@ -193,7 +192,7 @@ func TestProtoToResult_WithFlags(t *testing.T) {
 	}
 
 	result := protoToResultFromValues(resp.decision, resp.reasoning, resp.flagsJSON)
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision)
 	assert.Equal(t, "all good", result.Reasoning)
 	assert.Equal(t, "95%", result.Flags["coverage"])
 	assert.Equal(t, "0", result.Flags["warnings"])
@@ -201,17 +200,24 @@ func TestProtoToResult_WithFlags(t *testing.T) {
 
 func TestProtoToResult_EmptyFlags(t *testing.T) {
 	result := protoToResultFromValues("reject", "build failed", "")
-	assert.Equal(t, "reject", result.Decision)
+	assert.Equal(t, "halt", result.Decision)
 	assert.Equal(t, "build failed", result.Reasoning)
 	assert.Nil(t, result.Flags)
 }
 
 func TestProtoToResult_InvalidFlagsJSON(t *testing.T) {
 	result := protoToResultFromValues("approve", "ok", "not json")
-	assert.Equal(t, "approve", result.Decision)
+	assert.Equal(t, "proceed", result.Decision)
 	assert.Equal(t, "ok", result.Reasoning)
 	// Invalid JSON should be silently ignored.
 	assert.Nil(t, result.Flags)
+}
+
+func TestProtoToResult_LegacyArrayFlags(t *testing.T) {
+	result := protoToResultFromValues("proceed", "ok", `["flaky_test","timeout"]`)
+	require.NotNil(t, result.Flags)
+	assert.Equal(t, "true", result.Flags["flaky_test"])
+	assert.Equal(t, "true", result.Flags["timeout"])
 }
 
 // protoResponse is a test helper to avoid importing proto directly in tests.
@@ -225,13 +231,12 @@ type protoResponse struct {
 // without requiring a real proto message.
 func protoToResultFromValues(decision, reasoning, flagsJSON string) *AnalysisResult {
 	result := &AnalysisResult{
-		Decision:  decision,
+		Decision:  normalizeDecision(decision),
 		Reasoning: reasoning,
 	}
 
 	if flagsJSON != "" {
-		var flags map[string]string
-		if err := json.Unmarshal([]byte(flagsJSON), &flags); err == nil {
+		if flags, ok := parseFlagsJSON(flagsJSON); ok {
 			result.Flags = flags
 		}
 	}

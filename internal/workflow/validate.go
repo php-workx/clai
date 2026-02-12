@@ -1,6 +1,10 @@
 package workflow
 
-import "fmt"
+import (
+	"fmt"
+	"sort"
+	"strings"
+)
 
 // ValidationError represents a single validation failure with its location.
 type ValidationError struct {
@@ -30,6 +34,12 @@ func ValidateWorkflow(wf *WorkflowDef) []ValidationError {
 		errs = append(errs, ValidationError{
 			Field:   "jobs",
 			Message: "workflow must have at least one job",
+		})
+	} else if len(wf.Jobs) > 1 {
+		// v0 supports a single job only (spec note in §2.2).
+		errs = append(errs, ValidationError{
+			Field:   "jobs",
+			Message: "workflow v0 supports exactly one job",
 		})
 	}
 
@@ -63,13 +73,15 @@ func ValidateWorkflow(wf *WorkflowDef) []ValidationError {
 	// Validate each job.
 	for jobName, job := range wf.Jobs {
 		jobField := fmt.Sprintf("jobs.%s", jobName)
-		errs = append(errs, validateJob(jobField, job)...)
+		errs = append(errs, validateJob(jobField, jobName, job)...)
 	}
+	errs = append(errs, validateNeeds(wf)...)
+	errs = append(errs, validateDependencyCycles(wf)...)
 
 	return errs
 }
 
-func validateJob(field string, job *JobDef) []ValidationError {
+func validateJob(field, jobName string, job *JobDef) []ValidationError {
 	var errs []ValidationError
 
 	// Job must have at least one step.
@@ -87,6 +99,7 @@ func validateJob(field string, job *JobDef) []ValidationError {
 		stepField := fmt.Sprintf("%s.steps[%d]", field, i)
 		errs = append(errs, validateStep(stepField, step, seenIDs)...)
 	}
+	errs = append(errs, validateMatrixIncludeKeys(jobName, job)...)
 
 	return errs
 }
@@ -102,8 +115,13 @@ func validateStep(field string, step *StepDef, seenIDs map[string]bool) []Valida
 		})
 	}
 
-	// Step ID must be unique within the job (if set).
-	if step.ID != "" {
+	// Step ID is required and must be unique within the job.
+	if step.ID == "" {
+		errs = append(errs, ValidationError{
+			Field:   field + ".id",
+			Message: "step id is required",
+		})
+	} else {
 		if seenIDs[step.ID] {
 			errs = append(errs, ValidationError{
 				Field:   field + ".id",
@@ -133,9 +151,141 @@ func validateStep(field string, step *StepDef, seenIDs map[string]bool) []Valida
 	if !validShellValues[step.Shell] {
 		errs = append(errs, ValidationError{
 			Field:   field + ".shell",
-			Message: fmt.Sprintf("invalid shell value %q; must be one of: sh, bash, zsh, fish, pwsh, cmd, or true", step.Shell),
+			Message: fmt.Sprintf("invalid shell value %q; must be one of: sh, bash, zsh, fish, pwsh, cmd, true, or false", step.Shell),
 		})
 	}
 
 	return errs
+}
+
+func validateNeeds(wf *WorkflowDef) []ValidationError {
+	var errs []ValidationError
+
+	for jobName, job := range wf.Jobs {
+		for i, dep := range job.Needs {
+			field := fmt.Sprintf("jobs.%s.needs[%d]", jobName, i)
+			if dep == "" {
+				errs = append(errs, ValidationError{
+					Field:   field,
+					Message: "job dependency must not be empty",
+				})
+				continue
+			}
+			if _, ok := wf.Jobs[dep]; !ok {
+				errs = append(errs, ValidationError{
+					Field:   field,
+					Message: fmt.Sprintf("job %q depends on unknown job %q", jobName, dep),
+				})
+			}
+		}
+	}
+
+	return errs
+}
+
+func validateDependencyCycles(wf *WorkflowDef) []ValidationError {
+	var (
+		errs  []ValidationError
+		state = map[string]int{} // 0=unvisited, 1=visiting, 2=visited
+		stack []string
+	)
+
+	var dfs func(string) bool
+	dfs = func(job string) bool {
+		state[job] = 1
+		stack = append(stack, job)
+
+		for _, dep := range wf.Jobs[job].Needs {
+			if dep == "" {
+				continue
+			}
+			if _, ok := wf.Jobs[dep]; !ok {
+				continue
+			}
+			switch state[dep] {
+			case 0:
+				if dfs(dep) {
+					return true
+				}
+			case 1:
+				cycle := cyclePath(stack, dep)
+				errs = append(errs, ValidationError{
+					Field:   "jobs",
+					Message: fmt.Sprintf("circular dependency: %s", strings.Join(cycle, " -> ")),
+				})
+				return true
+			}
+		}
+
+		stack = stack[:len(stack)-1]
+		state[job] = 2
+		return false
+	}
+
+	jobNames := make([]string, 0, len(wf.Jobs))
+	for name := range wf.Jobs {
+		jobNames = append(jobNames, name)
+	}
+	sort.Strings(jobNames)
+
+	for _, jobName := range jobNames {
+		if state[jobName] == 0 && dfs(jobName) {
+			break
+		}
+	}
+
+	return errs
+}
+
+func cyclePath(stack []string, backEdgeTarget string) []string {
+	start := 0
+	for i := len(stack) - 1; i >= 0; i-- {
+		if stack[i] == backEdgeTarget {
+			start = i
+			break
+		}
+	}
+
+	path := append([]string{}, stack[start:]...)
+	path = append(path, backEdgeTarget)
+	return path
+}
+
+func validateMatrixIncludeKeys(jobName string, job *JobDef) []ValidationError {
+	if job.Strategy == nil || job.Strategy.Matrix == nil || len(job.Strategy.Matrix.Include) <= 1 {
+		return nil
+	}
+
+	baseline := keysSet(job.Strategy.Matrix.Include[0])
+	for i := 1; i < len(job.Strategy.Matrix.Include); i++ {
+		current := keysSet(job.Strategy.Matrix.Include[i])
+		if !sameKeySet(baseline, current) {
+			return []ValidationError{{
+				Field:   fmt.Sprintf("jobs.%s.strategy.matrix.include[%d]", jobName, i),
+				Message: "matrix include entries have inconsistent keys",
+			}}
+		}
+	}
+
+	return nil
+}
+
+func keysSet(m map[string]string) map[string]bool {
+	set := make(map[string]bool, len(m))
+	for k := range m {
+		set[k] = true
+	}
+	return set
+}
+
+func sameKeySet(a, b map[string]bool) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if !b[k] {
+			return false
+		}
+	}
+	return true
 }

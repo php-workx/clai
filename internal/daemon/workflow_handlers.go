@@ -93,6 +93,7 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 			StepID:      req.StepId,
 			MatrixKey:   req.MatrixKey,
 			Status:      req.Status,
+			Command:     req.Command,
 			ExitCode:    int(req.ExitCode),
 			DurationMs:  req.DurationMs,
 			StdoutTail:  req.StdoutTail,
@@ -251,23 +252,26 @@ func buildAnalysisPrompt(req *pb.AnalyzeStepOutputRequest) string {
 	b.WriteString("Respond with a JSON object containing:\n")
 	b.WriteString(`- "decision": one of "proceed", "halt", "needs_human"` + "\n")
 	b.WriteString(`- "reasoning": brief explanation of your decision` + "\n")
-	b.WriteString(`- "flags": array of flag strings (e.g. ["flaky_test", "timeout"])` + "\n")
+	b.WriteString(`- "flags": object of string keys/values (e.g. {"flaky_test":"true","timeout":"yes"})` + "\n")
 	return b.String()
 }
 
 // analysisResult is used to parse structured JSON responses from the LLM.
 type analysisResult struct {
-	Decision  string   `json:"decision"`
-	Reasoning string   `json:"reasoning"`
-	Flags     []string `json:"flags"`
+	Decision  string          `json:"decision"`
+	Reasoning string          `json:"reasoning"`
+	Flags     json.RawMessage `json:"flags"`
 }
 
 // formatAnalysisFields converts a parsed analysisResult into the return tuple.
 func formatAnalysisFields(result *analysisResult) (decision, reasoning, flagsJSON string) {
-	decision = result.Decision
+	decision = normalizeDecision(result.Decision)
+	if decision == "" {
+		decision = "needs_human"
+	}
 	reasoning = result.Reasoning
-	if len(result.Flags) > 0 {
-		if b, err := json.Marshal(result.Flags); err == nil {
+	if flagsMap := normalizeFlags(result.Flags); len(flagsMap) > 0 {
+		if b, err := json.Marshal(flagsMap); err == nil {
 			flagsJSON = string(b)
 		}
 	}
@@ -304,4 +308,41 @@ func parseAnalysisResponse(raw string) (decision, reasoning, flagsJSON string) {
 
 	// Fallback: treat the entire response as reasoning with needs_human decision.
 	return "needs_human", trimmed, ""
+}
+
+func normalizeDecision(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "approve", "proceed":
+		return "proceed"
+	case "reject", "halt":
+		return "halt"
+	case "needs_human":
+		return "needs_human"
+	case "error":
+		return "error"
+	default:
+		return ""
+	}
+}
+
+func normalizeFlags(raw json.RawMessage) map[string]string {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	var flagsMap map[string]string
+	if err := json.Unmarshal(raw, &flagsMap); err == nil {
+		return flagsMap
+	}
+
+	var legacy []string
+	if err := json.Unmarshal(raw, &legacy); err == nil {
+		flagsMap = make(map[string]string, len(legacy))
+		for _, f := range legacy {
+			flagsMap[f] = "true"
+		}
+		return flagsMap
+	}
+
+	return nil
 }

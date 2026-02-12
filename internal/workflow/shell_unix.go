@@ -24,8 +24,8 @@ func (a *unixShellAdapter) BuildCommand(ctx context.Context, step *StepDef, work
 	env = append(env, "CLAI_OUTPUT="+outputFile)
 
 	var cmd *exec.Cmd
-	if step.Shell == "" {
-		// Argv mode (default): split using POSIX shlex, no shell involved (D8).
+	if step.Shell == "false" {
+		// Explicit argv mode: split using POSIX shlex, no shell involved (D8).
 		argv, err := shlex.Split(step.Run)
 		if err != nil {
 			return nil, fmt.Errorf("splitting command: %w", err)
@@ -37,7 +37,7 @@ func (a *unixShellAdapter) BuildCommand(ctx context.Context, step *StepDef, work
 	} else {
 		// Shell mode: wrap in shell interpreter.
 		shellPath := "/bin/sh"
-		if step.Shell != "true" {
+		if step.Shell != "" && step.Shell != "true" {
 			shellPath = step.Shell
 		}
 		cmd = exec.CommandContext(ctx, shellPath, "-c", step.Run)

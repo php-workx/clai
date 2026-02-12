@@ -216,12 +216,13 @@ func TestRunner_ContextCancellation(t *testing.T) {
 	result := runner.Run(ctx, steps)
 	elapsed := time.Since(start)
 
-	assert.Equal(t, "failed", result.Status)
+	assert.Equal(t, "cancelled", result.Status)
 	// Should complete well before the sleep would finish.
 	assert.Less(t, elapsed, 30*time.Second)
 
 	// All steps should have results.
 	require.Len(t, result.Steps, 2)
+	assert.Equal(t, "cancelled", result.Steps[0].Status)
 	// Step 2 should be skipped (either because step 1 failed from cancellation
 	// or because context was already done).
 	assert.Equal(t, "skipped", result.Steps[1].Status)
@@ -377,13 +378,53 @@ func TestRunner_MultipleOutputs(t *testing.T) {
 	assert.Contains(t, result.Steps[1].StdoutTail, "value1 value2")
 }
 
+func TestRunner_OutputEnvInheritedByDownstreamStep(t *testing.T) {
+	skipOnWindows(t)
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("producer", "Write output env", `echo "EXPORTED_TOKEN=abc123" >> "$CLAI_OUTPUT"`),
+		shellStep("consumer", "Read inherited env", `echo "token=$EXPORTED_TOKEN"`),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "passed", result.Status)
+	require.Len(t, result.Steps, 2)
+	assert.Contains(t, result.Steps[1].StdoutTail, "token=abc123")
+}
+
+func TestRunner_OutputParseErrorIsNonFatal(t *testing.T) {
+	skipOnWindows(t)
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+	}
+	runner := NewRunner(cfg)
+
+	// Scanner default token limit is 64K, so this causes ParseOutputFile to error.
+	steps := []*StepDef{
+		shellStep("step1", "Write oversized output line", `awk 'BEGIN { printf("K=%070000d\n", 0) }' > "$CLAI_OUTPUT"`),
+	}
+
+	result := runner.Run(context.Background(), steps)
+	assert.Equal(t, "passed", result.Status)
+	require.Len(t, result.Steps, 1)
+	assert.Equal(t, "passed", result.Steps[0].Status)
+	assert.Empty(t, result.Steps[0].Outputs)
+}
+
 func TestMergeEnv(t *testing.T) {
 	workflow := map[string]string{"A": "w", "B": "w"}
 	job := map[string]string{"B": "j", "C": "j"}
 	step := map[string]string{"C": "s", "D": "s"}
 	matrix := map[string]string{"M": "m1"}
 
-	env := mergeEnv(workflow, job, step, matrix)
+	env := mergeEnv(nil, workflow, job, step, matrix)
 
 	// Convert to map for easier assertions.
 	envMap := make(map[string]string)

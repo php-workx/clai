@@ -9,8 +9,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/spf13/cobra"
 
 	pb "github.com/runger/clai/gen/clai/v1"
+	"github.com/runger/clai/internal/claude"
 	"github.com/runger/clai/internal/ipc"
 	"github.com/runger/clai/internal/workflow"
 )
@@ -82,6 +85,7 @@ type workflowRunContext struct {
 	runID          string
 	workflowHash   string
 	normalizedPath string
+	workDir        string
 	def            *workflow.WorkflowDef
 	display        *workflow.Display
 	artifact       *workflow.RunArtifact
@@ -181,7 +185,7 @@ func setupRunContext(cmd *cobra.Command, def *workflow.WorkflowDef, data []byte,
 	}
 
 	analyzer := workflow.NewAnalyzer(masker)
-	transport := workflow.NewAnalysisTransport(analyzer, nil)
+	transport := workflow.NewAnalysisTransport(analyzer, claude.QueryWithContext)
 
 	mode, _ := cmd.Flags().GetString("mode")
 	handler := selectInteractionHandler(mode, displayMode)
@@ -190,6 +194,7 @@ func setupRunContext(cmd *cobra.Command, def *workflow.WorkflowDef, data []byte,
 		runID:          runID,
 		workflowHash:   workflowHash,
 		normalizedPath: normalizedPath,
+		workDir:        ".",
 		def:            def,
 		display:        display,
 		artifact:       artifact,
@@ -208,19 +213,17 @@ type jobExecutionResult struct {
 	allStepResults []*workflow.StepResult
 	overallStatus  string
 	humanRejected  bool
+	validationErr  bool
+	cancelled      bool
 	totalDuration  time.Duration
 }
 
-// executeJob runs all matrix combinations for the first job in the workflow.
+// executeJob runs all matrix combinations for the workflow's single v0 job.
 func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.WorkflowDef) *jobExecutionResult {
-	// Get the first job (Tier 0: single job support).
-	var job *workflow.JobDef
-	for _, v := range def.Jobs {
-		job = v
-		break
-	}
-	if job == nil {
-		return &jobExecutionResult{overallStatus: string(workflow.RunFailed)}
+	job, err := getSingleJob(def)
+	if err != nil {
+		slog.Error("invalid workflow job layout", "error", err)
+		return &jobExecutionResult{overallStatus: string(workflow.RunFailed), validationErr: true}
 	}
 
 	// Parse --var flags into env overrides.
@@ -241,7 +244,7 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 
 	for _, matrixVars := range matrixCombinations {
 		cfg := workflow.RunnerConfig{
-			WorkDir:    ".",
+			WorkDir:    rc.workDir,
 			Env:        workflowEnv,
 			JobEnv:     job.Env,
 			MatrixVars: matrixVars,
@@ -263,6 +266,11 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 
 		if runResult.Status == string(workflow.RunFailed) {
 			result.overallStatus = string(workflow.RunFailed)
+		}
+		if runResult.Status == string(workflow.RunCancelled) {
+			result.overallStatus = string(workflow.RunCancelled)
+			result.cancelled = true
+			break
 		}
 	}
 
@@ -287,7 +295,7 @@ func (rc *workflowRunContext) processStepResults(ctx context.Context, results []
 			notifyDaemonStepUpdate(ctx, rc.runID, sr, matrixKey)
 		}
 
-		if sr.Status != "skipped" {
+		if sr.Status != string(workflow.StepSkipped) && sr.Status != string(workflow.StepCancelled) {
 			step := findStepDef(stepDefs, sr.StepID)
 			if step != nil && step.Analyze {
 				if rc.handleAnalysis(ctx, sr, step, matrixKey) {
@@ -305,15 +313,88 @@ func (rc *workflowRunContext) handleAnalysis(ctx context.Context, sr *workflow.S
 	analysisResult := analyzeStep(ctx, rc.transport, rc.runID, sr, step, matrixKey)
 
 	if analysisResult != nil && workflow.ShouldPromptHuman(analysisResult.Decision, step.RiskLevel) {
-		decision, reviewErr := rc.handler.PromptReview(ctx, sr.Name, analysisResult, sr.StdoutTail)
-		if reviewErr != nil {
-			slog.Warn("review error", "error", reviewErr)
-		}
-		if decision != nil && decision.Action == string(workflow.ActionReject) {
-			return true
+		for {
+			decision, reviewErr := rc.handler.PromptReview(ctx, sr.Name, analysisResult, sr.StdoutTail)
+			if reviewErr != nil {
+				slog.Warn("review error", "error", reviewErr)
+			}
+			if decision == nil {
+				return false
+			}
+
+			switch decision.Action {
+			case string(workflow.ActionReject):
+				return true
+			case string(workflow.ActionApprove):
+				return false
+			case string(workflow.ActionCommand):
+				if strings.TrimSpace(decision.Input) == "" {
+					continue
+				}
+				if err := runAdHocCommand(ctx, decision.Input, rc.workDir, sr.ResolvedEnv); err != nil {
+					slog.Warn("ad-hoc command failed", "error", err)
+					fmt.Fprintf(os.Stderr, "command exited: %v\n", err)
+				}
+			case string(workflow.ActionQuestion):
+				if strings.TrimSpace(decision.Input) == "" {
+					continue
+				}
+				followUp := analyzeStepWithQuestion(ctx, rc.transport, rc.runID, sr, step, matrixKey, decision.Input)
+				if followUp != nil {
+					analysisResult = followUp
+				}
+			default:
+				// Unknown action: prompt again.
+			}
 		}
 	}
 	return false
+}
+
+func analyzeStepWithQuestion(ctx context.Context, transport *workflow.AnalysisTransport, runID string, sr *workflow.StepResult, step *workflow.StepDef, matrixKey, question string) *workflow.AnalysisResult {
+	prompt := strings.TrimSpace(step.AnalysisPrompt)
+	if prompt == "" {
+		prompt = "Analyze the workflow step output."
+	}
+	prompt += "\n\nFollow-up question from reviewer: " + question
+
+	result, err := transport.Analyze(ctx, &workflow.AnalysisRequest{
+		RunID:          runID,
+		StepID:         sr.StepID,
+		StepName:       sr.Name,
+		MatrixKey:      matrixKey,
+		RiskLevel:      step.RiskLevel,
+		StdoutTail:     sr.StdoutTail,
+		StderrTail:     sr.StderrTail,
+		AnalysisPrompt: prompt,
+	})
+	if err != nil {
+		slog.Warn("follow-up analysis failed", "step", sr.Name, "error", err)
+		return nil
+	}
+	return result
+}
+
+func runAdHocCommand(ctx context.Context, command, workDir string, env []string) error {
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.CommandContext(ctx, "cmd.exe", "/C", command)
+	} else {
+		shellPath := os.Getenv("SHELL")
+		if shellPath == "" {
+			shellPath = "/bin/sh"
+		}
+		cmd = exec.CommandContext(ctx, shellPath, "-c", command)
+	}
+
+	cmd.Dir = workDir
+	if len(env) > 0 {
+		cmd.Env = env
+	}
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 // reportResults displays the final summary and returns the appropriate exit error.
@@ -339,6 +420,12 @@ func reportResults(rc *workflowRunContext, result *jobExecutionResult) error {
 		notifyDaemonRunEnd(context.Background(), rc.runID, result.overallStatus, result.totalDuration)
 	}
 
+	if result.validationErr {
+		return &WorkflowExitError{Code: ExitValidationError, Message: fmt.Sprintf("workflow %s", result.overallStatus)}
+	}
+	if result.cancelled || result.overallStatus == string(workflow.RunCancelled) {
+		return &WorkflowExitError{Code: ExitCancelled, Message: "workflow cancelled"}
+	}
 	if result.overallStatus == string(workflow.RunFailed) {
 		exitCode := ExitStepFailed
 		if result.humanRejected {
@@ -398,6 +485,16 @@ func expandMatrix(job *workflow.JobDef) []map[string]string {
 		return []map[string]string{{}} // single run with no matrix vars
 	}
 	return job.Strategy.Matrix.Include
+}
+
+func getSingleJob(def *workflow.WorkflowDef) (*workflow.JobDef, error) {
+	if len(def.Jobs) != 1 {
+		return nil, fmt.Errorf("expected exactly one job in v0, got %d", len(def.Jobs))
+	}
+	for _, job := range def.Jobs {
+		return job, nil
+	}
+	return nil, fmt.Errorf("no job found")
 }
 
 func matrixKeyString(vars map[string]string) string {
@@ -513,6 +610,7 @@ func notifyDaemonStepUpdate(ctx context.Context, runID string, sr *workflow.Step
 		StepId:      sr.StepID,
 		MatrixKey:   matrixKey,
 		Status:      sr.Status,
+		Command:     sr.Command,
 		ExitCode:    int32(sr.ExitCode),
 		DurationMs:  sr.DurationMs,
 		StdoutTail:  sr.StdoutTail,

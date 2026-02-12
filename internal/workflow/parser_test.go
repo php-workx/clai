@@ -91,10 +91,10 @@ jobs:
 	// Steps
 	require.Len(t, job.Steps, 3)
 
-	// Step 0: argv mode (no shell)
+	// Step 0: omitted shell uses default shell mode.
 	assert.Equal(t, "list-stacks", job.Steps[0].ID)
 	assert.Equal(t, "", job.Steps[0].Shell)
-	assert.Equal(t, "", job.Steps[0].ShellMode())
+	assert.Equal(t, "default", job.Steps[0].ShellMode())
 
 	// Step 1: shell: true
 	assert.Equal(t, "true", job.Steps[1].Shell)
@@ -136,8 +136,8 @@ jobs:
 `
 	wf, err := ParseWorkflow([]byte(yaml))
 	require.NoError(t, err)
-	assert.Equal(t, "", wf.Jobs["test"].Steps[0].Shell)
-	assert.Equal(t, "", wf.Jobs["test"].Steps[0].ShellMode())
+	assert.Equal(t, "false", wf.Jobs["test"].Steps[0].Shell)
+	assert.Equal(t, "argv", wf.Jobs["test"].Steps[0].ShellMode())
 }
 
 func TestParseWorkflow_ShellFieldString(t *testing.T) {
@@ -173,7 +173,7 @@ jobs:
 	wf, err := ParseWorkflow([]byte(yaml))
 	require.NoError(t, err)
 	assert.Equal(t, "", wf.Jobs["test"].Steps[0].Shell)
-	assert.Equal(t, "", wf.Jobs["test"].Steps[0].ShellMode())
+	assert.Equal(t, "default", wf.Jobs["test"].Steps[0].ShellMode())
 }
 
 func TestParseWorkflow_UnknownFieldsRejected(t *testing.T) {
