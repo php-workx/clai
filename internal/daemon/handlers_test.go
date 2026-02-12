@@ -567,6 +567,7 @@ func TestHandler_RecordFeedback_ValidationAndSuccess(t *testing.T) {
 func TestHandler_RecordFeedback_StoreError(t *testing.T) {
 	store := newMockStore()
 	feedbackStore, cleanup := newFeedbackStoreWithDB(t)
+	// Close the DB immediately to force store errors during RecordFeedback.
 	cleanup()
 
 	server, err := NewServer(&ServerConfig{
@@ -781,6 +782,8 @@ func TestHandler_Suggest_V1IncludesWhyDetailsWhenAvailable(t *testing.T) {
 	}
 
 	// Ensure hints are present (recency/frequency/success), and causality tags are present.
+	// These assertions intentionally pin exact display strings as part of the
+	// picker UX contract; changes here should be deliberate and coordinated.
 	var hasRecencyHint, hasFreqHint, hasSuccessHint, hasSourceTag bool
 	for _, r := range got.Reasons {
 		switch strings.TrimSpace(r.Type) {
@@ -2894,7 +2897,8 @@ func TestImportHistory_V2BackfillFailureNonFatal(t *testing.T) {
 		t.Fatalf("failed to open V2 database: %v", err)
 	}
 
-	// Close the V2 database to force backfill failure
+	// Close the V2 database to force backfill failure.
+	// Operations on a closed DB return errors, simulating V2 unavailability.
 	v2db.Close()
 
 	// Create a bash history file

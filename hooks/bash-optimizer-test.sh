@@ -15,6 +15,16 @@ FAIL=0
 # Disable logging during tests
 export BASH_OPTIMIZER_LOG=0
 
+command -v jq >/dev/null 2>&1 || {
+  printf "ERROR: jq is required to run these tests.\n" >&2
+  exit 2
+}
+
+if [[ ! -x "$HOOK" ]]; then
+  printf "ERROR: Hook not found or not executable: %s\n" "$HOOK" >&2
+  exit 2
+fi
+
 # ── Helpers ────────────────────────────────────────────────────────
 
 make_input() {

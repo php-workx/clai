@@ -485,6 +485,14 @@ func TestMergeResponses_EmptyInputs(t *testing.T) {
 	}
 }
 
+// These test-only helpers intentionally mutate unexported fields on
+// suggest2.Suggestion (and its unexported score struct) via reflection/unsafe.
+// They depend on the current internal field names:
+// Suggestion: lastSeenMs, maxTransCount, maxFreqScore, scores
+// scoreInfo: repoTransition, globalTransition, repoFrequency, globalFrequency,
+// projectTask, dangerous, dirTransition, dirFrequency, workflowBoost,
+// pipelineConf, dismissalPenalty, recoveryBoost.
+// If suggest2 internals are renamed, these helpers need to be updated.
 func setSuggestionPrivateInt64(s *suggest2.Suggestion, field string, value int64) {
 	v := reflect.ValueOf(s).Elem().FieldByName(field)
 	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetInt(value)

@@ -161,14 +161,22 @@ func TestEnableIncognito(t *testing.T) {
 	t.Run("ephemeral mode (default)", func(t *testing.T) {
 		var stdout bytes.Buffer
 		oldStdout := os.Stdout
-		r, w, _ := os.Pipe()
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("failed to create pipe: %v", err)
+		}
 		os.Stdout = w
 
-		err := enableIncognito(false)
+		done := make(chan struct{})
+		go func() {
+			_, _ = stdout.ReadFrom(r)
+			close(done)
+		}()
 
+		err = enableIncognito(false)
 		w.Close()
-		stdout.ReadFrom(r)
 		os.Stdout = oldStdout
+		<-done
 
 		if err != nil {
 			t.Errorf("enableIncognito(false) returned error: %v", err)
@@ -186,14 +194,22 @@ func TestEnableIncognito(t *testing.T) {
 	t.Run("no-send mode", func(t *testing.T) {
 		var stdout bytes.Buffer
 		oldStdout := os.Stdout
-		r, w, _ := os.Pipe()
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatalf("failed to create pipe: %v", err)
+		}
 		os.Stdout = w
 
-		err := enableIncognito(true)
+		done := make(chan struct{})
+		go func() {
+			_, _ = stdout.ReadFrom(r)
+			close(done)
+		}()
 
+		err = enableIncognito(true)
 		w.Close()
-		stdout.ReadFrom(r)
 		os.Stdout = oldStdout
+		<-done
 
 		if err != nil {
 			t.Errorf("enableIncognito(true) returned error: %v", err)
@@ -216,8 +232,14 @@ func TestDisableIncognito(t *testing.T) {
 	oldStdout := os.Stdout
 	oldStderr := os.Stderr
 
-	rOut, wOut, _ := os.Pipe()
-	rErr, wErr, _ := os.Pipe()
+	rOut, wOut, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stdout pipe: %v", err)
+	}
+	rErr, wErr, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
 	os.Stdout = wOut
 	os.Stderr = wErr
 
@@ -228,7 +250,7 @@ func TestDisableIncognito(t *testing.T) {
 		close(done)
 	}()
 
-	err := disableIncognito()
+	err = disableIncognito()
 
 	wOut.Close()
 	wErr.Close()

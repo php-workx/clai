@@ -3,7 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -451,6 +451,9 @@ func LoadFromFile(path string) (*Config, error) {
 	if err != nil {
 		if os.IsNotExist(err) {
 			cfg.ApplyEnvOverrides()
+			if err := cfg.Validate(); err != nil {
+				return nil, fmt.Errorf("invalid config from environment: %w", err)
+			}
 			return cfg, nil // Return defaults if file doesn't exist
 		}
 		return nil, fmt.Errorf("failed to read config file: %w", err)
@@ -880,11 +883,15 @@ func (c *Config) setHistoryPickerPageSize(value string) error {
 	if err != nil {
 		return fmt.Errorf("invalid value for picker_page_size: %w", err)
 	}
+	orig := v
 	if v < 20 {
 		v = 20
 	}
 	if v > 500 {
 		v = 500
+	}
+	if v != orig {
+		slog.Warn("config: clamped history.picker_page_size", "input", orig, "clamped", v)
 	}
 	c.History.PickerPageSize = v
 	return nil
@@ -921,11 +928,15 @@ func (c *Config) setHistoryUpArrowDoubleWindowMs(value string) error {
 	if err != nil {
 		return fmt.Errorf("invalid value for up_arrow_double_window_ms: %w", err)
 	}
+	orig := v
 	if v < 50 {
 		v = 50
 	}
 	if v > 1000 {
 		v = 1000
+	}
+	if v != orig {
+		slog.Warn("config: clamped history.up_arrow_double_window_ms", "input", orig, "clamped", v)
 	}
 	c.History.UpArrowDoubleWindowMs = v
 	return nil
@@ -1084,7 +1095,7 @@ func (s *SuggestionsConfig) ValidateAndFix() []ValidationWarning {
 
 	warn := func(field, msg string) {
 		warnings = append(warnings, ValidationWarning{Field: field, Message: msg})
-		log.Printf("WARN config: suggestions.%s: %s", field, msg)
+		slog.Warn("config validation warning", "section", "suggestions", "field", field, "message", msg)
 	}
 
 	s.validateMinOneIntFields(warn, &defaults)
@@ -1188,16 +1199,23 @@ func (s *SuggestionsConfig) validateEnumFields(warn func(string, string), defaul
 		s.IncognitoMode = defaults.IncognitoMode
 	}
 	if !isValidShimMode(s.ShimMode) {
-		warn("shim_mode", fmt.Sprintf("must be auto, persistent, or oneshot, got %q; falling back to auto", s.ShimMode))
-		s.ShimMode = "auto"
+		warn("shim_mode", fmt.Sprintf("must be auto, persistent, or oneshot, got %q; falling back to default %q", s.ShimMode, defaults.ShimMode))
+		s.ShimMode = defaults.ShimMode
 	}
 	if !isValidScorerVersion(s.ScorerVersion) {
 		warn("scorer_version", fmt.Sprintf("must be v1, v2, or blend, got %q; falling back to default %q", s.ScorerVersion, defaults.ScorerVersion))
 		s.ScorerVersion = defaults.ScorerVersion
 	}
 	if !isValidFTSTokenizer(s.SearchFTSTokenizer) {
-		warn("search_fts_tokenizer", fmt.Sprintf("must be trigram or unicode61, got %q; falling back to trigram", s.SearchFTSTokenizer))
-		s.SearchFTSTokenizer = "trigram"
+		warn(
+			"search_fts_tokenizer",
+			fmt.Sprintf(
+				"must be trigram or unicode61, got %q; falling back to default %q",
+				s.SearchFTSTokenizer,
+				defaults.SearchFTSTokenizer,
+			),
+		)
+		s.SearchFTSTokenizer = defaults.SearchFTSTokenizer
 	}
 	if !isValidSuggestionsPickerView(s.PickerView) {
 		warn("picker_view", fmt.Sprintf("must be compact or detailed, got %q; falling back to %q", s.PickerView, defaults.PickerView))
