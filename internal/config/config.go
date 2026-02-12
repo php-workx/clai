@@ -11,6 +11,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// invalidBoolValueFmt is the format string for boolean parse errors.
+const invalidBoolValueFmt = "invalid value for %s: %w"
+
 // Config represents the clai configuration.
 type Config struct {
 	Daemon      DaemonConfig      `yaml:"daemon"`
@@ -372,7 +375,7 @@ func (c *Config) setAIField(field, value string) error {
 	case "enabled":
 		v, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("invalid value for enabled: %w", err)
+			return fmt.Errorf(invalidBoolValueFmt, "enabled", err)
 		}
 		c.AI.Enabled = v
 	case "provider":
@@ -423,7 +426,7 @@ func (c *Config) setSuggestionsField(field, value string) error {
 	case "enabled":
 		v, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("invalid value for enabled: %w", err)
+			return fmt.Errorf(invalidBoolValueFmt, "enabled", err)
 		}
 		c.Suggestions.Enabled = v
 	case "max_history":
@@ -567,7 +570,7 @@ func (c *Config) setWorkflowsField(field, value string) error {
 	case "enabled":
 		v, err := strconv.ParseBool(value)
 		if err != nil {
-			return fmt.Errorf("invalid value for enabled: %w", err)
+			return fmt.Errorf(invalidBoolValueFmt, "enabled", err)
 		}
 		c.Workflows.Enabled = v
 	case "default_mode":

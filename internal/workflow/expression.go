@@ -13,6 +13,9 @@ type ExpressionContext struct {
 	Steps  map[string]map[string]string // steps.ID.outputs.KEY
 }
 
+// unresolvedStepsOutputFmt is the error format for unresolved steps.X.outputs.Y expressions.
+const unresolvedStepsOutputFmt = "unresolved expression: steps.%s.outputs.%s"
+
 // exprPattern matches ${{ ... }} expressions. The inner group captures the content
 // between delimiters. It uses a non-greedy match to handle multiple expressions.
 var exprPattern = regexp.MustCompile(`\$\{\{(.*?)\}\}`)
@@ -130,15 +133,15 @@ func resolveSteps(path string, ctx *ExpressionContext) (string, error) {
 	}
 
 	if ctx.Steps == nil {
-		return "", fmt.Errorf("unresolved expression: steps.%s.outputs.%s", stepID, outputKey)
+		return "", fmt.Errorf(unresolvedStepsOutputFmt, stepID, outputKey)
 	}
 	outputs, ok := ctx.Steps[stepID]
 	if !ok {
-		return "", fmt.Errorf("unresolved expression: steps.%s.outputs.%s", stepID, outputKey)
+		return "", fmt.Errorf(unresolvedStepsOutputFmt, stepID, outputKey)
 	}
 	val, ok := outputs[outputKey]
 	if !ok {
-		return "", fmt.Errorf("unresolved expression: steps.%s.outputs.%s", stepID, outputKey)
+		return "", fmt.Errorf(unresolvedStepsOutputFmt, stepID, outputKey)
 	}
 	return val, nil
 }

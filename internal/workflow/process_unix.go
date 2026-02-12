@@ -4,7 +4,7 @@ package workflow
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os/exec"
 	"syscall"
 	"time"
@@ -31,7 +31,7 @@ func (u *unixProcessController) Start(cmd *exec.Cmd) error {
 // Interrupt sends SIGINT to the process group (negative PID targets the group).
 func (u *unixProcessController) Interrupt(cmd *exec.Cmd) error {
 	if cmd.Process == nil {
-		return fmt.Errorf("process not started")
+		return errors.New(errProcessNotStarted)
 	}
 	return syscall.Kill(-cmd.Process.Pid, syscall.SIGINT)
 }
@@ -39,7 +39,7 @@ func (u *unixProcessController) Interrupt(cmd *exec.Cmd) error {
 // Kill sends SIGKILL to the process group.
 func (u *unixProcessController) Kill(cmd *exec.Cmd) error {
 	if cmd.Process == nil {
-		return fmt.Errorf("process not started")
+		return errors.New(errProcessNotStarted)
 	}
 	return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 }
@@ -48,7 +48,7 @@ func (u *unixProcessController) Kill(cmd *exec.Cmd) error {
 // waits up to gracePeriod for the process to exit, then sends Kill.
 func (u *unixProcessController) Wait(ctx context.Context, cmd *exec.Cmd, gracePeriod time.Duration) error {
 	if cmd.Process == nil {
-		return fmt.Errorf("process not started")
+		return errors.New(errProcessNotStarted)
 	}
 
 	// Channel to receive the result of cmd.Wait().

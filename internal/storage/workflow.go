@@ -13,13 +13,19 @@ var ErrWorkflowRunNotFound = errors.New("workflow run not found")
 // ErrWorkflowStepNotFound is returned when a workflow step is not found.
 var ErrWorkflowStepNotFound = errors.New("workflow step not found")
 
+// Validation error messages used across multiple methods.
+const (
+	errRunIDRequired  = "run_id is required"
+	errStepIDRequired = "step_id is required"
+)
+
 // CreateWorkflowRun creates a new workflow run record.
 func (s *SQLiteStore) CreateWorkflowRun(ctx context.Context, run *WorkflowRun) error {
 	if run == nil {
 		return errors.New("workflow run cannot be nil")
 	}
 	if run.RunID == "" {
-		return errors.New("run_id is required")
+		return errors.New(errRunIDRequired)
 	}
 	if run.WorkflowName == "" {
 		return errors.New("workflow_name is required")
@@ -52,7 +58,7 @@ func (s *SQLiteStore) CreateWorkflowRun(ctx context.Context, run *WorkflowRun) e
 // UpdateWorkflowRun updates a workflow run's status, end time, and duration.
 func (s *SQLiteStore) UpdateWorkflowRun(ctx context.Context, runID string, status string, endedAt int64, durationMs int64) error {
 	if runID == "" {
-		return errors.New("run_id is required")
+		return errors.New(errRunIDRequired)
 	}
 
 	result, err := s.db.ExecContext(ctx, `
@@ -76,7 +82,7 @@ func (s *SQLiteStore) UpdateWorkflowRun(ctx context.Context, runID string, statu
 // GetWorkflowRun retrieves a workflow run by ID.
 func (s *SQLiteStore) GetWorkflowRun(ctx context.Context, runID string) (*WorkflowRun, error) {
 	if runID == "" {
-		return nil, errors.New("run_id is required")
+		return nil, errors.New(errRunIDRequired)
 	}
 
 	row := s.db.QueryRowContext(ctx, `
@@ -181,10 +187,10 @@ func (s *SQLiteStore) CreateWorkflowStep(ctx context.Context, step *WorkflowStep
 		return errors.New("workflow step cannot be nil")
 	}
 	if step.RunID == "" {
-		return errors.New("run_id is required")
+		return errors.New(errRunIDRequired)
 	}
 	if step.StepID == "" {
-		return errors.New("step_id is required")
+		return errors.New(errStepIDRequired)
 	}
 
 	_, err := s.db.ExecContext(ctx, `
@@ -222,10 +228,10 @@ func (s *SQLiteStore) UpdateWorkflowStep(ctx context.Context, update *WorkflowSt
 		return errors.New("workflow step update cannot be nil")
 	}
 	if update.RunID == "" {
-		return errors.New("run_id is required")
+		return errors.New(errRunIDRequired)
 	}
 	if update.StepID == "" {
-		return errors.New("step_id is required")
+		return errors.New(errStepIDRequired)
 	}
 
 	result, err := s.db.ExecContext(ctx, `
@@ -261,10 +267,10 @@ func (s *SQLiteStore) UpdateWorkflowStep(ctx context.Context, update *WorkflowSt
 // GetWorkflowStep retrieves a workflow step by its composite key.
 func (s *SQLiteStore) GetWorkflowStep(ctx context.Context, runID, stepID, matrixKey string) (*WorkflowStep, error) {
 	if runID == "" {
-		return nil, errors.New("run_id is required")
+		return nil, errors.New(errRunIDRequired)
 	}
 	if stepID == "" {
-		return nil, errors.New("step_id is required")
+		return nil, errors.New(errStepIDRequired)
 	}
 
 	row := s.db.QueryRowContext(ctx, `
@@ -303,10 +309,10 @@ func (s *SQLiteStore) CreateWorkflowAnalysis(ctx context.Context, analysis *Work
 		return errors.New("workflow analysis cannot be nil")
 	}
 	if analysis.RunID == "" {
-		return errors.New("run_id is required")
+		return errors.New(errRunIDRequired)
 	}
 	if analysis.StepID == "" {
-		return errors.New("step_id is required")
+		return errors.New(errStepIDRequired)
 	}
 	if analysis.Decision == "" {
 		return errors.New("decision is required")
@@ -338,10 +344,10 @@ func (s *SQLiteStore) CreateWorkflowAnalysis(ctx context.Context, analysis *Work
 // GetWorkflowAnalyses retrieves all analysis records for a given step.
 func (s *SQLiteStore) GetWorkflowAnalyses(ctx context.Context, runID, stepID, matrixKey string) ([]WorkflowAnalysisRecord, error) {
 	if runID == "" {
-		return nil, errors.New("run_id is required")
+		return nil, errors.New(errRunIDRequired)
 	}
 	if stepID == "" {
-		return nil, errors.New("step_id is required")
+		return nil, errors.New(errStepIDRequired)
 	}
 
 	rows, err := s.db.QueryContext(ctx, `

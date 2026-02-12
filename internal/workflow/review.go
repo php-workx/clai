@@ -32,6 +32,27 @@ func NewTerminalReviewer(reader io.Reader, writer io.Writer) *TerminalReviewer {
 	return &TerminalReviewer{reader: reader, writer: writer}
 }
 
+// scanOrError reads the next line from the scanner, returning an error on failure.
+func scanOrError(scanner *bufio.Scanner) (string, error) {
+	if !scanner.Scan() {
+		if err := scanner.Err(); err != nil {
+			return "", err
+		}
+		return "", io.ErrUnexpectedEOF
+	}
+	return scanner.Text(), nil
+}
+
+// readInputDecision prompts for additional input and returns a decision with that input.
+func (t *TerminalReviewer) readInputDecision(scanner *bufio.Scanner, prompt, action string) (*ReviewDecision, error) {
+	fmt.Fprint(t.writer, prompt)
+	text, err := scanOrError(scanner)
+	if err != nil {
+		return nil, err
+	}
+	return &ReviewDecision{Action: action, Input: text}, nil
+}
+
 // PromptReview displays the analysis and prompts the user for a decision.
 func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, analysis *AnalysisResult, output string) (*ReviewDecision, error) {
 	fmt.Fprintf(t.writer, "Step: %s\n", stepName)
@@ -49,42 +70,22 @@ func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, an
 
 		fmt.Fprint(t.writer, "[a]pprove  [r]eject  [i]nspect  [c]ommand  [q]uestion > ")
 
-		if !scanner.Scan() {
-			if err := scanner.Err(); err != nil {
-				return nil, err
-			}
-			return nil, io.ErrUnexpectedEOF
+		choice, err := scanOrError(scanner)
+		if err != nil {
+			return nil, err
 		}
 
-		choice := strings.TrimSpace(scanner.Text())
-		switch choice {
+		switch strings.TrimSpace(choice) {
 		case "a":
 			return &ReviewDecision{Action: string(ActionApprove)}, nil
 		case "r":
 			return &ReviewDecision{Action: string(ActionReject)}, nil
 		case "i":
 			fmt.Fprintf(t.writer, "\n%s\n\n", output)
-			continue
 		case "c":
-			fmt.Fprint(t.writer, "Command: ")
-			if !scanner.Scan() {
-				if err := scanner.Err(); err != nil {
-					return nil, err
-				}
-				return nil, io.ErrUnexpectedEOF
-			}
-			return &ReviewDecision{Action: string(ActionCommand), Input: scanner.Text()}, nil
+			return t.readInputDecision(scanner, "Command: ", string(ActionCommand))
 		case "q":
-			fmt.Fprint(t.writer, "Question: ")
-			if !scanner.Scan() {
-				if err := scanner.Err(); err != nil {
-					return nil, err
-				}
-				return nil, io.ErrUnexpectedEOF
-			}
-			return &ReviewDecision{Action: string(ActionQuestion), Input: scanner.Text()}, nil
-		default:
-			continue
+			return t.readInputDecision(scanner, "Question: ", string(ActionQuestion))
 		}
 	}
 }

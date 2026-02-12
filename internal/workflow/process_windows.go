@@ -4,7 +4,7 @@ package workflow
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"os/exec"
 	"syscall"
 	"time"
@@ -30,7 +30,7 @@ func (w *windowsProcessController) Start(cmd *exec.Cmd) error {
 // Interrupt sends CTRL_BREAK_EVENT to the process group via GenerateConsoleCtrlEvent.
 func (w *windowsProcessController) Interrupt(cmd *exec.Cmd) error {
 	if cmd.Process == nil {
-		return fmt.Errorf("process not started")
+		return errors.New(errProcessNotStarted)
 	}
 	return windows.GenerateConsoleCtrlEvent(windows.CTRL_BREAK_EVENT, uint32(cmd.Process.Pid))
 }
@@ -38,7 +38,7 @@ func (w *windowsProcessController) Interrupt(cmd *exec.Cmd) error {
 // Kill forcefully terminates the process.
 func (w *windowsProcessController) Kill(cmd *exec.Cmd) error {
 	if cmd.Process == nil {
-		return fmt.Errorf("process not started")
+		return errors.New(errProcessNotStarted)
 	}
 	return cmd.Process.Kill()
 }
@@ -47,7 +47,7 @@ func (w *windowsProcessController) Kill(cmd *exec.Cmd) error {
 // waits up to gracePeriod for the process to exit, then sends Kill.
 func (w *windowsProcessController) Wait(ctx context.Context, cmd *exec.Cmd, gracePeriod time.Duration) error {
 	if cmd.Process == nil {
-		return fmt.Errorf("process not started")
+		return errors.New(errProcessNotStarted)
 	}
 
 	done := make(chan error, 1)

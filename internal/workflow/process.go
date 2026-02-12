@@ -9,6 +9,9 @@ import (
 // DefaultGracePeriod is the time to wait between interrupt and kill signals.
 const DefaultGracePeriod = 5 * time.Second
 
+// errProcessNotStarted is the error message for operations on an unstarted process.
+const errProcessNotStarted = "process not started"
+
 // ProcessController manages subprocess lifecycle with platform-appropriate signals.
 type ProcessController interface {
 	// Start configures platform-specific process group settings and starts the command.

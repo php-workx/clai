@@ -262,40 +262,46 @@ type analysisResult struct {
 	Flags     []string `json:"flags"`
 }
 
+// formatAnalysisFields converts a parsed analysisResult into the return tuple.
+func formatAnalysisFields(result *analysisResult) (decision, reasoning, flagsJSON string) {
+	decision = result.Decision
+	reasoning = result.Reasoning
+	if len(result.Flags) > 0 {
+		if b, err := json.Marshal(result.Flags); err == nil {
+			flagsJSON = string(b)
+		}
+	}
+	return decision, reasoning, flagsJSON
+}
+
+// tryParseJSON attempts to unmarshal data as an analysisResult.
+// Returns the result and true if successful, or nil and false otherwise.
+func tryParseJSON(data []byte) (*analysisResult, bool) {
+	var result analysisResult
+	if err := json.Unmarshal(data, &result); err == nil && result.Decision != "" {
+		return &result, true
+	}
+	return nil, false
+}
+
 // parseAnalysisResponse extracts decision, reasoning, and flags from the LLM response.
 // It attempts JSON parsing first, then falls back to simple text extraction.
 func parseAnalysisResponse(raw string) (decision, reasoning, flagsJSON string) {
-	// Try to parse as JSON
-	var result analysisResult
-	if err := json.Unmarshal([]byte(raw), &result); err == nil && result.Decision != "" {
-		decision = result.Decision
-		reasoning = result.Reasoning
-		if len(result.Flags) > 0 {
-			if b, err := json.Marshal(result.Flags); err == nil {
-				flagsJSON = string(b)
-			}
-		}
-		return decision, reasoning, flagsJSON
+	// Try to parse as JSON directly.
+	if result, ok := tryParseJSON([]byte(raw)); ok {
+		return formatAnalysisFields(result)
 	}
 
-	// Try to extract JSON from within the response (e.g., wrapped in markdown code blocks)
+	// Try to extract JSON from within the response (e.g., wrapped in markdown code blocks).
 	trimmed := strings.TrimSpace(raw)
 	if idx := strings.Index(trimmed, "{"); idx >= 0 {
 		if end := strings.LastIndex(trimmed, "}"); end > idx {
-			jsonStr := trimmed[idx : end+1]
-			if err := json.Unmarshal([]byte(jsonStr), &result); err == nil && result.Decision != "" {
-				decision = result.Decision
-				reasoning = result.Reasoning
-				if len(result.Flags) > 0 {
-					if b, err := json.Marshal(result.Flags); err == nil {
-						flagsJSON = string(b)
-					}
-				}
-				return decision, reasoning, flagsJSON
+			if result, ok := tryParseJSON([]byte(trimmed[idx : end+1])); ok {
+				return formatAnalysisFields(result)
 			}
 		}
 	}
 
-	// Fallback: treat the entire response as reasoning with needs_human decision
+	// Fallback: treat the entire response as reasoning with needs_human decision.
 	return "needs_human", trimmed, ""
 }
