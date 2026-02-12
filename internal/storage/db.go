@@ -170,6 +170,10 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 			version: 2,
 			sql:     migrationV2,
 		},
+		{
+			version: 3,
+			sql:     migrationV3,
+		},
 	}
 
 	for _, m := range migrations {
@@ -296,4 +300,59 @@ ALTER TABLE commands ADD COLUMN word_count INTEGER DEFAULT 0;
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_commands_git_branch ON commands(git_branch);
 CREATE INDEX IF NOT EXISTS idx_commands_git_repo ON commands(git_repo_name);
+`
+
+// migrationV3 adds workflow tables.
+const migrationV3 = `
+-- Workflow runs
+CREATE TABLE IF NOT EXISTS workflow_runs (
+  run_id TEXT PRIMARY KEY,
+  workflow_name TEXT NOT NULL,
+  workflow_hash TEXT NOT NULL,
+  workflow_path TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'running',
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_name ON workflow_runs(workflow_name);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_started ON workflow_runs(started_at DESC);
+
+-- Workflow steps
+CREATE TABLE IF NOT EXISTS workflow_steps (
+  run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),
+  step_id TEXT NOT NULL,
+  matrix_key TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'running',
+  command TEXT NOT NULL DEFAULT '',
+  exit_code INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  stdout_tail TEXT NOT NULL DEFAULT '',
+  stderr_tail TEXT NOT NULL DEFAULT '',
+  outputs_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (run_id, step_id, matrix_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_steps_run ON workflow_steps(run_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_steps_status ON workflow_steps(status);
+
+-- Workflow analyses
+CREATE TABLE IF NOT EXISTS workflow_analyses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL,
+  step_id TEXT NOT NULL,
+  matrix_key TEXT NOT NULL DEFAULT '',
+  decision TEXT NOT NULL,
+  reasoning TEXT NOT NULL DEFAULT '',
+  flags_json TEXT NOT NULL DEFAULT '{}',
+  prompt TEXT NOT NULL DEFAULT '',
+  raw_response TEXT NOT NULL DEFAULT '',
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  analyzed_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_analyses_step ON workflow_analyses(run_id, step_id, matrix_key);
+CREATE INDEX IF NOT EXISTS idx_workflow_analyses_decision ON workflow_analyses(decision);
 `

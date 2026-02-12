@@ -186,6 +186,69 @@ message StatusResponse {
 }
 
 // ---------------------------------------------------------
+// Workflow Lifecycle — Tier 0 (§13.1)
+// ---------------------------------------------------------
+
+message WorkflowRunStartRequest {
+  string run_id = 1;
+  string workflow_name = 2;
+  string workflow_hash = 3;       // SHA-256 of YAML content (M12)
+  string workflow_path = 4;
+  int64 started_at_unix_ms = 5;   // Client-provided timestamp (M18)
+}
+
+message WorkflowRunStartResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message WorkflowRunEndRequest {
+  string run_id = 1;
+  string status = 2;              // "passed", "failed", "cancelled"
+  int64 ended_at_unix_ms = 3;
+  int64 duration_ms = 4;
+}
+
+message WorkflowRunEndResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message WorkflowStepUpdateRequest {
+  string run_id = 1;
+  string step_id = 2;
+  string matrix_key = 3;          // Composite key per D16
+  string status = 4;              // "running", "passed", "failed", "skipped"
+  string command = 5;
+  int32 exit_code = 6;
+  int64 duration_ms = 7;
+  string stdout_tail = 8;         // Last 4KB
+  string stderr_tail = 9;         // Last 4KB
+  string outputs_json = 10;       // JSON-encoded step outputs
+}
+
+message WorkflowStepUpdateResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message AnalyzeStepOutputRequest {
+  string run_id = 1;
+  string step_id = 2;
+  string matrix_key = 3;
+  string step_name = 4;
+  string risk_level = 5;          // "low", "medium", "high"
+  string scrubbed_output = 6;     // ≤100KB scrubbed context (C5)
+  string analysis_prompt = 7;     // Optional custom prompt
+}
+
+message AnalyzeStepOutputResponse {
+  string decision = 1;            // "approve", "reject", "needs_human", "error"
+  string reasoning = 2;
+  string flags_json = 3;          // JSON-encoded flags
+}
+
+// ---------------------------------------------------------
 // Service
 // ---------------------------------------------------------
 
@@ -209,4 +272,10 @@ service ClaiService {
   // Ops
   rpc Ping(Ack) returns (Ack);
   rpc GetStatus(Ack) returns (StatusResponse);
+
+  // Workflow RPCs — Tier 0 (§13.1)
+  rpc WorkflowRunStart(WorkflowRunStartRequest) returns (WorkflowRunStartResponse);
+  rpc WorkflowRunEnd(WorkflowRunEndRequest) returns (WorkflowRunEndResponse);
+  rpc WorkflowStepUpdate(WorkflowStepUpdateRequest) returns (WorkflowStepUpdateResponse);
+  rpc AnalyzeStepOutput(AnalyzeStepOutputRequest) returns (AnalyzeStepOutputResponse);
 }

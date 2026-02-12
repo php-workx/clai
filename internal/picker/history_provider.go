@@ -86,6 +86,50 @@ func (p *HistoryProvider) getClient() (pb.ClaiServiceClient, error) {
 	return p.client, nil
 }
 
+// fetchOpts holds parsed options for a Fetch call.
+type fetchOpts struct {
+	sessionID     string
+	global        bool
+	caseSensitive bool
+}
+
+// parseFetchOpts extracts recognised option values from the request.
+func parseFetchOpts(opts map[string]string) fetchOpts {
+	if opts == nil {
+		return fetchOpts{}
+	}
+	var fo fetchOpts
+	if sid, ok := opts["session_id"]; ok {
+		fo.sessionID = sid
+	} else if sid, ok := opts["session"]; ok {
+		fo.sessionID = sid
+	}
+	fo.global = opts["global"] == "true"
+	fo.caseSensitive = opts["case_sensitive"] == "true"
+	return fo
+}
+
+// acceptItem sanitises a single history entry and deduplicates it.
+// It returns the cleaned command and true if the item should be included.
+func acceptItem(item *pb.HistoryItem, query string, caseSensitive bool, seen map[string]struct{}) (string, bool) {
+	cmd := strings.TrimSpace(ValidateUTF8(StripANSI(item.Command)))
+	if cmd == "" {
+		return "", false
+	}
+	if caseSensitive && query != "" && !strings.Contains(cmd, query) {
+		return "", false
+	}
+	key := cmdutil.NormalizeCommand(cmd)
+	if key == "" {
+		return "", false
+	}
+	if _, exists := seen[key]; exists {
+		return "", false
+	}
+	seen[key] = struct{}{}
+	return cmd, true
+}
+
 // Fetch calls the daemon's FetchHistory RPC and returns sanitized results.
 func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, error) {
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
@@ -96,25 +140,14 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 		return Response{}, err
 	}
 
-	baseReq := &pb.HistoryFetchRequest{
-		Query:  req.Query,
-		Limit:  int32(req.Limit),
-		Offset: int32(req.Offset),
-	}
+	opts := parseFetchOpts(req.Options)
 
-	// Map optional fields from Options map.
-	caseSensitive := false
-	if req.Options != nil {
-		// Accept both "session_id" and "session" for the session filter.
-		if sid, ok := req.Options["session_id"]; ok {
-			baseReq.SessionId = sid
-		} else if sid, ok := req.Options["session"]; ok {
-			baseReq.SessionId = sid
-		}
-		if g, ok := req.Options["global"]; ok && g == "true" {
-			baseReq.Global = true
-		}
-		caseSensitive = req.Options["case_sensitive"] == "true"
+	baseReq := &pb.HistoryFetchRequest{
+		Query:     req.Query,
+		Limit:     int32(req.Limit),
+		Offset:    int32(req.Offset),
+		SessionId: opts.sessionID,
+		Global:    opts.global,
 	}
 
 	targetUnique := int(baseReq.Limit)
@@ -143,33 +176,12 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 		fetched := len(grpcResp.Items)
 
 		for _, item := range grpcResp.Items {
-			cmd := strings.TrimSpace(ValidateUTF8(StripANSI(item.Command)))
-			if cmd == "" {
-				continue
+			if cmd, ok := acceptItem(item, req.Query, opts.caseSensitive, seen); ok {
+				items = append(items, cmd)
 			}
-			if caseSensitive && req.Query != "" && !strings.Contains(cmd, req.Query) {
-				continue
-			}
-			key := cmdutil.NormalizeCommand(cmd)
-			if key == "" {
-				continue
-			}
-			if _, exists := seen[key]; exists {
-				continue
-			}
-			seen[key] = struct{}{}
-			items = append(items, cmd)
 		}
 
-		// When limit isn't set, preserve single-request semantics and rely on daemon defaults.
-		if targetUnique <= 0 {
-			break
-		}
-		if len(items) >= targetUnique {
-			items = items[:targetUnique]
-			break
-		}
-		if atEnd || fetched == 0 || attempt >= maxTopUpFetches {
+		if shouldStopFetching(targetUnique, len(items), atEnd, fetched, attempt) {
 			break
 		}
 
@@ -177,9 +189,24 @@ func (p *HistoryProvider) Fetch(ctx context.Context, req Request) (Response, err
 		limit = targetUnique - len(items)
 	}
 
+	if targetUnique > 0 && len(items) > targetUnique {
+		items = items[:targetUnique]
+	}
+
 	return Response{
 		RequestID: req.RequestID,
 		Items:     items,
 		AtEnd:     atEnd,
 	}, nil
+}
+
+// shouldStopFetching returns true when the top-up loop should exit.
+func shouldStopFetching(target, collected int, atEnd bool, fetched, attempt int) bool {
+	if target <= 0 {
+		return true // no limit requested: single-request semantics
+	}
+	if collected >= target {
+		return true
+	}
+	return atEnd || fetched == 0 || attempt >= maxTopUpFetches
 }

@@ -1,4 +1,5 @@
 .agents/reviews
+.agents/compaction-snapshots
 .agents/tooling
 .agents/ao/sessions
 .claude/worktrees

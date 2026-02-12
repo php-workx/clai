@@ -2,6 +2,7 @@
 package config
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -75,6 +76,18 @@ func (p *Paths) LogFile() string {
 // HooksDir returns the path to the hooks directory.
 func (p *Paths) HooksDir() string {
 	return filepath.Join(p.BaseDir, "hooks")
+}
+
+// WorkflowLogDir returns the path to the workflow log directory.
+// Creates the directory if it doesn't exist.
+func (p *Paths) WorkflowLogDir(ctx context.Context) string {
+	_ = ctx // Reserved for future context-aware path resolution.
+	dir := filepath.Join(p.BaseDir, "workflow-logs")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		// Best-effort creation; callers may still use the returned path.
+		_ = err
+	}
+	return dir
 }
 
 // CacheDir returns the path to the cache directory.
