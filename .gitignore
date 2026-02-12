@@ -16,7 +16,7 @@ coverage.out
 coverage.html
 
 # Beads export state (machine-specific paths)
-.beads/export-state
+/.beads/export-state/
 .beads/.jsonl.lock
 .scannerwork
 .sonarqube

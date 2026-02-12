@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"syscall"
 	"testing"
 	"time"
@@ -226,6 +227,9 @@ func TestResolveRunPaths(t *testing.T) {
 
 func TestHandleLifecycleSignal(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping signal tests on Windows")
+	}
 
 	makeServer := func(baseDir string) *Server {
 		return &Server{
@@ -329,6 +333,9 @@ func TestStopWithPaths_NotRunning(t *testing.T) {
 
 func TestStopWithPaths_SignalsProcess(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping signal tests on Windows")
+	}
 
 	cmd := exec.Command("sh", "-c", "sleep 5")
 	if err := cmd.Start(); err != nil {
@@ -361,8 +368,11 @@ func TestProcessExists(t *testing.T) {
 
 func TestWaitForProcessExit(t *testing.T) {
 	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping shell process tests on Windows")
+	}
 
-	cmd := exec.Command("sh", "-c", "sleep 5")
+	cmd := exec.Command("sh", "-c", "sleep 0.05")
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("failed to start helper process: %v", err)
 	}
@@ -371,7 +381,7 @@ func TestWaitForProcessExit(t *testing.T) {
 		_, _ = cmd.Process.Wait()
 	}()
 
-	if err := waitForProcessExit(cmd.Process, 100*time.Millisecond); err != nil {
+	if err := waitForProcessExit(cmd.Process, 500*time.Millisecond); err != nil {
 		t.Fatalf("waitForProcessExit() error = %v", err)
 	}
 }

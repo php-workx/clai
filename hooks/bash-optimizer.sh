@@ -38,14 +38,21 @@ fi
 log_decision() {
   local rule="$1" decision="$2" reason="$3"
   if [[ "$ENABLE_LOGGING" == "1" ]]; then
-    mkdir -p "$LOG_DIR"
-    local ts
-    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-    local cmd_escaped
-    cmd_escaped=$(printf '%s' "$COMMAND" | head -c 200 | jq -Rs '.')
+    local shell_opts ts cmd_escaped
+    shell_opts="$-"
+    set +e
+    mkdir -p "$LOG_DIR" >/dev/null 2>&1
+    ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null)
+    cmd_escaped=$(printf '%s' "$COMMAND" | head -c 200 | jq -Rs '.' 2>/dev/null)
+    if [[ -z "$cmd_escaped" ]]; then
+      cmd_escaped='""'
+    fi
     printf '{"ts":"%s","session":"%s","tool_use_id":"%s","rule":"%s","decision":"%s","reason":"%s","command":%s}\n' \
       "$ts" "$SESSION_ID" "$TOOL_USE_ID" "$rule" "$decision" "$reason" "$cmd_escaped" \
-      >> "$LOG_FILE"
+      >> "$LOG_FILE" 2>/dev/null || true
+    case "$shell_opts" in
+      *e*) set -e ;;
+    esac
   fi
 }
 
@@ -97,8 +104,24 @@ FIRST_SEGMENT=$(printf '%s' "$COMMAND" | sed 's/|.*//' | sed 's/&&.*//' | sed 's
 
 # Strip leading whitespace and env vars (FOO=bar ...)
 STRIPPED="$FIRST_SEGMENT"
-while [[ "$STRIPPED" =~ ^[[:space:]]*[A-Z_]+=[^[:space:]]+ ]]; do
-  STRIPPED=$(printf '%s' "$STRIPPED" | sed 's/^[[:space:]]*[A-Z_]*=[^[:space:]]* *//')
+while [[ "$STRIPPED" =~ ^[[:space:]]*[A-Z_][A-Z0-9_]*=[^[:space:]]+ ]]; do
+  STRIPPED=$(printf '%s' "$STRIPPED" | sed -E 's/^[[:space:]]*[A-Z_][A-Z0-9_]*=[^[:space:]]+[[:space:]]*//')
+done
+
+# Strip wrapper commands before determining BASE_CMD.
+while :; do
+  PREV="$STRIPPED"
+  if [[ "$STRIPPED" =~ ^[[:space:]]*sudo([[:space:]]+-[[:alnum:]-]+)*[[:space:]]+ ]]; then
+    STRIPPED=$(printf '%s' "$STRIPPED" | sed -E 's/^[[:space:]]*sudo([[:space:]]+-[[:alnum:]-]+)*[[:space:]]+//')
+  elif [[ "$STRIPPED" =~ ^[[:space:]]*command[[:space:]]+ ]]; then
+    STRIPPED=$(printf '%s' "$STRIPPED" | sed -E 's/^[[:space:]]*command[[:space:]]+//')
+  elif [[ "$STRIPPED" =~ ^[[:space:]]*env([[:space:]]+-[[:alnum:]-]+)*[[:space:]]+ ]]; then
+    STRIPPED=$(printf '%s' "$STRIPPED" | sed -E 's/^[[:space:]]*env([[:space:]]+-[[:alnum:]-]+)*[[:space:]]+//')
+  fi
+  while [[ "$STRIPPED" =~ ^[[:space:]]*[A-Z_][A-Z0-9_]*=[^[:space:]]+ ]]; do
+    STRIPPED=$(printf '%s' "$STRIPPED" | sed -E 's/^[[:space:]]*[A-Z_][A-Z0-9_]*=[^[:space:]]+[[:space:]]*//')
+  done
+  [[ "$STRIPPED" == "$PREV" ]] && break
 done
 STRIPPED=$(printf '%s' "$STRIPPED" | sed 's/^[[:space:]]*//')
 
@@ -123,13 +146,7 @@ fi
 
 # ── Rule 2: grep/rg → Grep tool ───────────────────────────────────
 if [[ "$BASE_CMD" == "grep" || "$BASE_CMD" == "rg" ]]; then
-  # Allow: receiving pipe input (cmd | grep)
-  # The FIRST_SEGMENT check already strips pipe suffixes, so if BASE_CMD
-  # is grep, it means the command STARTS with grep (standalone).
-  # But also check: is it the full command or just the first part?
-  if printf '%s' "$COMMAND" | grep -qE '^\s*(grep|rg)\b'; then
-    deny "grep_tool" "Use the Grep tool instead of '$BASE_CMD'. Grep is the dedicated search tool with ripgrep backend, supports regex, file type filters, and context lines."
-  fi
+  deny "grep_tool" "Use the Grep tool instead of '$BASE_CMD'. Grep is the dedicated search tool with ripgrep backend, supports regex, file type filters, and context lines."
 fi
 
 # ── Rule 3: find → Glob tool ──────────────────────────────────────
@@ -146,11 +163,9 @@ fi
 # ── Rule 4: head/tail <file> → Read tool ──────────────────────────
 if [[ "$BASE_CMD" == "head" || "$BASE_CMD" == "tail" ]]; then
   # Allow: receiving pipe input (cmd | head)
-  if printf '%s' "$COMMAND" | grep -qE '^\s*(head|tail)\b'; then
-    # Check it's not receiving from a pipe in the FULL command
-    if ! printf '%s' "$COMMAND" | grep -qE '\|[[:space:]]*(head|tail)\b'; then
-      deny "head_tail_read" "Use the Read tool instead of '$BASE_CMD'. Read supports offset and limit parameters for reading specific line ranges."
-    fi
+  # Check it's not receiving from a pipe in the FULL command
+  if ! printf '%s' "$COMMAND" | grep -qE '\|[[:space:]]*(head|tail)\b'; then
+    deny "head_tail_read" "Use the Read tool instead of '$BASE_CMD'. Read supports offset and limit parameters for reading specific line ranges."
   fi
 fi
 
@@ -163,7 +178,7 @@ fi
 if [[ "$BASE_CMD" == "awk" ]]; then
   # awk is almost always used for text processing on files
   # Allow in pipelines
-  if printf '%s' "$COMMAND" | grep -qE '^\s*awk\b' && ! printf '%s' "$COMMAND" | grep -qE '\|[[:space:]]*awk\b'; then
+  if ! printf '%s' "$COMMAND" | grep -qE '\|[[:space:]]*awk\b'; then
     deny "awk_edit" "Use the Read tool (for extraction) or Edit tool (for modification) instead of 'awk'. Dedicated tools are preferred."
   fi
 fi
