@@ -1062,6 +1062,12 @@ bindkey 'ß' _clai_tui_suggest_picker_open
 # - trigger=single: Up opens TUI picker (fallback: native history)
 # - trigger=double: Up uses native history; Up+Up within window opens picker.
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
+    typeset -gi _clai_last_up_ms=0
+    typeset -gi _clai_window_ms="${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}"
+    [[ "$_clai_window_ms" == <-> ]] || _clai_window_ms=250
+    (( _clai_window_ms < 50 )) && _clai_window_ms=50
+    (( _clai_window_ms > 1000 )) && _clai_window_ms=1000
+
     _clai_up_arrow_single() {
         if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
             zle up-line-or-history
@@ -1069,6 +1075,21 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
         fi
 
         if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
+            local -i _clai_now_ms _clai_delta_ms
+            if [[ -n "${EPOCHREALTIME:-}" ]]; then
+                _clai_now_ms=$(( EPOCHREALTIME * 1000 ))
+            else
+                _clai_now_ms=$(( EPOCHSECONDS * 1000 ))
+            fi
+            _clai_delta_ms=$(( _clai_now_ms - _clai_last_up_ms ))
+            if (( _clai_last_up_ms > 0 && _clai_delta_ms >= 0 && _clai_delta_ms <= _clai_window_ms )); then
+                _clai_last_up_ms=0
+                if _clai_has_tui_picker; then
+                    _clai_tui_picker_open
+                    return
+                fi
+            fi
+            _clai_last_up_ms=$_clai_now_ms
             zle up-line-or-history
             return
         fi
@@ -1092,7 +1113,6 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
         zle up-line-or-history
         zle up-line-or-history
     }
-
     zle -N _clai_up_arrow_single
     zle -N _clai_up_arrow_double
     for _clai_km in emacs viins main; do
@@ -1101,13 +1121,13 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
         # Ensure Down arrow still performs native history navigation in both keymaps.
         bindkey -M "$_clai_km" '^[[B' down-line-or-history
         bindkey -M "$_clai_km" '^[OB' down-line-or-history
+        bindkey -M "$_clai_km" -r '^[[A^[[A'
+        bindkey -M "$_clai_km" -r '^[OA^[OA'
     done
-
     if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
-        typeset -g _clai_window_ms="${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}"
-        [[ "$_clai_window_ms" == <-> ]] || _clai_window_ms=250
-        (( _clai_window_ms < 50 )) && _clai_window_ms=50
-        (( _clai_window_ms > 1000 )) && _clai_window_ms=1000
+        # Keep KEYTIMEOUT side effects local: preserve and restore after binding setup.
+        typeset _clai_prev_keytimeout
+        _clai_prev_keytimeout="${KEYTIMEOUT:-}"
         typeset -gi _clai_keytimeout_cs
         _clai_keytimeout_cs=$(( (_clai_window_ms + 9) / 10 ))
         (( _clai_keytimeout_cs < 1 )) && _clai_keytimeout_cs=1
@@ -1116,11 +1136,7 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
             bindkey -M "$_clai_km" '^[[A^[[A' _clai_up_arrow_double
             bindkey -M "$_clai_km" '^[OA^[OA' _clai_up_arrow_double
         done
-    else
-        for _clai_km in emacs viins main; do
-            bindkey -M "$_clai_km" -r '^[[A^[[A'
-            bindkey -M "$_clai_km" -r '^[OA^[OA'
-        done
+        KEYTIMEOUT="$_clai_prev_keytimeout"
     fi
 fi
 

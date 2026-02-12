@@ -37,3 +37,20 @@ func TestRunSearch_HistoryFallback_NoDaemon(t *testing.T) {
 		t.Fatalf("expected git status in output, got %q", output)
 	}
 }
+
+func TestRunSearch_InvalidLimit(t *testing.T) {
+	searchJSON = false
+	searchLimit = 0
+	t.Cleanup(func() {
+		searchJSON = false
+		searchLimit = 20
+	})
+
+	err := runSearch(searchCmd, []string{"git"})
+	if err == nil {
+		t.Fatal("expected error for non-positive --limit")
+	}
+	if !strings.Contains(err.Error(), "invalid --limit") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

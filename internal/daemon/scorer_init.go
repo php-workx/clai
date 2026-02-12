@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"database/sql"
+	"io"
 	"log/slog"
 
 	"github.com/runger/clai/internal/suggestions/discovery"
@@ -17,6 +18,10 @@ import (
 // stores gracefully by skipping those scoring features. This allows partial
 // operation even when V1-schema stores are not compatible with the V2 database.
 func initV2Scorer(db *sql.DB, logger *slog.Logger) *suggest2.Scorer {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+
 	var deps suggest2.ScorerDependencies
 	deps.DB = db
 

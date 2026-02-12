@@ -1192,8 +1192,8 @@ func (s *SuggestionsConfig) validateEnumFields(warn func(string, string), defaul
 		s.ShimMode = "auto"
 	}
 	if !isValidScorerVersion(s.ScorerVersion) {
-		warn("scorer_version", fmt.Sprintf("must be v1, v2, or blend, got %q; falling back to v1", s.ScorerVersion))
-		s.ScorerVersion = "v1"
+		warn("scorer_version", fmt.Sprintf("must be v1, v2, or blend, got %q; falling back to default %q", s.ScorerVersion, defaults.ScorerVersion))
+		s.ScorerVersion = defaults.ScorerVersion
 	}
 	if !isValidFTSTokenizer(s.SearchFTSTokenizer) {
 		warn("search_fts_tokenizer", fmt.Sprintf("must be trigram or unicode61, got %q; falling back to trigram", s.SearchFTSTokenizer))

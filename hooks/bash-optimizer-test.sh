@@ -35,10 +35,17 @@ assert_deny() {
   output=$(make_input "$cmd" | "$HOOK" 2>/dev/null)
   exit_code=$?
 
-  local decision
+  local decision jq_status
   decision=$(printf '%s' "$output" | jq -r '.hookSpecificOutput.permissionDecision // ""' 2>/dev/null)
+  jq_status=$?
 
-  if [[ "$exit_code" == "0" && "$decision" == "deny" ]]; then
+  if [[ "$jq_status" != "0" ]]; then
+    printf "  FAIL  %-45s  malformed JSON output\n" "$test_name"
+    if [[ -n "$output" ]]; then
+      printf "        raw: %s\n" "$(printf '%s' "$output" | head -c 200)"
+    fi
+    ((FAIL++))
+  elif [[ "$exit_code" == "0" && "$decision" == "deny" ]]; then
     printf "  PASS  %-45s  (deny)\n" "$test_name"
     ((PASS++))
   else
@@ -57,10 +64,19 @@ assert_allow() {
   output=$(make_input "$cmd" | "$HOOK" 2>/dev/null)
   exit_code=$?
 
-  local decision
-  decision=$(printf '%s' "$output" | jq -r '.hookSpecificOutput.permissionDecision // ""' 2>/dev/null)
+  local decision jq_status
+  decision=""
+  jq_status=0
+  if [[ -n "$output" ]]; then
+    decision=$(printf '%s' "$output" | jq -r '.hookSpecificOutput.permissionDecision // ""' 2>/dev/null)
+    jq_status=$?
+  fi
 
-  if [[ "$exit_code" == "0" && "$decision" != "deny" ]]; then
+  if [[ "$jq_status" != "0" ]]; then
+    printf "  FAIL  %-45s  malformed JSON output\n" "$test_name"
+    printf "        raw: %s\n" "$(printf '%s' "$output" | head -c 200)"
+    ((FAIL++))
+  elif [[ "$exit_code" == "0" && "$decision" != "deny" ]]; then
     printf "  PASS  %-45s  (allow)\n" "$test_name"
     ((PASS++))
   else
@@ -79,11 +95,22 @@ assert_modified() {
   output=$(make_input "$cmd" | "$HOOK" 2>/dev/null)
   exit_code=$?
 
-  local decision new_cmd
+  local decision new_cmd jq_status
   decision=$(printf '%s' "$output" | jq -r '.hookSpecificOutput.permissionDecision // ""' 2>/dev/null)
-  new_cmd=$(printf '%s' "$output" | jq -r '.hookSpecificOutput.updatedInput.command // ""' 2>/dev/null)
+  jq_status=$?
+  new_cmd=""
+  if [[ "$jq_status" == "0" ]]; then
+    new_cmd=$(printf '%s' "$output" | jq -r '.hookSpecificOutput.updatedInput.command // ""' 2>/dev/null)
+    jq_status=$?
+  fi
 
-  if [[ "$exit_code" == "0" && "$decision" == "allow" && "$new_cmd" == *"$expected_fragment"* ]]; then
+  if [[ "$jq_status" != "0" ]]; then
+    printf "  FAIL  %-45s  malformed JSON output\n" "$test_name"
+    if [[ -n "$output" ]]; then
+      printf "        raw: %s\n" "$(printf '%s' "$output" | head -c 200)"
+    fi
+    ((FAIL++))
+  elif [[ "$exit_code" == "0" && "$decision" == "allow" && "$new_cmd" == *"$expected_fragment"* ]]; then
     printf "  PASS  %-45s  (modified: %s)\n" "$test_name" "$expected_fragment"
     ((PASS++))
   else

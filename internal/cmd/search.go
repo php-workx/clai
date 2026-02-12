@@ -58,6 +58,10 @@ type searchResponse struct {
 func runSearch(cmd *cobra.Command, args []string) error {
 	applyColorMode()
 
+	if searchLimit <= 0 {
+		return fmt.Errorf("invalid --limit: must be > 0")
+	}
+
 	query := args[0]
 
 	// Use history search for now (FTS5 will be added later)

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -22,7 +23,7 @@ func TestIntegration_BuildPickerBinary(t *testing.T) {
 	}
 
 	// Build the binary to a temp location.
-	binPath := t.TempDir() + "/clai-picker"
+	binPath := filepath.Join(t.TempDir(), "clai-picker")
 	cmd := exec.Command("go", "build", "-o", binPath, ".")
 	cmd.Dir = findPickerCmdDir(t)
 	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
@@ -31,8 +32,13 @@ func TestIntegration_BuildPickerBinary(t *testing.T) {
 		t.Fatalf("go build failed: %v\n%s", err, out)
 	}
 
+	expectedBin := binPath
+	if runtime.GOOS == "windows" {
+		expectedBin += ".exe"
+	}
+
 	// Verify binary was created.
-	if _, err := os.Stat(binPath); os.IsNotExist(err) {
+	if _, err := os.Stat(expectedBin); os.IsNotExist(err) {
 		t.Fatal("binary was not created")
 	}
 
@@ -41,7 +47,7 @@ func TestIntegration_BuildPickerBinary(t *testing.T) {
 	hasTTY := checkTTY() == nil
 
 	t.Run("help_flag", func(t *testing.T) {
-		cmd := exec.Command(binPath, "--help")
+		cmd := exec.Command(expectedBin, "--help")
 		output, err := cmd.CombinedOutput()
 		combined := string(output)
 		if hasTTY {
@@ -62,7 +68,7 @@ func TestIntegration_BuildPickerBinary(t *testing.T) {
 	})
 
 	t.Run("version_flag", func(t *testing.T) {
-		cmd := exec.Command(binPath, "--version")
+		cmd := exec.Command(expectedBin, "--version")
 		output, err := cmd.CombinedOutput()
 		combined := string(output)
 		if hasTTY {
@@ -80,7 +86,7 @@ func TestIntegration_BuildPickerBinary(t *testing.T) {
 	})
 
 	t.Run("unknown_command", func(t *testing.T) {
-		cmd := exec.Command(binPath, "unknown-command")
+		cmd := exec.Command(expectedBin, "unknown-command")
 		output, err := cmd.CombinedOutput()
 		if err == nil {
 			t.Fatal("expected non-zero exit code for unknown command")
@@ -98,7 +104,7 @@ func TestIntegration_BuildPickerBinary(t *testing.T) {
 	})
 
 	t.Run("no_args", func(t *testing.T) {
-		cmd := exec.Command(binPath)
+		cmd := exec.Command(expectedBin)
 		output, err := cmd.CombinedOutput()
 		if err == nil && hasTTY {
 			t.Fatal("expected non-zero exit code with no args")

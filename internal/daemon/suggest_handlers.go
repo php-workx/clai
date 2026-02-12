@@ -150,13 +150,43 @@ func v2SuggestionToProto(
 	return &pb.Suggestion{
 		Text:        sug.Command,
 		Description: v2SuggestionDescription(sug, why, prevCmd),
-		Source:      "global",
+		Source:      v2SuggestionSource(sug),
 		Score:       sug.Score,
 		Risk:        v2SuggestionRisk(sug.Command),
 		CmdNorm:     sug.Command,
 		Confidence:  sug.Confidence,
 		Reasons:     v2SuggestionReasons(sug, why, nowMs),
 	}
+}
+
+func v2SuggestionSource(sug suggest2.Suggestion) string {
+	breakdown := (&sug).ScoreBreakdown()
+
+	cwdScore := breakdown.DirTransition + breakdown.DirFrequency
+	repoScore := breakdown.RepoTransition + breakdown.RepoFrequency + breakdown.ProjectTask
+	globalScore := breakdown.GlobalTransition + breakdown.GlobalFrequency
+	sessionScore := breakdown.WorkflowBoost + breakdown.PipelineConf + breakdown.RecoveryBoost
+
+	source := "global"
+	maxScore := globalScore
+
+	if repoScore > maxScore {
+		source = "repo"
+		maxScore = repoScore
+	}
+	if cwdScore > maxScore {
+		source = "cwd"
+		maxScore = cwdScore
+	}
+	if sessionScore > maxScore {
+		source = "session"
+		maxScore = sessionScore
+	}
+
+	if maxScore <= 0 {
+		return "global"
+	}
+	return source
 }
 
 func v2SuggestionRisk(command string) string {

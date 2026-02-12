@@ -500,6 +500,12 @@ func setSuggestionPrivateFloat64(s *suggest2.Suggestion, field string, value flo
 	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetFloat(value)
 }
 
+func setSuggestionScorePrivateFloat64(s *suggest2.Suggestion, field string, value float64) {
+	scores := reflect.ValueOf(s).Elem().FieldByName("scores")
+	v := scores.FieldByName(field)
+	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetFloat(value)
+}
+
 func TestV2SuggestionRisk(t *testing.T) {
 	t.Parallel()
 	if got := v2SuggestionRisk("rm -rf /tmp/test"); got != "destructive" {
@@ -595,6 +601,59 @@ func TestV2SuggestionToProto_MapsFields(t *testing.T) {
 	}
 	if len(got.Reasons) == 0 {
 		t.Fatal("expected reasons to be populated")
+	}
+}
+
+func TestV2SuggestionSource_DominantSignals(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name    string
+		setter  func(*suggest2.Suggestion)
+		wantSrc string
+	}{
+		{
+			name: "repo dominates",
+			setter: func(s *suggest2.Suggestion) {
+				setSuggestionScorePrivateFloat64(s, "repoTransition", 0.8)
+				setSuggestionScorePrivateFloat64(s, "globalFrequency", 0.2)
+			},
+			wantSrc: "repo",
+		},
+		{
+			name: "cwd dominates",
+			setter: func(s *suggest2.Suggestion) {
+				setSuggestionScorePrivateFloat64(s, "dirFrequency", 0.9)
+				setSuggestionScorePrivateFloat64(s, "repoFrequency", 0.4)
+			},
+			wantSrc: "cwd",
+		},
+		{
+			name: "session dominates",
+			setter: func(s *suggest2.Suggestion) {
+				setSuggestionScorePrivateFloat64(s, "workflowBoost", 0.7)
+				setSuggestionScorePrivateFloat64(s, "globalTransition", 0.4)
+			},
+			wantSrc: "session",
+		},
+		{
+			name: "falls back global",
+			setter: func(s *suggest2.Suggestion) {
+				// No positive sources.
+			},
+			wantSrc: "global",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			s := suggest2.Suggestion{Command: "git status"}
+			tc.setter(&s)
+			if got := v2SuggestionSource(s); got != tc.wantSrc {
+				t.Fatalf("v2SuggestionSource()=%q want %q", got, tc.wantSrc)
+			}
+		})
 	}
 }
 

@@ -28,7 +28,7 @@ When incognito is ON:
   - Commands are NEVER persisted to disk or used for future suggestions
 
 Modes:
-  --ephemeral (default): Send events with ephemeral=true, keeps current-session suggestions useful
+  default (ephemeral): Send events with ephemeral=true, keeps current-session suggestions useful
   --no-send: Skip sending events entirely (simplest but loses current-session suggestions)
 
 Usage:

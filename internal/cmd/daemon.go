@@ -39,21 +39,22 @@ var daemonStartCmd = &cobra.Command{
 		// If the process is alive but the socket is missing, treat it as unhealthy
 		// and restart. This can happen if the socket path was unlinked while the
 		// daemon is still running, leaving it unreachable.
-		socketExists := false
-		if _, err := os.Stat(paths.SocketFile()); err == nil {
-			socketExists = true
+		socketPresent, socketErr := socketExists(paths)
+		if socketErr != nil {
+			return socketErr
 		}
-		if daemon.IsRunning() && socketExists {
+		running := daemon.IsRunning()
+		if running && socketPresent {
 			fmt.Printf("Daemon: %salready running%s\n", colorCyan, colorReset)
 			return nil
 		}
-		if daemon.IsRunning() && !socketExists {
+		if running && !socketPresent {
 			fmt.Printf("Daemon: %sunhealthy%s (socket missing), restarting...\n", colorYellow, colorReset)
 			_ = daemon.Stop() // best-effort; Stop() now falls back to lock PID
 		}
 
 		fmt.Print("Starting daemon...")
-		err := ipc.SpawnAndWait(5 * time.Second)
+		err := ipc.SpawnAndWaitContext(cmd.Context(), 5*time.Second)
 		if err != nil {
 			fmt.Printf(daemonFailedFmt, colorRed, colorReset)
 			return err
@@ -99,7 +100,7 @@ var daemonRestartCmd = &cobra.Command{
 
 		// Start
 		fmt.Print("Starting daemon...")
-		err := ipc.SpawnAndWait(5 * time.Second)
+		err := ipc.SpawnAndWaitContext(cmd.Context(), 5*time.Second)
 		if err != nil {
 			fmt.Printf(daemonFailedFmt, colorRed, colorReset)
 			return err
@@ -121,13 +122,26 @@ var daemonStatusCmd = &cobra.Command{
 				fmt.Printf("  PID:    %d\n", pid)
 			}
 			fmt.Printf("  Socket: %s\n", paths.SocketFile())
-			if _, err := os.Stat(paths.SocketFile()); err != nil {
+			if exists, err := socketExists(paths); err != nil {
+				fmt.Printf("  Socket: %scheck failed%s (%v)\n", colorYellow, colorReset, err)
+			} else if !exists {
 				fmt.Printf("  Socket: %smissing%s\n", colorYellow, colorReset)
 			}
 		} else {
 			fmt.Printf("Daemon: %snot running%s\n", colorDim, colorReset)
 		}
 	},
+}
+
+func socketExists(paths *config.Paths) (bool, error) {
+	_, err := os.Stat(paths.SocketFile())
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, fmt.Errorf("failed to stat daemon socket %q: %w", paths.SocketFile(), err)
 }
 
 func init() {

@@ -49,15 +49,15 @@ func TestIsIncognito(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Save original values
-			origNoRecord := os.Getenv("CLAI_NO_RECORD")
-			origEphemeral := os.Getenv("CLAI_EPHEMERAL")
+			origNoRecord, origNoRecordSet := os.LookupEnv("CLAI_NO_RECORD")
+			origEphemeral, origEphemeralSet := os.LookupEnv("CLAI_EPHEMERAL")
 			defer func() {
-				if origNoRecord != "" {
+				if origNoRecordSet {
 					os.Setenv("CLAI_NO_RECORD", origNoRecord)
 				} else {
 					os.Unsetenv("CLAI_NO_RECORD")
 				}
-				if origEphemeral != "" {
+				if origEphemeralSet {
 					os.Setenv("CLAI_EPHEMERAL", origEphemeral)
 				} else {
 					os.Unsetenv("CLAI_EPHEMERAL")
@@ -98,9 +98,9 @@ func TestIsNoRecord(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			orig := os.Getenv("CLAI_NO_RECORD")
+			orig, origSet := os.LookupEnv("CLAI_NO_RECORD")
 			defer func() {
-				if orig != "" {
+				if origSet {
 					os.Setenv("CLAI_NO_RECORD", orig)
 				} else {
 					os.Unsetenv("CLAI_NO_RECORD")
@@ -134,9 +134,9 @@ func TestIsEphemeral(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			orig := os.Getenv("CLAI_EPHEMERAL")
+			orig, origSet := os.LookupEnv("CLAI_EPHEMERAL")
 			defer func() {
-				if orig != "" {
+				if origSet {
 					os.Setenv("CLAI_EPHEMERAL", orig)
 				} else {
 					os.Unsetenv("CLAI_EPHEMERAL")
