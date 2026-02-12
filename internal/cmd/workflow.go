@@ -351,7 +351,14 @@ func (rc *workflowRunContext) handleAnalysis(ctx context.Context, sr *workflow.S
 	return false
 }
 
-func analyzeStepWithQuestion(ctx context.Context, transport *workflow.AnalysisTransport, runID string, sr *workflow.StepResult, step *workflow.StepDef, matrixKey, question string) *workflow.AnalysisResult {
+func analyzeStepWithQuestion(
+	ctx context.Context,
+	transport *workflow.AnalysisTransport,
+	runID string,
+	sr *workflow.StepResult,
+	step *workflow.StepDef,
+	matrixKey, question string,
+) *workflow.AnalysisResult {
 	prompt := strings.TrimSpace(step.AnalysisPrompt)
 	if prompt == "" {
 		prompt = "Analyze the workflow step output."
@@ -378,12 +385,14 @@ func analyzeStepWithQuestion(ctx context.Context, transport *workflow.AnalysisTr
 func runAdHocCommand(ctx context.Context, command, workDir string, env []string) error {
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
+		// #nosec G204 -- command is explicitly provided by the human reviewer at runtime.
 		cmd = exec.CommandContext(ctx, "cmd.exe", "/C", command)
 	} else {
 		shellPath := os.Getenv("SHELL")
 		if shellPath == "" {
 			shellPath = "/bin/sh"
 		}
+		// #nosec G204 -- command is explicitly provided by the human reviewer at runtime.
 		cmd = exec.CommandContext(ctx, shellPath, "-c", command)
 	}
 

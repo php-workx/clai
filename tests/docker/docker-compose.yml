@@ -34,3 +34,11 @@ services:
     volumes:
       - ../../bin/linux:/usr/local/bin:ro
       - ../../internal/cmd/shell:/app/internal/cmd/shell:ro
+
+  fedora:
+    build:
+      context: ../..
+      dockerfile: tests/docker/Dockerfile.fedora
+    volumes:
+      - ../../bin/linux:/usr/local/bin:ro
+      - ../../internal/cmd/shell:/app/internal/cmd/shell:ro

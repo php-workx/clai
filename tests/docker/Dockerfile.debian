@@ -1,17 +1,18 @@
 # Dockerfile for Debian interactive shell tests
-# Minimal image with shells only - binaries mounted at runtime
 FROM debian:bullseye-slim
 
 # Prevent interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install shells
+# Install shells and Go (for test2json)
 RUN apt-get update && apt-get install -y \
     zsh \
     fish \
+    golang-go \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Binaries mounted to /usr/local/bin at runtime via docker-compose
-CMD ["expect.test", "-test.v"]
+# Use gotestsum with test2json for consistent formatting
+CMD ["sh", "-c", "gotestsum --format testdox --raw-command -- go tool test2json -t -p expect /usr/local/bin/expect.test -test.v"]

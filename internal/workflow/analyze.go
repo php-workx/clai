@@ -261,8 +261,6 @@ func ShouldPromptHuman(decision, riskLevel string) bool {
 		return true
 	case RiskLow:
 		return normalizeDecision(decision) == string(DecisionHalt)
-	case RiskMedium:
-		fallthrough
 	default:
 		return normalizeDecision(decision) != string(DecisionProceed)
 	}

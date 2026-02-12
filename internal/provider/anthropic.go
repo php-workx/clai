@@ -146,7 +146,7 @@ func (p *AnthropicProvider) query(ctx context.Context, prompt string) (string, e
 		args = append(args, "--model", p.model)
 	}
 
-	cmd := exec.CommandContext(ctx, p.cliPath, args...)
+	cmd := exec.CommandContext(ctx, p.cliPath, args...) //nolint:gosec // G204: cliPath is Claude CLI binary
 	cmd.Stdin = strings.NewReader(prompt)
 
 	var stdout, stderr bytes.Buffer

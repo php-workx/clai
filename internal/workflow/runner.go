@@ -159,6 +159,8 @@ func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
 }
 
 // executeStep runs a single step and returns the result.
+//
+//nolint:funlen // Linear flow keeps failure handling explicit and easy to audit.
 func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map[string]map[string]string, stepOutputEnv map[string]string) *StepResult {
 	stepStart := time.Now()
 	sr := &StepResult{
