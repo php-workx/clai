@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 )
 
@@ -55,9 +56,7 @@ func (t *TerminalReviewer) readInputDecision(scanner *bufio.Scanner, prompt, act
 
 // PromptReview displays the analysis and prompts the user for a decision.
 func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, analysis *AnalysisResult, output string) (*ReviewDecision, error) {
-	fmt.Fprintf(t.writer, "Step: %s\n", stepName)
-	fmt.Fprintf(t.writer, "Decision: %s\n", analysis.Decision)
-	fmt.Fprintf(t.writer, "Reasoning: %s\n", analysis.Reasoning)
+	t.printReviewBlock(stepName, analysis)
 
 	scanner := bufio.NewScanner(t.reader)
 
@@ -68,7 +67,7 @@ func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, an
 		default:
 		}
 
-		fmt.Fprint(t.writer, "[a]pprove  [r]eject  [i]nspect  [c]ommand  [q]uestion > ")
+		fmt.Fprint(t.writer, "  [a]pprove  [r]eject  [i]nspect  [c]ommand  [q]uestion > ")
 
 		choice, err := scanOrError(scanner)
 		if err != nil {
@@ -88,6 +87,30 @@ func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, an
 			return t.readInputDecision(scanner, "Question: ", string(ActionQuestion))
 		}
 	}
+}
+
+// printReviewBlock renders a formatted analysis review block.
+func (t *TerminalReviewer) printReviewBlock(stepName string, analysis *AnalysisResult) {
+	icon := iconForDecision(analysis.Decision)
+	fmt.Fprintf(t.writer, "\n\u2500\u2500\u2500 Review: %s \u2500\u2500\u2500\n", stepName)
+	fmt.Fprintf(t.writer, "  %s Decision: %s\n", icon, analysis.Decision)
+
+	if reasoning := strings.TrimSpace(analysis.Reasoning); reasoning != "" {
+		for _, line := range strings.Split(reasoning, "\n") {
+			fmt.Fprintf(t.writer, "  \u2502 %s\n", line)
+		}
+	}
+
+	if len(analysis.Flags) > 0 {
+		flagParts := make([]string, 0, len(analysis.Flags))
+		for k, v := range analysis.Flags {
+			flagParts = append(flagParts, k+"="+v)
+		}
+		sort.Strings(flagParts)
+		fmt.Fprintf(t.writer, "  \u2502 Flags: %s\n", strings.Join(flagParts, ", "))
+	}
+
+	fmt.Fprintln(t.writer)
 }
 
 // ErrNonInteractive indicates a review was requested in non-interactive mode.

@@ -29,7 +29,7 @@ func TestReviewTerminalApprove(t *testing.T) {
 		t.Fatalf("expected approve, got %s", d.Action)
 	}
 
-	if !strings.Contains(out.String(), "Step: build") {
+	if !strings.Contains(out.String(), "Review: build") {
 		t.Errorf("output should contain step name, got: %s", out.String())
 	}
 	if !strings.Contains(out.String(), "Decision: proceed") {

@@ -302,9 +302,17 @@ func (rc *workflowRunContext) processSkippedSteps(results []*workflow.StepResult
 // handleAnalysis runs LLM analysis and prompts for human review if needed.
 // Returns true if the human rejected the step.
 func (rc *workflowRunContext) handleAnalysis(ctx context.Context, sr *workflow.StepResult, matrixKey string) bool {
+	rc.display.AnalysisStart(sr.Name)
 	analysisResult := analyzeStep(ctx, rc.transport, rc.runID, sr, matrixKey)
 
-	if analysisResult != nil && workflow.ShouldPromptHuman(analysisResult.Decision, sr.RiskLevel) {
+	if analysisResult == nil {
+		rc.display.AnalysisEnd(sr.Name, string(workflow.DecisionNeedsHuman))
+		return false
+	}
+
+	rc.display.AnalysisEnd(sr.Name, analysisResult.Decision)
+
+	if workflow.ShouldPromptHuman(analysisResult.Decision, sr.RiskLevel) {
 		for {
 			decision, reviewErr := rc.handler.PromptReview(ctx, sr.Name, analysisResult, sr.StdoutTail)
 			if reviewErr != nil {
