@@ -222,6 +222,47 @@ func TestDisplay_Plain_StepEnd_Skipped(t *testing.T) {
 	assert.Equal(t, "[step_skip] deploy [os=linux]\n", out)
 }
 
+func TestDisplay_TTY_StepError(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(&buf, DisplayTTY)
+
+	d.StepError("error: command not found\nexit status 1", "")
+
+	out := buf.String()
+	assert.Contains(t, out, "  error: command not found")
+	assert.Contains(t, out, "  exit status 1")
+}
+
+func TestDisplay_TTY_StepError_FallbackToStdout(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(&buf, DisplayTTY)
+
+	d.StepError("", "FAIL: TestSomething")
+
+	out := buf.String()
+	assert.Contains(t, out, "  FAIL: TestSomething")
+}
+
+func TestDisplay_TTY_StepError_Empty(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(&buf, DisplayTTY)
+
+	d.StepError("", "")
+
+	assert.Empty(t, buf.String())
+}
+
+func TestDisplay_Plain_StepError(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(&buf, DisplayPlain)
+
+	d.StepError("error: missing file\nexit status 2", "")
+
+	out := buf.String()
+	assert.Contains(t, out, "[step_error] error: missing file")
+	assert.Contains(t, out, "[step_error] exit status 2")
+}
+
 func TestDisplay_Plain_AnalysisStart(t *testing.T) {
 	var buf bytes.Buffer
 	d := NewDisplay(&buf, DisplayPlain)

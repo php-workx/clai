@@ -118,6 +118,28 @@ func (d *Display) StepEnd(stepName string, matrixKey string, status string, dura
 	}
 }
 
+// StepError prints the error output of a failed step.
+func (d *Display) StepError(stderrTail, stdoutTail string) {
+	// Prefer stderr; fall back to stdout if stderr is empty.
+	output := strings.TrimSpace(stderrTail)
+	if output == "" {
+		output = strings.TrimSpace(stdoutTail)
+	}
+	if output == "" {
+		return
+	}
+
+	if d.mode == DisplayTTY {
+		for _, line := range strings.Split(output, "\n") {
+			fmt.Fprintf(d.writer, "  %s\n", line)
+		}
+	} else {
+		for _, line := range strings.Split(output, "\n") {
+			fmt.Fprintf(d.writer, "[step_error] %s\n", line)
+		}
+	}
+}
+
 // AnalysisStart prints analysis start indicator.
 func (d *Display) AnalysisStart(stepName string) {
 	if d.mode == DisplayTTY {

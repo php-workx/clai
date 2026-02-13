@@ -52,22 +52,25 @@ func (e *WorkflowExitError) Error() string {
 
 var workflowCmd = &cobra.Command{
 	Use:     "workflow",
+	Aliases: []string{"w"},
 	Short:   "Run and validate workflow files",
 	GroupID: groupCore,
 }
 
 var workflowRunCmd = &cobra.Command{
-	Use:   "run <path>",
-	Short: "Execute a workflow file",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runWorkflow,
+	Use:          "run <path>",
+	Short:        "Execute a workflow file",
+	Args:         cobra.ExactArgs(1),
+	RunE:         runWorkflow,
+	SilenceUsage: true,
 }
 
 var workflowValidateCmd = &cobra.Command{
-	Use:   "validate <path>",
-	Short: "Validate a workflow file without executing",
-	Args:  cobra.ExactArgs(1),
-	RunE:  validateWorkflow,
+	Use:          "validate <path>",
+	Short:        "Validate a workflow file without executing",
+	Args:         cobra.ExactArgs(1),
+	RunE:         validateWorkflow,
+	SilenceUsage: true,
 }
 
 func init() {
@@ -274,6 +277,10 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 func (rc *workflowRunContext) processStepResults(ctx context.Context, results []*workflow.StepResult, stepDefs []*workflow.StepDef, matrixKey string) bool {
 	for _, sr := range results {
 		rc.display.StepEnd(sr.Name, matrixKey, sr.Status, time.Duration(sr.DurationMs)*time.Millisecond)
+
+		if sr.Status == string(workflow.StepFailed) {
+			rc.display.StepError(sr.StderrTail, sr.StdoutTail)
+		}
 
 		if rc.artifact != nil {
 			rc.artifact.WriteEvent(workflow.EventStepEnd, &workflow.StepEndData{
