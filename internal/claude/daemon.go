@@ -233,10 +233,11 @@ func startClaudeProcess() (*claudeProcess, error) {
 	cmd := exec.Command("claude",
 		"--print",
 		"--verbose",
-		"--model", "haiku",
+		"--model", "sonnet",
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
 	)
+	cmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

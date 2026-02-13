@@ -57,7 +57,7 @@ func runAsk(cmd *cobra.Command, args []string) error {
 	defer cancel()
 
 	// Query Claude with interruptible context
-	response, err := claude.QueryWithContext(ctx, contextBuilder.String())
+	response, err := claude.QueryFast(ctx, contextBuilder.String())
 	if err != nil {
 		if err.Error() == "interrupted" {
 			fmt.Printf("\n%sCancelled%s\n", colorDim, colorReset)

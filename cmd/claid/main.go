@@ -18,7 +18,7 @@ import (
 type claudeLLM struct{}
 
 func (c *claudeLLM) Query(ctx context.Context, prompt string) (string, error) {
-	return claude.QueryWithContext(ctx, prompt)
+	return claude.QueryFast(ctx, prompt)
 }
 
 func main() {
