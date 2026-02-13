@@ -37,6 +37,20 @@ type RunResult struct {
 	Error      error
 }
 
+// StepCallback is called by the runner before and after each step.
+// The StepResult is nil on start and populated on end.
+type StepCallback func(event StepEvent, stepDef *StepDef, result *StepResult)
+
+// StepEvent indicates whether a callback is for step start or end.
+type StepEvent int
+
+const (
+	// StepEventStart is emitted before a step begins execution.
+	StepEventStart StepEvent = iota
+	// StepEventEnd is emitted after a step completes.
+	StepEventEnd
+)
+
 // RunnerConfig configures the runner.
 type RunnerConfig struct {
 	WorkDir    string
@@ -45,6 +59,10 @@ type RunnerConfig struct {
 	MatrixVars map[string]string // matrix combination
 	Secrets    []SecretDef
 	BufferSize int // 0 = DefaultBufferSize
+
+	// OnStep is called before and after each step for live progress.
+	// Optional — if nil, no callbacks are made.
+	OnStep StepCallback
 
 	// Optional DI overrides. If nil, platform defaults are used.
 	Shell   ShellAdapter      // custom shell adapter
@@ -130,8 +148,16 @@ func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
 			continue
 		}
 
+		if r.config.OnStep != nil {
+			r.config.OnStep(StepEventStart, step, nil)
+		}
+
 		stepResult := r.executeStep(ctx, step, stepOutputs, stepOutputEnv)
 		result.Steps = append(result.Steps, stepResult)
+
+		if r.config.OnStep != nil {
+			r.config.OnStep(StepEventEnd, step, stepResult)
+		}
 
 		// Store outputs for expression resolution in subsequent steps.
 		if step.ID != "" && len(stepResult.Outputs) > 0 {

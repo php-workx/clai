@@ -237,17 +237,19 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 	}
 
 	for _, matrixVars := range matrixCombinations {
+		matrixKey := matrixKeyString(matrixVars)
+
 		cfg := workflow.RunnerConfig{
 			WorkDir:    rc.workDir,
 			Env:        workflowEnv,
 			JobEnv:     job.Env,
 			MatrixVars: matrixVars,
 			Secrets:    def.Secrets,
+			OnStep:     rc.makeStepCallback(matrixKey),
 		}
 
 		runner := workflow.NewRunner(cfg)
 		runResult := runner.Run(rc.ctx, job.Steps)
-		matrixKey := matrixKeyString(matrixVars)
 
 		rejected := rc.processStepResults(rc.ctx, runResult.Steps, job.Steps, matrixKey)
 		result.allStepResults = append(result.allStepResults, runResult.Steps...)
@@ -272,14 +274,15 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 	return result
 }
 
-// processStepResults handles display, artifact, daemon, and analysis for each step.
+// processStepResults handles artifact, daemon, and analysis for each step.
+// Display for executed steps is handled by the StepCallback in real time;
+// only skipped steps need display here (they don't fire callbacks).
 // Returns true if a human rejected the step (workflow should stop).
 func (rc *workflowRunContext) processStepResults(ctx context.Context, results []*workflow.StepResult, stepDefs []*workflow.StepDef, matrixKey string) bool {
 	for _, sr := range results {
-		rc.display.StepEnd(sr.Name, matrixKey, sr.Status, time.Duration(sr.DurationMs)*time.Millisecond)
-
-		if sr.Status == string(workflow.StepFailed) {
-			rc.display.StepError(sr.StderrTail, sr.StdoutTail)
+		// Skipped steps were not executed and didn't fire callbacks.
+		if sr.Status == string(workflow.StepSkipped) {
+			rc.display.StepEnd(sr.Name, matrixKey, sr.Status, 0)
 		}
 
 		if rc.artifact != nil {
@@ -587,6 +590,24 @@ func mergeMaps(base, override map[string]string) map[string]string {
 		result[k] = v
 	}
 	return result
+}
+
+// makeStepCallback returns a StepCallback that displays live progress.
+// Both start and end events are handled here so the in-progress indicator
+// is replaced in-place by the final status immediately after each step.
+func (rc *workflowRunContext) makeStepCallback(matrixKey string) workflow.StepCallback {
+	return func(event workflow.StepEvent, stepDef *workflow.StepDef, result *workflow.StepResult) {
+		switch event {
+		case workflow.StepEventStart:
+			rc.display.StepStart(stepDef.Name, matrixKey)
+		case workflow.StepEventEnd:
+			rc.display.StepEnd(result.Name, matrixKey, result.Status,
+				time.Duration(result.DurationMs)*time.Millisecond)
+			if result.Status == string(workflow.StepFailed) {
+				rc.display.StepError(result.StderrTail, result.StdoutTail)
+			}
+		}
+	}
 }
 
 func findStepDef(steps []*workflow.StepDef, stepID string) *workflow.StepDef {

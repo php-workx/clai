@@ -481,6 +481,86 @@ func TestRunner_BufferSizeConfig(t *testing.T) {
 	assert.LessOrEqual(t, len(result.Steps[0].StdoutTail), 10)
 }
 
+func TestRunner_StepCallback(t *testing.T) {
+	skipOnWindows(t)
+
+	type callbackEvent struct {
+		event  StepEvent
+		stepID string
+		result *StepResult
+	}
+
+	var events []callbackEvent
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		OnStep: func(event StepEvent, stepDef *StepDef, result *StepResult) {
+			events = append(events, callbackEvent{
+				event:  event,
+				stepID: stepDef.ID,
+				result: result,
+			})
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("step1", "Step 1", "echo one"),
+		shellStep("step2", "Step 2", "echo two"),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "passed", result.Status)
+	require.Len(t, events, 4) // 2 steps × (start + end)
+
+	// Step 1 start.
+	assert.Equal(t, StepEventStart, events[0].event)
+	assert.Equal(t, "step1", events[0].stepID)
+	assert.Nil(t, events[0].result)
+
+	// Step 1 end.
+	assert.Equal(t, StepEventEnd, events[1].event)
+	assert.Equal(t, "step1", events[1].stepID)
+	require.NotNil(t, events[1].result)
+	assert.Equal(t, "passed", events[1].result.Status)
+
+	// Step 2 start.
+	assert.Equal(t, StepEventStart, events[2].event)
+	assert.Equal(t, "step2", events[2].stepID)
+
+	// Step 2 end.
+	assert.Equal(t, StepEventEnd, events[3].event)
+	assert.Equal(t, "step2", events[3].stepID)
+	require.NotNil(t, events[3].result)
+	assert.Equal(t, "passed", events[3].result.Status)
+}
+
+func TestRunner_StepCallback_SkippedStepsNoCallback(t *testing.T) {
+	skipOnWindows(t)
+
+	var callbackStepIDs []string
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		OnStep: func(event StepEvent, stepDef *StepDef, _ *StepResult) {
+			callbackStepIDs = append(callbackStepIDs, fmt.Sprintf("%s:%d", stepDef.ID, event))
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("step1", "Fails", "exit 1"),
+		shellStep("step2", "Skipped", "echo never"),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "failed", result.Status)
+	// Only step1 should get callbacks (start + end). Step2 is skipped, no callbacks.
+	assert.Equal(t, []string{"step1:0", "step1:1"}, callbackStepIDs)
+}
+
 func TestRunner_WorkDir(t *testing.T) {
 	skipOnWindows(t)
 
