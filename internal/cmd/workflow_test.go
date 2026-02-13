@@ -20,6 +20,7 @@ import (
 
 // validWorkflowYAML is a minimal valid workflow for testing.
 const validWorkflowYAML = `name: test-workflow
+description: A test workflow for unit tests
 jobs:
   build:
     steps:
@@ -74,6 +75,7 @@ func TestValidateWorkflow_Valid(t *testing.T) {
 	assert.Contains(t, out, "test-workflow is valid")
 	assert.Contains(t, out, "1 jobs")
 	assert.Contains(t, out, "1 total steps")
+	assert.Contains(t, out, "A test workflow for unit tests")
 }
 
 func TestValidateWorkflow_Invalid(t *testing.T) {

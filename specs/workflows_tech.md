@@ -748,12 +748,13 @@ func (r *Runner) Run(ctx context.Context, wf *WorkflowDef) error {
 ```go
 // WorkflowDef is the top-level workflow file.
 type WorkflowDef struct {
-    Name     string                `yaml:"name"`
-    Env      map[string]string     `yaml:"env"`
-    Secrets  []SecretDef           `yaml:"secrets"`
-    Requires []string              `yaml:"requires"`
-    Config   *WorkflowConfigBlock  `yaml:"config"`
-    Jobs     map[string]*JobDef    `yaml:"jobs"`
+    Name        string                `yaml:"name"`
+    Description string                `yaml:"description,omitempty"`
+    Env         map[string]string     `yaml:"env"`
+    Secrets     []SecretDef           `yaml:"secrets"`
+    Requires    []string              `yaml:"requires"`
+    Config      *WorkflowConfigBlock  `yaml:"config"`
+    Jobs        map[string]*JobDef    `yaml:"jobs"`
     Vars     map[string]string     `yaml:"vars"`       // Tier 1 (FR-37): workflow-level variables
     LLM      *LLMConfig            `yaml:"llm"`        // Tier 1 (FR-29): per-workflow LLM config
     Params   []ParamDef            `yaml:"params"`     // Tier 1 (FR-44): CLI parameter definitions

@@ -485,6 +485,9 @@ func validateWorkflow(_ *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("  \u2713 %s is valid (%d jobs, %d total steps)\n", def.Name, len(def.Jobs), countSteps(def))
+	if def.Description != "" {
+		fmt.Printf("  %s\n", def.Description)
+	}
 	return nil
 }
 
