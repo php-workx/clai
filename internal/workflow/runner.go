@@ -41,7 +41,8 @@ type RunResult struct {
 
 // StepCallback is called by the runner before and after each step.
 // The StepResult is nil on start and populated on end.
-type StepCallback func(event StepEvent, stepDef *StepDef, result *StepResult)
+// Returning a non-nil error from StepEventEnd halts execution of subsequent steps.
+type StepCallback func(event StepEvent, stepDef *StepDef, result *StepResult) error
 
 // StepEvent indicates whether a callback is for step start or end.
 type StepEvent int
@@ -151,14 +152,18 @@ func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
 		}
 
 		if r.config.OnStep != nil {
-			r.config.OnStep(StepEventStart, step, nil)
+			_ = r.config.OnStep(StepEventStart, step, nil)
 		}
 
 		stepResult := r.executeStep(ctx, step, stepOutputs, stepOutputEnv)
 		result.Steps = append(result.Steps, stepResult)
 
 		if r.config.OnStep != nil {
-			r.config.OnStep(StepEventEnd, step, stepResult)
+			if cbErr := r.config.OnStep(StepEventEnd, step, stepResult); cbErr != nil {
+				failed = true
+				result.Status = string(RunFailed)
+				result.Error = cbErr
+			}
 		}
 
 		// Store outputs for expression resolution in subsequent steps.

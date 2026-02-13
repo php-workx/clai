@@ -96,6 +96,7 @@ type workflowRunContext struct {
 	transport      *workflow.AnalysisTransport
 	handler        workflow.InteractionHandler
 	noDaemon       bool
+	humanRejected  bool // set by step callback when analysis leads to rejection
 }
 
 func runWorkflow(cmd *cobra.Command, args []string) error {
@@ -248,13 +249,14 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 			OnStep:     rc.makeStepCallback(matrixKey),
 		}
 
+		rc.humanRejected = false // reset per matrix combination
 		runner := workflow.NewRunner(cfg)
 		runResult := runner.Run(rc.ctx, job.Steps)
 
-		rejected := rc.processStepResults(rc.ctx, runResult.Steps, job.Steps, matrixKey)
+		rc.processSkippedSteps(runResult.Steps, matrixKey)
 		result.allStepResults = append(result.allStepResults, runResult.Steps...)
 
-		if rejected {
+		if rc.humanRejected {
 			result.overallStatus = string(workflow.RunFailed)
 			result.humanRejected = true
 			break
@@ -274,16 +276,15 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 	return result
 }
 
-// processStepResults handles artifact, daemon, and analysis for each step.
-// Display for executed steps is handled by the StepCallback in real time;
-// only skipped steps need display here (they don't fire callbacks).
-// Returns true if a human rejected the step (workflow should stop).
-func (rc *workflowRunContext) processStepResults(ctx context.Context, results []*workflow.StepResult, stepDefs []*workflow.StepDef, matrixKey string) bool {
+// processSkippedSteps displays and records skipped steps.
+// Executed steps are handled by the StepCallback in real time;
+// skipped steps don't fire callbacks, so they are handled here.
+func (rc *workflowRunContext) processSkippedSteps(results []*workflow.StepResult, matrixKey string) {
 	for _, sr := range results {
-		// Skipped steps were not executed and didn't fire callbacks.
-		if sr.Status == string(workflow.StepSkipped) {
-			rc.display.StepEnd(sr.Name, matrixKey, sr.Status, 0)
+		if sr.Status != string(workflow.StepSkipped) {
+			continue
 		}
+		rc.display.StepEnd(sr.Name, matrixKey, sr.Status, 0)
 
 		if rc.artifact != nil {
 			rc.artifact.WriteEvent(workflow.EventStepEnd, &workflow.StepEndData{
@@ -293,19 +294,9 @@ func (rc *workflowRunContext) processStepResults(ctx context.Context, results []
 		}
 
 		if !rc.noDaemon {
-			notifyDaemonStepUpdate(ctx, rc.runID, sr, matrixKey)
-		}
-
-		if sr.Status != string(workflow.StepSkipped) && sr.Status != string(workflow.StepCancelled) {
-			step := findStepDef(stepDefs, sr.StepID)
-			if step != nil && step.Analyze {
-				if rc.handleAnalysis(ctx, sr, matrixKey) {
-					return true // human rejected
-				}
-			}
+			notifyDaemonStepUpdate(rc.ctx, rc.runID, sr, matrixKey)
 		}
 	}
-	return false
 }
 
 // handleAnalysis runs LLM analysis and prompts for human review if needed.
@@ -591,21 +582,47 @@ func mergeMaps(base, override map[string]string) map[string]string {
 	return result
 }
 
-// makeStepCallback returns a StepCallback that displays live progress.
-// Both start and end events are handled here so the in-progress indicator
-// is replaced in-place by the final status immediately after each step.
+// makeStepCallback returns a StepCallback that handles all per-step
+// processing: display, artifacts, daemon notifications, and analysis.
+// Analysis happens between steps so it can gate subsequent execution.
+// Returning an error from StepEventEnd halts the runner.
 func (rc *workflowRunContext) makeStepCallback(matrixKey string) workflow.StepCallback {
-	return func(event workflow.StepEvent, stepDef *workflow.StepDef, result *workflow.StepResult) {
-		switch event {
-		case workflow.StepEventStart:
+	return func(event workflow.StepEvent, stepDef *workflow.StepDef, result *workflow.StepResult) error {
+		if event == workflow.StepEventStart {
 			rc.display.StepStart(stepDef.Name, matrixKey)
-		case workflow.StepEventEnd:
-			rc.display.StepEnd(result.Name, matrixKey, result.Status,
-				time.Duration(result.DurationMs)*time.Millisecond)
-			if result.Status == string(workflow.StepFailed) {
-				rc.display.StepError(result.StderrTail, result.StdoutTail)
+			return nil
+		}
+
+		// StepEventEnd: display, artifacts, daemon, analysis.
+		rc.display.StepEnd(result.Name, matrixKey, result.Status,
+			time.Duration(result.DurationMs)*time.Millisecond)
+		if result.Status == string(workflow.StepFailed) {
+			rc.display.StepError(result.StderrTail, result.StdoutTail)
+		}
+
+		if rc.artifact != nil {
+			rc.artifact.WriteEvent(workflow.EventStepEnd, &workflow.StepEndData{
+				RunID: rc.runID, StepID: result.StepID, MatrixKey: matrixKey,
+				Status: result.Status, ExitCode: result.ExitCode, DurationMs: result.DurationMs,
+			})
+		}
+
+		if !rc.noDaemon {
+			notifyDaemonStepUpdate(rc.ctx, rc.runID, result, matrixKey)
+		}
+
+		// Analysis gate: if step has analyze: true, run LLM analysis now
+		// (between steps) so it can halt execution before the next step.
+		if stepDef.Analyze &&
+			result.Status != string(workflow.StepSkipped) &&
+			result.Status != string(workflow.StepCancelled) {
+			if rc.handleAnalysis(rc.ctx, result, matrixKey) {
+				rc.humanRejected = true
+				return fmt.Errorf("step %q rejected during analysis", result.Name)
 			}
 		}
+
+		return nil
 	}
 }
 

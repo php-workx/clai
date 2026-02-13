@@ -494,12 +494,13 @@ func TestRunner_StepCallback(t *testing.T) {
 
 	cfg := RunnerConfig{
 		WorkDir: t.TempDir(),
-		OnStep: func(event StepEvent, stepDef *StepDef, result *StepResult) {
+		OnStep: func(event StepEvent, stepDef *StepDef, result *StepResult) error {
 			events = append(events, callbackEvent{
 				event:  event,
 				stepID: stepDef.ID,
 				result: result,
 			})
+			return nil
 		},
 	}
 	runner := NewRunner(cfg)
@@ -543,8 +544,9 @@ func TestRunner_StepCallback_SkippedStepsNoCallback(t *testing.T) {
 
 	cfg := RunnerConfig{
 		WorkDir: t.TempDir(),
-		OnStep: func(event StepEvent, stepDef *StepDef, _ *StepResult) {
+		OnStep: func(event StepEvent, stepDef *StepDef, _ *StepResult) error {
 			callbackStepIDs = append(callbackStepIDs, fmt.Sprintf("%s:%d", stepDef.ID, event))
+			return nil
 		},
 	}
 	runner := NewRunner(cfg)
@@ -589,6 +591,34 @@ func TestRunner_RiskLevelExpressionResolution(t *testing.T) {
 	require.Len(t, result.Steps, 1)
 	assert.Equal(t, "high", result.Steps[0].RiskLevel)
 	assert.Equal(t, "Check high environment", result.Steps[0].AnalysisPrompt)
+}
+
+func TestRunner_StepCallback_ErrorHaltsExecution(t *testing.T) {
+	skipOnWindows(t)
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		OnStep: func(event StepEvent, stepDef *StepDef, _ *StepResult) error {
+			if event == StepEventEnd && stepDef.ID == "step1" {
+				return fmt.Errorf("analysis rejected step1")
+			}
+			return nil
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("step1", "Step 1", "echo one"),
+		shellStep("step2", "Step 2", "echo two"),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "failed", result.Status)
+	assert.Contains(t, result.Error.Error(), "analysis rejected step1")
+	require.Len(t, result.Steps, 2)
+	assert.Equal(t, "passed", result.Steps[0].Status)
+	assert.Equal(t, "skipped", result.Steps[1].Status)
 }
 
 func TestRunner_WorkDir(t *testing.T) {
