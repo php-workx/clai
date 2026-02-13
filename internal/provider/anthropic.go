@@ -151,7 +151,7 @@ func (p *AnthropicProvider) query(ctx context.Context, prompt string) (string, e
 	args := []string{"--print", "--model", p.model}
 
 	cmd := exec.CommandContext(ctx, p.cliPath, args...) //nolint:gosec // G204: cliPath is Claude CLI binary
-	cmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
+	cmd.Env = claude.FilterEnv(os.Environ(), "CLAUDECODE")
 	cmd.Stdin = strings.NewReader(prompt)
 
 	var stdout, stderr bytes.Buffer
@@ -182,22 +182,4 @@ func (p *AnthropicProvider) parseCommandResponse(response string) []Suggestion {
 // parseDiagnoseResponse parses a diagnosis response
 func (p *AnthropicProvider) parseDiagnoseResponse(response string) (string, []Suggestion) {
 	return ParseDiagnoseResponse(response)
-}
-
-// filterEnv returns a copy of env with the named variables removed.
-func filterEnv(env []string, keys ...string) []string {
-	filtered := make([]string, 0, len(env))
-	for _, e := range env {
-		skip := false
-		for _, key := range keys {
-			if strings.HasPrefix(e, key+"=") {
-				skip = true
-				break
-			}
-		}
-		if !skip {
-			filtered = append(filtered, e)
-		}
-	}
-	return filtered
 }

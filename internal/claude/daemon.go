@@ -237,7 +237,7 @@ func startClaudeProcess() (*claudeProcess, error) {
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
 	)
-	cmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
+	cmd.Env = FilterEnv(os.Environ(), "CLAUDECODE")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

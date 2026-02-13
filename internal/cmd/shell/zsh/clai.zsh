@@ -62,7 +62,8 @@ zmodload -F zsh/datetime p:EPOCHREALTIME 2>/dev/null
 _AI_CURRENT_SUGGESTION=""
 _AI_IN_PASTE=false
 
-# Double-tap up-arrow state (seconds with fractional precision)
+# Double-tap up-arrow detection
+_CLAI_DOUBLE_TAP_THRESHOLD=0.5
 _CLAI_LAST_UP_TIME=0
 
 # Disable zsh-autosuggestions when clai is active
@@ -751,7 +752,7 @@ _clai_picker_up() {
     local elapsed=$(( now - _CLAI_LAST_UP_TIME ))
     _CLAI_LAST_UP_TIME=$now
 
-    if (( elapsed > 0.5 )); then
+    if (( elapsed > _CLAI_DOUBLE_TAP_THRESHOLD )); then
         # Single tap — navigate history, keep ghost text
         _ai_up_line_or_history
         return

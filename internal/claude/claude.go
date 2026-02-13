@@ -24,7 +24,7 @@ func QueryWithContext(ctx context.Context, prompt string) (string, error) {
 	}
 
 	cmd := exec.CommandContext(ctx, "claude", "--print")
-	cmd.Env = filterEnv(os.Environ(), "CLAUDECODE")
+	cmd.Env = FilterEnv(os.Environ(), "CLAUDECODE")
 	cmd.Stdin = strings.NewReader(prompt)
 
 	var stdout, stderr bytes.Buffer
@@ -45,8 +45,8 @@ func QueryWithContext(ctx context.Context, prompt string) (string, error) {
 	return strings.TrimSpace(stdout.String()), nil
 }
 
-// filterEnv returns a copy of env with the named variables removed.
-func filterEnv(env []string, keys ...string) []string {
+// FilterEnv returns a copy of env with the named variables removed.
+func FilterEnv(env []string, keys ...string) []string {
 	filtered := make([]string, 0, len(env))
 	for _, e := range env {
 		skip := false
