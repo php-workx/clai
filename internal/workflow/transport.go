@@ -214,7 +214,8 @@ func buildFallbackPrompt(analyzer *Analyzer, req *AnalysisRequest, scrubbedOutpu
 	b.WriteString("Output:\n```\n")
 	b.WriteString(scrubbedOutput)
 	b.WriteString("\n```\n\n")
-	b.WriteString("Respond with a JSON object: {\"decision\": \"proceed|halt|needs_human\", \"reasoning\": \"...\", \"flags\": {}}\n")
-	b.WriteString("Valid decisions: proceed, halt, needs_human\n")
+	b.WriteString("Respond ONLY with a JSON object, no other text:\n")
+	b.WriteString("{\"decision\": \"proceed|halt|needs_human\", \"reasoning\": \"...\", \"flags\": {}}\n")
+	b.WriteString("Valid decisions: proceed (step looks good), halt (step has problems), needs_human (uncertain)\n")
 	return b.String()
 }
