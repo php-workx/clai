@@ -742,7 +742,12 @@ _clai_picker_up() {
     fi
 
     # Double-tap detection: open picker only if two Up presses within 0.5s.
-    local now=${EPOCHREALTIME:-0}
+    # Guard: if EPOCHREALTIME is unavailable, skip double-tap and navigate history.
+    if [[ -z "$EPOCHREALTIME" ]]; then
+        _ai_up_line_or_history
+        return
+    fi
+    local now=$EPOCHREALTIME
     local elapsed=$(( now - _CLAI_LAST_UP_TIME ))
     _CLAI_LAST_UP_TIME=$now
 

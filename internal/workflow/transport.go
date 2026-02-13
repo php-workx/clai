@@ -217,5 +217,6 @@ func buildFallbackPrompt(analyzer *Analyzer, req *AnalysisRequest, scrubbedOutpu
 	b.WriteString("Respond ONLY with a JSON object, no other text:\n")
 	b.WriteString("{\"decision\": \"proceed|halt|needs_human\", \"reasoning\": \"...\", \"flags\": {}}\n")
 	b.WriteString("Valid decisions: proceed (step looks good), halt (step has problems), needs_human (uncertain)\n")
+	b.WriteString("The reasoning field may contain multi-line text with markdown formatting (use \\n for newlines within the JSON string).\n")
 	return b.String()
 }

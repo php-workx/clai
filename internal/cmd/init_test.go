@@ -563,6 +563,11 @@ func TestZshScript_PickerUpDoubleTapDetection(t *testing.T) {
 	if !strings.Contains(upBody, "_ai_up_line_or_history") {
 		t.Error("_clai_picker_up should call _ai_up_line_or_history on single tap")
 	}
+
+	// Guard: must skip double-tap when EPOCHREALTIME is unavailable
+	if !strings.Contains(upBody, `-z "$EPOCHREALTIME"`) {
+		t.Error("_clai_picker_up should guard against missing EPOCHREALTIME")
+	}
 }
 
 // extractFunctionBody returns the text from a shell function definition
