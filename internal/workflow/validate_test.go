@@ -137,6 +137,13 @@ func TestValidateWorkflow_ValidRiskLevels(t *testing.T) {
 	}
 }
 
+func TestValidateWorkflow_RiskLevelWithExpression(t *testing.T) {
+	wf := validWorkflow()
+	wf.Jobs["build"].Steps[0].RiskLevel = "${{ matrix.risk }}"
+	errs := ValidateWorkflow(wf)
+	assert.Empty(t, errs, "expression in risk_level should pass validation")
+}
+
 func TestValidateWorkflow_AnalyzeMissingPrompt(t *testing.T) {
 	wf := validWorkflow()
 	wf.Jobs["build"].Steps[0].Analyze = true

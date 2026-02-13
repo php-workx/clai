@@ -315,15 +315,10 @@ func TestHandleAnalysis_Reject(t *testing.T) {
 		Name:       "Run tests",
 		StdoutTail: "output",
 		StderrTail: "",
-	}
-	step := &workflow.StepDef{
-		ID:        "s1",
-		Name:      "Run tests",
-		Analyze:   true,
-		RiskLevel: string(workflow.RiskLow),
+		RiskLevel:  string(workflow.RiskLow),
 	}
 
-	rejected := rc.handleAnalysis(context.Background(), sr, step, "os=linux")
+	rejected := rc.handleAnalysis(context.Background(), sr, "os=linux")
 	assert.True(t, rejected)
 }
 
@@ -354,20 +349,15 @@ func TestHandleAnalysis_QuestionThenApprove(t *testing.T) {
 	}
 
 	sr := &workflow.StepResult{
-		StepID:     "s1",
-		Name:       "Analyze",
-		StdoutTail: "stdout tail",
-		StderrTail: "stderr tail",
-	}
-	step := &workflow.StepDef{
-		ID:             "s1",
+		StepID:         "s1",
 		Name:           "Analyze",
-		Analyze:        true,
+		StdoutTail:     "stdout tail",
+		StderrTail:     "stderr tail",
 		RiskLevel:      string(workflow.RiskHigh),
 		AnalysisPrompt: "Look for regressions.",
 	}
 
-	rejected := rc.handleAnalysis(context.Background(), sr, step, "")
+	rejected := rc.handleAnalysis(context.Background(), sr, "")
 	assert.False(t, rejected)
 	assert.Equal(t, 2, calls)
 	require.Len(t, prompts, 2)

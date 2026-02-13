@@ -299,7 +299,7 @@ func (rc *workflowRunContext) processStepResults(ctx context.Context, results []
 		if sr.Status != string(workflow.StepSkipped) && sr.Status != string(workflow.StepCancelled) {
 			step := findStepDef(stepDefs, sr.StepID)
 			if step != nil && step.Analyze {
-				if rc.handleAnalysis(ctx, sr, step, matrixKey) {
+				if rc.handleAnalysis(ctx, sr, matrixKey) {
 					return true // human rejected
 				}
 			}
@@ -310,10 +310,10 @@ func (rc *workflowRunContext) processStepResults(ctx context.Context, results []
 
 // handleAnalysis runs LLM analysis and prompts for human review if needed.
 // Returns true if the human rejected the step.
-func (rc *workflowRunContext) handleAnalysis(ctx context.Context, sr *workflow.StepResult, step *workflow.StepDef, matrixKey string) bool {
-	analysisResult := analyzeStep(ctx, rc.transport, rc.runID, sr, step, matrixKey)
+func (rc *workflowRunContext) handleAnalysis(ctx context.Context, sr *workflow.StepResult, matrixKey string) bool {
+	analysisResult := analyzeStep(ctx, rc.transport, rc.runID, sr, matrixKey)
 
-	if analysisResult != nil && workflow.ShouldPromptHuman(analysisResult.Decision, step.RiskLevel) {
+	if analysisResult != nil && workflow.ShouldPromptHuman(analysisResult.Decision, sr.RiskLevel) {
 		for {
 			decision, reviewErr := rc.handler.PromptReview(ctx, sr.Name, analysisResult, sr.StdoutTail)
 			if reviewErr != nil {
@@ -340,7 +340,7 @@ func (rc *workflowRunContext) handleAnalysis(ctx context.Context, sr *workflow.S
 				if strings.TrimSpace(decision.Input) == "" {
 					continue
 				}
-				followUp := analyzeStepWithQuestion(ctx, rc.transport, rc.runID, sr, step, matrixKey, decision.Input)
+				followUp := analyzeStepWithQuestion(ctx, rc.transport, rc.runID, sr, matrixKey, decision.Input)
 				if followUp != nil {
 					analysisResult = followUp
 				}
@@ -357,10 +357,9 @@ func analyzeStepWithQuestion(
 	transport *workflow.AnalysisTransport,
 	runID string,
 	sr *workflow.StepResult,
-	step *workflow.StepDef,
 	matrixKey, question string,
 ) *workflow.AnalysisResult {
-	prompt := strings.TrimSpace(step.AnalysisPrompt)
+	prompt := strings.TrimSpace(sr.AnalysisPrompt)
 	if prompt == "" {
 		prompt = "Analyze the workflow step output."
 	}
@@ -371,7 +370,7 @@ func analyzeStepWithQuestion(
 		StepID:         sr.StepID,
 		StepName:       sr.Name,
 		MatrixKey:      matrixKey,
-		RiskLevel:      step.RiskLevel,
+		RiskLevel:      sr.RiskLevel,
 		StdoutTail:     sr.StdoutTail,
 		StderrTail:     sr.StderrTail,
 		AnalysisPrompt: prompt,
@@ -624,7 +623,6 @@ func analyzeStep(
 	transport *workflow.AnalysisTransport,
 	runID string,
 	sr *workflow.StepResult,
-	step *workflow.StepDef,
 	matrixKey string,
 ) *workflow.AnalysisResult {
 	result, err := transport.Analyze(ctx, &workflow.AnalysisRequest{
@@ -632,10 +630,10 @@ func analyzeStep(
 		StepID:         sr.StepID,
 		StepName:       sr.Name,
 		MatrixKey:      matrixKey,
-		RiskLevel:      step.RiskLevel,
+		RiskLevel:      sr.RiskLevel,
 		StdoutTail:     sr.StdoutTail,
 		StderrTail:     sr.StderrTail,
-		AnalysisPrompt: step.AnalysisPrompt,
+		AnalysisPrompt: sr.AnalysisPrompt,
 	})
 	if err != nil {
 		slog.Warn("analysis failed", "step", sr.Name, "error", err)

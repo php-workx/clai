@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+// containsExpression returns true if s contains a ${{ }} expression placeholder.
+func containsExpression(s string) bool {
+	return strings.Contains(s, "${{")
+}
+
 // ValidationError represents a single validation failure with its location.
 type ValidationError struct {
 	Field   string // dot-separated path, e.g. "jobs.deploy.steps[0].run"
@@ -152,8 +157,9 @@ func validateStep(field string, step *StepDef, seenIDs map[string]bool) []Valida
 		seenIDs[step.ID] = true
 	}
 
-	// risk_level must be valid.
-	if !validRiskLevels[step.RiskLevel] {
+	// risk_level must be valid (skip check when it contains expressions
+	// like "${{ matrix.risk }}" — resolved at runtime by the runner).
+	if !validRiskLevels[step.RiskLevel] && !containsExpression(step.RiskLevel) {
 		errs = append(errs, ValidationError{
 			Field:   field + ".risk_level",
 			Message: fmt.Sprintf("invalid risk_level %q; must be one of: low, medium, high", step.RiskLevel),

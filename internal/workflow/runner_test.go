@@ -561,6 +561,36 @@ func TestRunner_StepCallback_SkippedStepsNoCallback(t *testing.T) {
 	assert.Equal(t, []string{"step1:0", "step1:1"}, callbackStepIDs)
 }
 
+func TestRunner_RiskLevelExpressionResolution(t *testing.T) {
+	skipOnWindows(t)
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		MatrixVars: map[string]string{
+			"risk": "high",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		{
+			ID:             "step1",
+			Name:           "Check ${{ matrix.risk }}",
+			Run:            "echo ok",
+			Shell:          "true",
+			RiskLevel:      "${{ matrix.risk }}",
+			AnalysisPrompt: "Check ${{ matrix.risk }} environment",
+		},
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "passed", result.Status)
+	require.Len(t, result.Steps, 1)
+	assert.Equal(t, "high", result.Steps[0].RiskLevel)
+	assert.Equal(t, "Check high environment", result.Steps[0].AnalysisPrompt)
+}
+
 func TestRunner_WorkDir(t *testing.T) {
 	skipOnWindows(t)
 

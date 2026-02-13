@@ -16,17 +16,19 @@ const DefaultBufferSize = 4096
 
 // StepResult holds the outcome of a single step execution.
 type StepResult struct {
-	StepID      string
-	Name        string
-	Status      string // "passed", "failed", "skipped", "cancelled"
-	Command     string
-	ResolvedEnv []string
-	ExitCode    int
-	DurationMs  int64
-	StdoutTail  string
-	StderrTail  string
-	Outputs     map[string]string // from $CLAI_OUTPUT file
-	Error       error
+	StepID         string
+	Name           string
+	Status         string // "passed", "failed", "skipped", "cancelled"
+	Command        string
+	ResolvedEnv    []string
+	ExitCode       int
+	DurationMs     int64
+	StdoutTail     string
+	StderrTail     string
+	Outputs        map[string]string // from $CLAI_OUTPUT file
+	Error          error
+	RiskLevel      string // resolved from StepDef.RiskLevel after expression substitution
+	AnalysisPrompt string // resolved from StepDef.AnalysisPrompt after expression substitution
 }
 
 // RunResult holds the outcome of a complete job run.
@@ -243,6 +245,26 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 	resolvedName, err := ResolveExpressions(step.Name, exprCtx)
 	if err == nil {
 		sr.Name = resolvedName
+	}
+
+	// Resolve expressions in risk_level (e.g. "${{ matrix.risk }}").
+	if step.RiskLevel != "" {
+		resolvedRL, rlErr := ResolveExpressions(step.RiskLevel, exprCtx)
+		if rlErr == nil {
+			sr.RiskLevel = resolvedRL
+		} else {
+			sr.RiskLevel = step.RiskLevel
+		}
+	}
+
+	// Resolve expressions in analysis_prompt.
+	if step.AnalysisPrompt != "" {
+		resolvedAP, apErr := ResolveExpressions(step.AnalysisPrompt, exprCtx)
+		if apErr == nil {
+			sr.AnalysisPrompt = resolvedAP
+		} else {
+			sr.AnalysisPrompt = step.AnalysisPrompt
+		}
 	}
 
 	// Create a modified step with the resolved command.
