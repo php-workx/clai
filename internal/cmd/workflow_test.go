@@ -20,6 +20,7 @@ import (
 
 // validWorkflowYAML is a minimal valid workflow for testing.
 const validWorkflowYAML = `name: test-workflow
+description: A test workflow for unit tests
 jobs:
   build:
     steps:
@@ -74,6 +75,7 @@ func TestValidateWorkflow_Valid(t *testing.T) {
 	assert.Contains(t, out, "test-workflow is valid")
 	assert.Contains(t, out, "1 jobs")
 	assert.Contains(t, out, "1 total steps")
+	assert.Contains(t, out, "A test workflow for unit tests")
 }
 
 func TestValidateWorkflow_Invalid(t *testing.T) {
@@ -313,15 +315,10 @@ func TestHandleAnalysis_Reject(t *testing.T) {
 		Name:       "Run tests",
 		StdoutTail: "output",
 		StderrTail: "",
-	}
-	step := &workflow.StepDef{
-		ID:        "s1",
-		Name:      "Run tests",
-		Analyze:   true,
-		RiskLevel: string(workflow.RiskLow),
+		RiskLevel:  string(workflow.RiskLow),
 	}
 
-	rejected := rc.handleAnalysis(context.Background(), sr, step, "os=linux")
+	rejected := rc.handleAnalysis(context.Background(), sr, "os=linux")
 	assert.True(t, rejected)
 }
 
@@ -352,20 +349,15 @@ func TestHandleAnalysis_QuestionThenApprove(t *testing.T) {
 	}
 
 	sr := &workflow.StepResult{
-		StepID:     "s1",
-		Name:       "Analyze",
-		StdoutTail: "stdout tail",
-		StderrTail: "stderr tail",
-	}
-	step := &workflow.StepDef{
-		ID:             "s1",
+		StepID:         "s1",
 		Name:           "Analyze",
-		Analyze:        true,
+		StdoutTail:     "stdout tail",
+		StderrTail:     "stderr tail",
 		RiskLevel:      string(workflow.RiskHigh),
 		AnalysisPrompt: "Look for regressions.",
 	}
 
-	rejected := rc.handleAnalysis(context.Background(), sr, step, "")
+	rejected := rc.handleAnalysis(context.Background(), sr, "")
 	assert.False(t, rejected)
 	assert.Equal(t, 2, calls)
 	require.Len(t, prompts, 2)
@@ -738,6 +730,118 @@ func TestWorkflowRunCmd_Flags(t *testing.T) {
 	noDaemonFlag := f.Lookup("no-daemon")
 	require.NotNil(t, noDaemonFlag)
 	assert.Equal(t, "false", noDaemonFlag.DefValue)
+}
+
+func TestExecuteJob_FailFastTrue_StopsOnFirstFailure(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses Unix shell commands")
+	}
+
+	cmd := &cobra.Command{Use: "run"}
+	cmd.Flags().StringSlice("var", nil, "")
+
+	rc := &workflowRunContext{
+		runID:    "run-test",
+		workDir:  t.TempDir(),
+		ctx:      context.Background(),
+		display:  workflow.NewDisplay(new(bytes.Buffer), workflow.DisplayPlain),
+		noDaemon: true,
+	}
+
+	failFast := true
+	def := &workflow.WorkflowDef{
+		Name: "fail-fast-test",
+		Jobs: map[string]*workflow.JobDef{
+			"test": {
+				Strategy: &workflow.StrategyDef{
+					FailFast: &failFast,
+					Matrix: &workflow.MatrixDef{
+						Include: []map[string]string{
+							{"val": "first"},
+							{"val": "second"},
+							{"val": "third"},
+						},
+					},
+				},
+				Steps: []*workflow.StepDef{
+					{ID: "s1", Name: "Fail step", Run: "exit 1", Shell: "true"},
+				},
+			},
+		},
+	}
+
+	result := executeJob(cmd, rc, def)
+	assert.Equal(t, string(workflow.RunFailed), result.overallStatus)
+	// With fail_fast: true, should stop after first combination fails.
+	assert.Len(t, result.allStepResults, 1)
+}
+
+func TestExecuteJob_FailFastFalse_RunsAllCombinations(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("test uses Unix shell commands")
+	}
+
+	cmd := &cobra.Command{Use: "run"}
+	cmd.Flags().StringSlice("var", nil, "")
+
+	rc := &workflowRunContext{
+		runID:    "run-test",
+		workDir:  t.TempDir(),
+		ctx:      context.Background(),
+		display:  workflow.NewDisplay(new(bytes.Buffer), workflow.DisplayPlain),
+		noDaemon: true,
+	}
+
+	failFast := false
+	def := &workflow.WorkflowDef{
+		Name: "no-fail-fast-test",
+		Jobs: map[string]*workflow.JobDef{
+			"test": {
+				Strategy: &workflow.StrategyDef{
+					FailFast: &failFast,
+					Matrix: &workflow.MatrixDef{
+						Include: []map[string]string{
+							{"val": "first"},
+							{"val": "second"},
+							{"val": "third"},
+						},
+					},
+				},
+				Steps: []*workflow.StepDef{
+					{ID: "s1", Name: "Fail step", Run: "exit 1", Shell: "true"},
+				},
+			},
+		},
+	}
+
+	result := executeJob(cmd, rc, def)
+	assert.Equal(t, string(workflow.RunFailed), result.overallStatus)
+	// With fail_fast: false, all 3 combinations should run.
+	assert.Len(t, result.allStepResults, 3)
+}
+
+func TestCheckRequires_AllPresent(t *testing.T) {
+	tools := []string{"sh"}
+	if runtime.GOOS == "windows" {
+		tools = []string{"cmd"}
+	}
+	err := checkRequires(tools)
+	assert.NoError(t, err)
+}
+
+func TestCheckRequires_MissingTool(t *testing.T) {
+	err := checkRequires([]string{"echo", "nonexistent_tool_xyz_12345"})
+	require.Error(t, err)
+
+	var exitErr *WorkflowExitError
+	require.True(t, errors.As(err, &exitErr))
+	assert.Equal(t, ExitDependencyMissing, exitErr.Code)
+	assert.Contains(t, exitErr.Message, "nonexistent_tool_xyz_12345")
+}
+
+func TestCheckRequires_Empty(t *testing.T) {
+	err := checkRequires(nil)
+	assert.NoError(t, err)
 }
 
 func TestWorkflowRunCmd_RequiresArg(t *testing.T) {

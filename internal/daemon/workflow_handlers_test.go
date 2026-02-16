@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -600,8 +601,8 @@ func TestHandler_AnalyzeStepOutput_CustomPrompt(t *testing.T) {
 	if len(store.analyses) != 1 {
 		t.Fatalf("expected 1 analysis stored, got %d", len(store.analyses))
 	}
-	if store.analyses[0].Prompt != customPrompt {
-		t.Errorf("expected custom prompt to be stored, got %q", store.analyses[0].Prompt)
+	if !strings.Contains(store.analyses[0].Prompt, customPrompt) {
+		t.Errorf("expected stored prompt to contain custom instructions %q, got %q", customPrompt, store.analyses[0].Prompt)
 	}
 }
 

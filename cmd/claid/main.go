@@ -8,10 +8,18 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/runger/clai/internal/claude"
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/daemon"
 	"github.com/runger/clai/internal/storage"
 )
+
+// claudeLLM adapts claude.QueryWithContext to the daemon.LLMQuerier interface.
+type claudeLLM struct{}
+
+func (c *claudeLLM) Query(ctx context.Context, prompt string) (string, error) {
+	return claude.QueryFast(ctx, prompt)
+}
 
 func main() {
 	if err := run(); err != nil {
@@ -47,6 +55,7 @@ func run() error {
 		Store:  store,
 		Paths:  paths,
 		Logger: logger,
+		LLM:    &claudeLLM{},
 	}
 
 	// Run the daemon (blocks until shutdown)

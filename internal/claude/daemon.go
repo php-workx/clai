@@ -226,17 +226,19 @@ type claudeProcess struct {
 	mu      sync.Mutex
 }
 
-// startClaudeProcess starts the Claude CLI and waits for initialization
-func startClaudeProcess() (*claudeProcess, error) {
+// startClaudeProcess starts the Claude CLI and waits for initialization.
+// The context enables cancellation (e.g. Ctrl+C) of the child process.
+func startClaudeProcess(ctx context.Context) (*claudeProcess, error) {
 	fmt.Println("Starting Claude process...")
 
-	cmd := exec.Command("claude",
+	cmd := exec.CommandContext(ctx, "claude",
 		"--print",
 		"--verbose",
-		"--model", "haiku",
+		"--model", "sonnet",
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
 	)
+	cmd.Env = FilterEnv(os.Environ(), "CLAUDECODE")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -373,11 +375,12 @@ func handleDaemonConn(c net.Conn, claude *claudeProcess, activityMu *sync.Mutex,
 	json.NewEncoder(c).Encode(DaemonResponse{Result: result})
 }
 
-// RunDaemon runs the daemon server (called by "daemon run" command)
-func RunDaemon() error {
+// RunDaemon runs the daemon server (called by "daemon run" command).
+// The context enables cancellation of the child Claude process on shutdown.
+func RunDaemon(ctx context.Context) error {
 	os.Remove(socketPath())
 
-	claude, err := startClaudeProcess()
+	claude, err := startClaudeProcess(ctx)
 	if err != nil {
 		return err
 	}
@@ -408,11 +411,20 @@ func RunDaemon() error {
 		}
 	}()
 
+	// Close listener when context is cancelled so Accept() unblocks.
+	go func() {
+		<-ctx.Done()
+		listener.Close()
+	}()
+
 	fmt.Println("Daemon ready, accepting connections")
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			fmt.Printf("Accept error: %v\n", err)
 			return nil
 		}

@@ -156,11 +156,9 @@ func (s *Server) AnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutpu
 		return nil, fmt.Errorf("LLM querier not configured")
 	}
 
-	// Build the analysis prompt
-	prompt := req.AnalysisPrompt
-	if prompt == "" {
-		prompt = buildAnalysisPrompt(req)
-	}
+	// Always build the full prompt — AnalysisPrompt is custom instructions
+	// to include within the prompt, not a standalone prompt.
+	prompt := buildAnalysisPrompt(req)
 
 	// Call LLM with 120s timeout
 	llmCtx, cancel := context.WithTimeout(ctx, 120*time.Second)
@@ -242,17 +240,30 @@ func (s *Server) AnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutpu
 	}, nil
 }
 
-// buildAnalysisPrompt constructs a default analysis prompt from the request fields.
+// buildAnalysisPrompt constructs the full analysis prompt from the request fields.
 func buildAnalysisPrompt(req *pb.AnalyzeStepOutputRequest) string {
+	risk := req.RiskLevel
+	if risk == "" {
+		risk = "medium"
+	}
+
 	var b strings.Builder
-	b.WriteString("Analyze the following workflow step output and provide a decision.\n\n")
-	b.WriteString(fmt.Sprintf("Step: %s\n", req.StepName))
-	b.WriteString(fmt.Sprintf("Risk Level: %s\n", req.RiskLevel))
-	b.WriteString(fmt.Sprintf("Output:\n%s\n\n", req.ScrubbedOutput))
-	b.WriteString("Respond with a JSON object containing:\n")
-	b.WriteString(`- "decision": one of "proceed", "halt", "needs_human"` + "\n")
-	b.WriteString(`- "reasoning": brief explanation of your decision` + "\n")
-	b.WriteString(`- "flags": object of string keys/values (e.g. {"flaky_test":"true","timeout":"yes"})` + "\n")
+	b.WriteString("You are analyzing the output of a workflow step.\n\n")
+	fmt.Fprintf(&b, "Step: %s\n", req.StepName)
+	fmt.Fprintf(&b, "Risk level: %s\n\n", risk)
+
+	if req.AnalysisPrompt != "" {
+		fmt.Fprintf(&b, "Analysis instructions: %s\n\n", req.AnalysisPrompt)
+	}
+
+	b.WriteString("Output:\n```\n")
+	b.WriteString(req.ScrubbedOutput)
+	b.WriteString("\n```\n\n")
+
+	b.WriteString("Respond ONLY with a JSON object, no other text:\n")
+	b.WriteString(`{"decision": "proceed|halt|needs_human", "reasoning": "...", "flags": {}}` + "\n")
+	b.WriteString("Valid decisions: proceed (step looks good), halt (step has problems), needs_human (uncertain)\n")
+	b.WriteString("The reasoning field may contain multi-line text with markdown formatting (use \\n for newlines within the JSON string).\n")
 	return b.String()
 }
 

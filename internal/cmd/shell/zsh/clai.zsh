@@ -55,9 +55,16 @@ _CLAI_LAST_COMMAND=""
 # - Right-arrow to accept
 # - Alt+Right to accept next token
 
+# Load datetime module for EPOCHREALTIME (double-tap detection)
+zmodload -F zsh/datetime p:EPOCHREALTIME 2>/dev/null
+
 # Current suggestion state
 _AI_CURRENT_SUGGESTION=""
 _AI_IN_PASTE=false
+
+# Double-tap up-arrow detection
+_CLAI_DOUBLE_TAP_THRESHOLD=0.5
+_CLAI_LAST_UP_TIME=-1
 
 # Disable zsh-autosuggestions when clai is active
 _CLAI_ZSH_AUTOSUGGEST_PRESENT=false
@@ -154,18 +161,18 @@ _ai_expand_or_complete() {
 }
 zle -N expand-or-complete _ai_expand_or_complete
 
-# ZLE widget: History navigation should clear stale ghost text first.
+# ZLE widget: History navigation keeps ghost text (re-generated for new buffer).
 _ai_up_line_or_history() {
     _clai_dismiss_picker
-    _ai_clear_ghost_text
     zle .up-line-or-history
+    _ai_update_suggestion
 }
 zle -N up-line-or-history _ai_up_line_or_history
 
 _ai_down_line_or_history() {
     _clai_dismiss_picker
-    _ai_clear_ghost_text
     zle .down-line-or-history
+    _ai_update_suggestion
 }
 zle -N down-line-or-history _ai_down_line_or_history
 
@@ -699,9 +706,9 @@ _clai_picker_accept() {
 }
 
 _clai_picker_up() {
-    _ai_clear_ghost_text
     # Fast path: if picker is already open, navigate without external commands
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        _ai_clear_ghost_text
         local last_index=$((${#_CLAI_PICKER_ITEMS[@]} - 1))
         if [[ $_CLAI_PICKER_INDEX -lt $last_index ]]; then
             # Move up in the visual list (toward older items)
@@ -729,16 +736,35 @@ _clai_picker_up() {
         # At end and at top: do nothing (no more items)
         return
     fi
-    # Not in picker — try TUI picker first, then inline picker
+    # Not in picker — check for double-tap to open picker, else navigate history.
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
         _ai_up_line_or_history
         return
     fi
+
+    # Double-tap detection: open picker only if two Up presses within 0.5s.
+    # Guard: if EPOCHREALTIME is unavailable, skip double-tap and navigate history.
+    if [[ -z "$EPOCHREALTIME" ]]; then
+        _ai_up_line_or_history
+        return
+    fi
+    local now=$EPOCHREALTIME
+    local elapsed=$(( now - _CLAI_LAST_UP_TIME ))
+    _CLAI_LAST_UP_TIME=$now
+
+    if (( elapsed > _CLAI_DOUBLE_TAP_THRESHOLD )); then
+        # Single tap — navigate history, keep ghost text
+        _ai_up_line_or_history
+        return
+    fi
+
+    # Double-tap confirmed — open picker
     if [[ "$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$BUFFER" ]]; then
         _ai_up_line_or_history
         return
     fi
     if _clai_has_tui_picker; then
+        _ai_clear_ghost_text
         _clai_tui_picker_open
         return
     fi
@@ -746,6 +772,7 @@ _clai_picker_up() {
         _ai_up_line_or_history
         return
     fi
+    _ai_clear_ghost_text
     _clai_picker_open history
 }
 

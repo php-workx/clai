@@ -31,8 +31,9 @@ const (
 
 // Display renders workflow progress to the terminal.
 type Display struct {
-	writer io.Writer
-	mode   DisplayMode
+	writer     io.Writer
+	mode       DisplayMode
+	activeStep bool // TTY only: true when a step-start line awaits replacement
 }
 
 // StepSummary is a minimal step result for display purposes.
@@ -79,21 +80,30 @@ func (d *Display) RunStart(workflowName, runID string) {
 }
 
 // StepStart prints step start indicator.
+// In TTY mode the line is printed without a newline so that StepEnd can
+// replace it in-place with the final status.
 func (d *Display) StepStart(stepName string, matrixKey string) {
+	d.clearActiveLine()
 	label := formatStepLabel(stepName, matrixKey)
 	if d.mode == DisplayTTY {
-		fmt.Fprintf(d.writer, "%s Step: %s\n", iconRunning, label)
+		fmt.Fprintf(d.writer, "%s Step: %s", iconRunning, label)
+		d.activeStep = true
 	} else {
 		fmt.Fprintf(d.writer, "[step_start] %s\n", label)
 	}
 }
 
 // StepEnd prints step completion with status and duration.
+// In TTY mode, if a step-start line is active it is replaced in-place.
 func (d *Display) StepEnd(stepName string, matrixKey string, status string, duration time.Duration) {
 	label := formatStepLabel(stepName, matrixKey)
 	durStr := formatDuration(duration)
 
 	if d.mode == DisplayTTY {
+		if d.activeStep {
+			fmt.Fprint(d.writer, "\r\x1b[K")
+			d.activeStep = false
+		}
 		switch status {
 		case "passed":
 			fmt.Fprintf(d.writer, "%s Step: %s (%s)\n", iconPassed, label, durStr)
@@ -118,8 +128,41 @@ func (d *Display) StepEnd(stepName string, matrixKey string, status string, dura
 	}
 }
 
+// clearActiveLine finalizes any in-progress step-start line by emitting
+// a newline. This prevents garbled output if another display method is
+// called before StepEnd (which normally replaces the line).
+func (d *Display) clearActiveLine() {
+	if d.activeStep {
+		fmt.Fprint(d.writer, "\n")
+		d.activeStep = false
+	}
+}
+
+// StepError prints the error output of a failed step.
+func (d *Display) StepError(stderrTail, stdoutTail string) {
+	// Prefer stderr; fall back to stdout if stderr is empty.
+	output := strings.TrimSpace(stderrTail)
+	if output == "" {
+		output = strings.TrimSpace(stdoutTail)
+	}
+	if output == "" {
+		return
+	}
+
+	if d.mode == DisplayTTY {
+		for _, line := range strings.Split(output, "\n") {
+			fmt.Fprintf(d.writer, "  %s\n", line)
+		}
+	} else {
+		for _, line := range strings.Split(output, "\n") {
+			fmt.Fprintf(d.writer, "[step_error] %s\n", line)
+		}
+	}
+}
+
 // AnalysisStart prints analysis start indicator.
 func (d *Display) AnalysisStart(stepName string) {
+	d.clearActiveLine()
 	if d.mode == DisplayTTY {
 		fmt.Fprintf(d.writer, "%s Analyzing: %s\n", iconAnalyzing, stepName)
 	} else {
@@ -139,6 +182,7 @@ func (d *Display) AnalysisEnd(stepName string, decision string) {
 
 // ReviewPrompt prints that human review is needed.
 func (d *Display) ReviewPrompt(stepName string) {
+	d.clearActiveLine()
 	if d.mode == DisplayTTY {
 		fmt.Fprintf(d.writer, "%s Review needed: %s\n", iconPending, stepName)
 	} else {
@@ -148,6 +192,7 @@ func (d *Display) ReviewPrompt(stepName string) {
 
 // RunEnd prints the final run summary.
 func (d *Display) RunEnd(status string, totalDuration time.Duration, steps []StepSummary) {
+	d.clearActiveLine()
 	passed, failed, skipped, cancelled := countStatuses(steps)
 	durStr := formatDuration(totalDuration)
 	summary := formatSummary(passed, failed, skipped, cancelled)

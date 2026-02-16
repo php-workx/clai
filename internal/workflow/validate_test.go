@@ -56,6 +56,14 @@ func TestValidateWorkflow_JobNoSteps(t *testing.T) {
 	assertFieldError(t, errs, "jobs.empty.steps", "at least one step")
 }
 
+func TestValidateWorkflow_StepMissingName(t *testing.T) {
+	wf := validWorkflow()
+	wf.Jobs["build"].Steps[0].Name = ""
+	errs := ValidateWorkflow(wf)
+	require.NotEmpty(t, errs)
+	assertFieldError(t, errs, "jobs.build.steps[0].name", "required")
+}
+
 func TestValidateWorkflow_StepMissingRun(t *testing.T) {
 	wf := validWorkflow()
 	wf.Jobs["build"].Steps[0].Run = ""
@@ -135,6 +143,13 @@ func TestValidateWorkflow_ValidRiskLevels(t *testing.T) {
 			assert.Empty(t, errs)
 		})
 	}
+}
+
+func TestValidateWorkflow_RiskLevelWithExpression(t *testing.T) {
+	wf := validWorkflow()
+	wf.Jobs["build"].Steps[0].RiskLevel = "${{ matrix.risk }}"
+	errs := ValidateWorkflow(wf)
+	assert.Empty(t, errs, "expression in risk_level should pass validation")
 }
 
 func TestValidateWorkflow_AnalyzeMissingPrompt(t *testing.T) {

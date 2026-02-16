@@ -19,15 +19,33 @@ jobs:
 	wf, err := ParseWorkflow([]byte(yaml))
 	require.NoError(t, err)
 	assert.Equal(t, "minimal", wf.Name)
+	assert.Empty(t, wf.Description)
 	require.Contains(t, wf.Jobs, "build")
 	require.Len(t, wf.Jobs["build"].Steps, 1)
 	assert.Equal(t, "run build", wf.Jobs["build"].Steps[0].Name)
 	assert.Equal(t, "go build ./...", wf.Jobs["build"].Steps[0].Run)
 }
 
+func TestParseWorkflow_WithDescription(t *testing.T) {
+	yaml := `
+name: described
+description: A workflow that builds and tests the project
+jobs:
+  build:
+    steps:
+      - name: run build
+        run: go build ./...
+`
+	wf, err := ParseWorkflow([]byte(yaml))
+	require.NoError(t, err)
+	assert.Equal(t, "described", wf.Name)
+	assert.Equal(t, "A workflow that builds and tests the project", wf.Description)
+}
+
 func TestParseWorkflow_FullExample(t *testing.T) {
 	yaml := `
 name: pulumi-compliance
+description: Run Pulumi compliance checks across stacks
 env:
   PULUMI_CONFIG_PASSPHRASE: ""
 secrets:
@@ -71,6 +89,7 @@ jobs:
 	require.NoError(t, err)
 
 	assert.Equal(t, "pulumi-compliance", wf.Name)
+	assert.Equal(t, "Run Pulumi compliance checks across stacks", wf.Description)
 	assert.Equal(t, "", wf.Env["PULUMI_CONFIG_PASSPHRASE"])
 	require.Len(t, wf.Secrets, 2)
 	assert.Equal(t, "AWS_ACCESS_KEY_ID", wf.Secrets[0].Name)

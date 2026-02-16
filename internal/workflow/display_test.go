@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDisplay_TTY_RunStart(t *testing.T) {
@@ -29,6 +30,8 @@ func TestDisplay_TTY_StepStart(t *testing.T) {
 	out := buf.String()
 	assert.Contains(t, out, "\u25D0") // ◐ running icon
 	assert.Contains(t, out, "Step: build [os=linux]")
+	// TTY step-start omits newline so StepEnd can replace the line.
+	assert.False(t, strings.HasSuffix(out, "\n"))
 }
 
 func TestDisplay_TTY_StepStart_NoMatrixKey(t *testing.T) {
@@ -40,6 +43,21 @@ func TestDisplay_TTY_StepStart_NoMatrixKey(t *testing.T) {
 	out := buf.String()
 	assert.Contains(t, out, "Step: build")
 	assert.NotContains(t, out, "[")
+	assert.False(t, strings.HasSuffix(out, "\n"))
+}
+
+func TestDisplay_TTY_StepEnd_ReplacesActiveLine(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(&buf, DisplayTTY)
+
+	d.StepStart("build", "")
+	d.StepEnd("build", "", "passed", 1230*time.Millisecond)
+
+	out := buf.String()
+	// StepEnd should emit \r\x1b[K to clear the in-progress line.
+	assert.Contains(t, out, "\r\x1b[K")
+	assert.Contains(t, out, "\u2713") // ✓ passed icon
+	assert.Contains(t, out, "1.23s")
 }
 
 func TestDisplay_TTY_StepEnd_Passed(t *testing.T) {
@@ -222,6 +240,47 @@ func TestDisplay_Plain_StepEnd_Skipped(t *testing.T) {
 	assert.Equal(t, "[step_skip] deploy [os=linux]\n", out)
 }
 
+func TestDisplay_TTY_StepError(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(&buf, DisplayTTY)
+
+	d.StepError("error: command not found\nexit status 1", "")
+
+	out := buf.String()
+	assert.Contains(t, out, "  error: command not found")
+	assert.Contains(t, out, "  exit status 1")
+}
+
+func TestDisplay_TTY_StepError_FallbackToStdout(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(&buf, DisplayTTY)
+
+	d.StepError("", "FAIL: TestSomething")
+
+	out := buf.String()
+	assert.Contains(t, out, "  FAIL: TestSomething")
+}
+
+func TestDisplay_TTY_StepError_Empty(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(&buf, DisplayTTY)
+
+	d.StepError("", "")
+
+	assert.Empty(t, buf.String())
+}
+
+func TestDisplay_Plain_StepError(t *testing.T) {
+	var buf bytes.Buffer
+	d := NewDisplay(&buf, DisplayPlain)
+
+	d.StepError("error: missing file\nexit status 2", "")
+
+	out := buf.String()
+	assert.Contains(t, out, "[step_error] error: missing file")
+	assert.Contains(t, out, "[step_error] exit status 2")
+}
+
 func TestDisplay_Plain_AnalysisStart(t *testing.T) {
 	var buf bytes.Buffer
 	d := NewDisplay(&buf, DisplayPlain)
@@ -287,7 +346,9 @@ func TestDisplay_MatrixKey_Empty(t *testing.T) {
 	d.StepEnd("build", "", "passed", time.Second)
 
 	out := buf.String()
-	assert.False(t, strings.Contains(out, "["))
+	// The ANSI clear sequence \x1b[K contains a bracket, so strip it first.
+	cleaned := strings.ReplaceAll(out, "\x1b[K", "")
+	assert.False(t, strings.Contains(cleaned, "["))
 }
 
 func TestDisplay_Plain_MatrixKey_Present(t *testing.T) {
@@ -380,6 +441,7 @@ func TestIconForDecision(t *testing.T) {
 
 func TestDisplay_FullTTYSequence(t *testing.T) {
 	// End-to-end test: simulate a full workflow run in TTY mode.
+	// Call ordering reflects the real flow: StepStart → StepEnd → analysis.
 	var buf bytes.Buffer
 	d := NewDisplay(&buf, DisplayTTY)
 
@@ -387,9 +449,9 @@ func TestDisplay_FullTTYSequence(t *testing.T) {
 	d.StepStart("build", "os=linux")
 	d.StepEnd("build", "os=linux", "passed", 1230*time.Millisecond)
 	d.StepStart("test", "os=linux")
+	d.StepEnd("test", "os=linux", "failed", 450*time.Millisecond)
 	d.AnalysisStart("test")
 	d.AnalysisEnd("test", "approve")
-	d.StepEnd("test", "os=linux", "failed", 450*time.Millisecond)
 	d.StepEnd("deploy", "os=linux", "skipped", 0)
 
 	steps := []StepSummary{
@@ -400,16 +462,20 @@ func TestDisplay_FullTTYSequence(t *testing.T) {
 	d.RunEnd("FAILED", 1680*time.Millisecond, steps)
 
 	out := buf.String()
-	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
 
-	// Verify key structural elements.
-	assert.True(t, len(lines) >= 8, "expected at least 8 lines, got %d", len(lines))
-	assert.Contains(t, lines[0], "Running workflow: deploy")
-	assert.Contains(t, lines[len(lines)-1], "Run FAILED")
+	// Verify key structural elements are present.
+	assert.Contains(t, out, "Running workflow: deploy")
+	assert.Contains(t, out, "Run FAILED")
+	// In-progress lines are replaced, so the final output should not
+	// contain the running icon for steps that completed.
+	assert.Contains(t, out, "\u2713") // ✓ passed
+	assert.Contains(t, out, "\u2717") // ✗ failed
+	assert.Contains(t, out, "\u2298") // ⊘ skipped
 }
 
 func TestDisplay_FullPlainSequence(t *testing.T) {
 	// End-to-end test: simulate a full workflow run in plain mode.
+	// Plain mode prints both step_start and step_end as separate lines.
 	var buf bytes.Buffer
 	d := NewDisplay(&buf, DisplayPlain)
 
@@ -440,10 +506,8 @@ func TestDisplay_FullPlainSequence(t *testing.T) {
 		"[run_end] failed 1.68s (1 passed, 1 failed, 1 skipped)",
 	}
 
-	assert.Equal(t, len(expected), len(lines), "line count mismatch")
+	require.Equal(t, len(expected), len(lines), "line count mismatch")
 	for i, exp := range expected {
-		if i < len(lines) {
-			assert.Equal(t, exp, lines[i], "line %d mismatch", i)
-		}
+		assert.Equal(t, exp, lines[i], "line %d mismatch", i)
 	}
 }

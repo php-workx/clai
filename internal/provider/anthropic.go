@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/runger/clai/internal/claude"
 	"github.com/runger/clai/internal/sanitize"
 )
 
@@ -134,19 +136,22 @@ func (p *AnthropicProvider) Diagnose(ctx context.Context, req *DiagnoseRequest) 
 	}, nil
 }
 
-// query sends a prompt to Claude CLI
+// query sends a prompt to Claude CLI, using the daemon when no custom model is set.
 func (p *AnthropicProvider) query(ctx context.Context, prompt string) (string, error) {
 	// Apply timeout
 	ctx, cancel := context.WithTimeout(ctx, DefaultTimeout)
 	defer cancel()
 
-	// Build command arguments
-	args := []string{"--print"}
-	if p.model != "" {
-		args = append(args, "--model", p.model)
+	// When using the default model, route through the daemon for speed
+	if p.model == "" {
+		return claude.QueryFast(ctx, prompt)
 	}
 
+	// Custom model requested — must use direct CLI to pass --model flag
+	args := []string{"--print", "--model", p.model}
+
 	cmd := exec.CommandContext(ctx, p.cliPath, args...) //nolint:gosec // G204: cliPath is Claude CLI binary
+	cmd.Env = claude.FilterEnv(os.Environ(), "CLAUDECODE")
 	cmd.Stdin = strings.NewReader(prompt)
 
 	var stdout, stderr bytes.Buffer
