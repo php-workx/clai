@@ -62,11 +62,12 @@ const (
 
 // WorkflowDef is the top-level workflow file.
 type WorkflowDef struct {
-	Name     string             `yaml:"name"`
-	Env      map[string]string  `yaml:"env,omitempty"`
-	Secrets  []SecretDef        `yaml:"secrets,omitempty"`
-	Requires []string           `yaml:"requires,omitempty"`
-	Jobs     map[string]*JobDef `yaml:"jobs"`
+	Name        string             `yaml:"name"`
+	Description string             `yaml:"description,omitempty"`
+	Env         map[string]string  `yaml:"env,omitempty"`
+	Secrets     []SecretDef        `yaml:"secrets,omitempty"`
+	Requires    []string           `yaml:"requires,omitempty"`
+	Jobs        map[string]*JobDef `yaml:"jobs"`
 }
 
 // SecretDef defines a secret to be loaded before execution.

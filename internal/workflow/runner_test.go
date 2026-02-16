@@ -419,12 +419,12 @@ func TestRunner_OutputParseErrorIsNonFatal(t *testing.T) {
 }
 
 func TestMergeEnv(t *testing.T) {
-	workflow := map[string]string{"A": "w", "B": "w"}
+	wf := map[string]string{"A": "w", "B": "w"}
 	job := map[string]string{"B": "j", "C": "j"}
 	step := map[string]string{"C": "s", "D": "s"}
 	matrix := map[string]string{"M": "m1"}
 
-	env := mergeEnv(nil, workflow, job, step, matrix)
+	env := mergeEnv(nil, wf, job, step, matrix, nil)
 
 	// Convert to map for easier assertions.
 	envMap := make(map[string]string)
@@ -444,6 +444,26 @@ func TestMergeEnv(t *testing.T) {
 
 	// OS env should also be present.
 	assert.NotEmpty(t, envMap["PATH"]) // PATH should come from os.Environ
+}
+
+func TestMergeEnv_VarOverridesWin(t *testing.T) {
+	wf := map[string]string{"A": "workflow"}
+	job := map[string]string{"A": "job"}
+	step := map[string]string{"A": "step"}
+	matrix := map[string]string{"A": "matrix"}
+	varOverrides := map[string]string{"A": "cli-var"}
+
+	env := mergeEnv(nil, wf, job, step, matrix, varOverrides)
+
+	envMap := make(map[string]string)
+	for _, kv := range env {
+		idx := strings.IndexByte(kv, '=')
+		if idx >= 0 {
+			envMap[kv[:idx]] = kv[idx+1:]
+		}
+	}
+
+	assert.Equal(t, "cli-var", envMap["A"], "--var should override all other layers")
 }
 
 func TestExitCodeFromError(t *testing.T) {
@@ -479,6 +499,174 @@ func TestRunner_BufferSizeConfig(t *testing.T) {
 	require.Len(t, result.Steps, 1)
 	// The buffer should only retain the last 10 bytes (including the newline from echo).
 	assert.LessOrEqual(t, len(result.Steps[0].StdoutTail), 10)
+}
+
+func TestRunner_StepCallback(t *testing.T) {
+	skipOnWindows(t)
+
+	type callbackEvent struct {
+		event  StepEvent
+		stepID string
+		result *StepResult
+	}
+
+	var events []callbackEvent
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		OnStep: func(event StepEvent, stepDef *StepDef, result *StepResult) error {
+			events = append(events, callbackEvent{
+				event:  event,
+				stepID: stepDef.ID,
+				result: result,
+			})
+			return nil
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("step1", "Step 1", "echo one"),
+		shellStep("step2", "Step 2", "echo two"),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "passed", result.Status)
+	require.Len(t, events, 4) // 2 steps × (start + end)
+
+	// Step 1 start.
+	assert.Equal(t, StepEventStart, events[0].event)
+	assert.Equal(t, "step1", events[0].stepID)
+	assert.Nil(t, events[0].result)
+
+	// Step 1 end.
+	assert.Equal(t, StepEventEnd, events[1].event)
+	assert.Equal(t, "step1", events[1].stepID)
+	require.NotNil(t, events[1].result)
+	assert.Equal(t, "passed", events[1].result.Status)
+
+	// Step 2 start.
+	assert.Equal(t, StepEventStart, events[2].event)
+	assert.Equal(t, "step2", events[2].stepID)
+
+	// Step 2 end.
+	assert.Equal(t, StepEventEnd, events[3].event)
+	assert.Equal(t, "step2", events[3].stepID)
+	require.NotNil(t, events[3].result)
+	assert.Equal(t, "passed", events[3].result.Status)
+}
+
+func TestRunner_StepCallback_SkippedStepsNoCallback(t *testing.T) {
+	skipOnWindows(t)
+
+	var callbackStepIDs []string
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		OnStep: func(event StepEvent, stepDef *StepDef, _ *StepResult) error {
+			callbackStepIDs = append(callbackStepIDs, fmt.Sprintf("%s:%d", stepDef.ID, event))
+			return nil
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("step1", "Fails", "exit 1"),
+		shellStep("step2", "Skipped", "echo never"),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "failed", result.Status)
+	// Only step1 should get callbacks (start + end). Step2 is skipped, no callbacks.
+	assert.Equal(t, []string{"step1:0", "step1:1"}, callbackStepIDs)
+}
+
+func TestRunner_RiskLevelExpressionResolution(t *testing.T) {
+	skipOnWindows(t)
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		MatrixVars: map[string]string{
+			"risk": "high",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		{
+			ID:             "step1",
+			Name:           "Check ${{ matrix.risk }}",
+			Run:            "echo ok",
+			Shell:          "true",
+			RiskLevel:      "${{ matrix.risk }}",
+			AnalysisPrompt: "Check ${{ matrix.risk }} environment",
+		},
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "passed", result.Status)
+	require.Len(t, result.Steps, 1)
+	assert.Equal(t, "high", result.Steps[0].RiskLevel)
+	assert.Equal(t, "Check high environment", result.Steps[0].AnalysisPrompt)
+}
+
+func TestRunner_StepCallback_ErrorHaltsExecution(t *testing.T) {
+	skipOnWindows(t)
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		OnStep: func(event StepEvent, stepDef *StepDef, _ *StepResult) error {
+			if event == StepEventEnd && stepDef.ID == "step1" {
+				return fmt.Errorf("analysis rejected step1")
+			}
+			return nil
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("step1", "Step 1", "echo one"),
+		shellStep("step2", "Step 2", "echo two"),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "failed", result.Status)
+	assert.Contains(t, result.Error.Error(), "analysis rejected step1")
+	require.Len(t, result.Steps, 2)
+	assert.Equal(t, "passed", result.Steps[0].Status)
+	assert.Equal(t, "skipped", result.Steps[1].Status)
+}
+
+func TestRunner_VarOverridesMatrix(t *testing.T) {
+	skipOnWindows(t)
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		Env:     map[string]string{"VAR": "workflow"},
+		JobEnv:  map[string]string{"VAR": "job"},
+		MatrixVars: map[string]string{
+			"VAR": "matrix",
+		},
+		VarOverrides: map[string]string{
+			"VAR": "cli-override",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("step1", "Check var precedence", "echo $VAR"),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "passed", result.Status)
+	require.Len(t, result.Steps, 1)
+	assert.Contains(t, result.Steps[0].StdoutTail, "cli-override",
+		"--var should override matrix, job, and workflow env")
 }
 
 func TestRunner_WorkDir(t *testing.T) {

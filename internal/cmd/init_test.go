@@ -482,13 +482,23 @@ func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
 	}
 	script := string(content)
 
-	for _, fn := range []string{"_ai_expand_or_complete", "_ai_up_line_or_history", "_ai_down_line_or_history"} {
+	// Tab completion should clear ghost text before delegating.
+	tabBody := extractFunctionBody(script, "_ai_expand_or_complete")
+	if tabBody == "" {
+		t.Fatal("_ai_expand_or_complete() not found")
+	}
+	if !strings.Contains(tabBody, "_ai_clear_ghost_text") {
+		t.Error("_ai_expand_or_complete() should call _ai_clear_ghost_text before delegating")
+	}
+
+	// History navigation should re-generate ghost text (not clear it).
+	for _, fn := range []string{"_ai_up_line_or_history", "_ai_down_line_or_history"} {
 		body := extractFunctionBody(script, fn)
 		if body == "" {
 			t.Fatalf("%s() not found", fn)
 		}
-		if !strings.Contains(body, "_ai_clear_ghost_text") {
-			t.Errorf("%s() should call _ai_clear_ghost_text before delegating", fn)
+		if !strings.Contains(body, "_ai_update_suggestion") {
+			t.Errorf("%s() should call _ai_update_suggestion to keep ghost text", fn)
 		}
 	}
 
@@ -765,6 +775,51 @@ func TestZshScript_PickerRenderAndPaging(t *testing.T) {
 	}
 	if !strings.Contains(upBody, "_CLAI_PICKER_AT_END") {
 		t.Error("_clai_picker_up should check _CLAI_PICKER_AT_END before paging")
+	}
+}
+
+// TestZshScript_PickerUpDoubleTapDetection verifies that _clai_picker_up
+// uses EPOCHREALTIME-based double-tap detection before opening the picker.
+func TestZshScript_PickerUpDoubleTapDetection(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	// EPOCHREALTIME module must be loaded
+	if !strings.Contains(script, "zmodload") || !strings.Contains(script, "EPOCHREALTIME") {
+		t.Error("script should load zsh/datetime for EPOCHREALTIME")
+	}
+
+	// Double-tap state variable must be initialized
+	if !strings.Contains(script, "_CLAI_LAST_UP_TIME=-1") {
+		t.Error("script should initialize _CLAI_LAST_UP_TIME=-1")
+	}
+
+	upBody := extractFunctionBody(script, "_clai_picker_up")
+	if upBody == "" {
+		t.Fatal("_clai_picker_up() not found")
+	}
+
+	// Must reference EPOCHREALTIME for timing
+	if !strings.Contains(upBody, "EPOCHREALTIME") {
+		t.Error("_clai_picker_up should use EPOCHREALTIME for double-tap detection")
+	}
+
+	// Must have a threshold comparison
+	if !strings.Contains(upBody, "_CLAI_LAST_UP_TIME") {
+		t.Error("_clai_picker_up should track _CLAI_LAST_UP_TIME")
+	}
+
+	// Single tap should fall through to history navigation, not open picker
+	if !strings.Contains(upBody, "_ai_up_line_or_history") {
+		t.Error("_clai_picker_up should call _ai_up_line_or_history on single tap")
+	}
+
+	// Guard: must skip double-tap when EPOCHREALTIME is unavailable
+	if !strings.Contains(upBody, `-z "$EPOCHREALTIME"`) {
+		t.Error("_clai_picker_up should guard against missing EPOCHREALTIME")
 	}
 }
 

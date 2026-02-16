@@ -35,7 +35,7 @@ const (
 	ExitNeedsHuman        = 5
 	ExitDaemonUnavailable = 6 //nolint:unused // reserved for future use
 	ExitPolicyHalt        = 7 //nolint:unused // reserved for future use
-	ExitDependencyMissing = 8 //nolint:unused // reserved for future use
+	ExitDependencyMissing = 8
 	ExitTimeout           = 124
 )
 
@@ -52,22 +52,25 @@ func (e *WorkflowExitError) Error() string {
 
 var workflowCmd = &cobra.Command{
 	Use:     "workflow",
+	Aliases: []string{"w"},
 	Short:   "Run and validate workflow files",
 	GroupID: groupCore,
 }
 
 var workflowRunCmd = &cobra.Command{
-	Use:   "run <path>",
-	Short: "Execute a workflow file",
-	Args:  cobra.ExactArgs(1),
-	RunE:  runWorkflow,
+	Use:          "run <path>",
+	Short:        "Execute a workflow file",
+	Args:         cobra.ExactArgs(1),
+	RunE:         runWorkflow,
+	SilenceUsage: true,
 }
 
 var workflowValidateCmd = &cobra.Command{
-	Use:   "validate <path>",
-	Short: "Validate a workflow file without executing",
-	Args:  cobra.ExactArgs(1),
-	RunE:  validateWorkflow,
+	Use:          "validate <path>",
+	Short:        "Validate a workflow file without executing",
+	Args:         cobra.ExactArgs(1),
+	RunE:         validateWorkflow,
+	SilenceUsage: true,
 }
 
 func init() {
@@ -93,12 +96,18 @@ type workflowRunContext struct {
 	transport      *workflow.AnalysisTransport
 	handler        workflow.InteractionHandler
 	noDaemon       bool
+	humanRejected  bool // set by step callback when analysis leads to rejection
 }
 
 func runWorkflow(cmd *cobra.Command, args []string) error {
 	// Phase 1: Parse and validate.
 	def, data, err := loadWorkflow(args[0])
 	if err != nil {
+		return err
+	}
+
+	// Phase 1b: Check required external tools.
+	if err := checkRequires(def.Requires); err != nil {
 		return err
 	}
 
@@ -221,10 +230,9 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 		return &jobExecutionResult{overallStatus: string(workflow.RunFailed), validationErr: true}
 	}
 
-	// Parse --var flags into env overrides.
+	// Parse --var flags into env overrides (highest precedence).
 	vars, _ := cmd.Flags().GetStringSlice("var")
 	varEnv := parseVarFlags(vars)
-	workflowEnv := mergeMaps(def.Env, varEnv)
 
 	matrixCombinations := expandMatrix(job)
 
@@ -234,22 +242,26 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 	}
 
 	for _, matrixVars := range matrixCombinations {
-		cfg := workflow.RunnerConfig{
-			WorkDir:    rc.workDir,
-			Env:        workflowEnv,
-			JobEnv:     job.Env,
-			MatrixVars: matrixVars,
-			Secrets:    def.Secrets,
-		}
-
-		runner := workflow.NewRunner(cfg)
-		runResult := runner.Run(rc.ctx, job.Steps)
 		matrixKey := matrixKeyString(matrixVars)
 
-		rejected := rc.processStepResults(rc.ctx, runResult.Steps, job.Steps, matrixKey)
+		cfg := workflow.RunnerConfig{
+			WorkDir:      rc.workDir,
+			Env:          def.Env,
+			JobEnv:       job.Env,
+			MatrixVars:   matrixVars,
+			VarOverrides: varEnv,
+			Secrets:      def.Secrets,
+			OnStep:       rc.makeStepCallback(matrixKey),
+		}
+
+		rc.humanRejected = false // reset per matrix combination
+		runner := workflow.NewRunner(cfg)
+		runResult := runner.Run(rc.ctx, job.Steps)
+
+		rc.processSkippedSteps(runResult.Steps, matrixKey)
 		result.allStepResults = append(result.allStepResults, runResult.Steps...)
 
-		if rejected {
+		if rc.humanRejected {
 			result.overallStatus = string(workflow.RunFailed)
 			result.humanRejected = true
 			break
@@ -257,6 +269,10 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 
 		if runResult.Status == string(workflow.RunFailed) {
 			result.overallStatus = string(workflow.RunFailed)
+			// fail_fast: stop on first failure (default true when nil).
+			if job.Strategy == nil || job.Strategy.FailFast == nil || *job.Strategy.FailFast {
+				break
+			}
 		}
 		if runResult.Status == string(workflow.RunCancelled) {
 			result.overallStatus = string(workflow.RunCancelled)
@@ -269,11 +285,15 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 	return result
 }
 
-// processStepResults handles display, artifact, daemon, and analysis for each step.
-// Returns true if a human rejected the step (workflow should stop).
-func (rc *workflowRunContext) processStepResults(ctx context.Context, results []*workflow.StepResult, stepDefs []*workflow.StepDef, matrixKey string) bool {
+// processSkippedSteps displays and records skipped steps.
+// Executed steps are handled by the StepCallback in real time;
+// skipped steps don't fire callbacks, so they are handled here.
+func (rc *workflowRunContext) processSkippedSteps(results []*workflow.StepResult, matrixKey string) {
 	for _, sr := range results {
-		rc.display.StepEnd(sr.Name, matrixKey, sr.Status, time.Duration(sr.DurationMs)*time.Millisecond)
+		if sr.Status != string(workflow.StepSkipped) {
+			continue
+		}
+		rc.display.StepEnd(sr.Name, matrixKey, sr.Status, 0)
 
 		if rc.artifact != nil {
 			rc.artifact.WriteEvent(workflow.EventStepEnd, &workflow.StepEndData{
@@ -283,27 +303,25 @@ func (rc *workflowRunContext) processStepResults(ctx context.Context, results []
 		}
 
 		if !rc.noDaemon {
-			notifyDaemonStepUpdate(ctx, rc.runID, sr, matrixKey)
-		}
-
-		if sr.Status != string(workflow.StepSkipped) && sr.Status != string(workflow.StepCancelled) {
-			step := findStepDef(stepDefs, sr.StepID)
-			if step != nil && step.Analyze {
-				if rc.handleAnalysis(ctx, sr, step, matrixKey) {
-					return true // human rejected
-				}
-			}
+			notifyDaemonStepUpdate(rc.ctx, rc.runID, sr, matrixKey)
 		}
 	}
-	return false
 }
 
 // handleAnalysis runs LLM analysis and prompts for human review if needed.
 // Returns true if the human rejected the step.
-func (rc *workflowRunContext) handleAnalysis(ctx context.Context, sr *workflow.StepResult, step *workflow.StepDef, matrixKey string) bool {
-	analysisResult := analyzeStep(ctx, rc.transport, rc.runID, sr, step, matrixKey)
+func (rc *workflowRunContext) handleAnalysis(ctx context.Context, sr *workflow.StepResult, matrixKey string) bool {
+	rc.display.AnalysisStart(sr.Name)
+	analysisResult := analyzeStep(ctx, rc.transport, rc.runID, sr, matrixKey)
 
-	if analysisResult != nil && workflow.ShouldPromptHuman(analysisResult.Decision, step.RiskLevel) {
+	if analysisResult == nil {
+		rc.display.AnalysisEnd(sr.Name, string(workflow.DecisionNeedsHuman))
+		return false
+	}
+
+	rc.display.AnalysisEnd(sr.Name, analysisResult.Decision)
+
+	if workflow.ShouldPromptHuman(analysisResult.Decision, sr.RiskLevel) {
 		for {
 			decision, reviewErr := rc.handler.PromptReview(ctx, sr.Name, analysisResult, sr.StdoutTail)
 			if reviewErr != nil {
@@ -330,7 +348,7 @@ func (rc *workflowRunContext) handleAnalysis(ctx context.Context, sr *workflow.S
 				if strings.TrimSpace(decision.Input) == "" {
 					continue
 				}
-				followUp := analyzeStepWithQuestion(ctx, rc.transport, rc.runID, sr, step, matrixKey, decision.Input)
+				followUp := analyzeStepWithQuestion(ctx, rc.transport, rc.runID, sr, matrixKey, decision.Input)
 				if followUp != nil {
 					analysisResult = followUp
 				}
@@ -347,10 +365,9 @@ func analyzeStepWithQuestion(
 	transport *workflow.AnalysisTransport,
 	runID string,
 	sr *workflow.StepResult,
-	step *workflow.StepDef,
 	matrixKey, question string,
 ) *workflow.AnalysisResult {
-	prompt := strings.TrimSpace(step.AnalysisPrompt)
+	prompt := strings.TrimSpace(sr.AnalysisPrompt)
 	if prompt == "" {
 		prompt = "Analyze the workflow step output."
 	}
@@ -361,7 +378,7 @@ func analyzeStepWithQuestion(
 		StepID:         sr.StepID,
 		StepName:       sr.Name,
 		MatrixKey:      matrixKey,
-		RiskLevel:      step.RiskLevel,
+		RiskLevel:      sr.RiskLevel,
 		StdoutTail:     sr.StdoutTail,
 		StderrTail:     sr.StderrTail,
 		AnalysisPrompt: prompt,
@@ -485,6 +502,9 @@ func validateWorkflow(_ *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("  \u2713 %s is valid (%d jobs, %d total steps)\n", def.Name, len(def.Jobs), countSteps(def))
+	if def.Description != "" {
+		fmt.Printf("  %s\n", def.Description)
+	}
 	return nil
 }
 
@@ -505,6 +525,23 @@ func readWorkflowBytes(path string) ([]byte, error) {
 }
 
 // --- Helper functions ---
+
+// checkRequires verifies that all required external tools are available on $PATH.
+func checkRequires(requires []string) error {
+	var missing []string
+	for _, tool := range requires {
+		if _, err := exec.LookPath(tool); err != nil {
+			missing = append(missing, tool)
+		}
+	}
+	if len(missing) > 0 {
+		return &WorkflowExitError{
+			Code:    ExitDependencyMissing,
+			Message: fmt.Sprintf("required tools not found on $PATH: %s", strings.Join(missing, ", ")),
+		}
+	}
+	return nil
+}
 
 func generateRunID() string {
 	return fmt.Sprintf("run-%d", time.Now().UnixNano())
@@ -579,6 +616,50 @@ func mergeMaps(base, override map[string]string) map[string]string {
 	return result
 }
 
+// makeStepCallback returns a StepCallback that handles all per-step
+// processing: display, artifacts, daemon notifications, and analysis.
+// Analysis happens between steps so it can gate subsequent execution.
+// Returning an error from StepEventEnd halts the runner.
+func (rc *workflowRunContext) makeStepCallback(matrixKey string) workflow.StepCallback {
+	return func(event workflow.StepEvent, stepDef *workflow.StepDef, result *workflow.StepResult) error {
+		if event == workflow.StepEventStart {
+			rc.display.StepStart(stepDef.Name, matrixKey)
+			return nil
+		}
+
+		// StepEventEnd: display, artifacts, daemon, analysis.
+		rc.display.StepEnd(result.Name, matrixKey, result.Status,
+			time.Duration(result.DurationMs)*time.Millisecond)
+		if result.Status == string(workflow.StepFailed) {
+			rc.display.StepError(result.StderrTail, result.StdoutTail)
+		}
+
+		if rc.artifact != nil {
+			rc.artifact.WriteEvent(workflow.EventStepEnd, &workflow.StepEndData{
+				RunID: rc.runID, StepID: result.StepID, MatrixKey: matrixKey,
+				Status: result.Status, ExitCode: result.ExitCode, DurationMs: result.DurationMs,
+			})
+		}
+
+		if !rc.noDaemon {
+			notifyDaemonStepUpdate(rc.ctx, rc.runID, result, matrixKey)
+		}
+
+		// Analysis gate: if step has analyze: true, run LLM analysis now
+		// (between steps) so it can halt execution before the next step.
+		if stepDef.Analyze &&
+			result.Status != string(workflow.StepSkipped) &&
+			result.Status != string(workflow.StepCancelled) {
+			if rc.handleAnalysis(rc.ctx, result, matrixKey) {
+				rc.humanRejected = true
+				return fmt.Errorf("step %q rejected during analysis", result.Name)
+			}
+		}
+
+		return nil
+	}
+}
+
 func findStepDef(steps []*workflow.StepDef, stepID string) *workflow.StepDef {
 	for _, s := range steps {
 		if s.ID == stepID {
@@ -593,7 +674,6 @@ func analyzeStep(
 	transport *workflow.AnalysisTransport,
 	runID string,
 	sr *workflow.StepResult,
-	step *workflow.StepDef,
 	matrixKey string,
 ) *workflow.AnalysisResult {
 	result, err := transport.Analyze(ctx, &workflow.AnalysisRequest{
@@ -601,10 +681,10 @@ func analyzeStep(
 		StepID:         sr.StepID,
 		StepName:       sr.Name,
 		MatrixKey:      matrixKey,
-		RiskLevel:      step.RiskLevel,
+		RiskLevel:      sr.RiskLevel,
 		StdoutTail:     sr.StdoutTail,
 		StderrTail:     sr.StderrTail,
-		AnalysisPrompt: step.AnalysisPrompt,
+		AnalysisPrompt: sr.AnalysisPrompt,
 	})
 	if err != nil {
 		slog.Warn("analysis failed", "step", sr.Name, "error", err)

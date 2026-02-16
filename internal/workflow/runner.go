@@ -16,17 +16,19 @@ const DefaultBufferSize = 4096
 
 // StepResult holds the outcome of a single step execution.
 type StepResult struct {
-	StepID      string
-	Name        string
-	Status      string // "passed", "failed", "skipped", "cancelled"
-	Command     string
-	ResolvedEnv []string
-	ExitCode    int
-	DurationMs  int64
-	StdoutTail  string
-	StderrTail  string
-	Outputs     map[string]string // from $CLAI_OUTPUT file
-	Error       error
+	StepID         string
+	Name           string
+	Status         string // "passed", "failed", "skipped", "cancelled"
+	Command        string
+	ResolvedEnv    []string
+	ExitCode       int
+	DurationMs     int64
+	StdoutTail     string
+	StderrTail     string
+	Outputs        map[string]string // from $CLAI_OUTPUT file
+	Error          error
+	RiskLevel      string // resolved from StepDef.RiskLevel after expression substitution
+	AnalysisPrompt string // resolved from StepDef.AnalysisPrompt after expression substitution
 }
 
 // RunResult holds the outcome of a complete job run.
@@ -37,14 +39,34 @@ type RunResult struct {
 	Error      error
 }
 
+// StepCallback is called by the runner before and after each step.
+// The StepResult is nil on start and populated on end.
+// Returning a non-nil error from StepEventEnd halts execution of subsequent steps.
+type StepCallback func(event StepEvent, stepDef *StepDef, result *StepResult) error
+
+// StepEvent indicates whether a callback is for step start or end.
+type StepEvent int
+
+const (
+	// StepEventStart is emitted before a step begins execution.
+	StepEventStart StepEvent = iota
+	// StepEventEnd is emitted after a step completes.
+	StepEventEnd
+)
+
 // RunnerConfig configures the runner.
 type RunnerConfig struct {
-	WorkDir    string
-	Env        map[string]string // workflow-level env
-	JobEnv     map[string]string // job-level env
-	MatrixVars map[string]string // matrix combination
-	Secrets    []SecretDef
-	BufferSize int // 0 = DefaultBufferSize
+	WorkDir      string
+	Env          map[string]string // workflow-level env
+	JobEnv       map[string]string // job-level env
+	MatrixVars   map[string]string // matrix combination
+	VarOverrides map[string]string // --var CLI flags (highest precedence)
+	Secrets      []SecretDef
+	BufferSize   int // 0 = DefaultBufferSize
+
+	// OnStep is called before and after each step for live progress.
+	// Optional — if nil, no callbacks are made.
+	OnStep StepCallback
 
 	// Optional DI overrides. If nil, platform defaults are used.
 	Shell   ShellAdapter      // custom shell adapter
@@ -130,8 +152,20 @@ func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
 			continue
 		}
 
+		if r.config.OnStep != nil {
+			_ = r.config.OnStep(StepEventStart, step, nil)
+		}
+
 		stepResult := r.executeStep(ctx, step, stepOutputs, stepOutputEnv)
 		result.Steps = append(result.Steps, stepResult)
+
+		if r.config.OnStep != nil {
+			if cbErr := r.config.OnStep(StepEventEnd, step, stepResult); cbErr != nil {
+				failed = true
+				result.Status = string(RunFailed)
+				result.Error = cbErr
+			}
+		}
 
 		// Store outputs for expression resolution in subsequent steps.
 		if step.ID != "" && len(stepResult.Outputs) > 0 {
@@ -219,13 +253,33 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 		sr.Name = resolvedName
 	}
 
+	// Resolve expressions in risk_level (e.g. "${{ matrix.risk }}").
+	if step.RiskLevel != "" {
+		resolvedRL, rlErr := ResolveExpressions(step.RiskLevel, exprCtx)
+		if rlErr == nil {
+			sr.RiskLevel = resolvedRL
+		} else {
+			sr.RiskLevel = step.RiskLevel
+		}
+	}
+
+	// Resolve expressions in analysis_prompt.
+	if step.AnalysisPrompt != "" {
+		resolvedAP, apErr := ResolveExpressions(step.AnalysisPrompt, exprCtx)
+		if apErr == nil {
+			sr.AnalysisPrompt = resolvedAP
+		} else {
+			sr.AnalysisPrompt = step.AnalysisPrompt
+		}
+	}
+
 	// Create a modified step with the resolved command.
 	resolvedStep := *step
 	resolvedStep.Run = resolvedRun
 	sr.Command = resolvedRun
 
-	// Merge environment: OS -> output exports -> workflow -> job -> step -> matrix.
-	env := mergeEnv(stepOutputEnv, r.config.Env, r.config.JobEnv, resolvedStepEnv, r.config.MatrixVars)
+	// Merge environment: OS -> output exports -> workflow -> job -> step -> matrix -> --var overrides.
+	env := mergeEnv(stepOutputEnv, r.config.Env, r.config.JobEnv, resolvedStepEnv, r.config.MatrixVars, r.config.VarOverrides)
 	sr.ResolvedEnv = append([]string(nil), env...)
 
 	// Build command via ShellAdapter.
@@ -316,14 +370,18 @@ func (r *Runner) buildExprEnv(step *StepDef, outputEnv map[string]string) map[st
 	for k, v := range r.config.MatrixVars {
 		env[k] = v
 	}
+	// --var CLI overrides (highest precedence).
+	for k, v := range r.config.VarOverrides {
+		env[k] = v
+	}
 
 	return env
 }
 
 // mergeEnv merges environment variables with proper precedence:
-// OS env < output exports < workflow < job < step. Matrix vars are also included.
+// OS env < output exports < workflow < job < step < matrix < --var overrides.
 // Returns a []string in "KEY=value" format suitable for exec.Cmd.Env.
-func mergeEnv(outputs, workflow, job, step map[string]string, matrix map[string]string) []string {
+func mergeEnv(outputs, workflow, job, step, matrix, varOverrides map[string]string) []string {
 	merged := make(map[string]string)
 
 	// Start with OS environment.
@@ -352,6 +410,10 @@ func mergeEnv(outputs, workflow, job, step map[string]string, matrix map[string]
 	}
 	// Add matrix vars as environment variables.
 	for k, v := range matrix {
+		merged[k] = v
+	}
+	// --var CLI overrides (highest precedence).
+	for k, v := range varOverrides {
 		merged[k] = v
 	}
 
