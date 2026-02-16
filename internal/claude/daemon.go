@@ -411,11 +411,20 @@ func RunDaemon(ctx context.Context) error {
 		}
 	}()
 
+	// Close listener when context is cancelled so Accept() unblocks.
+	go func() {
+		<-ctx.Done()
+		listener.Close()
+	}()
+
 	fmt.Println("Daemon ready, accepting connections")
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			fmt.Printf("Accept error: %v\n", err)
 			return nil
 		}

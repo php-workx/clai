@@ -327,7 +327,7 @@ Multi-line commands use YAML literal block scalars (`|`):
 
 ### `steps[*].env`
 
-**Optional.** Step-level environment variables. Highest user-defined precedence (overrides workflow and job env). Expression values are supported.
+**Optional.** Step-level environment variables. Overrides workflow and job env, but is overridden by matrix variables and `--var` CLI flags. Expression values are supported.
 
 | | |
 |---|---|
