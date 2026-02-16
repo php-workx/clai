@@ -540,8 +540,8 @@ func TestZshScript_PickerUpDoubleTapDetection(t *testing.T) {
 	}
 
 	// Double-tap state variable must be initialized
-	if !strings.Contains(script, "_CLAI_LAST_UP_TIME=0") {
-		t.Error("script should initialize _CLAI_LAST_UP_TIME=0")
+	if !strings.Contains(script, "_CLAI_LAST_UP_TIME=-1") {
+		t.Error("script should initialize _CLAI_LAST_UP_TIME=-1")
 	}
 
 	upBody := extractFunctionBody(script, "_clai_picker_up")

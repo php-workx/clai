@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// containsExpression returns true if s contains a ${{ }} expression placeholder.
+// containsExpression returns true if s contains a well-formed ${{ ... }} expression.
 func containsExpression(s string) bool {
-	return strings.Contains(s, "${{")
+	return exprPattern.MatchString(s)
 }
 
 // ValidationError represents a single validation failure with its location.

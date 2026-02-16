@@ -1,7 +1,7 @@
 .agents/reviews
 .agents/compaction-snapshots
 .agents/tooling
-.agents/ao/sessions
+.agents/ao
 .claude/worktrees
 .idea
 .DS_Store

@@ -64,7 +64,7 @@ _AI_IN_PASTE=false
 
 # Double-tap up-arrow detection
 _CLAI_DOUBLE_TAP_THRESHOLD=0.5
-_CLAI_LAST_UP_TIME=0
+_CLAI_LAST_UP_TIME=-1
 
 # Disable zsh-autosuggestions when clai is active
 _CLAI_ZSH_AUTOSUGGEST_PRESENT=false
