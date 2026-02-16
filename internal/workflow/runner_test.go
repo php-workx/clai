@@ -419,12 +419,12 @@ func TestRunner_OutputParseErrorIsNonFatal(t *testing.T) {
 }
 
 func TestMergeEnv(t *testing.T) {
-	workflow := map[string]string{"A": "w", "B": "w"}
+	wf := map[string]string{"A": "w", "B": "w"}
 	job := map[string]string{"B": "j", "C": "j"}
 	step := map[string]string{"C": "s", "D": "s"}
 	matrix := map[string]string{"M": "m1"}
 
-	env := mergeEnv(nil, workflow, job, step, matrix)
+	env := mergeEnv(nil, wf, job, step, matrix, nil)
 
 	// Convert to map for easier assertions.
 	envMap := make(map[string]string)
@@ -444,6 +444,26 @@ func TestMergeEnv(t *testing.T) {
 
 	// OS env should also be present.
 	assert.NotEmpty(t, envMap["PATH"]) // PATH should come from os.Environ
+}
+
+func TestMergeEnv_VarOverridesWin(t *testing.T) {
+	wf := map[string]string{"A": "workflow"}
+	job := map[string]string{"A": "job"}
+	step := map[string]string{"A": "step"}
+	matrix := map[string]string{"A": "matrix"}
+	varOverrides := map[string]string{"A": "cli-var"}
+
+	env := mergeEnv(nil, wf, job, step, matrix, varOverrides)
+
+	envMap := make(map[string]string)
+	for _, kv := range env {
+		idx := strings.IndexByte(kv, '=')
+		if idx >= 0 {
+			envMap[kv[:idx]] = kv[idx+1:]
+		}
+	}
+
+	assert.Equal(t, "cli-var", envMap["A"], "--var should override all other layers")
 }
 
 func TestExitCodeFromError(t *testing.T) {
@@ -619,6 +639,34 @@ func TestRunner_StepCallback_ErrorHaltsExecution(t *testing.T) {
 	require.Len(t, result.Steps, 2)
 	assert.Equal(t, "passed", result.Steps[0].Status)
 	assert.Equal(t, "skipped", result.Steps[1].Status)
+}
+
+func TestRunner_VarOverridesMatrix(t *testing.T) {
+	skipOnWindows(t)
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		Env:     map[string]string{"VAR": "workflow"},
+		JobEnv:  map[string]string{"VAR": "job"},
+		MatrixVars: map[string]string{
+			"VAR": "matrix",
+		},
+		VarOverrides: map[string]string{
+			"VAR": "cli-override",
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("step1", "Check var precedence", "echo $VAR"),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "passed", result.Status)
+	require.Len(t, result.Steps, 1)
+	assert.Contains(t, result.Steps[0].StdoutTail, "cli-override",
+		"--var should override matrix, job, and workflow env")
 }
 
 func TestRunner_WorkDir(t *testing.T) {

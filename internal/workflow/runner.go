@@ -56,12 +56,13 @@ const (
 
 // RunnerConfig configures the runner.
 type RunnerConfig struct {
-	WorkDir    string
-	Env        map[string]string // workflow-level env
-	JobEnv     map[string]string // job-level env
-	MatrixVars map[string]string // matrix combination
-	Secrets    []SecretDef
-	BufferSize int // 0 = DefaultBufferSize
+	WorkDir      string
+	Env          map[string]string // workflow-level env
+	JobEnv       map[string]string // job-level env
+	MatrixVars   map[string]string // matrix combination
+	VarOverrides map[string]string // --var CLI flags (highest precedence)
+	Secrets      []SecretDef
+	BufferSize   int // 0 = DefaultBufferSize
 
 	// OnStep is called before and after each step for live progress.
 	// Optional — if nil, no callbacks are made.
@@ -277,8 +278,8 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 	resolvedStep.Run = resolvedRun
 	sr.Command = resolvedRun
 
-	// Merge environment: OS -> output exports -> workflow -> job -> step -> matrix.
-	env := mergeEnv(stepOutputEnv, r.config.Env, r.config.JobEnv, resolvedStepEnv, r.config.MatrixVars)
+	// Merge environment: OS -> output exports -> workflow -> job -> step -> matrix -> --var overrides.
+	env := mergeEnv(stepOutputEnv, r.config.Env, r.config.JobEnv, resolvedStepEnv, r.config.MatrixVars, r.config.VarOverrides)
 	sr.ResolvedEnv = append([]string(nil), env...)
 
 	// Build command via ShellAdapter.
@@ -369,14 +370,18 @@ func (r *Runner) buildExprEnv(step *StepDef, outputEnv map[string]string) map[st
 	for k, v := range r.config.MatrixVars {
 		env[k] = v
 	}
+	// --var CLI overrides (highest precedence).
+	for k, v := range r.config.VarOverrides {
+		env[k] = v
+	}
 
 	return env
 }
 
 // mergeEnv merges environment variables with proper precedence:
-// OS env < output exports < workflow < job < step. Matrix vars are also included.
+// OS env < output exports < workflow < job < step < matrix < --var overrides.
 // Returns a []string in "KEY=value" format suitable for exec.Cmd.Env.
-func mergeEnv(outputs, workflow, job, step map[string]string, matrix map[string]string) []string {
+func mergeEnv(outputs, workflow, job, step, matrix, varOverrides map[string]string) []string {
 	merged := make(map[string]string)
 
 	// Start with OS environment.
@@ -405,6 +410,10 @@ func mergeEnv(outputs, workflow, job, step map[string]string, matrix map[string]
 	}
 	// Add matrix vars as environment variables.
 	for k, v := range matrix {
+		merged[k] = v
+	}
+	// --var CLI overrides (highest precedence).
+	for k, v := range varOverrides {
 		merged[k] = v
 	}
 

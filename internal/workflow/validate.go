@@ -133,6 +133,14 @@ func validateStep(field string, step *StepDef, seenIDs map[string]bool) []Valida
 
 	var errs []ValidationError
 
+	// Step must have a name.
+	if step.Name == "" {
+		errs = append(errs, ValidationError{
+			Field:   field + ".name",
+			Message: "step name is required",
+		})
+	}
+
 	// Step must have a run field.
 	if step.Run == "" {
 		errs = append(errs, ValidationError{

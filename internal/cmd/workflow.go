@@ -35,7 +35,7 @@ const (
 	ExitNeedsHuman        = 5
 	ExitDaemonUnavailable = 6 //nolint:unused // reserved for future use
 	ExitPolicyHalt        = 7 //nolint:unused // reserved for future use
-	ExitDependencyMissing = 8 //nolint:unused // reserved for future use
+	ExitDependencyMissing = 8
 	ExitTimeout           = 124
 )
 
@@ -103,6 +103,11 @@ func runWorkflow(cmd *cobra.Command, args []string) error {
 	// Phase 1: Parse and validate.
 	def, data, err := loadWorkflow(args[0])
 	if err != nil {
+		return err
+	}
+
+	// Phase 1b: Check required external tools.
+	if err := checkRequires(def.Requires); err != nil {
 		return err
 	}
 
@@ -225,10 +230,9 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 		return &jobExecutionResult{overallStatus: string(workflow.RunFailed), validationErr: true}
 	}
 
-	// Parse --var flags into env overrides.
+	// Parse --var flags into env overrides (highest precedence).
 	vars, _ := cmd.Flags().GetStringSlice("var")
 	varEnv := parseVarFlags(vars)
-	workflowEnv := mergeMaps(def.Env, varEnv)
 
 	matrixCombinations := expandMatrix(job)
 
@@ -241,12 +245,13 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 		matrixKey := matrixKeyString(matrixVars)
 
 		cfg := workflow.RunnerConfig{
-			WorkDir:    rc.workDir,
-			Env:        workflowEnv,
-			JobEnv:     job.Env,
-			MatrixVars: matrixVars,
-			Secrets:    def.Secrets,
-			OnStep:     rc.makeStepCallback(matrixKey),
+			WorkDir:      rc.workDir,
+			Env:          def.Env,
+			JobEnv:       job.Env,
+			MatrixVars:   matrixVars,
+			VarOverrides: varEnv,
+			Secrets:      def.Secrets,
+			OnStep:       rc.makeStepCallback(matrixKey),
 		}
 
 		rc.humanRejected = false // reset per matrix combination
@@ -264,6 +269,10 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 
 		if runResult.Status == string(workflow.RunFailed) {
 			result.overallStatus = string(workflow.RunFailed)
+			// fail_fast: stop on first failure (default true when nil).
+			if job.Strategy == nil || job.Strategy.FailFast == nil || *job.Strategy.FailFast {
+				break
+			}
 		}
 		if runResult.Status == string(workflow.RunCancelled) {
 			result.overallStatus = string(workflow.RunCancelled)
@@ -516,6 +525,23 @@ func readWorkflowBytes(path string) ([]byte, error) {
 }
 
 // --- Helper functions ---
+
+// checkRequires verifies that all required external tools are available on $PATH.
+func checkRequires(requires []string) error {
+	var missing []string
+	for _, tool := range requires {
+		if _, err := exec.LookPath(tool); err != nil {
+			missing = append(missing, tool)
+		}
+	}
+	if len(missing) > 0 {
+		return &WorkflowExitError{
+			Code:    ExitDependencyMissing,
+			Message: fmt.Sprintf("required tools not found on $PATH: %s", strings.Join(missing, ", ")),
+		}
+	}
+	return nil
+}
 
 func generateRunID() string {
 	return fmt.Sprintf("run-%d", time.Now().UnixNano())
