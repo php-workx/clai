@@ -45,7 +45,7 @@ func TestTemplateStore_Upsert(t *testing.T) {
 		LastSeenMs:  1000,
 	}
 
-	err := store.Upsert(ctx, tmpl)
+	err := store.Upsert(ctx, &tmpl)
 	require.NoError(t, err)
 
 	got, err := store.Get(ctx, tmpl.TemplateID)
@@ -72,11 +72,11 @@ func TestTemplateStore_UpsertUpdatesLastSeen(t *testing.T) {
 		LastSeenMs:  1000,
 	}
 
-	err := store.Upsert(ctx, tmpl)
+	err := store.Upsert(ctx, &tmpl)
 	require.NoError(t, err)
 
 	tmpl.LastSeenMs = 2000
-	err = store.Upsert(ctx, tmpl)
+	err = store.Upsert(ctx, &tmpl)
 	require.NoError(t, err)
 
 	got, err := store.Get(ctx, id)
@@ -100,11 +100,11 @@ func TestTemplateStore_UpsertDoesNotDecrementLastSeen(t *testing.T) {
 		LastSeenMs:  5000,
 	}
 
-	err := store.Upsert(ctx, tmpl)
+	err := store.Upsert(ctx, &tmpl)
 	require.NoError(t, err)
 
 	tmpl.LastSeenMs = 3000
-	err = store.Upsert(ctx, tmpl)
+	err = store.Upsert(ctx, &tmpl)
 	require.NoError(t, err)
 
 	got, err := store.Get(ctx, id)
@@ -137,7 +137,7 @@ func TestTemplateStore_UpsertNilTags(t *testing.T) {
 		LastSeenMs:  1000,
 	}
 
-	err := store.Upsert(ctx, tmpl)
+	err := store.Upsert(ctx, &tmpl)
 	require.NoError(t, err)
 
 	got, err := store.Get(ctx, tmpl.TemplateID)

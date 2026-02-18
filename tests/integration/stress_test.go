@@ -9,6 +9,51 @@ import (
 	pb "github.com/runger/clai/gen/clai/v1"
 )
 
+// stressRunSessionCommands runs commands concurrently within a single session.
+func stressRunSessionCommands(ctx context.Context, client pb.ClaiServiceClient, sessionID string, numCommands int, errors chan<- error, t *testing.T) {
+	var cmdWg sync.WaitGroup
+	for j := 0; j < numCommands; j++ {
+		cmdWg.Add(1)
+		go func(cmdNum int) {
+			defer cmdWg.Done()
+
+			commandID := generateCommandID()
+
+			startResp, startErr := client.CommandStarted(ctx, &pb.CommandStartRequest{
+				SessionId: sessionID,
+				CommandId: commandID,
+				Cwd:       "/home/test",
+				Command:   "test command",
+				TsUnixMs:  time.Now().UnixMilli(),
+			})
+			if startErr != nil {
+				errors <- startErr
+				return
+			}
+			if !startResp.Ok {
+				t.Logf("command %d start failed: %s", cmdNum, startResp.Error)
+				return
+			}
+
+			endResp, endErr := client.CommandEnded(ctx, &pb.CommandEndRequest{
+				SessionId:  sessionID,
+				CommandId:  commandID,
+				ExitCode:   0,
+				DurationMs: 10,
+				TsUnixMs:   time.Now().UnixMilli(),
+			})
+			if endErr != nil {
+				errors <- endErr
+				return
+			}
+			if !endResp.Ok {
+				t.Logf("command %d end failed: %s", cmdNum, endResp.Error)
+			}
+		}(j)
+	}
+	cmdWg.Wait()
+}
+
 // TestStress_ConcurrentSessions tests concurrent session handling with goroutines.
 func TestStress_ConcurrentSessions(t *testing.T) {
 	env := SetupTestEnv(t)
@@ -49,49 +94,7 @@ func TestStress_ConcurrentSessions(t *testing.T) {
 			}
 
 			// Log multiple commands concurrently within this session
-			var cmdWg sync.WaitGroup
-			for j := 0; j < numCommandsPerSession; j++ {
-				cmdWg.Add(1)
-				go func(cmdNum int) {
-					defer cmdWg.Done()
-
-					commandID := generateCommandID()
-
-					// Log command start
-					startResp, err := env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
-						SessionId: sessionID,
-						CommandId: commandID,
-						Cwd:       "/home/test",
-						Command:   "test command",
-						TsUnixMs:  time.Now().UnixMilli(),
-					})
-					if err != nil {
-						errors <- err
-						return
-					}
-					if !startResp.Ok {
-						t.Logf("command %d start failed: %s", cmdNum, startResp.Error)
-						return
-					}
-
-					// Log command end
-					endResp, err := env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
-						SessionId:  sessionID,
-						CommandId:  commandID,
-						ExitCode:   0,
-						DurationMs: 10,
-						TsUnixMs:   time.Now().UnixMilli(),
-					})
-					if err != nil {
-						errors <- err
-						return
-					}
-					if !endResp.Ok {
-						t.Logf("command %d end failed: %s", cmdNum, endResp.Error)
-					}
-				}(j)
-			}
-			cmdWg.Wait()
+			stressRunSessionCommands(ctx, env.Client, sessionID, numCommandsPerSession, errors, t)
 
 			// End session
 			endResp, err := env.Client.SessionEnd(ctx, &pb.SessionEndRequest{
@@ -304,26 +307,26 @@ func TestStress_HighCommandVolume(t *testing.T) {
 	for i := 0; i < numCommands; i++ {
 		commandID := generateCommandID()
 
-		_, err := env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
+		_, cmdErr := env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
 			SessionId: sessionID,
 			CommandId: commandID,
 			Cwd:       "/home/test",
 			Command:   "test command",
 			TsUnixMs:  time.Now().UnixMilli(),
 		})
-		if err != nil {
-			t.Fatalf("CommandStarted %d failed: %v", i, err)
+		if cmdErr != nil {
+			t.Fatalf("CommandStarted %d failed: %v", i, cmdErr)
 		}
 
-		_, err = env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
+		_, cmdErr = env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
 			SessionId:  sessionID,
 			CommandId:  commandID,
 			ExitCode:   0,
 			DurationMs: 10,
 			TsUnixMs:   time.Now().UnixMilli(),
 		})
-		if err != nil {
-			t.Fatalf("CommandEnded %d failed: %v", i, err)
+		if cmdErr != nil {
+			t.Fatalf("CommandEnded %d failed: %v", i, cmdErr)
 		}
 	}
 

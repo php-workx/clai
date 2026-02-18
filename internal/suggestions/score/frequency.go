@@ -25,12 +25,10 @@ const (
 
 // FrequencyStore manages decayed frequency scores for commands.
 type FrequencyStore struct {
-	db    *sql.DB
-	tauMs int64
-
-	// Prepared statements
+	db         *sql.DB
 	getStmt    *sql.Stmt
 	upsertStmt *sql.Stmt
+	tauMs      int64
 }
 
 // FrequencyOptions configures the frequency store.
@@ -116,9 +114,9 @@ func (fs *FrequencyStore) Close() error {
 func (fs *FrequencyStore) Update(ctx context.Context, scope, cmdNorm string, nowMs int64) error {
 	// Get current score and timestamp
 	var currentScore float64
-	var lastTs int64
+	var lastTS int64
 
-	err := fs.getStmt.QueryRowContext(ctx, scope, cmdNorm).Scan(&currentScore, &lastTs)
+	err := fs.getStmt.QueryRowContext(ctx, scope, cmdNorm).Scan(&currentScore, &lastTS)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -130,7 +128,7 @@ func (fs *FrequencyStore) Update(ctx context.Context, scope, cmdNorm string, now
 		newScore = 1.0
 	} else {
 		// Apply decay: d = exp(-(now - last_ts) / tau_ms)
-		elapsed := float64(nowMs - lastTs)
+		elapsed := float64(nowMs - lastTS)
 		decay := math.Exp(-elapsed / float64(fs.tauMs))
 		newScore = currentScore*decay + 1.0
 	}
@@ -141,12 +139,12 @@ func (fs *FrequencyStore) Update(ctx context.Context, scope, cmdNorm string, now
 }
 
 // UpdateBoth updates both global and repo-scoped scores in a single transaction.
-func (fs *FrequencyStore) UpdateBoth(ctx context.Context, cmdNorm string, repoKey string, nowMs int64) error {
+func (fs *FrequencyStore) UpdateBoth(ctx context.Context, cmdNorm, repoKey string, nowMs int64) error {
 	tx, err := fs.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback on error
 
 	// Update global scope
 	if err := fs.updateInTx(ctx, tx, ScopeGlobal, cmdNorm, nowMs); err != nil {
@@ -170,7 +168,7 @@ func (fs *FrequencyStore) UpdateAll(ctx context.Context, cmdNorm, repoKey, dirSc
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback on error
 
 	// Update global scope
 	if err := fs.updateInTx(ctx, tx, ScopeGlobal, cmdNorm, nowMs); err != nil {
@@ -198,12 +196,12 @@ func (fs *FrequencyStore) UpdateAll(ctx context.Context, cmdNorm, repoKey, dirSc
 func (fs *FrequencyStore) updateInTx(ctx context.Context, tx *sql.Tx, scope, cmdNorm string, nowMs int64) error {
 	// Get current score and timestamp
 	var currentScore float64
-	var lastTs int64
+	var lastTS int64
 
 	err := tx.QueryRowContext(ctx, `
 		SELECT score, last_ts FROM command_score
 		WHERE scope = ? AND cmd_norm = ?
-	`, scope, cmdNorm).Scan(&currentScore, &lastTs)
+	`, scope, cmdNorm).Scan(&currentScore, &lastTS)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -215,7 +213,7 @@ func (fs *FrequencyStore) updateInTx(ctx context.Context, tx *sql.Tx, scope, cmd
 		newScore = 1.0
 	} else {
 		// Apply decay
-		elapsed := float64(nowMs - lastTs)
+		elapsed := float64(nowMs - lastTS)
 		decay := math.Exp(-elapsed / float64(fs.tauMs))
 		newScore = currentScore*decay + 1.0
 	}
@@ -241,9 +239,9 @@ func (fs *FrequencyStore) GetScore(ctx context.Context, scope, cmdNorm string) (
 // GetScoreAt retrieves the decayed score at a specific time.
 func (fs *FrequencyStore) GetScoreAt(ctx context.Context, scope, cmdNorm string, atMs int64) (float64, error) {
 	var score float64
-	var lastTs int64
+	var lastTS int64
 
-	err := fs.getStmt.QueryRowContext(ctx, scope, cmdNorm).Scan(&score, &lastTs)
+	err := fs.getStmt.QueryRowContext(ctx, scope, cmdNorm).Scan(&score, &lastTS)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
@@ -252,7 +250,7 @@ func (fs *FrequencyStore) GetScoreAt(ctx context.Context, scope, cmdNorm string,
 	}
 
 	// Apply decay to get current score
-	elapsed := float64(atMs - lastTs)
+	elapsed := float64(atMs - lastTS)
 	decay := math.Exp(-elapsed / float64(fs.tauMs))
 	return score * decay, nil
 }
@@ -266,7 +264,7 @@ func (fs *FrequencyStore) GetTopCommands(ctx context.Context, scope string, limi
 type ScoredCommand struct {
 	CmdNorm  string
 	Score    float64
-	LastTsMs int64
+	LastTSMs int64
 }
 
 // GetTopCommandsAt retrieves the top N commands by decayed score at a specific time.
@@ -290,20 +288,20 @@ func (fs *FrequencyStore) GetTopCommandsAt(ctx context.Context, scope string, li
 	for rows.Next() {
 		var cmdNorm string
 		var score float64
-		var lastTs int64
-		if err := rows.Scan(&cmdNorm, &score, &lastTs); err != nil {
+		var lastTS int64
+		if err := rows.Scan(&cmdNorm, &score, &lastTS); err != nil {
 			return nil, err
 		}
 
 		// Apply decay
-		elapsed := float64(atMs - lastTs)
+		elapsed := float64(atMs - lastTS)
 		decay := math.Exp(-elapsed / float64(fs.tauMs))
 		decayedScore := score * decay
 
 		results = append(results, ScoredCommand{
 			CmdNorm:  cmdNorm,
 			Score:    decayedScore,
-			LastTsMs: lastTs,
+			LastTSMs: lastTS,
 		})
 	}
 

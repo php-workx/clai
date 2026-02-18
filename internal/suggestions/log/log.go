@@ -57,7 +57,7 @@ func New(cfg *Config) *slog.Logger {
 	// Create JSON handler with timestamp formatted as "ts"
 	opts := &slog.HandlerOptions{
 		Level: level,
-		ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+		ReplaceAttr: func(_ []string, a slog.Attr) slog.Attr {
 			// Rename "time" to "ts" for spec compliance
 			if a.Key == slog.TimeKey {
 				a.Key = "ts"
@@ -96,14 +96,14 @@ type StartupInfo struct {
 	GitCommit     string
 	ConfigPath    string
 	DatabasePath  string
-	SchemaVersion int
 	SocketPath    string
-	FTS5Available bool
+	SchemaVersion int
 	PID           int
+	FTS5Available bool
 }
 
 // LogStartup logs daemon startup information.
-func LogStartup(logger *slog.Logger, info StartupInfo) {
+func LogStartup(logger *slog.Logger, info *StartupInfo) {
 	logger.Info("daemon started",
 		"version", info.Version,
 		"git_commit", info.GitCommit,
@@ -147,7 +147,7 @@ func LogFTS5Unavailable(logger *slog.Logger) {
 }
 
 // LogCorruptionDetected logs when database corruption is detected.
-func LogCorruptionDetected(logger *slog.Logger, dbPath string, reason string) {
+func LogCorruptionDetected(logger *slog.Logger, dbPath, reason string) {
 	logger.Error("database corruption detected",
 		"database_path", dbPath,
 		"reason", reason,
@@ -155,7 +155,7 @@ func LogCorruptionDetected(logger *slog.Logger, dbPath string, reason string) {
 }
 
 // LogCorruptionRecovered logs successful corruption recovery.
-func LogCorruptionRecovered(logger *slog.Logger, dbPath string, backupPath string) {
+func LogCorruptionRecovered(logger *slog.Logger, dbPath, backupPath string) {
 	logger.Info("database corruption recovered",
 		"database_path", dbPath,
 		"backup_path", backupPath,

@@ -108,8 +108,8 @@ func parseSuggestPrefix(args []string) string {
 	return args[0]
 }
 
-func resolveLastCommand() (string, string) {
-	lastCmd := strings.TrimSpace(os.Getenv("CLAI_LAST_COMMAND"))
+func resolveLastCommand() (lastCmd, normalized string) {
+	lastCmd = strings.TrimSpace(os.Getenv("CLAI_LAST_COMMAND"))
 	if lastCmd == "" {
 		return "", ""
 	}
@@ -199,7 +199,7 @@ func filterSuppressedSuggestions(suggestions []suggestOutput, lastCmd, lastCmdNo
 	return out
 }
 
-func formatGhostMeta(s suggestOutput) string {
+func formatGhostMeta(s *suggestOutput) string {
 	src := strings.TrimSpace(s.Source)
 	if src == "" {
 		src = "unknown"
@@ -236,8 +236,8 @@ func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.
 		// This is used for inline ghost text in shells where accepting the
 		// suggestion must insert only the command text, but the UI can display
 		// additional metadata.
-		for _, s := range suggestions {
-			fmt.Printf("%s\t%s\n", s.Text, formatGhostMeta(s))
+		for i := range suggestions {
+			fmt.Printf("%s\t%s\n", suggestions[i].Text, formatGhostMeta(&suggestions[i]))
 		}
 	case "text":
 		// text format: numbered list with metadata
@@ -264,18 +264,18 @@ func outputPlainSuggestions(suggestions []suggestOutput) {
 type suggestOutput struct {
 	Text        string           `json:"text"`
 	Source      string           `json:"source"`
-	Score       float64          `json:"score"`
 	Description string           `json:"description"`
 	Risk        string           `json:"risk"`
-	CwdMatch    bool             `json:"cwd_match,omitempty"`
 	Recency     string           `json:"recency,omitempty"`
 	Reasons     []explain.Reason `json:"reasons,omitempty"`
+	Score       float64          `json:"score"`
+	CwdMatch    bool             `json:"cwd_match,omitempty"`
 }
 
 // suggestJSONResponse wraps suggestions with optional timing hint for JSON output.
 type suggestJSONResponse struct {
-	Suggestions []suggestOutput    `json:"suggestions"`
 	TimingHint  *timing.TimingHint `json:"timing_hint,omitempty"`
+	Suggestions []suggestOutput    `json:"suggestions"`
 }
 
 func riskFromText(text string) string {
@@ -379,9 +379,9 @@ func daemonSuggestionToOutput(s *pb.Suggestion, includeReasons bool) suggestOutp
 	return out
 }
 
-func deriveSuggestionMeta(s *pb.Suggestion) (bool, string) {
-	cwdMatch := strings.TrimSpace(s.Source) == "cwd"
-	recency := ""
+func deriveSuggestionMeta(s *pb.Suggestion) (cwdMatch bool, recency string) {
+	cwdMatch = strings.TrimSpace(s.Source) == "cwd"
+	recency = ""
 	for _, r := range s.Reasons {
 		if r == nil {
 			continue

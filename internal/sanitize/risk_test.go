@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestIsDestructive(t *testing.T) {
+func TestIsDestructive(t *testing.T) { //nolint:funlen // table-driven test with comprehensive destructive command cases
 	tests := []struct {
 		name     string
 		command  string

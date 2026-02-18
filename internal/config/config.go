@@ -17,20 +17,20 @@ const minOneFallbackFmt = "must be >= 1, got %d; falling back to default %d"
 // Config represents the clai configuration.
 type Config struct {
 	Daemon      DaemonConfig      `yaml:"daemon"`
-	Client      ClientConfig      `yaml:"client"`
 	AI          AIConfig          `yaml:"ai"`
-	Suggestions SuggestionsConfig `yaml:"suggestions"`
-	Privacy     PrivacyConfig     `yaml:"privacy"`
-	History     HistoryConfig     `yaml:"history"`
 	Workflows   WorkflowsConfig   `yaml:"workflows"`
+	History     HistoryConfig     `yaml:"history"`
+	Suggestions SuggestionsConfig `yaml:"suggestions"`
+	Client      ClientConfig      `yaml:"client"`
+	Privacy     PrivacyConfig     `yaml:"privacy"`
 }
 
 // DaemonConfig holds daemon-related settings.
 type DaemonConfig struct {
-	IdleTimeoutMins int    `yaml:"idle_timeout_mins"` // Auto-shutdown after idle (0 = never)
-	SocketPath      string `yaml:"socket_path"`       // Unix socket path (overrides default)
-	LogLevel        string `yaml:"log_level"`         // debug, info, warn, error
-	LogFile         string `yaml:"log_file"`          // Log file path (overrides default)
+	SocketPath      string `yaml:"socket_path"`
+	LogLevel        string `yaml:"log_level"`
+	LogFile         string `yaml:"log_file"`
+	IdleTimeoutMins int    `yaml:"idle_timeout_mins"`
 }
 
 // ClientConfig holds client-related settings.
@@ -43,11 +43,11 @@ type ClientConfig struct {
 
 // AIConfig holds AI-related settings.
 type AIConfig struct {
-	Enabled       bool   `yaml:"enabled"`         // Must opt-in to AI features
-	Provider      string `yaml:"provider"`        // anthropic or auto (Claude CLI only)
-	Model         string `yaml:"model"`           // Provider-specific model
-	AutoDiagnose  bool   `yaml:"auto_diagnose"`   // Auto-trigger diagnosis on non-zero exit
-	CacheTTLHours int    `yaml:"cache_ttl_hours"` // AI response cache lifetime
+	Provider      string `yaml:"provider"`
+	Model         string `yaml:"model"`
+	CacheTTLHours int    `yaml:"cache_ttl_hours"`
+	Enabled       bool   `yaml:"enabled"`
+	AutoDiagnose  bool   `yaml:"auto_diagnose"`
 }
 
 // SuggestionsWeights holds ranking weight configuration.
@@ -66,147 +66,100 @@ type SuggestionsWeights struct {
 
 // SuggestionsConfig holds suggestion-related settings.
 type SuggestionsConfig struct {
-	// Legacy fields (pre-V2)
-	MaxHistory      int  `yaml:"max_history"`       // Max history-based suggestions
-	MaxAI           int  `yaml:"max_ai"`            // Max AI-generated suggestions
-	ShowRiskWarning bool `yaml:"show_risk_warning"` // Highlight destructive commands
-
-	// --- Core ---
-	Enabled       bool `yaml:"enabled"`         // Master toggle for shell integration
-	MaxResults    int  `yaml:"max_results"`     // Max suggestion results returned
-	CacheTTLMs    int  `yaml:"cache_ttl_ms"`    // Cache time-to-live in ms
-	HardTimeoutMs int  `yaml:"hard_timeout_ms"` // Hard timeout for suggestion generation in ms
-
-	// --- UI ---
-	PickerView string `yaml:"picker_view"` // compact|detailed (suggestion picker list rendering)
-
-	// --- Hook/transport ---
-	HookConnectTimeoutMs  int    `yaml:"hook_connect_timeout_ms"` // Socket connect timeout in ms
-	HookWriteTimeoutMs    int    `yaml:"hook_write_timeout_ms"`   // Socket write timeout in ms
-	SocketPath            string `yaml:"socket_path"`             // Unix socket path (empty = auto)
-	IngestSyncWaitMs      int    `yaml:"ingest_sync_wait_ms"`     // Sync wait for ingest in ms
-	InteractiveRequireTTY bool   `yaml:"interactive_require_tty"` // Require TTY for interactive mode
-	CmdRawMaxBytes        int    `yaml:"cmd_raw_max_bytes"`       // Max raw command size in bytes
-	ShimMode              string `yaml:"shim_mode"`               // auto|persistent|oneshot
-
-	// --- Ranking weights ---
-	Weights SuggestionsWeights `yaml:"weights"` // Ranking weight configuration
-
-	// --- Learning ---
-	DecayHalfLifeHours          int     `yaml:"decay_half_life_hours"`              // Decay half-life in hours
-	FeedbackBoostAccept         float64 `yaml:"feedback_boost_accept"`              // Boost for accepted suggestions
-	FeedbackPenaltyDismiss      float64 `yaml:"feedback_penalty_dismiss"`           // Penalty for dismissed suggestions
-	SlotMaxValuesPerSlot        int     `yaml:"slot_max_values_per_slot"`           // Max values per slot
-	FeedbackMatchWindowMs       int     `yaml:"feedback_match_window_ms"`           // Feedback match window in ms
-	OnlineLearningEnabled       bool    `yaml:"online_learning_enabled"`            // Enable online weight learning
-	OnlineLearningEta           float64 `yaml:"online_learning_eta"`                // Online learning rate
-	OnlineLearningEtaDecayConst int     `yaml:"online_learning_eta_decay_constant"` // Eta decay constant (samples)
-	OnlineLearningEtaFloor      float64 `yaml:"online_learning_eta_floor"`          // Minimum learning rate
-	OnlineLearningMinSamples    int     `yaml:"online_learning_min_samples"`        // Min samples before learning
-	WeightMin                   float64 `yaml:"weight_min"`                         // Min learned weight value
-	WeightMax                   float64 `yaml:"weight_max"`                         // Max learned weight value
-	WeightRiskMin               float64 `yaml:"weight_risk_min"`                    // Min risk weight value
-	WeightRiskMax               float64 `yaml:"weight_risk_max"`                    // Max risk weight value
-	SlotCorrelationMinConf      float64 `yaml:"slot_correlation_min_confidence"`    // Min correlation confidence
-
-	// --- Backpressure ---
-	BurstEventsThreshold int `yaml:"burst_events_threshold"`  // Events before backpressure
-	BurstWindowMs        int `yaml:"burst_window_ms"`         // Burst detection window in ms
-	BurstQuietMs         int `yaml:"burst_quiet_ms"`          // Quiet period after burst in ms
-	IngestQueueMaxEvents int `yaml:"ingest_queue_max_events"` // Max events in ingest queue
-	IngestQueueMaxBytes  int `yaml:"ingest_queue_max_bytes"`  // Max bytes in ingest queue
-
-	// --- Task discovery ---
-	TaskPlaybookEnabled bool    `yaml:"task_playbook_enabled"` // Enable task playbooks
-	TaskPlaybookPath    string  `yaml:"task_playbook_path"`    // Path to task playbook file
-	TaskPlaybookBoost   float64 `yaml:"task_playbook_boost"`   // Boost for playbook matches
-
-	// --- Search ---
-	SearchFTSEnabled        bool   `yaml:"search_fts_enabled"`         // Enable full-text search
-	SearchFallbackScanLimit int    `yaml:"search_fallback_scan_limit"` // Fallback scan limit
-	SearchFTSTokenizer      string `yaml:"search_fts_tokenizer"`       // trigram|unicode61
-	SearchDescribeEnabled   bool   `yaml:"search_describe_enabled"`    // Enable describe search
-	SearchAutoModeMerge     bool   `yaml:"search_auto_mode_merge"`     // Auto-merge search modes
-	SearchTagVocabularyPath string `yaml:"search_tag_vocabulary_path"` // Tag vocabulary path
-
-	// --- Project type ---
-	ProjectTypeDetectionEnabled bool `yaml:"project_type_detection_enabled"` // Enable project type detection
-	ProjectTypeCacheTTLMs       int  `yaml:"project_type_cache_ttl_ms"`      // Project type cache TTL in ms
-
-	// --- Pipeline ---
-	PipelineAwarenessEnabled bool `yaml:"pipeline_awareness_enabled"` // Enable pipeline awareness
-	PipelineMaxSegments      int  `yaml:"pipeline_max_segments"`      // Max pipeline segments
-	PipelinePatternMinCount  int  `yaml:"pipeline_pattern_min_count"` // Min pattern count
-
-	// --- Failure recovery ---
-	FailureRecoveryEnabled          bool `yaml:"failure_recovery_enabled"`           // Enable failure recovery
-	FailureRecoveryBootstrapEnabled bool `yaml:"failure_recovery_bootstrap_enabled"` // Enable bootstrap recovery
-	FailureRecoveryMinCount         int  `yaml:"failure_recovery_min_count"`         // Min failures before recovery
-
-	// --- Workflow ---
-	WorkflowDetectionEnabled    bool    `yaml:"workflow_detection_enabled"`     // Enable workflow detection
-	WorkflowMinSteps            int     `yaml:"workflow_min_steps"`             // Min steps in a workflow
-	WorkflowMaxSteps            int     `yaml:"workflow_max_steps"`             // Max steps in a workflow
-	WorkflowMinOccurrences      int     `yaml:"workflow_min_occurrences"`       // Min occurrences to learn workflow
-	WorkflowMaxGap              int     `yaml:"workflow_max_gap"`               // Max gap between workflow steps
-	WorkflowActivationTimeoutMs int     `yaml:"workflow_activation_timeout_ms"` // Workflow activation timeout in ms
-	WorkflowBoost               float64 `yaml:"workflow_boost"`                 // Boost for workflow matches
-	WorkflowMineIntervalMs      int     `yaml:"workflow_mine_interval_ms"`      // Workflow mining interval in ms
-
-	// --- Adaptive timing ---
-	AdaptiveTimingEnabled   bool    `yaml:"adaptive_timing_enabled"`    // Enable adaptive timing
-	TypingFastThresholdCPS  float64 `yaml:"typing_fast_threshold_cps"`  // Fast typing threshold (chars/sec)
-	TypingPauseThresholdMs  int     `yaml:"typing_pause_threshold_ms"`  // Pause detection threshold in ms
-	TypingEagerPrefixLength int     `yaml:"typing_eager_prefix_length"` // Eager prefix length
-
-	// --- Alias ---
-	AliasResolutionEnabled bool `yaml:"alias_resolution_enabled"`  // Enable alias resolution
-	AliasMaxExpansionDepth int  `yaml:"alias_max_expansion_depth"` // Max alias expansion depth
-	AliasRenderPreferred   bool `yaml:"alias_render_preferred"`    // Prefer alias rendering
-
-	// --- Dismissal ---
-	DismissalLearnedThreshold    int `yaml:"dismissal_learned_threshold"`      // Dismissals before learned
-	DismissalLearnedHalflifeHrs  int `yaml:"dismissal_learned_halflife_hours"` // Learned dismissal halflife in hours
-	DismissalTemporaryHalflifeMs int `yaml:"dismissal_temporary_halflife_ms"`  // Temporary dismissal halflife in ms
-
-	// --- Directory scope ---
-	DirectoryScopingEnabled bool `yaml:"directory_scoping_enabled"` // Enable directory scoping
-	DirectoryScopeMaxDepth  int  `yaml:"directory_scope_max_depth"` // Max directory scope depth
-
-	// --- Scorer version ---
-	ScorerVersion string `yaml:"scorer_version"` // v1|v2 - which suggestion scorer to use
-
-	// --- Explainability ---
-	ExplainEnabled         bool    `yaml:"explain_enabled"`          // Enable explainability
-	ExplainMaxReasons      int     `yaml:"explain_max_reasons"`      // Max reasons in explanation
-	ExplainMinContribution float64 `yaml:"explain_min_contribution"` // Min contribution to show
-
-	// --- Extended playbook ---
-	TaskPlaybookExtendedEnabled   bool    `yaml:"task_playbook_extended_enabled"`    // Enable extended playbooks
-	TaskPlaybookAfterBoost        float64 `yaml:"task_playbook_after_boost"`         // After-failure boost
-	TaskPlaybookWorkflowSeedCount int     `yaml:"task_playbook_workflow_seed_count"` // Workflow seed count
-
-	// --- Discovery ---
-	DiscoveryEnabled                bool    `yaml:"discovery_enabled"`                  // Enable discovery
-	DiscoveryCooldownHours          int     `yaml:"discovery_cooldown_hours"`           // Cooldown between discoveries in hours
-	DiscoveryMaxConfidenceThreshold float64 `yaml:"discovery_max_confidence_threshold"` // Max confidence for discovery
-	DiscoverySourceProjectType      bool    `yaml:"discovery_source_project_type"`      // Source: project type
-	DiscoverySourcePlaybook         bool    `yaml:"discovery_source_playbook"`          // Source: playbook
-	DiscoverySourceToolCommon       bool    `yaml:"discovery_source_tool_common"`       // Source: common tools
-
-	// --- Storage ---
-	RetentionDays                int `yaml:"retention_days"`                  // History retention in days
-	RetentionMaxEvents           int `yaml:"retention_max_events"`            // Max events to retain
-	MaintenanceIntervalMs        int `yaml:"maintenance_interval_ms"`         // Maintenance interval in ms
-	MaintenanceVacuumThresholdMB int `yaml:"maintenance_vacuum_threshold_mb"` // Vacuum threshold in MB
-	SQLiteBusyTimeoutMs          int `yaml:"sqlite_busy_timeout_ms"`          // SQLite busy timeout in ms
-
-	// --- Cache ---
-	CacheMemoryBudgetMB int `yaml:"cache_memory_budget_mb"` // Memory budget for caches in MB
-
-	// --- Privacy ---
-	IncognitoMode         string `yaml:"incognito_mode"`          // off|ephemeral|no_send
-	RedactSensitiveTokens bool   `yaml:"redact_sensitive_tokens"` // Redact sensitive tokens
+	SocketPath                      string             `yaml:"socket_path"`
+	IncognitoMode                   string             `yaml:"incognito_mode"`
+	ScorerVersion                   string             `yaml:"scorer_version"`
+	SearchTagVocabularyPath         string             `yaml:"search_tag_vocabulary_path"`
+	SearchFTSTokenizer              string             `yaml:"search_fts_tokenizer"`
+	TaskPlaybookPath                string             `yaml:"task_playbook_path"`
+	PickerView                      string             `yaml:"picker_view"`
+	ShimMode                        string             `yaml:"shim_mode"`
+	Weights                         SuggestionsWeights `yaml:"weights"`
+	DismissalLearnedHalflifeHrs     int                `yaml:"dismissal_learned_halflife_hours"`
+	FailureRecoveryMinCount         int                `yaml:"failure_recovery_min_count"`
+	IngestSyncWaitMs                int                `yaml:"ingest_sync_wait_ms"`
+	MaxAI                           int                `yaml:"max_ai"`
+	CmdRawMaxBytes                  int                `yaml:"cmd_raw_max_bytes"`
+	HookConnectTimeoutMs            int                `yaml:"hook_connect_timeout_ms"`
+	HardTimeoutMs                   int                `yaml:"hard_timeout_ms"`
+	DecayHalfLifeHours              int                `yaml:"decay_half_life_hours"`
+	FeedbackBoostAccept             float64            `yaml:"feedback_boost_accept"`
+	FeedbackPenaltyDismiss          float64            `yaml:"feedback_penalty_dismiss"`
+	SlotMaxValuesPerSlot            int                `yaml:"slot_max_values_per_slot"`
+	FeedbackMatchWindowMs           int                `yaml:"feedback_match_window_ms"`
+	CacheMemoryBudgetMB             int                `yaml:"cache_memory_budget_mb"`
+	OnlineLearningEta               float64            `yaml:"online_learning_eta"`
+	OnlineLearningEtaDecayConst     int                `yaml:"online_learning_eta_decay_constant"`
+	OnlineLearningEtaFloor          float64            `yaml:"online_learning_eta_floor"`
+	OnlineLearningMinSamples        int                `yaml:"online_learning_min_samples"`
+	WeightMin                       float64            `yaml:"weight_min"`
+	WeightMax                       float64            `yaml:"weight_max"`
+	WeightRiskMin                   float64            `yaml:"weight_risk_min"`
+	WeightRiskMax                   float64            `yaml:"weight_risk_max"`
+	SlotCorrelationMinConf          float64            `yaml:"slot_correlation_min_confidence"`
+	BurstEventsThreshold            int                `yaml:"burst_events_threshold"`
+	BurstWindowMs                   int                `yaml:"burst_window_ms"`
+	BurstQuietMs                    int                `yaml:"burst_quiet_ms"`
+	IngestQueueMaxEvents            int                `yaml:"ingest_queue_max_events"`
+	IngestQueueMaxBytes             int                `yaml:"ingest_queue_max_bytes"`
+	SQLiteBusyTimeoutMs             int                `yaml:"sqlite_busy_timeout_ms"`
+	CacheTTLMs                      int                `yaml:"cache_ttl_ms"`
+	TaskPlaybookBoost               float64            `yaml:"task_playbook_boost"`
+	MaintenanceVacuumThresholdMB    int                `yaml:"maintenance_vacuum_threshold_mb"`
+	SearchFallbackScanLimit         int                `yaml:"search_fallback_scan_limit"`
+	MaxResults                      int                `yaml:"max_results"`
+	MaintenanceIntervalMs           int                `yaml:"maintenance_interval_ms"`
+	RetentionMaxEvents              int                `yaml:"retention_max_events"`
+	RetentionDays                   int                `yaml:"retention_days"`
+	DiscoveryMaxConfidenceThreshold float64            `yaml:"discovery_max_confidence_threshold"`
+	ProjectTypeCacheTTLMs           int                `yaml:"project_type_cache_ttl_ms"`
+	DiscoveryCooldownHours          int                `yaml:"discovery_cooldown_hours"`
+	PipelineMaxSegments             int                `yaml:"pipeline_max_segments"`
+	PipelinePatternMinCount         int                `yaml:"pipeline_pattern_min_count"`
+	TaskPlaybookWorkflowSeedCount   int                `yaml:"task_playbook_workflow_seed_count"`
+	HookWriteTimeoutMs              int                `yaml:"hook_write_timeout_ms"`
+	TaskPlaybookAfterBoost          float64            `yaml:"task_playbook_after_boost"`
+	ExplainMinContribution          float64            `yaml:"explain_min_contribution"`
+	WorkflowMinSteps                int                `yaml:"workflow_min_steps"`
+	WorkflowMaxSteps                int                `yaml:"workflow_max_steps"`
+	WorkflowMinOccurrences          int                `yaml:"workflow_min_occurrences"`
+	WorkflowMaxGap                  int                `yaml:"workflow_max_gap"`
+	WorkflowActivationTimeoutMs     int                `yaml:"workflow_activation_timeout_ms"`
+	WorkflowBoost                   float64            `yaml:"workflow_boost"`
+	WorkflowMineIntervalMs          int                `yaml:"workflow_mine_interval_ms"`
+	ExplainMaxReasons               int                `yaml:"explain_max_reasons"`
+	TypingFastThresholdCPS          float64            `yaml:"typing_fast_threshold_cps"`
+	TypingPauseThresholdMs          int                `yaml:"typing_pause_threshold_ms"`
+	TypingEagerPrefixLength         int                `yaml:"typing_eager_prefix_length"`
+	DirectoryScopeMaxDepth          int                `yaml:"directory_scope_max_depth"`
+	AliasMaxExpansionDepth          int                `yaml:"alias_max_expansion_depth"`
+	DismissalTemporaryHalflifeMs    int                `yaml:"dismissal_temporary_halflife_ms"`
+	DismissalLearnedThreshold       int                `yaml:"dismissal_learned_threshold"`
+	MaxHistory                      int                `yaml:"max_history"`
+	TaskPlaybookEnabled             bool               `yaml:"task_playbook_enabled"`
+	SearchDescribeEnabled           bool               `yaml:"search_describe_enabled"`
+	AliasResolutionEnabled          bool               `yaml:"alias_resolution_enabled"`
+	ShowRiskWarning                 bool               `yaml:"show_risk_warning"`
+	ExplainEnabled                  bool               `yaml:"explain_enabled"`
+	AdaptiveTimingEnabled           bool               `yaml:"adaptive_timing_enabled"`
+	AliasRenderPreferred            bool               `yaml:"alias_render_preferred"`
+	TaskPlaybookExtendedEnabled     bool               `yaml:"task_playbook_extended_enabled"`
+	FailureRecoveryBootstrapEnabled bool               `yaml:"failure_recovery_bootstrap_enabled"`
+	FailureRecoveryEnabled          bool               `yaml:"failure_recovery_enabled"`
+	DirectoryScopingEnabled         bool               `yaml:"directory_scoping_enabled"`
+	DiscoveryEnabled                bool               `yaml:"discovery_enabled"`
+	Enabled                         bool               `yaml:"enabled"`
+	PipelineAwarenessEnabled        bool               `yaml:"pipeline_awareness_enabled"`
+	DiscoverySourcePlaybook         bool               `yaml:"discovery_source_playbook"`
+	DiscoverySourceToolCommon       bool               `yaml:"discovery_source_tool_common"`
+	DiscoverySourceProjectType      bool               `yaml:"discovery_source_project_type"`
+	SearchAutoModeMerge             bool               `yaml:"search_auto_mode_merge"`
+	WorkflowDetectionEnabled        bool               `yaml:"workflow_detection_enabled"`
+	SearchFTSEnabled                bool               `yaml:"search_fts_enabled"`
+	ProjectTypeDetectionEnabled     bool               `yaml:"project_type_detection_enabled"`
+	OnlineLearningEnabled           bool               `yaml:"online_learning_enabled"`
+	InteractiveRequireTTY           bool               `yaml:"interactive_require_tty"`
+	RedactSensitiveTokens           bool               `yaml:"redact_sensitive_tokens"`
 }
 
 // PrivacyConfig holds privacy-related settings.
@@ -216,34 +169,34 @@ type PrivacyConfig struct {
 
 // TabDef defines a tab in the history picker.
 type TabDef struct {
+	Args     map[string]string `yaml:"args"`
 	ID       string            `yaml:"id"`
 	Label    string            `yaml:"label"`
 	Provider string            `yaml:"provider"`
-	Args     map[string]string `yaml:"args"`
 }
 
 // WorkflowsConfig holds workflow execution settings.
 type WorkflowsConfig struct {
-	Enabled           bool     `yaml:"enabled"`            // Tier 0: master enable/disable
-	DefaultMode       string   `yaml:"default_mode"`       // Tier 0: "interactive" or "non-interactive-fail"
-	DefaultShell      string   `yaml:"default_shell"`      // Tier 0: default shell for steps
-	LogDir            string   `yaml:"log_dir"`            // Tier 0: workflow log directory
-	SearchPaths       []string `yaml:"search_paths"`       // Tier 1: workflow file search paths
-	RetainRuns        int      `yaml:"retain_runs"`        // Tier 1: max runs to keep
-	StrictPermissions bool     `yaml:"strict_permissions"` // Tier 1: enforce file permissions
-	SecretFile        string   `yaml:"secret_file"`        // Tier 1: path to .secrets file
+	DefaultMode       string   `yaml:"default_mode"`
+	DefaultShell      string   `yaml:"default_shell"`
+	LogDir            string   `yaml:"log_dir"`
+	SecretFile        string   `yaml:"secret_file"`
+	SearchPaths       []string `yaml:"search_paths"`
+	RetainRuns        int      `yaml:"retain_runs"`
+	Enabled           bool     `yaml:"enabled"`
+	StrictPermissions bool     `yaml:"strict_permissions"`
 }
 
 // HistoryConfig holds history picker settings.
 type HistoryConfig struct {
-	PickerBackend         string   `yaml:"picker_backend"`            // builtin, fzf, or clai
-	PickerOpenOnEmpty     bool     `yaml:"picker_open_on_empty"`      // Open picker when search is empty
-	PickerPageSize        int      `yaml:"picker_page_size"`          // Number of items per page
-	PickerCaseSensitive   bool     `yaml:"picker_case_sensitive"`     // Case-sensitive search
-	PickerTabs            []TabDef `yaml:"picker_tabs"`               // Tab definitions
-	UpArrowOpensHistory   bool     `yaml:"up_arrow_opens_history"`    // Up arrow opens TUI picker (default: false)
-	UpArrowTrigger        string   `yaml:"up_arrow_trigger"`          // single or double
-	UpArrowDoubleWindowMs int      `yaml:"up_arrow_double_window_ms"` // detection window for double-up
+	PickerBackend         string   `yaml:"picker_backend"`
+	UpArrowTrigger        string   `yaml:"up_arrow_trigger"`
+	PickerTabs            []TabDef `yaml:"picker_tabs"`
+	PickerPageSize        int      `yaml:"picker_page_size"`
+	UpArrowDoubleWindowMs int      `yaml:"up_arrow_double_window_ms"`
+	PickerOpenOnEmpty     bool     `yaml:"picker_open_on_empty"`
+	PickerCaseSensitive   bool     `yaml:"picker_case_sensitive"`
+	UpArrowOpensHistory   bool     `yaml:"up_arrow_opens_history"`
 }
 
 // DefaultConfig returns the default configuration.
@@ -467,11 +420,11 @@ func Load() (*Config, error) {
 func LoadFromFile(path string) (*Config, error) {
 	cfg := DefaultConfig()
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: config file path is from trusted source
 	if err != nil {
 		if os.IsNotExist(err) {
 			cfg.ApplyEnvOverrides()
-			if err := cfg.Validate(); err != nil {
+			if err = cfg.Validate(); err != nil {
 				return nil, fmt.Errorf("invalid config from environment: %w", err)
 			}
 			return cfg, nil // Return defaults if file doesn't exist
@@ -479,7 +432,7 @@ func LoadFromFile(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	if err := yaml.Unmarshal(data, cfg); err != nil {
+	if err = yaml.Unmarshal(data, cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
@@ -502,7 +455,7 @@ func (c *Config) Save() error {
 func (c *Config) SaveToFile(path string) error {
 	// Derive directory from path and ensure it exists
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // G301: config directory needs standard permissions
 		return fmt.Errorf("failed to create config directory: %w", err)
 	}
 
@@ -511,7 +464,7 @@ func (c *Config) SaveToFile(path string) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(path, data, 0o644); err != nil {
+	if err := os.WriteFile(path, data, 0o644); err != nil { //nolint:gosec // G306: config file must be readable by user
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -1219,26 +1172,26 @@ func (s *SuggestionsConfig) ValidateAndFix() []ValidationWarning {
 // back to their default values when invalid.
 func (s *SuggestionsConfig) validateMinOneIntFields(warn func(string, string), defaults *SuggestionsConfig) {
 	fields := []struct {
-		name string
 		val  *int
+		name string
 		def  int
 	}{
 		// Timeouts
-		{"hard_timeout_ms", &s.HardTimeoutMs, defaults.HardTimeoutMs},
-		{"hook_connect_timeout_ms", &s.HookConnectTimeoutMs, defaults.HookConnectTimeoutMs},
-		{"hook_write_timeout_ms", &s.HookWriteTimeoutMs, defaults.HookWriteTimeoutMs},
-		{"ingest_sync_wait_ms", &s.IngestSyncWaitMs, defaults.IngestSyncWaitMs},
-		{"cache_ttl_ms", &s.CacheTTLMs, defaults.CacheTTLMs},
+		{&s.HardTimeoutMs, "hard_timeout_ms", defaults.HardTimeoutMs},
+		{&s.HookConnectTimeoutMs, "hook_connect_timeout_ms", defaults.HookConnectTimeoutMs},
+		{&s.HookWriteTimeoutMs, "hook_write_timeout_ms", defaults.HookWriteTimeoutMs},
+		{&s.IngestSyncWaitMs, "ingest_sync_wait_ms", defaults.IngestSyncWaitMs},
+		{&s.CacheTTLMs, "cache_ttl_ms", defaults.CacheTTLMs},
 		// Counts
-		{"max_results", &s.MaxResults, defaults.MaxResults},
-		{"ingest_queue_max_events", &s.IngestQueueMaxEvents, defaults.IngestQueueMaxEvents},
-		{"burst_events_threshold", &s.BurstEventsThreshold, defaults.BurstEventsThreshold},
+		{&s.MaxResults, "max_results", defaults.MaxResults},
+		{&s.IngestQueueMaxEvents, "ingest_queue_max_events", defaults.IngestQueueMaxEvents},
+		{&s.BurstEventsThreshold, "burst_events_threshold", defaults.BurstEventsThreshold},
 		// Byte sizes
-		{"cmd_raw_max_bytes", &s.CmdRawMaxBytes, defaults.CmdRawMaxBytes},
-		{"ingest_queue_max_bytes", &s.IngestQueueMaxBytes, defaults.IngestQueueMaxBytes},
-		{"cache_memory_budget_mb", &s.CacheMemoryBudgetMB, defaults.CacheMemoryBudgetMB},
+		{&s.CmdRawMaxBytes, "cmd_raw_max_bytes", defaults.CmdRawMaxBytes},
+		{&s.IngestQueueMaxBytes, "ingest_queue_max_bytes", defaults.IngestQueueMaxBytes},
+		{&s.CacheMemoryBudgetMB, "cache_memory_budget_mb", defaults.CacheMemoryBudgetMB},
 		// Online learning
-		{"online_learning_min_samples", &s.OnlineLearningMinSamples, defaults.OnlineLearningMinSamples},
+		{&s.OnlineLearningMinSamples, "online_learning_min_samples", defaults.OnlineLearningMinSamples},
 	}
 	for _, f := range fields {
 		if *f.val < 1 {
@@ -1251,19 +1204,19 @@ func (s *SuggestionsConfig) validateMinOneIntFields(warn func(string, string), d
 // validateWeightFields clamps weight values to [0.0, 1.0].
 func (s *SuggestionsConfig) validateWeightFields(warn func(string, string)) {
 	fields := []struct {
-		name string
 		val  *float64
+		name string
 	}{
-		{"weights.transition", &s.Weights.Transition},
-		{"weights.frequency", &s.Weights.Frequency},
-		{"weights.success", &s.Weights.Success},
-		{"weights.prefix", &s.Weights.Prefix},
-		{"weights.affinity", &s.Weights.Affinity},
-		{"weights.task", &s.Weights.Task},
-		{"weights.feedback", &s.Weights.Feedback},
-		{"weights.risk_penalty", &s.Weights.RiskPenalty},
-		{"weights.project_type_affinity", &s.Weights.ProjectTypeAffinity},
-		{"weights.failure_recovery", &s.Weights.FailureRecovery},
+		{&s.Weights.Transition, "weights.transition"},
+		{&s.Weights.Frequency, "weights.frequency"},
+		{&s.Weights.Success, "weights.success"},
+		{&s.Weights.Prefix, "weights.prefix"},
+		{&s.Weights.Affinity, "weights.affinity"},
+		{&s.Weights.Task, "weights.task"},
+		{&s.Weights.Feedback, "weights.feedback"},
+		{&s.Weights.RiskPenalty, "weights.risk_penalty"},
+		{&s.Weights.ProjectTypeAffinity, "weights.project_type_affinity"},
+		{&s.Weights.FailureRecovery, "weights.failure_recovery"},
 	}
 	for _, f := range fields {
 		if *f.val < 0.0 {

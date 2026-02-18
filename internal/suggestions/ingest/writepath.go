@@ -39,77 +39,34 @@ const DefaultPipelineMaxSegments = 8
 
 // WritePathConfig configures the write-path transaction orchestrator.
 type WritePathConfig struct {
-	// TauMs is the decay time constant in milliseconds for frequency scoring.
-	// Default: 7 days.
-	TauMs int64
-
-	// ProjectTypes is the list of active project types for the session (e.g., "go", "docker").
-	// When non-empty, project_type_stat and project_type_transition are updated.
-	ProjectTypes []string
-
-	// SlotCorrelationKeys defines which slot index tuples to track for correlations.
-	// Each entry is a list of slot indices (e.g., [0,1] to correlate slots 0 and 1).
-	// When empty, no slot correlations are tracked.
+	Cache               CacheInvalidator
+	ProjectTypes        []string
 	SlotCorrelationKeys [][]int
-
-	// PipelineMaxSegments is the maximum number of pipeline segments to process.
-	// Pipelines exceeding this are truncated. Default: DefaultPipelineMaxSegments (8).
+	TauMs               int64
 	PipelineMaxSegments int
-
-	// Cache is an optional cache invalidator. If set, it is called after commit.
-	Cache CacheInvalidator
 }
 
 // WritePathContext holds the enriched context for a single event ingestion.
 // It is computed before the transaction begins.
 type WritePathContext struct {
-	// Event is the validated command event.
-	Event *event.CommandEvent
-
-	// PreNorm is the result of pre-normalization.
-	PreNorm normalize.PreNormResult
-
-	// Slots are the extracted slot values from normalization.
-	Slots []normalize.SlotValue
-
-	// RepoKey is the repository identifier (empty if not in a repo).
-	RepoKey string
-
-	// Branch is the current git branch (empty if not in a repo).
-	Branch string
-
-	// PrevTemplateID is the template_id of the previous command in this session.
-	// Empty if this is the first command or previous is unknown.
+	Event          *event.CommandEvent
+	RepoKey        string
+	Branch         string
 	PrevTemplateID string
-
-	// PrevExitCode is the exit code of the previous command (if PrevTemplateID is set).
-	PrevExitCode int
-
-	// PrevFailed indicates the previous command failed (exit code != 0).
-	PrevFailed bool
-
-	// NowMs is the current timestamp in milliseconds (from the event).
-	NowMs int64
+	Slots          []normalize.SlotValue
+	PreNorm        normalize.PreNormResult
+	PrevExitCode   int
+	NowMs          int64
+	PrevFailed     bool
 }
 
 // WritePathResult holds the output of a successful write-path transaction.
 type WritePathResult struct {
-	// EventID is the auto-incremented ID of the inserted command_event row.
-	EventID int64
-
-	// TemplateID is the template_id used for this event.
-	TemplateID string
-
-	// CmdNorm is the normalized command string.
-	CmdNorm string
-
-	// TransitionRecorded indicates whether a transition was recorded.
-	TransitionRecorded bool
-
-	// PipelineSegments is the number of pipeline segments processed.
-	PipelineSegments int
-
-	// FailureRecoveryRecorded indicates whether a failure recovery was recorded.
+	TemplateID              string
+	CmdNorm                 string
+	EventID                 int64
+	PipelineSegments        int
+	TransitionRecorded      bool
 	FailureRecoveryRecorded bool
 }
 
@@ -128,7 +85,7 @@ type WritePathResult struct {
 //  9. Update pipeline_event/pipeline_transition/pipeline_pattern (for compound commands)
 //  10. Update failure_recovery (when previous command failed)
 //  11. Invalidate cache index (after commit)
-func WritePath(ctx context.Context, db *sql.DB, wctx *WritePathContext, cfg WritePathConfig) (*WritePathResult, error) {
+func WritePath(ctx context.Context, db *sql.DB, wctx *WritePathContext, cfg *WritePathConfig) (*WritePathResult, error) {
 	if err := validateWritePathInputs(db, wctx); err != nil {
 		return nil, err
 	}
@@ -146,7 +103,7 @@ func WritePath(ctx context.Context, db *sql.DB, wctx *WritePathContext, cfg Writ
 	if err != nil {
 		return nil, fmt.Errorf("begin immediate transaction: %w", err)
 	}
-	defer tx.Rollback() //nolint:errcheck // Best-effort rollback after commit
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback after commit
 
 	_, err = executeWritePathSteps(ctx, tx, wctx, cfg, tauMs, result)
 	if err != nil {
@@ -187,7 +144,7 @@ func executeWritePathSteps(
 	ctx context.Context,
 	tx *sql.Tx,
 	wctx *WritePathContext,
-	cfg WritePathConfig,
+	cfg *WritePathConfig,
 	tauMs int64,
 	result *WritePathResult,
 ) (int64, error) {
@@ -212,7 +169,7 @@ func runOptionalWritePathSteps(
 	ctx context.Context,
 	tx *sql.Tx,
 	wctx *WritePathContext,
-	cfg WritePathConfig,
+	cfg *WritePathConfig,
 	tauMs int64,
 	eventID int64,
 	result *WritePathResult,
@@ -249,7 +206,7 @@ func runPipelineAndRecoverySteps(
 	ctx context.Context,
 	tx *sql.Tx,
 	wctx *WritePathContext,
-	cfg WritePathConfig,
+	cfg *WritePathConfig,
 	eventID int64,
 	result *WritePathResult,
 ) error {
@@ -289,7 +246,7 @@ func beginImmediate(ctx context.Context, db *sql.DB) (*sql.Tx, error) {
 	// serialized already, but we use IMMEDIATE for correctness if the pool
 	// config ever changes.
 	if _, err := tx.ExecContext(ctx, "SELECT 1"); err != nil {
-		tx.Rollback() //nolint:errcheck
+		tx.Rollback() //nolint:errcheck // best-effort rollback on error
 		return nil, err
 	}
 
@@ -505,8 +462,8 @@ func updateSlotStats(ctx context.Context, tx *sql.Tx, wctx *WritePathContext, ta
 type slotStatUpsertInput struct {
 	scope      string
 	templateID string
-	slotIndex  int
 	value      string
+	slotIndex  int
 	nowMs      int64
 	tauMs      int64
 }
@@ -591,7 +548,7 @@ func writePathScopes(repoKey string) []string {
 	return scopes
 }
 
-func buildCorrelationTuple(indices []int, slotMap map[int]string) (string, string, string, bool, error) {
+func buildCorrelationTuple(indices []int, slotMap map[int]string) (slotKey, tupleHash, tupleValueJSON string, ok bool, err error) {
 	if len(indices) < 2 {
 		return "", "", "", false, nil
 	}
@@ -607,8 +564,8 @@ func buildCorrelationTuple(indices []int, slotMap map[int]string) (string, strin
 	if err != nil {
 		return "", "", "", false, fmt.Errorf("marshal tuple values: %w", err)
 	}
-	slotKey := buildSlotKey(indices)
-	tupleHash := computeHash(string(valueJSON))
+	slotKey = buildSlotKey(indices)
+	tupleHash = computeHash(string(valueJSON))
 	return slotKey, tupleHash, string(valueJSON), true, nil
 }
 
@@ -728,12 +685,12 @@ func loadDecayedTransitionWeightAndCount(
 	query string,
 	args []any,
 	nowMs, tauMs int64,
-) (float64, int, error) {
+) (weight float64, count int, err error) {
 	var currentWeight float64
 	var currentCount int
 	var lastSeenMs int64
 
-	err := tx.QueryRowContext(ctx, query, args...).Scan(&currentWeight, &currentCount, &lastSeenMs)
+	err = tx.QueryRowContext(ctx, query, args...).Scan(&currentWeight, &currentCount, &lastSeenMs)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return 0, 0, err
 	}
@@ -1063,7 +1020,7 @@ func PrepareWriteContext(
 	normalizer := normalize.NewNormalizer()
 	_, slots := normalizer.Normalize(ev.CmdRaw)
 
-	nowMs := ev.Ts
+	nowMs := ev.TS
 	if nowMs == 0 {
 		nowMs = time.Now().UnixMilli()
 	}

@@ -117,7 +117,7 @@ func (s *SQLiteStore) PruneExpiredCache(ctx context.Context) (int64, error) {
 	return rows, nil
 }
 
-// GetCacheStats returns statistics about the cache.
+// CacheStats returns statistics about the cache.
 type CacheStats struct {
 	TotalEntries   int64
 	ExpiredEntries int64

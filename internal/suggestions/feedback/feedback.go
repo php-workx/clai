@@ -34,19 +34,23 @@ const (
 
 // FeedbackRecord represents a stored feedback entry.
 type FeedbackRecord struct {
-	ID, TsMs, LatencyMs int64
-	SessionID           string
-	PromptPrefix        string
-	SuggestedText       string
-	Action              FeedbackAction
-	ExecutedText        string
-	MatchMethod         MatchMethod
+	SessionID     string
+	PromptPrefix  string
+	SuggestedText string
+	ExecutedText  string
+	Action        FeedbackAction
+	MatchMethod   MatchMethod
+	ID            int64
+	TSMs          int64
+	LatencyMs     int64
 }
 
 // RecentSuggestion tracks a suggestion shown to the user.
 type RecentSuggestion struct {
-	SessionID, SuggestedText, PromptPrefix string
-	ShownAtMs                              int64
+	SessionID     string
+	SuggestedText string
+	PromptPrefix  string
+	ShownAtMs     int64
 }
 
 // Config holds feedback system configuration.
@@ -64,9 +68,9 @@ func DefaultConfig() Config {
 // Store manages suggestion feedback persistence and querying.
 type Store struct {
 	db                *sql.DB
-	cfg               Config
 	logger            *slog.Logger
 	recentSuggestions []RecentSuggestion
+	cfg               Config
 }
 
 // NewStore creates a new feedback store.
@@ -78,7 +82,7 @@ func NewStore(db *sql.DB, cfg Config, logger *slog.Logger) *Store {
 }
 
 // RecordFeedback stores a feedback record.
-func (s *Store) RecordFeedback(ctx context.Context, rec FeedbackRecord) (int64, error) {
+func (s *Store) RecordFeedback(ctx context.Context, rec *FeedbackRecord) (int64, error) {
 	if rec.SessionID == "" {
 		return 0, fmt.Errorf("session_id is required")
 	}
@@ -88,12 +92,12 @@ func (s *Store) RecordFeedback(ctx context.Context, rec FeedbackRecord) (int64, 
 	if !isValidAction(rec.Action) {
 		return 0, fmt.Errorf("invalid feedback action: %q", rec.Action)
 	}
-	if rec.TsMs == 0 {
-		rec.TsMs = time.Now().UnixMilli()
+	if rec.TSMs == 0 {
+		rec.TSMs = time.Now().UnixMilli()
 	}
 	result, err := s.db.ExecContext(ctx,
 		"INSERT INTO suggestion_feedback (session_id, ts_ms, prompt_prefix, suggested_text, action, executed_text, latency_ms) VALUES (?, ?, ?, ?, ?, ?, ?)",
-		rec.SessionID, rec.TsMs, nullStr(rec.PromptPrefix), rec.SuggestedText, string(rec.Action), nullStr(rec.ExecutedText), rec.LatencyMs)
+		rec.SessionID, rec.TSMs, nullStr(rec.PromptPrefix), rec.SuggestedText, string(rec.Action), nullStr(rec.ExecutedText), rec.LatencyMs)
 	if err != nil {
 		return 0, fmt.Errorf("failed to insert feedback: %w", err)
 	}
@@ -141,8 +145,8 @@ func (s *Store) CheckImplicitAcceptance(ctx context.Context, sessionID, executed
 		return "", nil
 	}
 	latMs := executedAtMs - bestMatch.ShownAtMs
-	_, err := s.RecordFeedback(ctx, FeedbackRecord{
-		SessionID: sessionID, TsMs: executedAtMs, PromptPrefix: bestMatch.PromptPrefix,
+	_, err := s.RecordFeedback(ctx, &FeedbackRecord{
+		SessionID: sessionID, TSMs: executedAtMs, PromptPrefix: bestMatch.PromptPrefix,
 		SuggestedText: bestMatch.SuggestedText, Action: ActionAccepted, ExecutedText: executedCmd,
 		LatencyMs: latMs, MatchMethod: bestMethod,
 	})
@@ -202,7 +206,7 @@ func (s *Store) QueryFeedback(ctx context.Context, sessionID string, limit int) 
 	for rows.Next() {
 		var r FeedbackRecord
 		var pp, et sql.NullString
-		if err := rows.Scan(&r.ID, &r.SessionID, &r.TsMs, &pp, &r.SuggestedText, &r.Action, &et, &r.LatencyMs); err != nil {
+		if err := rows.Scan(&r.ID, &r.SessionID, &r.TSMs, &pp, &r.SuggestedText, &r.Action, &et, &r.LatencyMs); err != nil {
 			return nil, err
 		}
 		if pp.Valid {

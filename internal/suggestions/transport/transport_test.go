@@ -283,8 +283,8 @@ func TestUnixTransport_Dial(t *testing.T) {
 	// Accept connections in background
 	accepted := make(chan net.Conn, 1)
 	go func() {
-		conn, err := listener.Accept()
-		if err != nil {
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
 			return
 		}
 		accepted <- conn
@@ -434,9 +434,9 @@ func TestUnixTransport_DataTransfer(t *testing.T) {
 		defer close(serverDone)
 		defer listener.Close()
 
-		conn, err := listener.Accept()
-		if err != nil {
-			serverErr = err
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			serverErr = acceptErr
 			return
 		}
 		defer conn.Close()

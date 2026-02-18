@@ -22,25 +22,12 @@ import (
 
 // MinerConfig holds configuration for the workflow miner.
 type MinerConfig struct {
-	// MinSteps is the minimum number of steps in a workflow (default: 3).
-	MinSteps int
-
-	// MaxSteps is the maximum number of steps in a workflow (default: 6).
-	MaxSteps int
-
-	// MinOccurrences is the minimum number of times a pattern must appear
-	// before it is stored/promoted (default: 3).
+	Scope          string
+	MinSteps       int
+	MaxSteps       int
 	MinOccurrences int
-
-	// MaxGap is the maximum number of non-matching commands between
-	// workflow steps in non-contiguous matching (default: 2).
-	MaxGap int
-
-	// MineIntervalMs is the interval between mining runs in milliseconds.
+	MaxGap         int
 	MineIntervalMs int
-
-	// Scope is the scope to use for storing patterns (e.g., "global" or a repo key).
-	Scope string
 }
 
 // DefaultMinerConfig returns the default miner configuration.
@@ -60,10 +47,10 @@ func DefaultMinerConfig() MinerConfig {
 // for repeated template_id sequences.
 type Miner struct {
 	db     *sql.DB
-	cfg    MinerConfig
-	mu     sync.Mutex
 	stopCh chan struct{}
 	doneCh chan struct{}
+	cfg    MinerConfig
+	mu     sync.Mutex
 }
 
 // NewMiner creates a new workflow miner.
@@ -295,9 +282,9 @@ func (m *Miner) buildNonContiguousFrom(
 		key := patternKey(ids)
 		if cp, ok := counts[key]; ok {
 			cp.count++
-			lastTs := entries[indices[len(indices)-1]].tsMs
-			if lastTs > cp.lastSeenMs {
-				cp.lastSeenMs = lastTs
+			lastTS := entries[indices[len(indices)-1]].tsMs
+			if lastTS > cp.lastSeenMs {
+				cp.lastSeenMs = lastTS
 			}
 		} else {
 			counts[key] = &candidatePattern{
@@ -347,7 +334,7 @@ func (m *Miner) storePattern(ctx context.Context, cp *candidatePattern) error {
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback on error
 
 	// Upsert workflow_pattern.
 	_, err = tx.ExecContext(ctx, `
@@ -416,9 +403,9 @@ func LoadPromotedPatterns(ctx context.Context, db *sql.DB, minOccurrences int) (
 // Pattern is a detected workflow pattern stored in the database.
 type Pattern struct {
 	PatternID       string   `json:"pattern_id"`
+	Scope           string   `json:"scope"`
 	TemplateIDs     []string `json:"template_ids"`
 	DisplayNames    []string `json:"display_names"`
-	Scope           string   `json:"scope"`
 	StepCount       int      `json:"step_count"`
 	OccurrenceCount int      `json:"occurrence_count"`
 	LastSeenMs      int64    `json:"last_seen_ms"`

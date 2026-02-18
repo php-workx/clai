@@ -118,7 +118,8 @@ func TestEtaDecayFormula(t *testing.T) {
 
 func TestLearnerEta(t *testing.T) {
 	cfg := DefaultConfig()
-	learner := NewLearner(DefaultWeights(), cfg, nil)
+	dw := DefaultWeights()
+	learner := NewLearner(&dw, cfg, nil)
 
 	eta0 := learner.Eta()
 	if math.Abs(eta0-0.02) > epsilon {
@@ -151,7 +152,7 @@ func TestWeightClampingAtBoundaries(t *testing.T) {
 		FailureRecovery:     0.60,
 		RiskPenalty:         0.60,
 	}
-	learner := NewLearner(initial, cfg, nil)
+	learner := NewLearner(&initial, cfg, nil)
 
 	// Push all features positive hard.
 	fPos := FeatureVector{
@@ -161,7 +162,7 @@ func TestWeightClampingAtBoundaries(t *testing.T) {
 	}
 	fNeg := FeatureVector{} // all zeros
 
-	learner.Update(context.Background(), "test", fPos, fNeg)
+	learner.Update(context.Background(), "test", &fPos, &fNeg)
 
 	w := learner.Weights()
 	// After renormalization non-penalty weights should preserve their original sum.
@@ -192,7 +193,7 @@ func TestWeightClampingLowerBound(t *testing.T) {
 		Feedback:    0.01,
 		RiskPenalty: 0.11,
 	}
-	learner := NewLearner(initial, cfg, nil)
+	learner := NewLearner(&initial, cfg, nil)
 
 	// Push all features negative hard.
 	fNeg := FeatureVector{
@@ -201,7 +202,7 @@ func TestWeightClampingLowerBound(t *testing.T) {
 	}
 	fPos := FeatureVector{} // all zeros
 
-	learner.Update(context.Background(), "test", fPos, fNeg)
+	learner.Update(context.Background(), "test", &fPos, &fNeg)
 
 	w := learner.Weights()
 	// Non-penalty weights clamped to 0.0
@@ -225,13 +226,13 @@ func TestRenormalizationPreservesSum(t *testing.T) {
 	initial := DefaultWeights()
 	sumBefore := nonPenaltySum(&initial)
 
-	learner := NewLearner(initial, cfg, nil)
+	learner := NewLearner(&initial, cfg, nil)
 
 	// Apply several updates and verify the non-penalty sum is preserved.
 	for i := 0; i < 5; i++ {
 		fPos := FeatureVector{Transition: 0.8, Frequency: 0.3}
 		fNeg := FeatureVector{Task: 0.5, Success: 0.4}
-		learner.Update(context.Background(), "test", fPos, fNeg)
+		learner.Update(context.Background(), "test", &fPos, &fNeg)
 	}
 
 	w := learner.Weights()
@@ -243,19 +244,19 @@ func TestRenormalizationPreservesSum(t *testing.T) {
 	}
 }
 
-func TestRenormalizationWithZeroSum(t *testing.T) {
+func TestRenormalizationWithZeroSum(_ *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MinSamples = 0
 
 	// All non-penalty weights are zero; renormalization should not panic.
 	initial := Weights{RiskPenalty: 0.20}
-	learner := NewLearner(initial, cfg, nil)
+	learner := NewLearner(&initial, cfg, nil)
 
 	fPos := FeatureVector{Transition: 0.5}
 	fNeg := FeatureVector{}
 
 	// Should not panic.
-	learner.Update(context.Background(), "test", fPos, fNeg)
+	learner.Update(context.Background(), "test", &fPos, &fNeg)
 }
 
 // -----------------------------------------------------------------------
@@ -267,14 +268,14 @@ func TestLowSampleFreeze(t *testing.T) {
 	cfg.MinSamples = 10
 
 	initial := DefaultWeights()
-	learner := NewLearner(initial, cfg, nil)
+	learner := NewLearner(&initial, cfg, nil)
 
 	fPos := FeatureVector{Transition: 1.0, Frequency: 1.0}
 	fNeg := FeatureVector{}
 
 	// Apply 9 updates (below threshold): weights should not change.
 	for i := 0; i < 9; i++ {
-		learner.Update(context.Background(), "test", fPos, fNeg)
+		learner.Update(context.Background(), "test", &fPos, &fNeg)
 	}
 
 	w := learner.Weights()
@@ -288,7 +289,7 @@ func TestLowSampleFreeze(t *testing.T) {
 	}
 
 	// 10th update should trigger actual weight change.
-	learner.Update(context.Background(), "test", fPos, fNeg)
+	learner.Update(context.Background(), "test", &fPos, &fNeg)
 
 	w2 := learner.Weights()
 	if math.Abs(w2.Transition-initial.Transition) < epsilon {
@@ -305,13 +306,13 @@ func TestPairwiseUpdateIncreasesAcceptedFeature(t *testing.T) {
 	cfg.MinSamples = 0
 
 	initial := DefaultWeights()
-	learner := NewLearner(initial, cfg, nil)
+	learner := NewLearner(&initial, cfg, nil)
 
 	// Positive signal for Transition feature.
 	fPos := FeatureVector{Transition: 0.9}
 	fNeg := FeatureVector{Transition: 0.1}
 
-	learner.Update(context.Background(), "test", fPos, fNeg)
+	learner.Update(context.Background(), "test", &fPos, &fNeg)
 
 	w := learner.Weights()
 	// Transition should have increased (before renormalization adjusts everything).
@@ -331,13 +332,13 @@ func TestPairwiseUpdateDecreasesNegativeFeature(t *testing.T) {
 	cfg.MinSamples = 0
 
 	initial := DefaultWeights()
-	learner := NewLearner(initial, cfg, nil)
+	learner := NewLearner(&initial, cfg, nil)
 
 	// Negative signal for Task feature (dismissed candidate was strong on Task).
 	fPos := FeatureVector{Task: 0.1}
 	fNeg := FeatureVector{Task: 0.9}
 
-	learner.Update(context.Background(), "test", fPos, fNeg)
+	learner.Update(context.Background(), "test", &fPos, &fNeg)
 
 	w := learner.Weights()
 	initialRatio := initial.Task / nonPenaltySum(&initial)
@@ -362,13 +363,15 @@ func TestPerScopeIsolation(t *testing.T) {
 
 	// Create two learners without store to avoid async goroutine races.
 	// We persist via the store directly to test scope isolation.
-	learnerA := NewLearner(DefaultWeights(), cfg, nil)
-	learnerB := NewLearner(DefaultWeights(), cfg, nil)
+	dwA := DefaultWeights()
+	learnerA := NewLearner(&dwA, cfg, nil)
+	dwB := DefaultWeights()
+	learnerB := NewLearner(&dwB, cfg, nil)
 
 	// Update scope A only.
 	fPos := FeatureVector{Transition: 1.0}
 	fNeg := FeatureVector{}
-	learnerA.Update(ctx, "repo:alpha", fPos, fNeg)
+	learnerA.Update(ctx, "repo:alpha", &fPos, &fNeg)
 
 	// Save both scopes synchronously to the store.
 	wA := learnerA.Weights()
@@ -528,7 +531,8 @@ func TestConcurrentSafety(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MinSamples = 0
 
-	learner := NewLearner(DefaultWeights(), cfg, nil)
+	dw := DefaultWeights()
+	learner := NewLearner(&dw, cfg, nil)
 
 	var wg sync.WaitGroup
 	const goroutines = 20
@@ -541,7 +545,7 @@ func TestConcurrentSafety(t *testing.T) {
 			for i := 0; i < updatesPerGoroutine; i++ {
 				fPos := FeatureVector{Transition: 0.7, Frequency: 0.3}
 				fNeg := FeatureVector{Task: 0.4}
-				learner.Update(context.Background(), "global", fPos, fNeg)
+				learner.Update(context.Background(), "global", &fPos, &fNeg)
 			}
 		}()
 	}
@@ -644,7 +648,8 @@ func TestLoadFromStore(t *testing.T) {
 	}
 
 	// Create a learner and load.
-	learner := NewLearner(DefaultWeights(), cfg, store)
+	dw := DefaultWeights()
+	learner := NewLearner(&dw, cfg, store)
 	found, err := learner.LoadFromStore(ctx, "repo:myrepo")
 	if err != nil {
 		t.Fatal(err)
@@ -666,7 +671,8 @@ func TestLoadFromStoreNotFound(t *testing.T) {
 	store := NewStore(db)
 	cfg := DefaultConfig()
 
-	learner := NewLearner(DefaultWeights(), cfg, store)
+	dw := DefaultWeights()
+	learner := NewLearner(&dw, cfg, store)
 	found, err := learner.LoadFromStore(context.Background(), "nonexistent")
 	if err != nil {
 		t.Fatal(err)
@@ -684,7 +690,8 @@ func TestLoadFromStoreNotFound(t *testing.T) {
 
 func TestLoadFromStoreNilStore(t *testing.T) {
 	cfg := DefaultConfig()
-	learner := NewLearner(DefaultWeights(), cfg, nil)
+	dw := DefaultWeights()
+	learner := NewLearner(&dw, cfg, nil)
 
 	found, err := learner.LoadFromStore(context.Background(), "global")
 	if err != nil {
@@ -703,7 +710,8 @@ func TestRepeatedUpdatesConverge(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.MinSamples = 0
 
-	learner := NewLearner(DefaultWeights(), cfg, nil)
+	dw := DefaultWeights()
+	learner := NewLearner(&dw, cfg, nil)
 
 	// Apply the same update 1000 times. Due to eta decay, changes should diminish.
 	fPos := FeatureVector{Transition: 0.8}
@@ -712,7 +720,7 @@ func TestRepeatedUpdatesConverge(t *testing.T) {
 	var prevW Weights
 	for i := 0; i < 1000; i++ {
 		prevW = learner.Weights()
-		learner.Update(context.Background(), "test", fPos, fNeg)
+		learner.Update(context.Background(), "test", &fPos, &fNeg)
 	}
 
 	w := learner.Weights()
@@ -737,10 +745,10 @@ func TestNoOpUpdate(t *testing.T) {
 	cfg.MinSamples = 0
 
 	initial := DefaultWeights()
-	learner := NewLearner(initial, cfg, nil)
+	learner := NewLearner(&initial, cfg, nil)
 
 	fSame := FeatureVector{Transition: 0.5, Frequency: 0.3}
-	learner.Update(context.Background(), "test", fSame, fSame)
+	learner.Update(context.Background(), "test", &fSame, &fSame)
 
 	w := learner.Weights()
 	// With identical feature vectors, the delta is zero so weights should

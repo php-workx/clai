@@ -97,7 +97,7 @@ func TestCP2_SessionFlow(t *testing.T) {
 
 // TestCP3_CommandLogging verifies commands are logged with exit codes.
 // Checkpoint 3: Command Logging - Commands logged with exit codes
-func TestCP3_CommandLogging(t *testing.T) {
+func TestCP3_CommandLogging(t *testing.T) { //nolint:funlen // table-driven test with command verification
 	env := SetupTestEnv(t)
 	defer env.Teardown()
 
@@ -121,14 +121,14 @@ func TestCP3_CommandLogging(t *testing.T) {
 	// Log commands with different exit codes
 	testCases := []struct {
 		command  string
-		exitCode int
 		cwd      string
+		exitCode int
 	}{
-		{"echo hello", 0, "/home/test"},
-		{"ls -la", 0, "/home/test"},
-		{"git status", 0, "/home/test/repo"},
-		{"npm test", 1, "/home/test/project"},
-		{"make build", 2, "/home/test/src"},
+		{"echo hello", "/home/test", 0},
+		{"ls -la", "/home/test", 0},
+		{"git status", "/home/test/repo", 0},
+		{"npm test", "/home/test/project", 1},
+		{"make build", "/home/test/src", 2},
 	}
 
 	for _, tc := range testCases {
@@ -136,7 +136,8 @@ func TestCP3_CommandLogging(t *testing.T) {
 		startTime := time.Now()
 
 		// Log command start
-		startResp, err := env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
+		var startResp *pb.Ack
+		startResp, err = env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
 			SessionId: sessionID,
 			CommandId: commandID,
 			Cwd:       tc.cwd,
@@ -153,10 +154,11 @@ func TestCP3_CommandLogging(t *testing.T) {
 		// Log command end
 		endTime := time.Now()
 		durationMs := endTime.Sub(startTime).Milliseconds()
-		endResp, err := env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
+		var endResp *pb.Ack
+		endResp, err = env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
 			SessionId:  sessionID,
 			CommandId:  commandID,
-			ExitCode:   int32(tc.exitCode),
+			ExitCode:   int32(tc.exitCode), //nolint:gosec // G115: test data, exit codes are small bounded values
 			DurationMs: durationMs,
 			TsUnixMs:   endTime.UnixMilli(),
 		})
@@ -356,7 +358,7 @@ func TestSession_MultipleSessions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStatus failed: %v", err)
 	}
-	if status.ActiveSessions != int32(len(sessions)) {
+	if status.ActiveSessions != int32(len(sessions)) { //nolint:gosec // G115: test data, session count is small
 		t.Errorf("expected %d active sessions, got %d", len(sessions), status.ActiveSessions)
 	}
 
@@ -393,8 +395,77 @@ func TestSession_MultipleSessions(t *testing.T) {
 			t.Fatalf("GetStatus failed: %v", err)
 		}
 		expectedActive := len(sessions) - (i + 1)
-		if status.ActiveSessions != int32(expectedActive) {
+		if status.ActiveSessions != int32(expectedActive) { //nolint:gosec // G115: test data, session count is small
 			t.Errorf("after ending session %d, expected %d active sessions, got %d", i, expectedActive, status.ActiveSessions)
+		}
+	}
+}
+
+// logCommandsToSession logs a list of commands to the given session.
+func logCommandsToSession(ctx context.Context, client pb.ClaiServiceClient, sessionID, cwd string, commands []string) {
+	for _, cmd := range commands {
+		commandID := generateCommandID()
+		_, _ = client.CommandStarted(ctx, &pb.CommandStartRequest{
+			SessionId: sessionID,
+			CommandId: commandID,
+			Cwd:       cwd,
+			Command:   cmd,
+			TsUnixMs:  time.Now().UnixMilli(),
+		})
+		_, _ = client.CommandEnded(ctx, &pb.CommandEndRequest{
+			SessionId:  sessionID,
+			CommandId:  commandID,
+			ExitCode:   0,
+			DurationMs: 100,
+			TsUnixMs:   time.Now().UnixMilli(),
+		})
+	}
+}
+
+// assertSessionSuggestions verifies that a session's suggestions contain expectedOwner commands
+// and do not contain unexpectedOwner commands.
+func assertSessionSuggestions(t *testing.T, suggestions []*pb.Suggestion, expectedOwner, unexpectedOwner, ownerLabel string) {
+	t.Helper()
+	foundOwn := false
+	for _, s := range suggestions {
+		if s.Text == expectedOwner+"-unique-command-1" || s.Text == expectedOwner+"-unique-command-2" {
+			foundOwn = true
+		}
+		if s.Text == unexpectedOwner+"-unique-command-1" || s.Text == unexpectedOwner+"-unique-command-2" {
+			t.Errorf("session %s should not see %s's command: %s", ownerLabel, unexpectedOwner, s.Text)
+		}
+	}
+	if !foundOwn && len(suggestions) > 0 {
+		t.Logf("%s's commands not found in suggestions (may be expected if session filtering is strict)", expectedOwner)
+	}
+}
+
+// assertSharedPrefixAttribution verifies source attribution for shared-prefix suggestions.
+func assertSharedPrefixAttribution(t *testing.T, suggestions []*pb.Suggestion, ownSuffix, otherSuffix, label string) {
+	t.Helper()
+	foundOwnInSession := false
+	for _, s := range suggestions {
+		if s.Text == "shared-prefix-"+ownSuffix && s.Source == "session" {
+			foundOwnInSession = true
+		}
+		if s.Text == "shared-prefix-"+otherSuffix && s.Source != "global" {
+			t.Errorf("session %s seeing %s's command from wrong source: got %s, want global", label, otherSuffix, s.Source)
+		}
+	}
+	if len(suggestions) > 0 && !foundOwnInSession {
+		t.Logf("session %s did not find own command with source=session (may be expected based on ranking)", label)
+	}
+}
+
+// assertNoCommandCrossContamination verifies that commands from one session
+// don't appear in another session's stored commands.
+func assertNoCommandCrossContamination(t *testing.T, commands []storage.Command, foreignCommands []string, label string) {
+	t.Helper()
+	for _, cmd := range commands {
+		for _, foreign := range foreignCommands {
+			if cmd.Command == foreign {
+				t.Errorf("session %s commands contain foreign command: %s", label, cmd.Command)
+			}
 		}
 	}
 }
@@ -435,53 +506,20 @@ func TestSession_HistoryIsolation(t *testing.T) {
 		}
 	}
 
-	// Log unique commands to session A
+	// Log unique commands to each session
 	sessionACommands := []string{
 		"alice-unique-command-1",
 		"alice-unique-command-2",
 		"shared-prefix-alice",
 	}
-	for _, cmd := range sessionACommands {
-		commandID := generateCommandID()
-		_, _ = env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
-			SessionId: sessionA,
-			CommandId: commandID,
-			Cwd:       "/home/alice/project",
-			Command:   cmd,
-			TsUnixMs:  time.Now().UnixMilli(),
-		})
-		_, _ = env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
-			SessionId:  sessionA,
-			CommandId:  commandID,
-			ExitCode:   0,
-			DurationMs: 100,
-			TsUnixMs:   time.Now().UnixMilli(),
-		})
-	}
+	logCommandsToSession(ctx, env.Client, sessionA, "/home/alice/project", sessionACommands)
 
-	// Log unique commands to session B
 	sessionBCommands := []string{
 		"bob-unique-command-1",
 		"bob-unique-command-2",
 		"shared-prefix-bob",
 	}
-	for _, cmd := range sessionBCommands {
-		commandID := generateCommandID()
-		_, _ = env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
-			SessionId: sessionB,
-			CommandId: commandID,
-			Cwd:       "/home/bob/project",
-			Command:   cmd,
-			TsUnixMs:  time.Now().UnixMilli(),
-		})
-		_, _ = env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
-			SessionId:  sessionB,
-			CommandId:  commandID,
-			ExitCode:   0,
-			DurationMs: 100,
-			TsUnixMs:   time.Now().UnixMilli(),
-		})
-	}
+	logCommandsToSession(ctx, env.Client, sessionB, "/home/bob/project", sessionBCommands)
 
 	// Query suggestions from session A with "alice" prefix
 	t.Run("SessionA_OnlySeesOwnCommands", func(t *testing.T) {
@@ -494,21 +532,7 @@ func TestSession_HistoryIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Suggest failed: %v", err)
 		}
-
-		// Should find alice's commands
-		foundAlice := false
-		for _, s := range resp.Suggestions {
-			if s.Text == "alice-unique-command-1" || s.Text == "alice-unique-command-2" {
-				foundAlice = true
-			}
-			// Should NOT find bob's commands
-			if s.Text == "bob-unique-command-1" || s.Text == "bob-unique-command-2" {
-				t.Errorf("session A should not see session B's command: %s", s.Text)
-			}
-		}
-		if !foundAlice && len(resp.Suggestions) > 0 {
-			t.Log("alice's commands not found in suggestions (may be expected if session filtering is strict)")
-		}
+		assertSessionSuggestions(t, resp.Suggestions, "alice", "bob", "A")
 	})
 
 	// Query suggestions from session B with "bob" prefix
@@ -522,27 +546,11 @@ func TestSession_HistoryIsolation(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Suggest failed: %v", err)
 		}
-
-		// Should find bob's commands
-		foundBob := false
-		for _, s := range resp.Suggestions {
-			if s.Text == "bob-unique-command-1" || s.Text == "bob-unique-command-2" {
-				foundBob = true
-			}
-			// Should NOT find alice's commands
-			if s.Text == "alice-unique-command-1" || s.Text == "alice-unique-command-2" {
-				t.Errorf("session B should not see session A's command: %s", s.Text)
-			}
-		}
-		if !foundBob && len(resp.Suggestions) > 0 {
-			t.Log("bob's commands not found in suggestions (may be expected if session filtering is strict)")
-		}
+		assertSessionSuggestions(t, resp.Suggestions, "bob", "alice", "B")
 	})
 
 	// Query with shared prefix - verify source attribution is correct
-	// Session scope remains isolated, but Global scope shows commands from OTHER sessions
 	t.Run("SharedPrefix_SourceAttribution", func(t *testing.T) {
-		// Session A queries "shared-prefix"
 		respA, err := env.Client.Suggest(ctx, &pb.SuggestRequest{
 			SessionId:  sessionA,
 			Cwd:        "/home/alice/project",
@@ -553,7 +561,6 @@ func TestSession_HistoryIsolation(t *testing.T) {
 			t.Fatalf("Suggest for session A failed: %v", err)
 		}
 
-		// Session B queries "shared-prefix"
 		respB, err := env.Client.Suggest(ctx, &pb.SuggestRequest{
 			SessionId:  sessionB,
 			Cwd:        "/home/bob/project",
@@ -564,42 +571,12 @@ func TestSession_HistoryIsolation(t *testing.T) {
 			t.Fatalf("Suggest for session B failed: %v", err)
 		}
 
-		// Verify session A sees its own command from "session" source
-		// and may see session B's command from "global" source (for discovery)
-		foundOwnInSession := false
-		for _, s := range respA.Suggestions {
-			if s.Text == "shared-prefix-alice" && s.Source == "session" {
-				foundOwnInSession = true
-			}
-			// If session A sees bob's command, it MUST be from "global" source
-			if s.Text == "shared-prefix-bob" && s.Source != "global" {
-				t.Errorf("session A seeing bob's command from wrong source: got %s, want global", s.Source)
-			}
-		}
-		if len(respA.Suggestions) > 0 && !foundOwnInSession {
-			t.Log("session A did not find own command with source=session (may be expected based on ranking)")
-		}
-
-		// Verify session B sees its own command from "session" source
-		// and may see session A's command from "global" source (for discovery)
-		foundOwnInSessionB := false
-		for _, s := range respB.Suggestions {
-			if s.Text == "shared-prefix-bob" && s.Source == "session" {
-				foundOwnInSessionB = true
-			}
-			// If session B sees alice's command, it MUST be from "global" source
-			if s.Text == "shared-prefix-alice" && s.Source != "global" {
-				t.Errorf("session B seeing alice's command from wrong source: got %s, want global", s.Source)
-			}
-		}
-		if len(respB.Suggestions) > 0 && !foundOwnInSessionB {
-			t.Log("session B did not find own command with source=session (may be expected based on ranking)")
-		}
+		assertSharedPrefixAttribution(t, respA.Suggestions, "alice", "bob", "A")
+		assertSharedPrefixAttribution(t, respB.Suggestions, "bob", "alice", "B")
 	})
 
 	// Verify via direct storage query that commands are properly tagged
 	t.Run("StorageQuery_CommandsTaggedWithSession", func(t *testing.T) {
-		// Query commands for session A
 		commandsA, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
 			SessionID: &sessionA,
 			Limit:     100,
@@ -608,7 +585,6 @@ func TestSession_HistoryIsolation(t *testing.T) {
 			t.Fatalf("QueryCommands for session A failed: %v", err)
 		}
 
-		// Query commands for session B
 		commandsB, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
 			SessionID: &sessionB,
 			Limit:     100,
@@ -617,7 +593,6 @@ func TestSession_HistoryIsolation(t *testing.T) {
 			t.Fatalf("QueryCommands for session B failed: %v", err)
 		}
 
-		// Verify counts
 		if len(commandsA) != len(sessionACommands) {
 			t.Errorf("session A should have %d commands, got %d", len(sessionACommands), len(commandsA))
 		}
@@ -625,21 +600,8 @@ func TestSession_HistoryIsolation(t *testing.T) {
 			t.Errorf("session B should have %d commands, got %d", len(sessionBCommands), len(commandsB))
 		}
 
-		// Verify no cross-contamination
-		for _, cmd := range commandsA {
-			for _, bCmd := range sessionBCommands {
-				if cmd.Command == bCmd {
-					t.Errorf("session A commands contain session B command: %s", cmd.Command)
-				}
-			}
-		}
-		for _, cmd := range commandsB {
-			for _, aCmd := range sessionACommands {
-				if cmd.Command == aCmd {
-					t.Errorf("session B commands contain session A command: %s", cmd.Command)
-				}
-			}
-		}
+		assertNoCommandCrossContamination(t, commandsA, sessionBCommands, "A")
+		assertNoCommandCrossContamination(t, commandsB, sessionACommands, "B")
 	})
 }
 

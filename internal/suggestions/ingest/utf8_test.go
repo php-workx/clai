@@ -64,8 +64,8 @@ func TestToLossyUTF8_InvalidSequencesReplaced(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		input  []byte
 		output string
+		input  []byte
 	}{
 		{
 			name:   "single invalid byte 0x80",
@@ -175,8 +175,8 @@ func TestToLossyUTF8_MixedValidInvalid(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		input  []byte
 		output string
+		input  []byte
 	}{
 		{
 			name:   "invalid between valid ASCII",
@@ -235,8 +235,8 @@ func TestToLossyUTF8_NULByteHandling(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		input  []byte
 		output string
+		input  []byte
 	}{
 		{
 			name:   "single NUL byte",

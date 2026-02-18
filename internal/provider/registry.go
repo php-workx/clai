@@ -8,9 +8,9 @@ import (
 
 // Registry manages available AI providers and handles provider selection
 type Registry struct {
-	mu        sync.RWMutex
 	providers map[string]Provider
 	preferred string // User-specified preferred provider
+	mu        sync.RWMutex
 }
 
 // ProviderPriority defines the order of provider selection when in "auto" mode

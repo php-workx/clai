@@ -289,7 +289,7 @@ func TestCorruptionHistory_RecordAndLoad(t *testing.T) {
 		RecoverySuccess:   true,
 	}
 
-	err := recordCorruptionEvent(dbPath, event)
+	err := recordCorruptionEvent(dbPath, &event)
 	if err != nil {
 		t.Fatalf("recordCorruptionEvent() error = %v", err)
 	}
@@ -330,7 +330,7 @@ func TestCorruptionHistory_MultipleEvents(t *testing.T) {
 			Reason:            "test corruption",
 			RecoverySuccess:   true,
 		}
-		if err := recordCorruptionEvent(dbPath, event); err != nil {
+		if err := recordCorruptionEvent(dbPath, &event); err != nil {
 			t.Fatalf("recordCorruptionEvent() error = %v", err)
 		}
 	}
@@ -679,9 +679,9 @@ func TestOpen_WithRecovery_WALAndSHMRotated(t *testing.T) {
 	// Verify all corrupt backups were created
 	for _, suffix := range []string{"", "-wal", "-shm"} {
 		pattern := filepath.Join(tmpDir, "suggestions_v2.db"+suffix+".corrupt.*")
-		matches, err := filepath.Glob(pattern)
-		if err != nil {
-			t.Fatalf("Glob(%s) error = %v", pattern, err)
+		matches, globErr := filepath.Glob(pattern)
+		if globErr != nil {
+			t.Fatalf("Glob(%s) error = %v", pattern, globErr)
 		}
 		if len(matches) == 0 {
 			t.Errorf("No backup found for %s", "suggestions_v2.db"+suffix)
@@ -690,15 +690,15 @@ func TestOpen_WithRecovery_WALAndSHMRotated(t *testing.T) {
 
 	// Verify original files are gone
 	for _, suffix := range []string{"", "-wal", "-shm"} {
-		if _, err := os.Stat(dbPath + suffix); !os.IsNotExist(err) {
+		if _, statErr := os.Stat(dbPath + suffix); !os.IsNotExist(statErr) {
 			t.Errorf("Original file %s should not exist after rotation", dbPath+suffix)
 		}
 	}
 
 	// Now also verify that Open with recovery handles the main file corruption.
 	// Write just the main file as garbage (WAL/SHM may not exist).
-	if err := os.WriteFile(dbPath, []byte("garbage"), 0644); err != nil {
-		t.Fatalf("Failed to create corrupt file: %v", err)
+	if writeErr := os.WriteFile(dbPath, []byte("garbage"), 0644); writeErr != nil {
+		t.Fatalf("Failed to create corrupt file: %v", writeErr)
 	}
 
 	db, err := Open(context.Background(), Options{

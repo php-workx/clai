@@ -246,19 +246,19 @@ func TestFrequencyStore_GetTopCommands(t *testing.T) {
 	defer fs.Close()
 
 	ctx := context.Background()
-	baseTs := int64(1000000)
+	baseTS := int64(1000000)
 
 	// Insert commands with different frequencies
 	commands := []string{"git status", "git commit", "make build", "npm test"}
 	for i, cmd := range commands {
 		// More recent commands get lower multiplier (to test decay effects)
 		for j := 0; j <= i; j++ {
-			require.NoError(t, fs.Update(ctx, ScopeGlobal, cmd, baseTs))
+			require.NoError(t, fs.Update(ctx, ScopeGlobal, cmd, baseTS))
 		}
 	}
 
 	t.Run("returns top commands by score", func(t *testing.T) {
-		top, err := fs.GetTopCommandsAt(ctx, ScopeGlobal, 3, baseTs)
+		top, err := fs.GetTopCommandsAt(ctx, ScopeGlobal, 3, baseTS)
 		require.NoError(t, err)
 
 		assert.Len(t, top, 3)
@@ -269,14 +269,14 @@ func TestFrequencyStore_GetTopCommands(t *testing.T) {
 	})
 
 	t.Run("respects limit", func(t *testing.T) {
-		top, err := fs.GetTopCommandsAt(ctx, ScopeGlobal, 2, baseTs)
+		top, err := fs.GetTopCommandsAt(ctx, ScopeGlobal, 2, baseTS)
 		require.NoError(t, err)
 
 		assert.Len(t, top, 2)
 	})
 
 	t.Run("returns empty for nonexistent scope", func(t *testing.T) {
-		top, err := fs.GetTopCommandsAt(ctx, "nonexistent", 10, baseTs)
+		top, err := fs.GetTopCommandsAt(ctx, "nonexistent", 10, baseTS)
 		require.NoError(t, err)
 
 		assert.Empty(t, top)

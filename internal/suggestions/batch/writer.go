@@ -34,6 +34,14 @@ const (
 
 // Options configures the batch writer.
 type Options struct {
+	// WritePathConfig configures the ingest.WritePath call per event.
+	// When set, each event in the batch also populates V2 aggregate tables
+	// (command_template, command_stat, transition_stat, etc.) via WritePath.
+	WritePathConfig *ingest.WritePathConfig
+
+	// Logger is the structured logger (optional, uses slog.Default if nil).
+	Logger *slog.Logger
+
 	// FlushInterval is how often to flush batched events.
 	// Defaults to DefaultFlushInterval (35ms).
 	FlushInterval time.Duration
@@ -46,14 +54,6 @@ type Options struct {
 	// QueueSize is the size of the event channel buffer.
 	// Defaults to DefaultQueueSize (500).
 	QueueSize int
-
-	// WritePathConfig configures the ingest.WritePath call per event.
-	// When set, each event in the batch also populates V2 aggregate tables
-	// (command_template, command_stat, transition_stat, etc.) via WritePath.
-	WritePathConfig *ingest.WritePathConfig
-
-	// Logger is the structured logger (optional, uses slog.Default if nil).
-	Logger *slog.Logger
 }
 
 // DefaultOptions returns the default batch writer options.
@@ -71,38 +71,33 @@ const maxSessionEntries = 256
 
 // sessionState tracks per-session state for transition tracking across batches.
 type sessionState struct {
+	lastSeen       time.Time
 	lastTemplateID string
 	lastExitCode   int
 	lastFailed     bool
-	lastSeen       time.Time
 }
 
 // Writer batches events and writes them to SQLite in transactions.
 // It is safe for concurrent use.
 type Writer struct {
-	db     *sql.DB
-	opts   Options
-	logger *slog.Logger
-
-	eventCh   chan *event.CommandEvent
-	flushCh   chan struct{}
-	doneCh    chan struct{}
-	stoppedCh chan struct{}
-	stopOnce  sync.Once
-
-	// Per-session state for transition tracking (only accessed from writeLoop goroutine)
-	sessions map[string]*sessionState
-
-	// Metrics
-	mu             sync.RWMutex
-	eventsWritten  int64
-	batchesWritten int64
-	eventsDropped  int64
-	lastFlushTime  time.Time
-	lastBatchSize  int
-	writeErrors    int64
-	lastWriteError error
 	lastErrorTime  time.Time
+	lastFlushTime  time.Time
+	lastWriteError error
+	doneCh         chan struct{}
+	db             *sql.DB
+	stoppedCh      chan struct{}
+	sessions       map[string]*sessionState
+	flushCh        chan struct{}
+	eventCh        chan *event.CommandEvent
+	logger         *slog.Logger
+	opts           Options
+	eventsDropped  int64
+	batchesWritten int64
+	eventsWritten  int64
+	writeErrors    int64
+	lastBatchSize  int
+	mu             sync.RWMutex
+	stopOnce       sync.Once
 }
 
 // NewWriter creates a new batch writer with the given database and options.
@@ -286,7 +281,7 @@ func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
 			nil, // aliases
 		)
 
-		result, err := ingest.WritePath(ctx, w.db, wctx, *w.opts.WritePathConfig)
+		result, err := ingest.WritePath(ctx, w.db, wctx, w.opts.WritePathConfig)
 		if err != nil {
 			w.logger.Warn("batch WritePath error",
 				"session_id", ev.SessionID,
@@ -315,8 +310,8 @@ func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
 func (w *Writer) evictStaleSessions() {
 	// Find the oldest entries and remove them
 	type entry struct {
-		id       string
 		lastSeen time.Time
+		id       string
 	}
 	entries := make([]entry, 0, len(w.sessions))
 	for id, s := range w.sessions {
@@ -379,7 +374,7 @@ func (w *Writer) writeBatchRaw(batch []*event.CommandEvent) error {
 		// For now, insert with raw command; normalization is done upstream
 		_, err := stmt.ExecContext(ctx,
 			ev.SessionID,
-			ev.Ts, // ts_ms
+			ev.TS, // ts_ms
 			ev.Cwd,
 			"", // repo_key - computed by git context
 			"", // branch - computed by git context
@@ -398,15 +393,15 @@ func (w *Writer) writeBatchRaw(batch []*event.CommandEvent) error {
 
 // Stats returns current writer statistics.
 type Stats struct {
+	LastWriteError error
+	LastFlushTime  time.Time
+	LastErrorTime  time.Time
 	EventsWritten  int64
 	BatchesWritten int64
 	EventsDropped  int64
-	QueueLength    int
-	LastFlushTime  time.Time
-	LastBatchSize  int
 	WriteErrors    int64
-	LastWriteError error
-	LastErrorTime  time.Time
+	QueueLength    int
+	LastBatchSize  int
 }
 
 // Stats returns the current writer statistics.

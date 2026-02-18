@@ -241,18 +241,18 @@ func TestValidateAndFix_DefaultsProduceNoWarnings(t *testing.T) {
 func TestValidateAndFix_NegativeTimeouts(t *testing.T) {
 	defaults := DefaultSuggestionsConfig()
 	tests := []struct {
-		name   string
 		modify func(*SuggestionsConfig)
-		field  string
 		check  func(*SuggestionsConfig) int
+		name   string
+		field  string
 		defVal int
 	}{
-		{"hard_timeout_ms=0", func(s *SuggestionsConfig) { s.HardTimeoutMs = 0 }, "hard_timeout_ms", func(s *SuggestionsConfig) int { return s.HardTimeoutMs }, defaults.HardTimeoutMs},
-		{"hard_timeout_ms=-1", func(s *SuggestionsConfig) { s.HardTimeoutMs = -1 }, "hard_timeout_ms", func(s *SuggestionsConfig) int { return s.HardTimeoutMs }, defaults.HardTimeoutMs},
-		{"hook_connect_timeout_ms=0", func(s *SuggestionsConfig) { s.HookConnectTimeoutMs = 0 }, "hook_connect_timeout_ms", func(s *SuggestionsConfig) int { return s.HookConnectTimeoutMs }, defaults.HookConnectTimeoutMs},
-		{"hook_write_timeout_ms=-5", func(s *SuggestionsConfig) { s.HookWriteTimeoutMs = -5 }, "hook_write_timeout_ms", func(s *SuggestionsConfig) int { return s.HookWriteTimeoutMs }, defaults.HookWriteTimeoutMs},
-		{"ingest_sync_wait_ms=0", func(s *SuggestionsConfig) { s.IngestSyncWaitMs = 0 }, "ingest_sync_wait_ms", func(s *SuggestionsConfig) int { return s.IngestSyncWaitMs }, defaults.IngestSyncWaitMs},
-		{"cache_ttl_ms=-100", func(s *SuggestionsConfig) { s.CacheTTLMs = -100 }, "cache_ttl_ms", func(s *SuggestionsConfig) int { return s.CacheTTLMs }, defaults.CacheTTLMs},
+		{func(s *SuggestionsConfig) { s.HardTimeoutMs = 0 }, func(s *SuggestionsConfig) int { return s.HardTimeoutMs }, "hard_timeout_ms=0", "hard_timeout_ms", defaults.HardTimeoutMs},
+		{func(s *SuggestionsConfig) { s.HardTimeoutMs = -1 }, func(s *SuggestionsConfig) int { return s.HardTimeoutMs }, "hard_timeout_ms=-1", "hard_timeout_ms", defaults.HardTimeoutMs},
+		{func(s *SuggestionsConfig) { s.HookConnectTimeoutMs = 0 }, func(s *SuggestionsConfig) int { return s.HookConnectTimeoutMs }, "hook_connect_timeout_ms=0", "hook_connect_timeout_ms", defaults.HookConnectTimeoutMs},
+		{func(s *SuggestionsConfig) { s.HookWriteTimeoutMs = -5 }, func(s *SuggestionsConfig) int { return s.HookWriteTimeoutMs }, "hook_write_timeout_ms=-5", "hook_write_timeout_ms", defaults.HookWriteTimeoutMs},
+		{func(s *SuggestionsConfig) { s.IngestSyncWaitMs = 0 }, func(s *SuggestionsConfig) int { return s.IngestSyncWaitMs }, "ingest_sync_wait_ms=0", "ingest_sync_wait_ms", defaults.IngestSyncWaitMs},
+		{func(s *SuggestionsConfig) { s.CacheTTLMs = -100 }, func(s *SuggestionsConfig) int { return s.CacheTTLMs }, "cache_ttl_ms=-100", "cache_ttl_ms", defaults.CacheTTLMs},
 	}
 
 	for _, tt := range tests {

@@ -34,44 +34,25 @@ const (
 
 // Candidate represents a single discovery suggestion.
 type Candidate struct {
-	// Command is the suggested command text.
-	Command string
-
-	// Source identifies the origin of this candidate (playbook, project_type, tool_common).
-	Source string
-
-	// Priority determines ordering within a source (higher = more important).
+	Command  string
+	Source   string
+	Tags     []string
 	Priority int
-
-	// Tags are metadata labels for this candidate.
-	Tags []string
 }
 
 // DiscoverConfig configures a single discovery request.
 type DiscoverConfig struct {
-	// ProjectTypes are the detected project types for the current directory.
-	ProjectTypes []string
-
-	// PlaybookPath is the path to .clai/tasks.yaml, or empty if not available.
 	PlaybookPath string
-
-	// Limit is the maximum number of candidates to return.
-	Limit int
-
-	// CooldownMs is the minimum time (in milliseconds) before re-suggesting
-	// the same candidate. Zero means no cooldown.
-	CooldownMs int64
+	ProjectTypes []string
+	Limit        int
+	CooldownMs   int64
 }
 
 // Engine is the V2 discovery engine. It is safe for concurrent use.
 type Engine struct {
-	mu sync.Mutex
-
-	// cooldowns tracks when each command was last suggested, keyed by command string.
 	cooldowns map[string]int64
-
-	// nowFn returns the current time in milliseconds. Override for testing.
-	nowFn func() int64
+	nowFn     func() int64
+	mu        sync.Mutex
 }
 
 // NewEngine creates a new discovery engine.
@@ -178,7 +159,7 @@ func appendToolCommonCandidates(candidates []Candidate) []Candidate {
 
 // applyCooldown filters out candidates that were recently suggested.
 // Must be called with e.mu held.
-func (e *Engine) applyCooldown(candidates []Candidate, cooldownMs int64, now int64) []Candidate {
+func (e *Engine) applyCooldown(candidates []Candidate, cooldownMs, now int64) []Candidate {
 	if cooldownMs <= 0 {
 		return candidates
 	}

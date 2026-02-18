@@ -149,7 +149,7 @@ func (s *AutoService) mergeFTSResults(mergeMap map[string]*mergedResult, ftsResu
 	ftsMax := maxScore(ftsResults)
 	for i := range ftsResults {
 		r := ftsResults[i]
-		key := dedupKey(r)
+		key := dedupKey(&r)
 		normalizedScore := normalizeFTSScore(r.Score, ftsMax)
 		if existing, ok := mergeMap[key]; ok {
 			existing.ftsScore = normalizedScore
@@ -174,9 +174,9 @@ func normalizeFTSScore(score, maxScore float64) float64 {
 func (s *AutoService) mergeDescribeResults(mergeMap map[string]*mergedResult, descResults []SearchResult) {
 	for i := range descResults {
 		r := descResults[i]
-		key := dedupKey(r)
+		key := dedupKey(&r)
 		if existing, ok := mergeMap[key]; ok {
-			mergeDescribeIntoExisting(existing, r)
+			mergeDescribeIntoExisting(existing, &r)
 			continue
 		}
 		mergeMap[key] = &mergedResult{
@@ -187,7 +187,7 @@ func (s *AutoService) mergeDescribeResults(mergeMap map[string]*mergedResult, de
 	}
 }
 
-func mergeDescribeIntoExisting(existing *mergedResult, r SearchResult) {
+func mergeDescribeIntoExisting(existing *mergedResult, r *SearchResult) {
 	existing.descScore = r.Score
 	existing.hasDescribe = true
 	if len(existing.result.Tags) == 0 {
@@ -215,7 +215,7 @@ func (s *AutoService) buildMergedResults(mergeMap map[string]*mergedResult) []Se
 }
 
 // dedupKey returns the key used to deduplicate results.
-func dedupKey(r SearchResult) string {
+func dedupKey(r *SearchResult) string {
 	if r.TemplateID != "" {
 		return "t:" + r.TemplateID
 	}

@@ -33,7 +33,7 @@ Subcommands:
 var daemonStartCmd = &cobra.Command{
 	Use:   "start",
 	Short: "Start the clai daemon",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		paths := config.DefaultPaths()
 
 		// If the process is alive but the socket is missing, treat it as unhealthy
@@ -67,7 +67,7 @@ var daemonStartCmd = &cobra.Command{
 var daemonStopCmd = &cobra.Command{
 	Use:   "stop",
 	Short: "Stop the clai daemon",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		if !daemon.IsRunning() {
 			fmt.Printf("Daemon: %snot running%s\n", colorDim, colorReset)
 			return nil
@@ -87,7 +87,7 @@ var daemonStopCmd = &cobra.Command{
 var daemonRestartCmd = &cobra.Command{
 	Use:   "restart",
 	Short: "Restart the clai daemon",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		// Stop if running
 		if daemon.IsRunning() {
 			fmt.Print("Stopping daemon...")
@@ -113,7 +113,7 @@ var daemonRestartCmd = &cobra.Command{
 var daemonStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Show daemon status",
-	Run: func(cmd *cobra.Command, args []string) {
+	Run: func(_ *cobra.Command, _ []string) {
 		paths := config.DefaultPaths()
 
 		if daemon.IsRunning() {

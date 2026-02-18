@@ -18,8 +18,8 @@ import (
 type AnthropicProvider struct {
 	sanitizer *sanitize.Sanitizer
 	cliPath   string
-	cliOnce   sync.Once
 	model     string
+	cliOnce   sync.Once
 }
 
 // NewAnthropicProvider creates a new Anthropic provider

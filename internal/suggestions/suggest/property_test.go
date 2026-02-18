@@ -47,7 +47,7 @@ func TestProperty_Determinism(t *testing.T) {
 	require.NoError(t, transStore.RecordTransition(ctx, score.ScopeGlobal, "git add .", "git commit", nowMs))
 	require.NoError(t, transStore.RecordTransition(ctx, score.ScopeGlobal, "git commit", "git push", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
@@ -62,7 +62,7 @@ func TestProperty_Determinism(t *testing.T) {
 	// Run 100 times with identical input
 	var firstResult []Suggestion
 	for i := 0; i < 100; i++ {
-		suggestions, err := scorer.Suggest(ctx, suggestCtx)
+		suggestions, err := scorer.Suggest(ctx, &suggestCtx)
 		require.NoError(t, err)
 
 		if i == 0 {
@@ -104,13 +104,13 @@ func TestProperty_Monotonicity(t *testing.T) {
 		require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "cmdB", nowMs))
 	}
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{NowMs: nowMs})
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(suggestions), 2, "need at least 2 suggestions")
 
@@ -172,7 +172,7 @@ func TestProperty_BoundedScores(t *testing.T) {
 	cfg := DefaultScorerConfig()
 	cfg.TopK = MaxTopK // Get maximum number of results
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
@@ -188,7 +188,7 @@ func TestProperty_BoundedScores(t *testing.T) {
 	}
 
 	for _, suggestCtx := range contexts {
-		suggestions, err := scorer.Suggest(ctx, suggestCtx)
+		suggestions, err := scorer.Suggest(ctx, &suggestCtx)
 		require.NoError(t, err)
 
 		for _, sug := range suggestions {
@@ -225,13 +225,13 @@ func TestProperty_TopKInvariant(t *testing.T) {
 		cfg := DefaultScorerConfig()
 		cfg.TopK = topK
 
-		scorer, err := NewScorer(ScorerDependencies{
+		scorer, err := NewScorer(&ScorerDependencies{
 			DB:        db,
 			FreqStore: freqStore,
 		}, cfg)
 		require.NoError(t, err)
 
-		suggestions, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+		suggestions, err := scorer.Suggest(ctx, &SuggestContext{NowMs: nowMs})
 		require.NoError(t, err)
 		assert.LessOrEqual(t, len(suggestions), topK,
 			"results count (%d) should be <= TopK (%d)", len(suggestions), topK)
@@ -246,7 +246,7 @@ func TestProperty_TopKClamp(t *testing.T) {
 
 	overValues := []int{MaxTopK + 1, 100, 999, 50000}
 	for _, v := range overValues {
-		scorer, err := NewScorer(ScorerDependencies{DB: db}, ScorerConfig{TopK: v})
+		scorer, err := NewScorer(&ScorerDependencies{DB: db}, &ScorerConfig{TopK: v})
 		require.NoError(t, err)
 		assert.Equal(t, MaxTopK, scorer.TopK(),
 			"TopK=%d should be clamped to MaxTopK=%d", v, MaxTopK)
@@ -288,7 +288,7 @@ func TestProperty_Ordering(t *testing.T) {
 	cfg := DefaultScorerConfig()
 	cfg.TopK = MaxTopK
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
@@ -302,7 +302,7 @@ func TestProperty_Ordering(t *testing.T) {
 	}
 
 	for _, suggestCtx := range contexts {
-		suggestions, err := scorer.Suggest(ctx, suggestCtx)
+		suggestions, err := scorer.Suggest(ctx, &suggestCtx)
 		require.NoError(t, err)
 
 		if len(suggestions) < 2 {
@@ -357,14 +357,14 @@ func TestProperty_NoDuplicateCommands(t *testing.T) {
 	cfg := DefaultScorerConfig()
 	cfg.TopK = MaxTopK
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
 	}, cfg)
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastCmd: "git status",
 		RepoKey: "repo:/test",
 		NowMs:   nowMs,
@@ -395,7 +395,7 @@ func TestProperty_EmptyContextNoPanic(t *testing.T) {
 
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "git status", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
@@ -415,7 +415,7 @@ func TestProperty_EmptyContextNoPanic(t *testing.T) {
 	}
 
 	for i, sc := range edgeCases {
-		suggestions, err := scorer.Suggest(ctx, sc)
+		suggestions, err := scorer.Suggest(ctx, &sc)
 		require.NoError(t, err, "edge case %d should not error", i)
 		// Results count should always respect TopK
 		assert.LessOrEqual(t, len(suggestions), scorer.TopK(),
@@ -430,7 +430,7 @@ func TestProperty_ConfidenceConsistency(t *testing.T) {
 
 	db := createTestDB(t)
 
-	scorer, err := NewScorer(ScorerDependencies{DB: db}, DefaultScorerConfig())
+	scorer, err := NewScorer(&ScorerDependencies{DB: db}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	// Create suggestions with increasing score magnitudes
@@ -532,13 +532,13 @@ func TestProperty_DangerousPenaltyAlwaysApplied(t *testing.T) {
 	cfg := DefaultScorerConfig()
 	cfg.TopK = MaxTopK
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, cfg)
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{NowMs: nowMs})
 	require.NoError(t, err)
 
 	for _, sug := range suggestions {

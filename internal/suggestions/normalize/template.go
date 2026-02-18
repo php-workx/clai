@@ -33,7 +33,7 @@ func NewTemplateStore(db *sql.DB) *TemplateStore {
 // Upsert inserts or updates a command template.
 // On conflict, it updates last_seen_ms to the MAX of old and new values,
 // preserving the earliest first_seen_ms.
-func (s *TemplateStore) Upsert(ctx context.Context, t Template) error {
+func (s *TemplateStore) Upsert(ctx context.Context, t *Template) error {
 	tagsJSON := "null"
 	if len(t.Tags) > 0 {
 		b, err := json.Marshal(t.Tags)

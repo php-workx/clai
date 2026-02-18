@@ -16,27 +16,27 @@ const DefaultBufferSize = 4096
 
 // StepResult holds the outcome of a single step execution.
 type StepResult struct {
+	Error          error
+	Outputs        map[string]string
+	Command        string
 	StepID         string
 	Name           string
-	Status         string // "passed", "failed", "skipped", "cancelled"
-	Command        string
-	ResolvedEnv    []string
-	ExitCode       int
-	DurationMs     int64
+	Status         string
 	StdoutTail     string
 	StderrTail     string
-	Outputs        map[string]string // from $CLAI_OUTPUT file
-	Error          error
-	RiskLevel      string // resolved from StepDef.RiskLevel after expression substitution
-	AnalysisPrompt string // resolved from StepDef.AnalysisPrompt after expression substitution
+	RiskLevel      string
+	AnalysisPrompt string
+	ResolvedEnv    []string
+	DurationMs     int64
+	ExitCode       int
 }
 
 // RunResult holds the outcome of a complete job run.
 type RunResult struct {
-	Status     string // "passed", "failed", "cancelled"
+	Error      error
+	Status     string
 	Steps      []*StepResult
 	DurationMs int64
-	Error      error
 }
 
 // StepCallback is called by the runner before and after each step.
@@ -56,21 +56,16 @@ const (
 
 // RunnerConfig configures the runner.
 type RunnerConfig struct {
+	Shell        ShellAdapter
+	Process      ProcessController
+	Env          map[string]string
+	JobEnv       map[string]string
+	MatrixVars   map[string]string
+	VarOverrides map[string]string
+	OnStep       StepCallback
 	WorkDir      string
-	Env          map[string]string // workflow-level env
-	JobEnv       map[string]string // job-level env
-	MatrixVars   map[string]string // matrix combination
-	VarOverrides map[string]string // --var CLI flags (highest precedence)
 	Secrets      []SecretDef
-	BufferSize   int // 0 = DefaultBufferSize
-
-	// OnStep is called before and after each step for live progress.
-	// Optional — if nil, no callbacks are made.
-	OnStep StepCallback
-
-	// Optional DI overrides. If nil, platform defaults are used.
-	Shell   ShellAdapter      // custom shell adapter
-	Process ProcessController // custom process controller
+	BufferSize   int
 }
 
 // Runner executes a job's steps sequentially.
@@ -83,7 +78,7 @@ type Runner struct {
 
 // NewRunner creates a runner with the given config.
 // If cfg.Shell or cfg.Process are nil, platform defaults are used.
-func NewRunner(cfg RunnerConfig) *Runner {
+func NewRunner(cfg RunnerConfig) *Runner { //nolint:gocritic // hugeParam: cfg is intentionally copied into Runner
 	bufSize := cfg.BufferSize
 	if bufSize <= 0 {
 		bufSize = DefaultBufferSize
@@ -325,7 +320,8 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 	sr.Outputs = outputs
 
 	// Determine exit code and status.
-	if ctx.Err() != nil {
+	switch {
+	case ctx.Err() != nil:
 		sr.ExitCode = exitCodeFromError(waitErr)
 		if sr.ExitCode == 0 {
 			// Conventional code for interrupted command.
@@ -333,11 +329,11 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 		}
 		sr.Status = string(StepCancelled)
 		sr.Error = ctx.Err()
-	} else if waitErr != nil {
+	case waitErr != nil:
 		sr.ExitCode = exitCodeFromError(waitErr)
 		sr.Status = string(StepFailed)
 		sr.Error = waitErr
-	} else {
+	default:
 		sr.ExitCode = 0
 		sr.Status = string(StepPassed)
 	}

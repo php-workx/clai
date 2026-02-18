@@ -75,7 +75,7 @@ func captureFish(ctx context.Context) (AliasMap, error) {
 
 // runShellCommand executes a command and returns its stdout output.
 func runShellCommand(ctx context.Context, name string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // shell and args are controlled by caller
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -208,7 +208,7 @@ func unquote(s string) string {
 
 // splitFirstWord splits a string into the first whitespace-delimited word
 // and the remaining text.
-func splitFirstWord(s string) (string, string) {
+func splitFirstWord(s string) (first, rest string) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "", ""
@@ -236,7 +236,7 @@ func ShouldResnapshot(cmd string) bool {
 	return false
 }
 
-// ReverseMap builds a reverse mapping from expansion to alias name.
+// ReverseEntry is a reverse mapping from expansion to alias name.
 // When multiple aliases map to the same expansion, the shortest alias name wins.
 // The returned map is sorted by expansion length (longest first) for
 // greedy prefix matching during rendering.

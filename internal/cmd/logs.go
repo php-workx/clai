@@ -73,7 +73,7 @@ func tailLogs(filename string, n int) error {
 		return fmt.Errorf("lines must be a positive number")
 	}
 
-	f, err := os.Open(filename)
+	f, err := os.Open(filename) //nolint:gosec // G304: log file path from trusted config
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
@@ -181,7 +181,7 @@ func splitLines(s string) []string {
 
 func followLogs(ctx context.Context, filename string) error {
 	// Open file
-	f, err := os.Open(filename)
+	f, err := os.Open(filename) //nolint:gosec // G304: log file path from trusted config
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}

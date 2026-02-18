@@ -11,28 +11,13 @@ import (
 
 // RecoveryCandidate represents a suggested recovery command for a failure.
 type RecoveryCandidate struct {
-	// RecoveryTemplateID is the template ID of the recovery command.
 	RecoveryTemplateID string
-
-	// RecoveryCmdNorm is the normalized recovery command text.
-	// For learned patterns this comes from the command_template table.
-	// For bootstrap patterns this is extracted from the template ID.
-	RecoveryCmdNorm string
-
-	// SuccessRate is the observed success rate (0-1).
-	SuccessRate float64
-
-	// Count is the number of times this recovery was observed.
-	Count int
-
-	// Source indicates whether this is "learned" or "bootstrap".
-	Source string
-
-	// ExitCodeClass is the failure class this recovery applies to.
-	ExitCodeClass string
-
-	// Weight is the scoring weight from the database.
-	Weight float64
+	RecoveryCmdNorm    string
+	Source             string
+	ExitCodeClass      string
+	SuccessRate        float64
+	Count              int
+	Weight             float64
 }
 
 // EngineConfig configures the recovery engine.

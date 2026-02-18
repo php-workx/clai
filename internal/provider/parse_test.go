@@ -305,13 +305,13 @@ func TestStartsFixSection(t *testing.T) {
 func TestCreateSuggestion(t *testing.T) {
 	tests := []struct {
 		text         string
-		index        int
 		expectedRisk string
+		index        int
 	}{
-		{"ls -la", 0, "safe"},
-		{"rm -rf /tmp", 0, "destructive"},
-		{"git push --force", 0, "destructive"},
-		{"echo hello", 0, "safe"},
+		{"ls -la", "safe", 0},
+		{"rm -rf /tmp", "destructive", 0},
+		{"git push --force", "destructive", 0},
+		{"echo hello", "safe", 0},
 	}
 
 	for _, tt := range tests {

@@ -78,20 +78,20 @@ const (
 // ShellSession wraps go-expect for interactive shell testing.
 type ShellSession struct {
 	Console *expect.Console
+	cmd     *exec.Cmd
 	Shell   string
 	Timeout time.Duration
-	cmd     *exec.Cmd
 }
 
 // SessionOption configures a ShellSession.
 type SessionOption func(*sessionConfig)
 
 type sessionConfig struct {
-	timeout    time.Duration
-	env        []string
-	showOutput bool
 	rcFile     string
-	claiInit   bool // Use eval "$(clai init <shell>)" instead of sourcing RC file
+	env        []string
+	timeout    time.Duration
+	showOutput bool
+	claiInit   bool
 }
 
 // WithTimeout sets the default timeout for expect operations.

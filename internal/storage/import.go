@@ -120,7 +120,7 @@ func importHistoryEntries(ctx context.Context, stmt *sql.Stmt, entries []history
 			continue
 		}
 
-		tsStart := importEntryStartTs(entry, now, imported)
+		tsStart := importEntryStartTS(entry, now, imported)
 		norm := cmdutil.NormalizeCommand(entry.Command)
 		hash := cmdutil.HashCommand(norm)
 
@@ -145,7 +145,7 @@ func importHistoryEntries(ctx context.Context, stmt *sql.Stmt, entries []history
 	return imported
 }
 
-func importEntryStartTs(entry history.ImportEntry, now int64, imported int) int64 {
+func importEntryStartTS(entry history.ImportEntry, now int64, imported int) int64 {
 	if !entry.Timestamp.IsZero() {
 		return entry.Timestamp.UnixMilli()
 	}

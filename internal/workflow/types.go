@@ -62,12 +62,12 @@ const (
 
 // WorkflowDef is the top-level workflow file.
 type WorkflowDef struct {
+	Env         map[string]string  `yaml:"env,omitempty"`
+	Jobs        map[string]*JobDef `yaml:"jobs"`
 	Name        string             `yaml:"name"`
 	Description string             `yaml:"description,omitempty"`
-	Env         map[string]string  `yaml:"env,omitempty"`
 	Secrets     []SecretDef        `yaml:"secrets,omitempty"`
 	Requires    []string           `yaml:"requires,omitempty"`
-	Jobs        map[string]*JobDef `yaml:"jobs"`
 }
 
 // SecretDef defines a secret to be loaded before execution.
@@ -101,19 +101,17 @@ type MatrixDef struct {
 
 // StepDef represents a single step within a job.
 type StepDef struct {
-	ID             string            `yaml:"id,omitempty"`
-	Name           string            `yaml:"name"`
-	Run            string            `yaml:"run"`
-	Env            map[string]string `yaml:"env,omitempty"`
-	Shell          string            `yaml:"-"` // handled by custom UnmarshalYAML
-	Analyze        bool              `yaml:"analyze,omitempty"`
-	AnalysisPrompt string            `yaml:"analysis_prompt,omitempty"`
-	RiskLevel      string            `yaml:"risk_level,omitempty"` // "low", "medium", "high"
-
-	// Runtime fields (not from YAML)
-	ResolvedArgv    []string `yaml:"-"`
-	ResolvedCommand string   `yaml:"-"`
-	ResolvedEnv     []string `yaml:"-"`
+	Env             map[string]string `yaml:"env,omitempty"`
+	ID              string            `yaml:"id,omitempty"`
+	Name            string            `yaml:"name"`
+	Run             string            `yaml:"run"`
+	Shell           string            `yaml:"-"`
+	AnalysisPrompt  string            `yaml:"analysis_prompt,omitempty"`
+	RiskLevel       string            `yaml:"risk_level,omitempty"`
+	ResolvedCommand string            `yaml:"-"`
+	ResolvedArgv    []string          `yaml:"-"`
+	ResolvedEnv     []string          `yaml:"-"`
+	Analyze         bool              `yaml:"analyze,omitempty"`
 }
 
 // knownStepFields is the set of YAML keys accepted in a step mapping.
@@ -135,14 +133,14 @@ var knownStepFields = map[string]bool{
 // stepFields is used for decoding all StepDef fields including Shell.
 // The Shell field is typed as interface{} to accept both bool and string YAML values.
 type stepFields struct {
+	Env            map[string]string `yaml:"env,omitempty"`
+	Shell          interface{}       `yaml:"shell,omitempty"`
 	ID             string            `yaml:"id,omitempty"`
 	Name           string            `yaml:"name"`
 	Run            string            `yaml:"run"`
-	Env            map[string]string `yaml:"env,omitempty"`
-	Shell          interface{}       `yaml:"shell,omitempty"`
-	Analyze        bool              `yaml:"analyze,omitempty"`
 	AnalysisPrompt string            `yaml:"analysis_prompt,omitempty"`
 	RiskLevel      string            `yaml:"risk_level,omitempty"`
+	Analyze        bool              `yaml:"analyze,omitempty"`
 }
 
 // UnmarshalYAML handles both bool and string values for the Shell field.

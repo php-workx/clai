@@ -18,9 +18,9 @@ import (
 type CorruptionEvent struct {
 	Timestamp         time.Time `json:"timestamp"`
 	OriginalPath      string    `json:"original_path"`
-	OriginalSizeBytes int64     `json:"original_size_bytes"`
 	CorruptBackup     string    `json:"corrupt_backup"`
 	Reason            string    `json:"reason"`
+	OriginalSizeBytes int64     `json:"original_size_bytes"`
 	RecoverySuccess   bool      `json:"recovery_success"`
 }
 
@@ -170,12 +170,8 @@ func RunIntegrityCheck(ctx context.Context, db *sql.DB) error {
 
 // RecoverOptions configures database recovery behavior.
 type RecoverOptions struct {
-	// RunIntegrityCheck enables PRAGMA integrity_check on open.
+	Logger            *slog.Logger
 	RunIntegrityCheck bool
-
-	// Logger is the structured logger for recovery events.
-	// If nil, a default logger is used.
-	Logger *slog.Logger
 }
 
 // recoverAndReopen attempts to recover from a corrupted database by:
@@ -240,7 +236,7 @@ func recoverAndReopen(ctx context.Context, dbPath string, corruptDB *sql.DB, rea
 	}
 
 	// Step 5: Record the corruption event
-	event := CorruptionEvent{
+	event := &CorruptionEvent{
 		Timestamp:         time.Now(),
 		OriginalPath:      dbPath,
 		OriginalSizeBytes: originalSize,
@@ -259,7 +255,7 @@ func recoverAndReopen(ctx context.Context, dbPath string, corruptDB *sql.DB, rea
 }
 
 // recordCorruptionEvent appends a corruption event to the history file.
-func recordCorruptionEvent(dbPath string, event CorruptionEvent) error {
+func recordCorruptionEvent(dbPath string, event *CorruptionEvent) error {
 	historyPath := corruptionHistoryPath(dbPath)
 
 	history, err := LoadCorruptionHistory(historyPath)
@@ -268,14 +264,14 @@ func recordCorruptionEvent(dbPath string, event CorruptionEvent) error {
 		history = &CorruptionHistory{}
 	}
 
-	history.Events = append(history.Events, event)
+	history.Events = append(history.Events, *event)
 
 	data, err := json.MarshalIndent(history, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal corruption history: %w", err)
 	}
 
-	if err := os.WriteFile(historyPath, data, 0o644); err != nil {
+	if err := os.WriteFile(historyPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write corruption history: %w", err)
 	}
 
@@ -284,7 +280,7 @@ func recordCorruptionEvent(dbPath string, event CorruptionEvent) error {
 
 // LoadCorruptionHistory loads the corruption history from the given path.
 func LoadCorruptionHistory(path string) (*CorruptionHistory, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // reads user-specified path
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &CorruptionHistory{}, nil

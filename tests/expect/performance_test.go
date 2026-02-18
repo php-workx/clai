@@ -334,6 +334,51 @@ func TestPerformance_SourceScriptFast(t *testing.T) {
 	})
 }
 
+// maxTimingDeviation computes the maximum absolute deviation from the mean.
+func maxTimingDeviation(durations []time.Duration) (avg, maxDev time.Duration) {
+	var total time.Duration
+	for _, d := range durations {
+		total += d
+	}
+	avg = total / time.Duration(len(durations))
+
+	for _, d := range durations {
+		dev := d - avg
+		if dev < 0 {
+			dev = -dev
+		}
+		if dev > maxDev {
+			maxDev = dev
+		}
+	}
+	return avg, maxDev
+}
+
+// measureShellSessionDurations measures startup durations for a shell with RC file.
+func measureShellSessionDurations(t *testing.T, shellName, hookFile string, iterations int) []time.Duration {
+	t.Helper()
+	var durations []time.Duration
+	for i := 0; i < iterations; i++ {
+		start := time.Now()
+		session, err := NewSession(shellName,
+			WithTimeout(10*time.Second),
+			WithRCFile(hookFile),
+		)
+		if err != nil {
+			t.Fatalf("iteration %d: failed to create session: %v", i, err)
+		}
+		_, err = session.ExpectTimeout("clai [", 5*time.Second)
+		session.Close()
+		if err != nil {
+			t.Fatalf("iteration %d: startup message not received: %v", i, err)
+		}
+		duration := time.Since(start)
+		durations = append(durations, duration)
+		t.Logf("%s iteration %d: %v", shellName, i, duration)
+	}
+	return durations
+}
+
 // TestPerformance_NoBlockingIPCOnStartup verifies startup doesn't block on IPC.
 // The shell script should background all clai-shim calls.
 func TestPerformance_NoBlockingIPCOnStartup(t *testing.T) {
@@ -349,10 +394,6 @@ func TestPerformance_NoBlockingIPCOnStartup(t *testing.T) {
 		t.Skip("skipping timing variance test on Alpine (musl libc)")
 	}
 
-	// This test verifies that even if the daemon is not running,
-	// shell startup is still fast because IPC calls are backgrounded.
-	// Test zsh and bash which have reliable prompt/message detection.
-
 	shells := []struct {
 		name     string
 		hookFile string
@@ -364,123 +405,48 @@ func TestPerformance_NoBlockingIPCOnStartup(t *testing.T) {
 	for _, shell := range shells {
 		t.Run(shell.name, func(t *testing.T) {
 			SkipIfShellMissing(t, shell.name)
-
 			hookFile := FindHookFile(shell.hookFile)
 			if hookFile == "" {
 				t.Skipf("%s hook file not found", shell.hookFile)
 			}
-
-			// Start multiple sessions in sequence to verify consistent timing
-			var durations []time.Duration
-
-			for i := 0; i < 3; i++ {
-				start := time.Now()
-
-				session, err := NewSession(shell.name,
-					WithTimeout(10*time.Second),
-					WithRCFile(hookFile),
-				)
-				if err != nil {
-					t.Fatalf("iteration %d: failed to create session: %v", i, err)
-				}
-
-				_, err = session.ExpectTimeout("clai [", 5*time.Second)
-				session.Close()
-
-				if err != nil {
-					t.Fatalf("iteration %d: startup message not received: %v", i, err)
-				}
-
-				duration := time.Since(start)
-				durations = append(durations, duration)
-				t.Logf("%s iteration %d: %v", shell.name, i, duration)
-			}
-
-			// All iterations should have similar timing (no random blocking)
-			// Calculate variance - if IPC was blocking, we'd see high variance
-			var total time.Duration
-			for _, d := range durations {
-				total += d
-			}
-			avg := total / time.Duration(len(durations))
-
-			var maxDeviation time.Duration
-			for _, d := range durations {
-				dev := d - avg
-				if dev < 0 {
-					dev = -dev
-				}
-				if dev > maxDeviation {
-					maxDeviation = dev
-				}
-			}
-
-			t.Logf("%s average: %v, max deviation: %v", shell.name, avg, maxDeviation)
-
-			// Max deviation should be small if startup is consistent
-			assert.Less(t, maxDeviation, 100*time.Millisecond,
+			durations := measureShellSessionDurations(t, shell.name, hookFile, 3)
+			avg, maxDev := maxTimingDeviation(durations)
+			t.Logf("%s average: %v, max deviation: %v", shell.name, avg, maxDev)
+			assert.Less(t, maxDev, 100*time.Millisecond,
 				"%s startup timing is inconsistent (deviation: %v), may indicate blocking IPC",
-				shell.name, maxDeviation)
+				shell.name, maxDev)
 		})
 	}
 
 	// Fish uses different detection method due to PTY behavior
 	t.Run("fish", func(t *testing.T) {
 		SkipIfShellMissing(t, "fish")
-
 		hookFile := FindHookFile("clai.fish")
 		if hookFile == "" {
 			t.Skip("clai.fish hook file not found")
 		}
-
 		var durations []time.Duration
-
 		for i := 0; i < 3; i++ {
 			session, err := NewSession("fish", WithTimeout(10*time.Second))
 			if err != nil {
 				t.Fatalf("iteration %d: failed to create session: %v", i, err)
 			}
-
 			time.Sleep(200 * time.Millisecond)
-
 			start := time.Now()
-
 			session.SendLine(fmt.Sprintf("source %s 2>/dev/null", hookFile))
 			session.SendLine("functions -q run && echo ITER_DONE")
-
 			_, err = session.ExpectTimeout("ITER_DONE", 5*time.Second)
 			session.Close()
-
 			if err != nil {
 				t.Fatalf("iteration %d: clai not loaded: %v", i, err)
 			}
-
-			duration := time.Since(start)
-			durations = append(durations, duration)
-			t.Logf("fish iteration %d: %v", i, duration)
+			durations = append(durations, time.Since(start))
+			t.Logf("fish iteration %d: %v", i, durations[len(durations)-1])
 		}
-
-		var total time.Duration
-		for _, d := range durations {
-			total += d
-		}
-		avg := total / time.Duration(len(durations))
-
-		var maxDeviation time.Duration
-		for _, d := range durations {
-			dev := d - avg
-			if dev < 0 {
-				dev = -dev
-			}
-			if dev > maxDeviation {
-				maxDeviation = dev
-			}
-		}
-
-		t.Logf("fish average: %v, max deviation: %v", avg, maxDeviation)
-
-		assert.Less(t, maxDeviation, 100*time.Millisecond,
+		avg, maxDev := maxTimingDeviation(durations)
+		t.Logf("fish average: %v, max deviation: %v", avg, maxDev)
+		assert.Less(t, maxDev, 100*time.Millisecond,
 			"fish startup timing is inconsistent (deviation: %v), may indicate blocking IPC",
-			maxDeviation)
+			maxDev)
 	})
 }

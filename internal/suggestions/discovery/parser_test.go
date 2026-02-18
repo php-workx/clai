@@ -359,10 +359,10 @@ func TestNavigateJSONPath(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name    string
 		data    interface{}
-		path    string
 		want    interface{}
+		name    string
+		path    string
 		wantErr bool
 	}{
 		{

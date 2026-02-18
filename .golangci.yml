@@ -16,8 +16,6 @@ formatters:
         - github.com/runger/clai
 
 linters:
-  # Start with default linters minus errcheck (codebase has many intentional unchecked errors)
-  # Enable errcheck later after fixing existing issues
   default: none
   # Exclude complexity/length/style linters from test files (table-driven tests are verbose by design)
   exclusions:
@@ -66,20 +64,10 @@ linters:
     - depguard
   settings:
     staticcheck:
-      checks:
-        - "all"
-        - "-QF1012"  # WriteString(Sprintf(...)) is intentional for string builder patterns
-        - "-ST1000"  # Package comments - defer documentation work
-        - "-ST1003"  # Naming conventions (Ts vs TS) - too many to rename across codebase
-        - "-ST1020"  # Method comment form - defer documentation work
-        - "-ST1021"  # Type comment form - defer documentation work
-        - "-ST1022"  # Const comment form - defer documentation work
+      checks: ["all"]
     govet:
       enable-all: true
-      disable:
-        - fieldalignment
-        - shadow
-    # Complexity settings (tightened from initial permissive values)
+    # Complexity settings
     gocognit:
       min-complexity: 35
     cyclop:
@@ -89,7 +77,7 @@ linters:
       min-complexity: 7
     maintidx:
       under: 18
-    # Length limits (tightened from initial permissive values)
+    # Length limits
     lll:
       line-length: 160
     funlen:
@@ -104,40 +92,13 @@ linters:
         - diagnostic
         - style
         - performance
-      disabled-checks:
-        - whyNoLint
-        - unnamedResult      # Named returns not always clearer
-        - commentedOutCode   # False positives on example comments
-        - hugeParam          # bubbletea models pass by value intentionally
-        - paramTypeCombine   # Style preference, not impactful
-        - regexpSimplify     # Readability vs brevity tradeoff
-        - evalOrder          # bubbletea pattern returns cmd before model update
-        - ifElseChain        # Style preference
-        - deprecatedComment  # Documentation work (enable later)
-        - badRegexp          # ANSI escape sequences use intentional char ranges
     # Revive settings
     revive:
-      rules:
-        - name: unused-parameter
-          disabled: true  # Cobra patterns use unused cmd/args params
-        - name: package-comments
-          disabled: true  # Defer package documentation work
+      rules: []
     # Security settings
     gosec:
       excludes:
-        - G103  # Unsafe calls required for TTY ioctl
-        - G104  # Unhandled errors - enable errcheck later to replace this
-        - G101  # False positives on test credentials
-        - G115  # Integer conversion in picker is bounded by terminal size
-        - G204  # Subprocess with variable args is expected for exec helpers
-        - G301  # World-readable dirs (0755) are intentional for user access
-        - G302  # World-readable files (0644) are intentional for logs
-        - G304  # File paths from variables are expected for file operations
-        - G306  # History files use 0644 intentionally for user readability
-        - G702  # CLI tools intentionally pass user input to shell commands
-        - G703  # Path traversal from variables is expected for file operations
-        - G705  # CLI output to stderr/stdout is not XSS-vulnerable
-        - G706  # Log injection from file paths is expected in CLI tools
+        - G104  # Unhandled errors - enable errcheck linter to replace this (separate effort)
     # Architecture rules
     depguard:
       rules:

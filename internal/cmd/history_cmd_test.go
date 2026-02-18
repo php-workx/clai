@@ -13,19 +13,19 @@ import (
 
 func TestFormatDurationMs(t *testing.T) {
 	tests := []struct {
-		ms       int64
 		expected string
+		ms       int64
 	}{
-		{0, "0ms"},
-		{100, "100ms"},
-		{999, "999ms"},
-		{1000, "1.0s"},
-		{1500, "1.5s"},
-		{5000, "5.0s"},
-		{59000, "59.0s"},
-		{60000, "1m0s"},
-		{90000, "1m30s"},
-		{3600000, "60m0s"},
+		{"0ms", 0},
+		{"100ms", 100},
+		{"999ms", 999},
+		{"1.0s", 1000},
+		{"1.5s", 1500},
+		{"5.0s", 5000},
+		{"59.0s", 59000},
+		{"1m0s", 60000},
+		{"1m30s", 90000},
+		{"60m0s", 3600000},
 	}
 
 	for _, tt := range tests {
@@ -384,14 +384,14 @@ func TestRunHistory_JSON_Global(t *testing.T) {
 	createCommand(t, store, storage.Command{
 		CommandID:     "cmd-1",
 		SessionID:     "sess-1",
-		TsStartUnixMs: 1000,
+		TSStartUnixMs: 1000,
 		CWD:           "/tmp",
 		Command:       "git status",
 	})
 	createCommand(t, store, storage.Command{
 		CommandID:     "cmd-2",
 		SessionID:     "sess-2",
-		TsStartUnixMs: 2000,
+		TSStartUnixMs: 2000,
 		CWD:           "/work",
 		Command:       "ls -la",
 	})
@@ -429,14 +429,14 @@ func TestRunHistory_JSON_SessionDefault(t *testing.T) {
 	createCommand(t, store, storage.Command{
 		CommandID:     "cmd-a",
 		SessionID:     "sess-a",
-		TsStartUnixMs: 1000,
+		TSStartUnixMs: 1000,
 		CWD:           "/tmp",
 		Command:       "git status",
 	})
 	createCommand(t, store, storage.Command{
 		CommandID:     "cmd-b",
 		SessionID:     "sess-b",
-		TsStartUnixMs: 2000,
+		TSStartUnixMs: 2000,
 		CWD:           "/tmp",
 		Command:       "ls",
 	})
@@ -476,7 +476,7 @@ func TestRunHistory_StatusFilterFailure(t *testing.T) {
 	createCommand(t, store, storage.Command{
 		CommandID:     "cmd-ok",
 		SessionID:     "sess-1",
-		TsStartUnixMs: 1000,
+		TSStartUnixMs: 1000,
 		CWD:           "/tmp",
 		Command:       "echo ok",
 		IsSuccess:     &ok,
@@ -485,7 +485,7 @@ func TestRunHistory_StatusFilterFailure(t *testing.T) {
 	createCommand(t, store, storage.Command{
 		CommandID:     "cmd-bad",
 		SessionID:     "sess-1",
-		TsStartUnixMs: 2000,
+		TSStartUnixMs: 2000,
 		CWD:           "/tmp",
 		Command:       "false",
 		IsSuccess:     &bad,
@@ -522,14 +522,14 @@ func TestRunHistory_JSON_CWDSource(t *testing.T) {
 	createCommand(t, store, storage.Command{
 		CommandID:     "cmd-1",
 		SessionID:     "sess-1",
-		TsStartUnixMs: 1000,
+		TSStartUnixMs: 1000,
 		CWD:           "/tmp",
 		Command:       "ls",
 	})
 	createCommand(t, store, storage.Command{
 		CommandID:     "cmd-2",
 		SessionID:     "sess-1",
-		TsStartUnixMs: 2000,
+		TSStartUnixMs: 2000,
 		CWD:           "/work",
 		Command:       "pwd",
 	})

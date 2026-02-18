@@ -126,8 +126,8 @@ func TestBash_GitContextRefreshOnCD(t *testing.T) {
 
 	repoA := filepath.Join(t.TempDir(), "repo-a")
 	repoB := filepath.Join(t.TempDir(), "repo-b")
-	require.NoError(t, os.MkdirAll(filepath.Join(repoA, ".git"), 0755))
-	require.NoError(t, os.MkdirAll(filepath.Join(repoB, ".git"), 0755))
+	require.NoError(t, os.MkdirAll(filepath.Join(repoA, ".git"), 0750))
+	require.NoError(t, os.MkdirAll(filepath.Join(repoB, ".git"), 0750))
 
 	shimDir, logPath := createLoggingShim(t)
 	session, err := NewSession("bash",
@@ -203,7 +203,7 @@ func TestBash_NonInteractiveBashC_DoesNotRunHooks(t *testing.T) {
 	}
 
 	shimDir, logPath := createLoggingShim(t)
-	cmd := exec.Command("bash", "--norc", "--noprofile", "-c",
+	cmd := exec.Command("bash", "--norc", "--noprofile", "-c", //nolint:gosec // G204: test launches known binary with test-controlled args
 		fmt.Sprintf("source %q; echo NON_INTERACTIVE_OK", hookFile))
 	cmd.Env = append(os.Environ(),
 		"PATH="+shimDir+string(os.PathListSeparator)+os.Getenv("PATH"),
@@ -246,11 +246,11 @@ func TestBash_NonInteractiveScript_DoesNotRunHooks(t *testing.T) {
 	assert.Len(t, lines, 0, "hooks must not run while executing scripts")
 }
 
-func createLoggingShim(t *testing.T) (string, string) {
+func createLoggingShim(t *testing.T) (dir string, logPath string) {
 	t.Helper()
 
-	dir := t.TempDir()
-	logPath := filepath.Join(dir, "shim.log")
+	dir = t.TempDir()
+	logPath = filepath.Join(dir, "shim.log")
 	scriptPath := filepath.Join(dir, "clai-shim")
 
 	script := fmt.Sprintf(`#!/bin/sh

@@ -19,9 +19,9 @@ import (
 
 // mockCacheInvalidator records invalidation calls for testing.
 type mockCacheInvalidator struct {
-	mu        sync.Mutex
 	calls     []string
 	callCount int
+	mu        sync.Mutex
 }
 
 func (m *mockCacheInvalidator) Invalidate(sessionID string) {
@@ -67,7 +67,7 @@ func makeEvent(overrides ...func(*event.CommandEvent)) *event.CommandEvent {
 	ev := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1700000000000,
+		TS:        1700000000000,
 		SessionID: "test-session",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user/project",
@@ -90,7 +90,7 @@ func makeWriteContext(ev *event.CommandEvent, opts ...func(*WritePathContext)) *
 		Event:   ev,
 		PreNorm: preNorm,
 		Slots:   slots,
-		NowMs:   ev.Ts,
+		NowMs:   ev.TS,
 	}
 	for _, fn := range opts {
 		fn(wctx)
@@ -104,7 +104,7 @@ func TestWritePath_NilContext(t *testing.T) {
 	t.Parallel()
 	sqlDB := newTestDB(t)
 
-	_, err := WritePath(context.Background(), sqlDB, nil, WritePathConfig{})
+	_, err := WritePath(context.Background(), sqlDB, nil, &WritePathConfig{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "context is nil")
 }
@@ -114,7 +114,7 @@ func TestWritePath_NilDB(t *testing.T) {
 	ev := makeEvent()
 	wctx := makeWriteContext(ev)
 
-	_, err := WritePath(context.Background(), nil, wctx, WritePathConfig{})
+	_, err := WritePath(context.Background(), nil, wctx, &WritePathConfig{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "database is nil")
 }
@@ -126,7 +126,7 @@ func TestWritePath_BasicEvent(t *testing.T) {
 	ev := makeEvent()
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(context.Background(), sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(context.Background(), sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -146,7 +146,7 @@ func TestWritePath_CommandEventInserted(t *testing.T) {
 	ev := makeEvent()
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Verify command_event row
@@ -175,7 +175,7 @@ func TestWritePath_CommandTemplateUpserted(t *testing.T) {
 	ev := makeEvent()
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Verify command_template row
@@ -200,18 +200,18 @@ func TestWritePath_CommandTemplateUpsertPreservesFirstSeen(t *testing.T) {
 
 	// First insert
 	ev1 := makeEvent(func(e *event.CommandEvent) {
-		e.Ts = 1000
+		e.TS = 1000
 	})
 	wctx1 := makeWriteContext(ev1)
-	result1, err := WritePath(ctx, sqlDB, wctx1, WritePathConfig{})
+	result1, err := WritePath(ctx, sqlDB, wctx1, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Second insert (same command, later time)
 	ev2 := makeEvent(func(e *event.CommandEvent) {
-		e.Ts = 2000
+		e.TS = 2000
 	})
 	wctx2 := makeWriteContext(ev2)
-	_, err = WritePath(ctx, sqlDB, wctx2, WritePathConfig{})
+	_, err = WritePath(ctx, sqlDB, wctx2, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Verify first_seen_ms preserved, last_seen_ms updated
@@ -237,7 +237,7 @@ func TestWritePath_CommandStatUpdated(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Verify global command_stat
@@ -265,7 +265,7 @@ func TestWritePath_CommandStatFailure(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	var successCount, failureCount int
@@ -289,7 +289,7 @@ func TestWritePath_CommandStatRepoScope(t *testing.T) {
 		w.RepoKey = "repo-abc123"
 	})
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Verify repo-scoped command_stat exists
@@ -315,18 +315,18 @@ func TestWritePath_CommandStatDecay(t *testing.T) {
 
 	// First event at t=1000
 	ev1 := makeEvent(func(e *event.CommandEvent) {
-		e.Ts = 1000
+		e.TS = 1000
 	})
 	wctx1 := makeWriteContext(ev1)
-	result, err := WritePath(ctx, sqlDB, wctx1, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx1, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Second event at t=2000 (same command)
 	ev2 := makeEvent(func(e *event.CommandEvent) {
-		e.Ts = 2000
+		e.TS = 2000
 	})
 	wctx2 := makeWriteContext(ev2)
-	_, err = WritePath(ctx, sqlDB, wctx2, WritePathConfig{})
+	_, err = WritePath(ctx, sqlDB, wctx2, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Score should be > 1.0 (decayed first + 1.0 for second)
@@ -348,7 +348,7 @@ func TestWritePath_TransitionStatNoHistory(t *testing.T) {
 	ev := makeEvent()
 	wctx := makeWriteContext(ev) // No PrevTemplateID
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.False(t, result.TransitionRecorded)
 
@@ -367,21 +367,21 @@ func TestWritePath_TransitionStatRecorded(t *testing.T) {
 	// First command: git add
 	ev1 := makeEvent(func(e *event.CommandEvent) {
 		e.CmdRaw = "git add ."
-		e.Ts = 1000
+		e.TS = 1000
 	})
 	wctx1 := makeWriteContext(ev1)
-	result1, err := WritePath(ctx, sqlDB, wctx1, WritePathConfig{})
+	result1, err := WritePath(ctx, sqlDB, wctx1, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Second command: git commit (with prev template)
 	ev2 := makeEvent(func(e *event.CommandEvent) {
 		e.CmdRaw = "git commit -m 'test'"
-		e.Ts = 2000
+		e.TS = 2000
 	})
 	wctx2 := makeWriteContext(ev2, func(w *WritePathContext) {
 		w.PrevTemplateID = result1.TemplateID
 	})
-	result2, err := WritePath(ctx, sqlDB, wctx2, WritePathConfig{})
+	result2, err := WritePath(ctx, sqlDB, wctx2, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.True(t, result2.TransitionRecorded)
 
@@ -409,7 +409,7 @@ func TestWritePath_TransitionStatRepoScope(t *testing.T) {
 		w.RepoKey = "repo-xyz"
 	})
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Verify repo-scoped transition
@@ -438,7 +438,7 @@ func TestWritePath_SlotStatsUpdated(t *testing.T) {
 	// Ensure we have slots
 	require.Greater(t, len(wctx.Slots), 0, "expected at least one slot from normalization")
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Verify slot_stat row(s) exist
@@ -464,7 +464,7 @@ func TestWritePath_SlotStatsNoSlots(t *testing.T) {
 		w.Slots = nil
 	})
 
-	_, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	_, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// No slot_stat rows for this template
@@ -496,7 +496,7 @@ func TestWritePath_SlotCorrelationsUpdated(t *testing.T) {
 		SlotCorrelationKeys: [][]int{{0, 1}},
 	}
 
-	result, err := WritePath(ctx, sqlDB, wctx, cfg)
+	result, err := WritePath(ctx, sqlDB, wctx, &cfg)
 	require.NoError(t, err)
 
 	// Verify slot_correlation row
@@ -532,7 +532,7 @@ func TestWritePath_SlotCorrelationsSkippedWhenFewSlots(t *testing.T) {
 		SlotCorrelationKeys: [][]int{{0, 1}},
 	}
 
-	_, err := WritePath(ctx, sqlDB, wctx, cfg)
+	_, err := WritePath(ctx, sqlDB, wctx, &cfg)
 	require.NoError(t, err)
 
 	// No correlation rows (only 1 slot present)
@@ -558,7 +558,7 @@ func TestWritePath_ProjectTypeStatUpdated(t *testing.T) {
 		ProjectTypes: []string{"go", "docker"},
 	}
 
-	result, err := WritePath(ctx, sqlDB, wctx, cfg)
+	result, err := WritePath(ctx, sqlDB, wctx, &cfg)
 	require.NoError(t, err)
 
 	// Verify project_type_stat rows for both types
@@ -588,7 +588,7 @@ func TestWritePath_ProjectTypeTransitionUpdated(t *testing.T) {
 		ProjectTypes: []string{"go"},
 	}
 
-	result, err := WritePath(ctx, sqlDB, wctx, cfg)
+	result, err := WritePath(ctx, sqlDB, wctx, &cfg)
 	require.NoError(t, err)
 
 	// Verify project_type_transition row
@@ -609,7 +609,7 @@ func TestWritePath_NoProjectTypesSkipsStep(t *testing.T) {
 	ev := makeEvent()
 	wctx := makeWriteContext(ev)
 
-	_, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	_, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	var count int
@@ -630,7 +630,7 @@ func TestWritePath_DirectoryScopedAggregates(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	dirScope := computeDirScope("/home/user/my-project")
@@ -657,7 +657,7 @@ func TestWritePath_DirectoryScopedTransition(t *testing.T) {
 		w.PrevTemplateID = prevID
 	})
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	dirScope := computeDirScope("/home/user/my-project")
@@ -685,7 +685,7 @@ func TestWritePath_PipelineSimpleCommand(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 0, result.PipelineSegments)
 
@@ -707,7 +707,7 @@ func TestWritePath_PipelineCompoundCommand(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.PipelineSegments)
 
@@ -740,7 +740,7 @@ func TestWritePath_PipelineThreeSegments(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.PipelineSegments)
 
@@ -770,7 +770,7 @@ func TestWritePath_PipelineAndOperator(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.PipelineSegments)
 
@@ -795,7 +795,7 @@ func TestWritePath_FailureRecoveryNotRecordedWithoutPrevFailure(t *testing.T) {
 	ev := makeEvent()
 	wctx := makeWriteContext(ev) // No PrevFailed
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.False(t, result.FailureRecoveryRecorded)
 
@@ -821,7 +821,7 @@ func TestWritePath_FailureRecoveryRecorded(t *testing.T) {
 		w.PrevFailed = true
 	})
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.True(t, result.FailureRecoveryRecorded)
 
@@ -848,28 +848,28 @@ func TestWritePath_FailureRecoverySuccessRateAveraged(t *testing.T) {
 	ev1 := makeEvent(func(e *event.CommandEvent) {
 		e.CmdRaw = "make clean"
 		e.ExitCode = 0
-		e.Ts = 1000
+		e.TS = 1000
 	})
 	wctx1 := makeWriteContext(ev1, func(w *WritePathContext) {
 		w.PrevTemplateID = prevTemplateID
 		w.PrevExitCode = 2
 		w.PrevFailed = true
 	})
-	_, err := WritePath(ctx, sqlDB, wctx1, WritePathConfig{})
+	_, err := WritePath(ctx, sqlDB, wctx1, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Second recovery: failure
 	ev2 := makeEvent(func(e *event.CommandEvent) {
 		e.CmdRaw = "make clean"
 		e.ExitCode = 1 // Recovery also failed
-		e.Ts = 2000
+		e.TS = 2000
 	})
 	wctx2 := makeWriteContext(ev2, func(w *WritePathContext) {
 		w.PrevTemplateID = prevTemplateID
 		w.PrevExitCode = 2
 		w.PrevFailed = true
 	})
-	result, err := WritePath(ctx, sqlDB, wctx2, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx2, &WritePathConfig{})
 	require.NoError(t, err)
 
 	// Verify averaged success rate: 1 success out of 2 = 0.5
@@ -894,7 +894,7 @@ func TestWritePath_CacheInvalidated(t *testing.T) {
 	ev := makeEvent()
 	wctx := makeWriteContext(ev)
 
-	_, err := WritePath(context.Background(), sqlDB, wctx, WritePathConfig{
+	_, err := WritePath(context.Background(), sqlDB, wctx, &WritePathConfig{
 		Cache: cache,
 	})
 	require.NoError(t, err)
@@ -912,7 +912,7 @@ func TestWritePath_CacheNotInvalidatedOnNilCache(t *testing.T) {
 	wctx := makeWriteContext(ev)
 
 	// Should not panic with nil cache
-	_, err := WritePath(context.Background(), sqlDB, wctx, WritePathConfig{
+	_, err := WritePath(context.Background(), sqlDB, wctx, &WritePathConfig{
 		Cache: nil,
 	})
 	require.NoError(t, err)
@@ -946,7 +946,7 @@ func TestWritePath_AtomicRollbackOnFailure(t *testing.T) {
 		w.RepoKey = "repo-123"
 	})
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{
 		ProjectTypes: []string{"go"},
 	})
 	require.NoError(t, err)
@@ -996,7 +996,7 @@ func TestPrepareWriteContext_Basic(t *testing.T) {
 	assert.Equal(t, "main", wctx.Branch)
 	assert.Empty(t, wctx.PrevTemplateID)
 	assert.False(t, wctx.PrevFailed)
-	assert.Equal(t, ev.Ts, wctx.NowMs)
+	assert.Equal(t, ev.TS, wctx.NowMs)
 }
 
 func TestPrepareWriteContext_WithAliases(t *testing.T) {
@@ -1087,13 +1087,13 @@ func TestWritePath_MultipleEvents(t *testing.T) {
 	for i, cmd := range commands {
 		ev := makeEvent(func(e *event.CommandEvent) {
 			e.CmdRaw = cmd
-			e.Ts = int64(1000 + i*1000)
+			e.TS = int64(1000 + i*1000)
 		})
 		wctx := makeWriteContext(ev, func(w *WritePathContext) {
 			w.PrevTemplateID = prevTemplateID
 		})
 
-		result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+		result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 		require.NoError(t, err, "failed writing event %d: %s", i, cmd)
 		prevTemplateID = result.TemplateID
 	}
@@ -1119,11 +1119,11 @@ func TestWritePath_SameCommandMultipleTimes(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		ev := makeEvent(func(e *event.CommandEvent) {
 			e.CmdRaw = "git status"
-			e.Ts = int64(1000 + i*1000)
+			e.TS = int64(1000 + i*1000)
 		})
 		wctx := makeWriteContext(ev)
 
-		_, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+		_, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 		require.NoError(t, err, "iteration %d", i)
 	}
 
@@ -1158,7 +1158,7 @@ func TestWritePath_EphemeralEvent(t *testing.T) {
 	wctx := makeWriteContext(ev)
 
 	// Should still work (ephemeral flag is stored in command_event)
-	result, err := WritePath(context.Background(), sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(context.Background(), sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Greater(t, result.EventID, int64(0))
 }
@@ -1173,7 +1173,7 @@ func TestWritePath_LongCommand(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(context.Background(), sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(context.Background(), sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Greater(t, result.EventID, int64(0))
 }
@@ -1187,7 +1187,7 @@ func TestWritePath_CommandWithUnicode(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(context.Background(), sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(context.Background(), sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Greater(t, result.EventID, int64(0))
 }
@@ -1203,7 +1203,7 @@ func TestWritePath_CommandWithDuration(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 
 	var durationMs int64
@@ -1244,7 +1244,7 @@ func TestWritePath_AllStepsTogether(t *testing.T) {
 		Cache:               cache,
 	}
 
-	result, err := WritePath(ctx, sqlDB, wctx, cfg)
+	result, err := WritePath(ctx, sqlDB, wctx, &cfg)
 	require.NoError(t, err)
 
 	// Verify all steps completed
@@ -1287,7 +1287,7 @@ func TestWritePath_PipelineGoTestGrepFAIL(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.PipelineSegments)
 
@@ -1302,17 +1302,17 @@ func TestWritePath_PipelineGoTestGrepFAIL(t *testing.T) {
 	defer rows.Close()
 
 	type pipelineRow struct {
-		position   int
-		operator   sql.NullString
 		cmdRaw     string
 		cmdNorm    string
 		templateID string
+		operator   sql.NullString
+		position   int
 	}
 	var pRows []pipelineRow
 	for rows.Next() {
 		var r pipelineRow
-		err := rows.Scan(&r.position, &r.operator, &r.cmdRaw, &r.cmdNorm, &r.templateID)
-		require.NoError(t, err)
+		scanErr := rows.Scan(&r.position, &r.operator, &r.cmdRaw, &r.cmdNorm, &r.templateID)
+		require.NoError(t, scanErr)
 		pRows = append(pRows, r)
 	}
 	require.NoError(t, rows.Err())
@@ -1367,7 +1367,7 @@ func TestWritePath_PipelineMaxSegmentsEnforced(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{
 		PipelineMaxSegments: 3,
 	})
 	require.NoError(t, err)
@@ -1402,7 +1402,7 @@ func TestWritePath_PipelineDefaultMaxSegments(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 4, result.PipelineSegments)
 }
@@ -1419,7 +1419,7 @@ func TestWritePath_PipelineRepoScoped(t *testing.T) {
 		w.RepoKey = "repo-pipeline-test"
 	})
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.PipelineSegments)
 
@@ -1461,7 +1461,7 @@ func TestWritePath_PipelineSemicolonOperator(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.PipelineSegments)
 
@@ -1486,7 +1486,7 @@ func TestWritePath_PipelineOrOperator(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 2, result.PipelineSegments)
 }
@@ -1500,11 +1500,11 @@ func TestWritePath_PipelinePatternCountIncremented(t *testing.T) {
 	for i := 0; i < 3; i++ {
 		ev := makeEvent(func(e *event.CommandEvent) {
 			e.CmdRaw = "go test ./... | grep FAIL"
-			e.Ts = int64(1000 + i*1000)
+			e.TS = int64(1000 + i*1000)
 		})
 		wctx := makeWriteContext(ev)
 
-		_, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+		_, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 		require.NoError(t, err, "iteration %d", i)
 	}
 
@@ -1526,11 +1526,11 @@ func TestWritePath_PipelineTransitionWeightIncremented(t *testing.T) {
 	for i := 0; i < 2; i++ {
 		ev := makeEvent(func(e *event.CommandEvent) {
 			e.CmdRaw = "cat file.txt | grep pattern"
-			e.Ts = int64(1000 + i*1000)
+			e.TS = int64(1000 + i*1000)
 		})
 		wctx := makeWriteContext(ev)
 
-		_, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+		_, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 		require.NoError(t, err)
 	}
 
@@ -1556,7 +1556,7 @@ func TestWritePath_PipelineMixedOperators(t *testing.T) {
 	})
 	wctx := makeWriteContext(ev)
 
-	result, err := WritePath(ctx, sqlDB, wctx, WritePathConfig{})
+	result, err := WritePath(ctx, sqlDB, wctx, &WritePathConfig{})
 	require.NoError(t, err)
 	assert.Equal(t, 3, result.PipelineSegments)
 
@@ -1592,7 +1592,7 @@ func BenchmarkWritePath_SimpleCommand(b *testing.B) {
 	ev := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1700000000000,
+		TS:        1700000000000,
 		SessionID: "bench-session",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user/project",
@@ -1602,9 +1602,9 @@ func BenchmarkWritePath_SimpleCommand(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ev.Ts = int64(1700000000000 + i)
+		ev.TS = int64(1700000000000 + i)
 		wctx := makeWriteContextBench(ev)
-		_, err := WritePath(context.Background(), sqlDB, wctx, WritePathConfig{})
+		_, err := WritePath(context.Background(), sqlDB, wctx, &WritePathConfig{})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -1619,6 +1619,6 @@ func makeWriteContextBench(ev *event.CommandEvent) *WritePathContext {
 		Event:   ev,
 		PreNorm: preNorm,
 		Slots:   slots,
-		NowMs:   ev.Ts,
+		NowMs:   ev.TS,
 	}
 }

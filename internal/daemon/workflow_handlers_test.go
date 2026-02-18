@@ -13,8 +13,8 @@ import (
 
 // mockLLMQuerier implements LLMQuerier for testing.
 type mockLLMQuerier struct {
-	response string
 	err      error
+	response string
 }
 
 func (m *mockLLMQuerier) Query(ctx context.Context, prompt string) (string, error) {

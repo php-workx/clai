@@ -61,7 +61,7 @@ func (e *AliasExpander) Expand(cmd string) (string, bool) {
 
 // splitFirstToken splits a command into the first whitespace-delimited token
 // and the rest of the string.
-func splitFirstToken(cmd string) (string, string) {
+func splitFirstToken(cmd string) (first, rest string) {
 	cmd = strings.TrimSpace(cmd)
 	if cmd == "" {
 		return "", ""

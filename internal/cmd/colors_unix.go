@@ -10,7 +10,7 @@ import (
 
 // getTermWidthIoctl returns the terminal width via ioctl, or 0 if unavailable.
 func getTermWidthIoctl() int {
-	ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ)
+	ws, err := unix.IoctlGetWinsize(int(os.Stdout.Fd()), unix.TIOCGWINSZ) //nolint:gosec // G115: fd fits in int
 	if err != nil || ws.Col == 0 {
 		return 0
 	}

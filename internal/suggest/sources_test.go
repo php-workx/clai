@@ -47,7 +47,7 @@ func createTestCommand(t *testing.T, store *storage.SQLiteStore, sessionID, comm
 	cmd := &storage.Command{
 		CommandID:     commandID,
 		SessionID:     sessionID,
-		TsStartUnixMs: ts,
+		TSStartUnixMs: ts,
 		CWD:           cwd,
 		Command:       command,
 		IsSuccess:     &isSuccess,

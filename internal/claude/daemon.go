@@ -106,7 +106,7 @@ func StartDaemonProcess() error {
 	}
 
 	// Ensure directory exists
-	os.MkdirAll(daemonDir(), 0o755)
+	os.MkdirAll(daemonDir(), 0o750)
 
 	// Start daemon process
 	exe, err := os.Executable()
@@ -115,7 +115,7 @@ func StartDaemonProcess() error {
 	}
 
 	// Create log file for daemon output
-	logFile, err := os.OpenFile(logPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	logFile, err := os.OpenFile(logPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		logFile = nil
 	}
@@ -143,7 +143,7 @@ func StartDaemonProcess() error {
 	}
 
 	// Write PID file
-	os.WriteFile(pidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o644)
+	os.WriteFile(pidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o600)
 
 	// Wait for socket to be available (up to 90 seconds for Claude init with hooks)
 	for i := 0; i < 900; i++ {

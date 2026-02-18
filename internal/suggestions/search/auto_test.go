@@ -113,17 +113,17 @@ func TestDedupKey(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name     string
-		result   SearchResult
 		expected string
+		result   SearchResult
 	}{
-		{"with template ID", SearchResult{TemplateID: "abc123", CmdRaw: "git status"}, "t:abc123"},
-		{"without template ID", SearchResult{CmdRaw: "git status"}, "r:git status"},
-		{"empty template ID", SearchResult{TemplateID: "", CmdRaw: "ls -la"}, "r:ls -la"},
+		{"with template ID", "t:abc123", SearchResult{TemplateID: "abc123", CmdRaw: "git status"}},
+		{"without template ID", "r:git status", SearchResult{CmdRaw: "git status"}},
+		{"empty template ID", "r:ls -la", SearchResult{TemplateID: "", CmdRaw: "ls -la"}},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, dedupKey(tt.result))
+			assert.Equal(t, tt.expected, dedupKey(&tt.result))
 		})
 	}
 }

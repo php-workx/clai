@@ -143,15 +143,15 @@ func DefaultWeights() Weights {
 
 // ScorerConfig configures the scorer.
 type ScorerConfig struct {
+	Logger     *slog.Logger
 	Weights    Weights
 	Amplifiers AmplifierConfig
 	TopK       int
-	Logger     *slog.Logger
 }
 
 // DefaultScorerConfig returns the default scorer configuration.
-func DefaultScorerConfig() ScorerConfig {
-	return ScorerConfig{
+func DefaultScorerConfig() *ScorerConfig {
+	return &ScorerConfig{
 		Weights:    DefaultWeights(),
 		Amplifiers: DefaultAmplifierConfig(),
 		TopK:       DefaultTopK,
@@ -161,27 +161,27 @@ func DefaultScorerConfig() ScorerConfig {
 
 // Suggestion represents a scored command suggestion.
 type Suggestion struct {
-	Command       string    // The suggested command (normalized)
-	TemplateID    string    // Template ID for near-duplicate suppression
-	Score         float64   // Combined score
-	Confidence    float64   // Confidence score (0-1)
-	Reasons       []string  // Tags explaining why this was suggested
-	scores        scoreInfo // Internal scoring breakdown
-	frequency     float64   // Raw frequency signal for tie-breaking (source-dependent)
-	lastSeenMs    int64     // Best-effort last-seen timestamp (unix ms) for UI/tie-breaking
-	maxFreqScore  float64   // Best-effort decayed frequency score (from FrequencyStore)
-	maxTransCount int       // Best-effort transition count (from TransitionStore)
+	Command       string
+	TemplateID    string
+	Reasons       []string
+	scores        scoreInfo
+	Score         float64
+	Confidence    float64
+	frequency     float64
+	lastSeenMs    int64
+	maxFreqScore  float64
+	maxTransCount int
 }
 
 // LastSeenMs returns the best-effort last-seen timestamp (unix ms) for this suggestion.
 // This is used for UI hints and deterministic tie-breaking.
-func (s Suggestion) LastSeenMs() int64 { return s.lastSeenMs }
+func (s *Suggestion) LastSeenMs() int64 { return s.lastSeenMs }
 
 // MaxFreqScore returns the best-effort decayed frequency score observed for this suggestion.
-func (s Suggestion) MaxFreqScore() float64 { return s.maxFreqScore }
+func (s *Suggestion) MaxFreqScore() float64 { return s.maxFreqScore }
 
 // MaxTransitionCount returns the best-effort transition count observed for this suggestion.
-func (s Suggestion) MaxTransitionCount() int { return s.maxTransCount }
+func (s *Suggestion) MaxTransitionCount() int { return s.maxTransCount }
 
 // scoreInfo tracks the breakdown of scoring sources.
 type scoreInfo struct {
@@ -261,7 +261,7 @@ type ScorerDependencies struct {
 }
 
 // NewScorer creates a new suggestion scorer.
-func NewScorer(deps ScorerDependencies, cfg ScorerConfig) (*Scorer, error) {
+func NewScorer(deps *ScorerDependencies, cfg *ScorerConfig) (*Scorer, error) {
 	if cfg.TopK <= 0 {
 		cfg.TopK = DefaultTopK
 	}
@@ -286,7 +286,7 @@ func NewScorer(deps ScorerDependencies, cfg ScorerConfig) (*Scorer, error) {
 		dismissalStore:    deps.DismissalStore,
 		recoveryEngine:    deps.RecoveryEngine,
 		dangerousCommands: buildDangerousCommands(),
-		cfg:               cfg,
+		cfg:               *cfg,
 	}, nil
 }
 
@@ -309,15 +309,15 @@ func buildDangerousCommands() map[string]bool {
 type SuggestContext struct {
 	SessionID      string
 	RepoKey        string
-	LastCmd        string // Last command (normalized)
-	LastTemplateID string // Template ID of the last command
-	LastExitCode   int    // Exit code of the last command (0 = success)
-	LastFailed     bool   // Whether the last command failed
-	Prefix         string // Typed prefix for filtering
+	LastCmd        string
+	LastTemplateID string
+	Prefix         string
 	Cwd            string
+	DirScopeKey    string
+	Scope          string
+	LastExitCode   int
 	NowMs          int64
-	DirScopeKey    string // Directory scope key (from dirscope.ComputeScopeKey)
-	Scope          string // Scope for dismissal/recovery lookups
+	LastFailed     bool
 }
 
 // Suggest generates scored suggestions based on the current context.
@@ -335,8 +335,8 @@ type SuggestContext struct {
 //
 // Plus amplifiers: dismissal penalty, recency decay, prefix filtering,
 // near-duplicate suppression, and deterministic tie-breaking.
-func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Suggestion, error) {
-	suggestCtx = s.normalizeSuggestContext(suggestCtx)
+func (s *Scorer) Suggest(ctx context.Context, suggestCtx *SuggestContext) ([]Suggestion, error) {
+	s.normalizeSuggestContext(suggestCtx)
 	candidates := make(map[string]*Suggestion)
 
 	s.collectCandidates(ctx, suggestCtx, candidates)
@@ -350,17 +350,16 @@ func (s *Scorer) Suggest(ctx context.Context, suggestCtx SuggestContext) ([]Sugg
 	return s.finalizeSuggestions(candidates), nil
 }
 
-func (s *Scorer) normalizeSuggestContext(suggestCtx SuggestContext) SuggestContext {
+func (s *Scorer) normalizeSuggestContext(suggestCtx *SuggestContext) {
 	if suggestCtx.NowMs == 0 {
 		suggestCtx.NowMs = time.Now().UnixMilli()
 	}
 	if suggestCtx.Scope == "" {
 		suggestCtx.Scope = score.ScopeGlobal
 	}
-	return suggestCtx
 }
 
-func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx SuggestContext, candidates map[string]*Suggestion) {
+func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx *SuggestContext, candidates map[string]*Suggestion) {
 	s.collectTransitionCandidates(
 		ctx, candidates, suggestCtx.RepoKey, suggestCtx.LastCmd,
 		ReasonRepoTransition, s.cfg.Weights.RepoTransition, "repo transitions query failed",
@@ -410,7 +409,7 @@ func (s *Scorer) collectTransitionCandidates(
 	}
 
 	for _, t := range transitions {
-		s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTsMs)
+		s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTSMs)
 	}
 }
 
@@ -434,7 +433,7 @@ func (s *Scorer) collectFrequencyCandidates(
 	}
 
 	for _, f := range frequencies {
-		s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTsMs)
+		s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTSMs)
 	}
 }
 
@@ -454,7 +453,7 @@ func (s *Scorer) collectProjectTasks(ctx context.Context, candidates map[string]
 	}
 }
 
-func (s *Scorer) applyContextBoosts(ctx context.Context, candidates map[string]*Suggestion, suggestCtx SuggestContext) {
+func (s *Scorer) applyContextBoosts(ctx context.Context, candidates map[string]*Suggestion, suggestCtx *SuggestContext) {
 	s.applyWorkflowBoost(candidates, suggestCtx)
 	s.applyPipelineConfidence(ctx, candidates, suggestCtx)
 	s.applyRecoveryBoost(ctx, candidates, suggestCtx)
@@ -524,7 +523,7 @@ func sortSuggestions(suggestions []Suggestion) {
 
 // applyWorkflowBoost amplifies candidates that match active workflow next-steps.
 // Per spec Section 7.1: workflow_boost_factor (default 1.5x when workflow active).
-func (s *Scorer) applyWorkflowBoost(candidates map[string]*Suggestion, suggestCtx SuggestContext) {
+func (s *Scorer) applyWorkflowBoost(candidates map[string]*Suggestion, suggestCtx *SuggestContext) {
 	if s.workflowTracker == nil {
 		return
 	}
@@ -579,7 +578,7 @@ func (s *Scorer) applyWorkflowBoost(candidates map[string]*Suggestion, suggestCt
 // applyPipelineConfidence adds pipeline confidence scores for candidates
 // that match pipeline continuation patterns.
 // Per spec Section 7.1: pipeline_confidence as direct weight addition.
-func (s *Scorer) applyPipelineConfidence(ctx context.Context, candidates map[string]*Suggestion, suggestCtx SuggestContext) {
+func (s *Scorer) applyPipelineConfidence(ctx context.Context, candidates map[string]*Suggestion, suggestCtx *SuggestContext) {
 	if s.pipelineStore == nil || suggestCtx.LastTemplateID == "" {
 		return
 	}
@@ -625,7 +624,7 @@ func (s *Scorer) applyPipelineConfidence(ctx context.Context, candidates map[str
 
 // applyRecoveryBoost amplifies recovery candidates when the last command failed.
 // Per spec Section 7.1: recovery_boost_factor (default 2.0x after failure).
-func (s *Scorer) applyRecoveryBoost(ctx context.Context, candidates map[string]*Suggestion, suggestCtx SuggestContext) {
+func (s *Scorer) applyRecoveryBoost(ctx context.Context, candidates map[string]*Suggestion, suggestCtx *SuggestContext) {
 	if s.recoveryEngine == nil || !suggestCtx.LastFailed {
 		return
 	}
@@ -673,7 +672,7 @@ func (s *Scorer) applyRecoveryBoost(ctx context.Context, candidates map[string]*
 // Per spec Section 7.1:
 //   - dismissed: score *= DismissalPenaltyFactor (default 0.3)
 //   - permanent/never: score *= PermanentPenaltyFactor (default 0.0)
-func (s *Scorer) applyDismissalPenalties(ctx context.Context, candidates map[string]*Suggestion, suggestCtx SuggestContext) {
+func (s *Scorer) applyDismissalPenalties(ctx context.Context, candidates map[string]*Suggestion, suggestCtx *SuggestContext) {
 	if s.dismissalStore == nil || suggestCtx.LastTemplateID == "" {
 		return
 	}
@@ -983,7 +982,7 @@ type DebugScore struct {
 	Scope   string
 	CmdNorm string
 	Score   float64
-	LastTs  int64
+	LastTS  int64
 }
 
 // DebugScores returns the top scores from the command_score table for debugging.
@@ -1008,7 +1007,7 @@ func (s *Scorer) DebugScores(ctx context.Context, limit int) ([]DebugScore, erro
 	var scores []DebugScore
 	for rows.Next() {
 		var ds DebugScore
-		if err := rows.Scan(&ds.Scope, &ds.CmdNorm, &ds.Score, &ds.LastTs); err != nil {
+		if err := rows.Scan(&ds.Scope, &ds.CmdNorm, &ds.Score, &ds.LastTS); err != nil {
 			return nil, err
 		}
 		scores = append(scores, ds)

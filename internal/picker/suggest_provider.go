@@ -307,9 +307,7 @@ func baseSuggestionDetailParts(s *pb.Suggestion) []string {
 	return parts
 }
 
-func collectSuggestionReasonDetails(reasons []*pb.SuggestionReason) ([]string, []string) {
-	var causality []string
-	var hints []string
+func collectSuggestionReasonDetails(reasons []*pb.SuggestionReason) (causality, hints []string) {
 	for _, r := range reasons {
 		if r == nil {
 			continue

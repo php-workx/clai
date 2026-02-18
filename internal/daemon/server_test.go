@@ -155,11 +155,11 @@ func TestNewServer_TableDriven(t *testing.T) {
 	validRegistry := provider.NewRegistry()
 
 	tests := []struct {
-		name        string
 		config      *ServerConfig
-		wantErr     bool
-		errContains string
 		validate    func(t *testing.T, s *Server)
+		name        string
+		errContains string
+		wantErr     bool
 	}{
 		{
 			name:        "nil config returns error",
@@ -757,10 +757,10 @@ func TestServer_WatchIdle_NoShutdownWithActiveSessions(t *testing.T) {
 
 // mockStoreWithPruning is a mock store that tracks prune calls.
 type mockStoreWithPruning struct {
+	pruneErr error
 	*mockStore
 	pruneCalls   int
 	pruneReturns int64
-	pruneErr     error
 	mu           sync.Mutex
 }
 
@@ -927,7 +927,7 @@ func TestServer_Start_CreatesSocket(t *testing.T) {
 	}
 
 	// Pre-create all directories that EnsureDirectories would create
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -967,9 +967,9 @@ func TestServer_Start_CreatesSocket(t *testing.T) {
 		}
 		// Check if server returned an error
 		select {
-		case err := <-serverErr:
-			if err != nil {
-				t.Fatalf("server.Start failed: %v", err)
+		case srvErr := <-serverErr:
+			if srvErr != nil {
+				t.Fatalf("server.Start failed: %v", srvErr)
 			}
 		default:
 		}
@@ -1001,9 +1001,9 @@ func TestServer_Start_CreatesSocket(t *testing.T) {
 
 	// Check for unexpected errors
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			t.Errorf("unexpected server error: %v", err)
+	case srvErr := <-serverErr:
+		if srvErr != nil {
+			t.Errorf("unexpected server error: %v", srvErr)
 		}
 	case <-time.After(2 * time.Second):
 		t.Error("server did not stop in time")
@@ -1045,7 +1045,7 @@ func TestServer_Shutdown_ClosesListener(t *testing.T) {
 	}
 
 	// Pre-create directories
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -1380,7 +1380,7 @@ func TestServer_BatchWriterLifecycle(t *testing.T) {
 	paths := &config.Paths{
 		BaseDir: tmpDir,
 	}
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -1421,9 +1421,9 @@ func TestServer_BatchWriterLifecycle(t *testing.T) {
 		}
 		// Check if server returned an error
 		select {
-		case err := <-serverErr:
-			if err != nil {
-				t.Fatalf("server.Start failed: %v", err)
+		case srvErr := <-serverErr:
+			if srvErr != nil {
+				t.Fatalf("server.Start failed: %v", srvErr)
 			}
 		default:
 		}
@@ -1443,9 +1443,9 @@ func TestServer_BatchWriterLifecycle(t *testing.T) {
 
 	// Wait for server to stop
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			t.Errorf("unexpected server error: %v", err)
+	case srvErr := <-serverErr:
+		if srvErr != nil {
+			t.Errorf("unexpected server error: %v", srvErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("server did not stop in time")
@@ -1470,7 +1470,7 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 	paths := &config.Paths{
 		BaseDir: tmpDir,
 	}
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -1516,9 +1516,9 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 	server.Shutdown()
 
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			t.Errorf("unexpected server error: %v", err)
+	case srvErr := <-serverErr:
+		if srvErr != nil {
+			t.Errorf("unexpected server error: %v", srvErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("server did not stop in time")

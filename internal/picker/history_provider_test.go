@@ -24,12 +24,12 @@ var testSocketCounter atomic.Uint64
 // mockClaiService implements the FetchHistory RPC for testing.
 type mockClaiService struct {
 	pb.UnimplementedClaiServiceServer
-	items    []*pb.HistoryItem
-	atEnd    bool
-	delay    time.Duration
-	lastReq  *pb.HistoryFetchRequest
-	reqs     []*pb.HistoryFetchRequest
 	failWith error
+	lastReq  *pb.HistoryFetchRequest
+	items    []*pb.HistoryItem
+	reqs     []*pb.HistoryFetchRequest
+	delay    time.Duration
+	atEnd    bool
 }
 
 func (m *mockClaiService) FetchHistory(_ context.Context, req *pb.HistoryFetchRequest) (*pb.HistoryFetchResponse, error) {

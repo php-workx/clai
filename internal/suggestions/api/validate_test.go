@@ -259,14 +259,14 @@ func TestValidateTimestamp_Zero(t *testing.T) {
 	}
 	result := ValidateCommandStartRequest(req)
 	require.True(t, result.HasErrors())
-	hasTsError := false
+	hasTSError := false
 	for _, e := range result.Errors {
 		if e.Field == "ts_unix_ms" {
-			hasTsError = true
+			hasTSError = true
 			assert.Contains(t, e.Message, "positive")
 		}
 	}
-	assert.True(t, hasTsError, "expected ts_unix_ms error")
+	assert.True(t, hasTSError, "expected ts_unix_ms error")
 }
 
 func TestValidateTimestamp_Negative(t *testing.T) {
@@ -280,13 +280,13 @@ func TestValidateTimestamp_Negative(t *testing.T) {
 	}
 	result := ValidateCommandStartRequest(req)
 	require.True(t, result.HasErrors())
-	hasTsError := false
+	hasTSError := false
 	for _, e := range result.Errors {
 		if e.Field == "ts_unix_ms" {
-			hasTsError = true
+			hasTSError = true
 		}
 	}
-	assert.True(t, hasTsError, "expected ts_unix_ms error")
+	assert.True(t, hasTSError, "expected ts_unix_ms error")
 }
 
 func TestValidateTimestamp_TooFarInFuture(t *testing.T) {
@@ -301,14 +301,14 @@ func TestValidateTimestamp_TooFarInFuture(t *testing.T) {
 	}
 	result := ValidateCommandStartRequest(req)
 	require.True(t, result.HasErrors())
-	hasTsError := false
+	hasTSError := false
 	for _, e := range result.Errors {
 		if e.Field == "ts_unix_ms" {
-			hasTsError = true
+			hasTSError = true
 			assert.Contains(t, e.Message, "future")
 		}
 	}
-	assert.True(t, hasTsError, "expected ts_unix_ms error")
+	assert.True(t, hasTSError, "expected ts_unix_ms error")
 }
 
 func TestValidateTimestamp_Valid(t *testing.T) {
@@ -869,10 +869,10 @@ func TestValidationError_Error(t *testing.T) {
 	assert.Equal(t, "E_INVALID_ARGUMENT: session_id: is required", e.Error())
 }
 
-func TestValidationError_ToApiError(t *testing.T) {
+func TestValidationError_ToAPIError(t *testing.T) {
 	t.Parallel()
 	e := &ValidationError{Field: "session_id", Message: "is required"}
-	apiErr := e.ToApiError()
+	apiErr := e.ToAPIError()
 	assert.Equal(t, "E_INVALID_ARGUMENT", apiErr.Code)
 	assert.Contains(t, apiErr.Message, "session_id")
 	assert.Contains(t, apiErr.Message, "is required")

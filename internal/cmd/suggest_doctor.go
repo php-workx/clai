@@ -56,49 +56,49 @@ func init() {
 
 // suggestDoctorReport holds all diagnostic sections for JSON output.
 type suggestDoctorReport struct {
-	DaemonHealth    daemonHealthInfo  `json:"daemon_health"`
-	SchemaVersion   schemaVersionInfo `json:"schema_version"`
-	CacheStats      cacheStatsInfo    `json:"cache_stats"`
-	FTSAvailability ftsInfo           `json:"fts_availability"`
-	PlaybookStatus  playbookInfo      `json:"playbook_status"`
 	ActiveFeatures  activeFeatureInfo `json:"active_features"`
-	ShellMatrix     shellMatrixInfo   `json:"shell_matrix"`
+	Metrics         map[string]int64  `json:"metrics"`
+	SchemaVersion   schemaVersionInfo `json:"schema_version"`
+	FTSAvailability ftsInfo           `json:"fts_availability"`
 	TemplateCount   countInfo         `json:"template_count"`
 	EventCount      countInfo         `json:"event_count"`
+	ShellMatrix     shellMatrixInfo   `json:"shell_matrix"`
+	DaemonHealth    daemonHealthInfo  `json:"daemon_health"`
+	PlaybookStatus  playbookInfo      `json:"playbook_status"`
+	CacheStats      cacheStatsInfo    `json:"cache_stats"`
 	FeedbackStats   feedbackStatsInfo `json:"feedback_stats"`
-	Metrics         map[string]int64  `json:"metrics"`
 }
 
 type daemonHealthInfo struct {
-	Running    bool   `json:"running"`
 	SocketPath string `json:"socket_path"`
-	PID        int    `json:"pid"`
 	Status     string `json:"status"`
+	PID        int    `json:"pid"`
+	Running    bool   `json:"running"`
 }
 
 type schemaVersionInfo struct {
-	Version int    `json:"version"`
 	Status  string `json:"status"`
+	Version int    `json:"version"`
 }
 
 type cacheStatsInfo struct {
+	Status     string  `json:"status"`
 	HitRate    float64 `json:"hit_rate"`
 	Hits       int64   `json:"hits"`
 	Misses     int64   `json:"misses"`
 	EntryCount int64   `json:"entry_count"`
-	Status     string  `json:"status"`
 }
 
 type ftsInfo struct {
-	Enabled bool   `json:"enabled"`
 	Status  string `json:"status"`
+	Enabled bool   `json:"enabled"`
 }
 
 type playbookInfo struct {
-	Present   bool   `json:"present"`
-	TaskCount int    `json:"task_count"`
 	Path      string `json:"path"`
 	Status    string `json:"status"`
+	TaskCount int    `json:"task_count"`
+	Present   bool   `json:"present"`
 }
 
 type activeFeatureInfo struct {
@@ -110,16 +110,16 @@ type shellMatrixInfo struct {
 }
 
 type countInfo struct {
-	Count  int64  `json:"count"`
 	Status string `json:"status"`
+	Count  int64  `json:"count"`
 }
 
 type feedbackStatsInfo struct {
+	Status    string `json:"status"`
 	Accepted  int64  `json:"accepted"`
 	Dismissed int64  `json:"dismissed"`
 	Edited    int64  `json:"edited"`
 	Total     int64  `json:"total"`
-	Status    string `json:"status"`
 }
 
 func runSuggestDoctor(cmd *cobra.Command, args []string) error {
@@ -134,7 +134,7 @@ func runSuggestDoctor(cmd *cobra.Command, args []string) error {
 		return enc.Encode(report)
 	}
 
-	printSuggestDoctorText(report)
+	printSuggestDoctorText(&report)
 	return nil
 }
 
@@ -262,7 +262,7 @@ func checkPlaybookStatus(cfg *config.Config) playbookInfo {
 		Path: absPath,
 	}
 
-	data, err := os.ReadFile(absPath)
+	data, err := os.ReadFile(absPath) //nolint:gosec // G304: playbook path from trusted config
 	if err != nil {
 		if os.IsNotExist(err) {
 			info.Status = "not found"
@@ -369,7 +369,7 @@ func checkFeedbackStats(ctx context.Context, sdb *sql.DB) feedbackStatsInfo {
 	return info
 }
 
-func printSuggestDoctorText(report suggestDoctorReport) {
+func printSuggestDoctorText(report *suggestDoctorReport) {
 	fmt.Printf("%sclai Suggestions Doctor%s\n", colorBold, colorReset)
 	fmt.Println(strings.Repeat("-", 40))
 	fmt.Println()
@@ -480,7 +480,7 @@ func openSuggestionsDBReadOnly() *sql.DB {
 		return nil
 	}
 
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+	if _, statErr := os.Stat(dbPath); os.IsNotExist(statErr) {
 		return nil
 	}
 

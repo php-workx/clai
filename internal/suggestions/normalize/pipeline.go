@@ -31,10 +31,10 @@ func SplitPipeline(cmd string) []Segment {
 }
 
 type pipelineParser struct {
-	runes    []rune
-	pos      int
 	current  strings.Builder
+	runes    []rune
 	segments []Segment
+	pos      int
 }
 
 func newPipelineParser(cmd string) *pipelineParser {

@@ -274,14 +274,14 @@ func TestRetentionPrune_DeletesOldRows(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now().UnixMilli()
-	oldTs := now - 100*24*60*60*1000 // 100 days ago
-	newTs := now - 10*24*60*60*1000  // 10 days ago
+	oldTS := now - 100*24*60*60*1000 // 100 days ago
+	newTS := now - 10*24*60*60*1000  // 10 days ago
 
 	for i := 0; i < 5; i++ {
-		insertEvent(t, db, oldTs, fmt.Sprintf("old-cmd-%d", i), nil)
+		insertEvent(t, db, oldTS, fmt.Sprintf("old-cmd-%d", i), nil)
 	}
 	for i := 0; i < 3; i++ {
-		insertEvent(t, db, newTs, fmt.Sprintf("new-cmd-%d", i), nil)
+		insertEvent(t, db, newTS, fmt.Sprintf("new-cmd-%d", i), nil)
 	}
 
 	if count := countEvents(t, db); count != 8 {
@@ -308,11 +308,11 @@ func TestRetentionPrune_BatchProcessing(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now().UnixMilli()
-	oldTs := now - 100*24*60*60*1000
+	oldTS := now - 100*24*60*60*1000
 
 	// Insert 10 old events (will require multiple batches of 3)
 	for i := 0; i < 10; i++ {
-		insertEvent(t, db, oldTs, fmt.Sprintf("cmd-%d", i), nil)
+		insertEvent(t, db, oldTS, fmt.Sprintf("cmd-%d", i), nil)
 	}
 
 	deleted := r.retentionPrune(ctx)
@@ -331,9 +331,9 @@ func TestRetentionPrune_DisabledWhenZero(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now().UnixMilli()
-	oldTs := now - 1000*24*60*60*1000 // Very old
+	oldTS := now - 1000*24*60*60*1000 // Very old
 
-	insertEvent(t, db, oldTs, "old-cmd", nil)
+	insertEvent(t, db, oldTS, "old-cmd", nil)
 
 	// tick should not prune because RetentionDays=0
 	r.tick(ctx)
@@ -367,10 +367,10 @@ func TestRetentionPrune_CancelledContext(t *testing.T) {
 	})
 
 	now := time.Now().UnixMilli()
-	oldTs := now - 100*24*60*60*1000
+	oldTS := now - 100*24*60*60*1000
 
 	for i := 0; i < 10; i++ {
-		insertEvent(t, db, oldTs, fmt.Sprintf("cmd-%d", i), nil)
+		insertEvent(t, db, oldTS, fmt.Sprintf("cmd-%d", i), nil)
 	}
 
 	// Cancel context immediately
@@ -742,13 +742,13 @@ func TestIntegration_FullMaintenancePass(t *testing.T) {
 	ctx := context.Background()
 
 	now := time.Now().UnixMilli()
-	oldTs := now - 100*24*60*60*1000
+	oldTS := now - 100*24*60*60*1000
 
 	// Insert old events with template references
 	tmpl := "tmpl-old"
 	insertTemplate(t, db, tmpl, "old-cmd")
 	for i := 0; i < 5; i++ {
-		insertEvent(t, db, oldTs, fmt.Sprintf("old-cmd-%d", i), &tmpl)
+		insertEvent(t, db, oldTS, fmt.Sprintf("old-cmd-%d", i), &tmpl)
 	}
 
 	// Insert recent event with different template

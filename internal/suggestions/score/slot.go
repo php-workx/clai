@@ -28,14 +28,12 @@ const (
 // SlotStore manages slot value histograms for argument prediction.
 // It tracks the most frequent values used for each slot position in normalized commands.
 type SlotStore struct {
-	db    *sql.DB
-	tauMs int64
-	topK  int
-
-	// Prepared statements
+	db         *sql.DB
 	getStmt    *sql.Stmt
 	upsertStmt *sql.Stmt
 	topKStmt   *sql.Stmt
+	tauMs      int64
+	topK       int
 }
 
 // SlotOptions configures the slot store.
@@ -151,7 +149,7 @@ func (ss *SlotStore) Close() error {
 type SlotValue struct {
 	Value  string
 	Count  float64
-	LastTs int64
+	LastTS int64
 }
 
 // Update updates the count for a slot value in the given scope.
@@ -160,9 +158,9 @@ type SlotValue struct {
 func (ss *SlotStore) Update(ctx context.Context, scope, cmdNorm string, slotIdx int, value string, nowMs int64) error {
 	// Get current count and timestamp
 	var currentCount float64
-	var lastTs int64
+	var lastTS int64
 
-	err := ss.getStmt.QueryRowContext(ctx, scope, cmdNorm, slotIdx, value).Scan(&currentCount, &lastTs)
+	err := ss.getStmt.QueryRowContext(ctx, scope, cmdNorm, slotIdx, value).Scan(&currentCount, &lastTS)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -174,7 +172,7 @@ func (ss *SlotStore) Update(ctx context.Context, scope, cmdNorm string, slotIdx 
 		newCount = 1.0
 	} else {
 		// Apply decay
-		elapsed := float64(nowMs - lastTs)
+		elapsed := float64(nowMs - lastTS)
 		decay := math.Exp(-elapsed / float64(ss.tauMs))
 		newCount = currentCount*decay + 1.0
 	}
@@ -190,7 +188,7 @@ func (ss *SlotStore) UpdateBoth(ctx context.Context, cmdNorm string, slotIdx int
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback on error
 
 	// Update global scope
 	if err := ss.updateInTx(ctx, tx, ScopeGlobal, cmdNorm, slotIdx, value, nowMs); err != nil {
@@ -211,12 +209,12 @@ func (ss *SlotStore) UpdateBoth(ctx context.Context, cmdNorm string, slotIdx int
 func (ss *SlotStore) updateInTx(ctx context.Context, tx *sql.Tx, scope, cmdNorm string, slotIdx int, value string, nowMs int64) error {
 	// Get current count and timestamp
 	var currentCount float64
-	var lastTs int64
+	var lastTS int64
 
 	err := tx.QueryRowContext(ctx, `
 		SELECT count, last_ts FROM slot_value
 		WHERE scope = ? AND cmd_norm = ? AND slot_idx = ? AND value = ?
-	`, scope, cmdNorm, slotIdx, value).Scan(&currentCount, &lastTs)
+	`, scope, cmdNorm, slotIdx, value).Scan(&currentCount, &lastTS)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
@@ -226,7 +224,7 @@ func (ss *SlotStore) updateInTx(ctx context.Context, tx *sql.Tx, scope, cmdNorm 
 	if errors.Is(err, sql.ErrNoRows) {
 		newCount = 1.0
 	} else {
-		elapsed := float64(nowMs - lastTs)
+		elapsed := float64(nowMs - lastTS)
 		decay := math.Exp(-elapsed / float64(ss.tauMs))
 		newCount = currentCount*decay + 1.0
 	}
@@ -263,12 +261,12 @@ func (ss *SlotStore) GetTopValuesAt(ctx context.Context, scope, cmdNorm string, 
 	var results []SlotValue
 	for rows.Next() {
 		var sv SlotValue
-		if err := rows.Scan(&sv.Value, &sv.Count, &sv.LastTs); err != nil {
+		if err := rows.Scan(&sv.Value, &sv.Count, &sv.LastTS); err != nil {
 			return nil, err
 		}
 
 		// Apply decay to get current count
-		elapsed := float64(atMs - sv.LastTs)
+		elapsed := float64(atMs - sv.LastTS)
 		decay := math.Exp(-elapsed / float64(ss.tauMs))
 		sv.Count *= decay
 

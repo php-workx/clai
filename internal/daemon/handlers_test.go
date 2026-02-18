@@ -26,10 +26,10 @@ type mockStore struct {
 }
 
 type importStatusStore struct {
-	*mockStore
-	has       bool
 	hasErr    error
 	importErr error
+	*mockStore
+	has bool
 }
 
 func (m *importStatusStore) HasImportedHistory(ctx context.Context, shell string) (bool, error) {
@@ -99,7 +99,7 @@ func (m *mockStore) UpdateCommandEnd(ctx context.Context, commandID string, exit
 		ec := exitCode
 		isSuccess := exitCode == 0
 		c.ExitCode = &ec
-		c.TsEndUnixMs = &endTime
+		c.TSEndUnixMs = &endTime
 		c.DurationMs = &duration
 		c.IsSuccess = &isSuccess
 	}
@@ -128,10 +128,10 @@ func (m *mockStore) QueryHistoryCommands(ctx context.Context, q storage.CommandQ
 			continue
 		}
 		existing, ok := seen[c.Command]
-		if !ok || c.TsStartUnixMs > existing.TimestampMs {
+		if !ok || c.TSStartUnixMs > existing.TimestampMs {
 			seen[c.Command] = storage.HistoryRow{
 				Command:     c.Command,
-				TimestampMs: c.TsStartUnixMs,
+				TimestampMs: c.TSStartUnixMs,
 			}
 		}
 	}
@@ -237,8 +237,8 @@ func (m *mockRanker) Rank(ctx context.Context, req *suggest.RankRequest) ([]sugg
 // mockProvider implements provider.Provider for testing.
 type mockProvider struct {
 	name       string
-	available  bool
 	suggestion string
+	available  bool
 }
 
 func (m *mockProvider) Name() string {
@@ -551,9 +551,9 @@ func TestHandler_RecordFeedback_ValidationAndSuccess(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		resp, err := server.RecordFeedback(ctx, tc.req)
-		if err != nil {
-			t.Fatalf("%s: RecordFeedback returned error: %v", tc.name, err)
+		resp, fbErr := server.RecordFeedback(ctx, tc.req)
+		if fbErr != nil {
+			t.Fatalf("%s: RecordFeedback returned error: %v", tc.name, fbErr)
 		}
 		if resp.Ok {
 			t.Fatalf("%s: expected response.Ok=false", tc.name)
@@ -1009,14 +1009,14 @@ func TestHandler_SuggestWithDestructiveCommand(t *testing.T) {
 func TestTruncate(t *testing.T) {
 	tests := []struct {
 		input    string
-		maxLen   int
 		expected string
+		maxLen   int
 	}{
-		{"hello", 10, "hello"},
-		{"hello world", 5, "he..."},
-		{"abc", 3, "abc"},
-		{"abcd", 3, "abc"},
-		{"hello", 0, ""},
+		{"hello", "hello", 10},
+		{"hello world", "he...", 5},
+		{"abc", "abc", 3},
+		{"abcd", "abc", 3},
+		{"hello", "", 0},
 	}
 
 	for _, tt := range tests {
@@ -1039,8 +1039,8 @@ func TestTruncate_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		maxLen   int
 		expected string
+		maxLen   int
 	}{
 		{
 			name:     "empty string",
@@ -2465,7 +2465,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-1",
 		Command:       "git status",
 		CommandNorm:   "git status",
-		TsStartUnixMs: 1000,
+		TSStartUnixMs: 1000,
 		CWD:           "/tmp",
 	}
 	store.commands["cmd-2"] = &storage.Command{
@@ -2473,7 +2473,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-1",
 		Command:       "git log",
 		CommandNorm:   "git log",
-		TsStartUnixMs: 2000,
+		TSStartUnixMs: 2000,
 		CWD:           "/tmp",
 	}
 	store.commands["cmd-3"] = &storage.Command{
@@ -2481,7 +2481,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-1",
 		Command:       "git status",
 		CommandNorm:   "git status",
-		TsStartUnixMs: 3000,
+		TSStartUnixMs: 3000,
 		CWD:           "/tmp",
 	}
 	store.commands["cmd-4"] = &storage.Command{
@@ -2489,7 +2489,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-2",
 		Command:       "ls -la",
 		CommandNorm:   "ls -la",
-		TsStartUnixMs: 4000,
+		TSStartUnixMs: 4000,
 		CWD:           "/tmp",
 	}
 	store.commands["cmd-5"] = &storage.Command{
@@ -2497,7 +2497,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-2",
 		Command:       "echo hello",
 		CommandNorm:   "echo hello",
-		TsStartUnixMs: 5000,
+		TSStartUnixMs: 5000,
 		CWD:           "/tmp",
 	}
 
@@ -2669,7 +2669,7 @@ func TestHandler_FetchHistory_ANSIStripping(t *testing.T) {
 		SessionID:     "session-1",
 		Command:       "\x1b[32mgit\x1b[0m status",
 		CommandNorm:   "git status",
-		TsStartUnixMs: 1000,
+		TSStartUnixMs: 1000,
 		CWD:           "/tmp",
 	}
 
@@ -2828,8 +2828,8 @@ func TestImportHistory_V2BackfillCalled(t *testing.T) {
 	// Create a bash history file with timestamped entries
 	histPath := filepath.Join(tmpDir, "bash_history")
 	histContent := "#1700000000\ngit status\n#1700000100\nls -la\n#1700000200\necho hello\n"
-	if err := writeTestFile(histPath, histContent); err != nil {
-		t.Fatalf("failed to write test history file: %v", err)
+	if writeErr := writeTestFile(histPath, histContent); writeErr != nil {
+		t.Fatalf("failed to write test history file: %v", writeErr)
 	}
 
 	store := newMockStore()
@@ -2940,8 +2940,8 @@ func TestImportHistory_V2BackfillFailureNonFatal(t *testing.T) {
 	// Create a bash history file
 	histPath := filepath.Join(tmpDir, "bash_history")
 	histContent := "#1700000000\ngit status\n#1700000100\nls -la\n#1700000200\necho hello\n"
-	if err := writeTestFile(histPath, histContent); err != nil {
-		t.Fatalf("failed to write test history file: %v", err)
+	if writeErr := writeTestFile(histPath, histContent); writeErr != nil {
+		t.Fatalf("failed to write test history file: %v", writeErr)
 	}
 
 	store := newMockStore()
@@ -3031,12 +3031,12 @@ func TestCommandEnded_FeedsV2(t *testing.T) {
 	}
 
 	// CommandEnded should enqueue to V2 batch writer
-	endTs := time.Now().Add(-2 * time.Minute).UnixMilli()
+	endTS := time.Now().Add(-2 * time.Minute).UnixMilli()
 	resp, err := server.CommandEnded(ctx, &pb.CommandEndRequest{
 		SessionId:  "v2-session",
 		CommandId:  "v2-cmd-1",
 		ExitCode:   0,
-		TsUnixMs:   endTs,
+		TsUnixMs:   endTS,
 		DurationMs: 250,
 	})
 	if err != nil {
@@ -3081,8 +3081,8 @@ func TestCommandEnded_FeedsV2(t *testing.T) {
 	if durationMs != 250 {
 		t.Errorf("expected duration_ms=250, got %d", durationMs)
 	}
-	if ts != endTs {
-		t.Errorf("expected ts=%d from request, got %d", endTs, ts)
+	if ts != endTS {
+		t.Errorf("expected ts=%d from request, got %d", endTS, ts)
 	}
 }
 

@@ -67,33 +67,25 @@ type overrideConfig struct {
 
 // cacheEntry holds a cached detection result.
 type cacheEntry struct {
-	types     []string
 	expiresAt time.Time
+	types     []string
 }
 
 // DetectorOptions configures the project type detector.
 type DetectorOptions struct {
-	// CacheTTL is the time-to-live for cached detection results.
-	// Default: 60s.
-	CacheTTL time.Duration
-
-	// MaxScanDepth is the maximum number of parent directories to scan upward.
-	// Default: 10.
-	MaxScanDepth int
-
-	// ExtraMarkers are additional markers to check beyond the built-in set.
 	ExtraMarkers []Marker
+	CacheTTL     time.Duration
+	MaxScanDepth int
 }
 
 // Detector detects project types by scanning for marker files.
 // It is safe for concurrent use.
 type Detector struct {
-	opts    DetectorOptions
-	markers []Marker
-
-	mu      sync.RWMutex
 	cache   map[string]*cacheEntry
-	nowFunc func() time.Time // for testing
+	nowFunc func() time.Time
+	markers []Marker
+	opts    DetectorOptions
+	mu      sync.RWMutex
 }
 
 // NewDetector creates a new project type detector.

@@ -10,6 +10,9 @@ import (
 // Config holds tuning parameters for the online learner.
 // Defaults match spec Section 7.7 and Section 16.
 type Config struct {
+	// Logger for diagnostic output (optional).
+	Logger *slog.Logger
+
 	// EtaInitial is the initial learning rate (default 0.02).
 	EtaInitial float64
 
@@ -37,9 +40,6 @@ type Config struct {
 	// weight updates begin. Below this threshold, static defaults are used.
 	// Default 30.
 	MinSamples int64
-
-	// Logger for diagnostic output (optional).
-	Logger *slog.Logger
 }
 
 // DefaultConfig returns the spec-default learner configuration.
@@ -75,22 +75,22 @@ type FeatureVector struct {
 // Learner implements adaptive weight tuning with pairwise updates and
 // eta decay per spec Section 7.7. It is safe for concurrent use.
 type Learner struct {
+	store       *Store
+	config      Config
 	weights     Weights
 	sampleCount int64
-	config      Config
-	store       *Store
 	mu          sync.RWMutex
 }
 
 // NewLearner creates a learner with the given initial weights, config,
 // and optional persistence store. If store is nil, weights are kept
 // in memory only.
-func NewLearner(initial Weights, cfg Config, store *Store) *Learner {
+func NewLearner(initial *Weights, cfg Config, store *Store) *Learner {
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
 	return &Learner{
-		weights: initial,
+		weights: *initial,
 		config:  cfg,
 		store:   store,
 	}
@@ -150,7 +150,7 @@ func effectiveEta(etaInitial, etaDecayConstant, etaFloor float64, sampleCount in
 // The scope parameter identifies the weight profile (e.g. "session:<id>",
 // "repo:<key>", or "global"). When a store is configured the updated
 // profile is persisted asynchronously.
-func (l *Learner) Update(ctx context.Context, scope string, fPos, fNeg FeatureVector) {
+func (l *Learner) Update(ctx context.Context, scope string, fPos, fNeg *FeatureVector) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 

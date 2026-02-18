@@ -22,7 +22,7 @@ import (
 )
 
 // createTestDB creates a temporary SQLite database for testing.
-func createTestDB(t testing.TB) *sql.DB {
+func createTestDB(t testing.TB) *sql.DB { //nolint:funlen // test DB setup with full V2 schema
 	t.Helper()
 
 	dir, err := os.MkdirTemp("", "clai-scorer-test-*")
@@ -163,13 +163,13 @@ func TestScorer_Suggest_DoesNotSuggestLastCommand(t *testing.T) {
 	cfg := DefaultScorerConfig()
 	cfg.TopK = MaxTopK
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, cfg)
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastCmd: "make install",
 		NowMs:   nowMs,
 	})
@@ -191,7 +191,7 @@ func TestScorer_NewScorer(t *testing.T) {
 
 	db := createTestDB(t)
 
-	scorer, err := NewScorer(ScorerDependencies{DB: db}, DefaultScorerConfig())
+	scorer, err := NewScorer(&ScorerDependencies{DB: db}, DefaultScorerConfig())
 	require.NoError(t, err)
 	assert.NotNil(t, scorer)
 	assert.Equal(t, DefaultTopK, scorer.TopK())
@@ -202,14 +202,14 @@ func TestScorer_NewScorer_CustomConfig(t *testing.T) {
 
 	db := createTestDB(t)
 
-	cfg := ScorerConfig{
+	cfg := &ScorerConfig{
 		TopK: 5,
 		Weights: Weights{
 			RepoTransition: 100,
 		},
 	}
 
-	scorer, err := NewScorer(ScorerDependencies{DB: db}, cfg)
+	scorer, err := NewScorer(&ScorerDependencies{DB: db}, cfg)
 	require.NoError(t, err)
 	assert.Equal(t, 5, scorer.TopK())
 	assert.Equal(t, float64(100), scorer.Weights().RepoTransition)
@@ -220,11 +220,11 @@ func TestScorer_Suggest_Empty(t *testing.T) {
 
 	db := createTestDB(t)
 
-	scorer, err := NewScorer(ScorerDependencies{DB: db}, DefaultScorerConfig())
+	scorer, err := NewScorer(&ScorerDependencies{DB: db}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{})
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{})
 	require.NoError(t, err)
 	assert.Empty(t, suggestions)
 }
@@ -249,13 +249,13 @@ func TestScorer_Suggest_WithFrequency(t *testing.T) {
 		require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "git commit", nowMs))
 	}
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{NowMs: nowMs})
 	require.NoError(t, err)
 	assert.NotEmpty(t, suggestions)
 
@@ -284,13 +284,13 @@ func TestScorer_Suggest_WithTransitions(t *testing.T) {
 		require.NoError(t, transStore.RecordTransition(ctx, score.ScopeGlobal, "git add .", "git status", nowMs))
 	}
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		TransitionStore: transStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastCmd: "git add .",
 		NowMs:   nowMs,
 	})
@@ -319,14 +319,14 @@ func TestScorer_Suggest_WithProjectTasks(t *testing.T) {
 	`, "/test/repo", "makefile", "test", "make test", "Run tests", 1000000)
 	require.NoError(t, err)
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:               db,
 		DiscoveryService: discSvc,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		RepoKey: "/test/repo",
 		NowMs:   1000000,
 	})
@@ -364,14 +364,14 @@ func BenchmarkScorer_Suggest_Latency(b *testing.B) {
 		require.NoError(b, transStore.RecordTransition(ctx, score.ScopeGlobal, "git status", "git commit", nowMs))
 	}
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
 	}, DefaultScorerConfig())
 	require.NoError(b, err)
 
-	suggestCtx := SuggestContext{
+	suggestCtx := &SuggestContext{
 		LastCmd: "git status",
 		NowMs:   nowMs,
 	}
@@ -418,14 +418,14 @@ func TestScorer_Suggest_Deduplication(t *testing.T) {
 	// Via transition
 	require.NoError(t, transStore.RecordTransition(ctx, score.ScopeGlobal, "git add .", "git status", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastCmd: "git add .",
 		NowMs:   nowMs,
 	})
@@ -465,13 +465,13 @@ func TestScorer_Suggest_DangerousPenalty(t *testing.T) {
 		require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "ls -la", nowMs))
 	}
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{NowMs: nowMs})
 	require.NoError(t, err)
 
 	// Find the dangerous command
@@ -515,13 +515,13 @@ func TestScorer_Suggest_RepoScope(t *testing.T) {
 	// Add global commands
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "git status", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		RepoKey: repoKey,
 		NowMs:   nowMs,
 	})
@@ -557,13 +557,13 @@ func TestScorer_Suggest_TopK(t *testing.T) {
 	}
 
 	// Create scorer with TopK=3
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
-	}, ScorerConfig{TopK: 3})
+	}, &ScorerConfig{TopK: 3})
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{NowMs: nowMs})
 	require.NoError(t, err)
 	assert.Len(t, suggestions, 3)
 }
@@ -573,7 +573,7 @@ func TestScorer_Confidence(t *testing.T) {
 
 	db := createTestDB(t)
 
-	scorer, err := NewScorer(ScorerDependencies{DB: db}, DefaultScorerConfig())
+	scorer, err := NewScorer(&ScorerDependencies{DB: db}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	// Test confidence calculation
@@ -615,14 +615,14 @@ func TestScorer_Suggest_WithDirScope(t *testing.T) {
 	// Add dir-scoped transition
 	require.NoError(t, transStore.RecordTransition(ctx, dirKey, "git pull", "npm run dev", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastCmd:     "git pull",
 		DirScopeKey: dirKey,
 		NowMs:       nowMs,
@@ -660,14 +660,14 @@ func TestScorer_Suggest_DirScopeEmpty(t *testing.T) {
 	// Add global frequency only
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "ls -la", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	// No DirScopeKey set - should still work
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{NowMs: nowMs})
 	require.NoError(t, err)
 	assert.NotEmpty(t, suggestions)
 	assert.Equal(t, "ls -la", suggestions[0].Command)
@@ -842,7 +842,7 @@ func TestScorer_WorkflowBoost(t *testing.T) {
 	}
 	tracker := workflow.NewTracker(patterns, workflow.DefaultTrackerConfig())
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		WorkflowTracker: tracker,
@@ -850,7 +850,7 @@ func TestScorer_WorkflowBoost(t *testing.T) {
 	require.NoError(t, err)
 
 	// Simulate being at step 0 (just ran "git add .") by using the template ID
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastCmd:        "git add .",
 		LastTemplateID: "tmpl:git_add",
 		NowMs:          nowMs,
@@ -883,13 +883,13 @@ func TestScorer_WorkflowBoost_NilTracker(t *testing.T) {
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "git status", nowMs))
 
 	// No workflow tracker provided
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastTemplateID: "tmpl:git_add",
 		NowMs:          nowMs,
 	})
@@ -918,14 +918,14 @@ func TestScorer_PipelineConfidence(t *testing.T) {
 
 	pipelineStore := score.NewPipelineStore(db)
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:            db,
 		PipelineStore: pipelineStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastTemplateID: "tmpl:grep",
 		Scope:          "global",
 		NowMs:          1000000,
@@ -949,13 +949,13 @@ func TestScorer_PipelineConfidence_NilStore(t *testing.T) {
 
 	db := createTestDB(t)
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB: db,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastTemplateID: "tmpl:grep",
 		Scope:          "global",
 		NowMs:          1000000,
@@ -988,14 +988,14 @@ func TestScorer_RecoveryBoost(t *testing.T) {
 	recoveryEngine, err := recovery.NewEngine(db, classifier, safety, recovery.DefaultEngineConfig())
 	require.NoError(t, err)
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:             db,
 		RecoveryEngine: recoveryEngine,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastTemplateID: "tmpl:npm_install",
 		LastExitCode:   1,
 		LastFailed:     true,
@@ -1027,14 +1027,14 @@ func TestScorer_RecoveryBoost_NotTriggeredOnSuccess(t *testing.T) {
 	recoveryEngine, err := recovery.NewEngine(db, classifier, safety, recovery.DefaultEngineConfig())
 	require.NoError(t, err)
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:             db,
 		RecoveryEngine: recoveryEngine,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastTemplateID: "tmpl:npm_install",
 		LastExitCode:   0,
 		LastFailed:     false, // Not failed
@@ -1050,13 +1050,13 @@ func TestScorer_RecoveryBoost_NilEngine(t *testing.T) {
 
 	db := createTestDB(t)
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB: db,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	ctx := context.Background()
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastFailed: true,
 		NowMs:      1000000,
 	})
@@ -1095,14 +1095,14 @@ func TestScorer_DismissalPenalty_Learned(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, dismissal.StateLearned, state)
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:             db,
 		FreqStore:      freqStore,
 		DismissalStore: dismissalStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastTemplateID: "tmpl:prev_cmd",
 		Scope:          "global",
 		NowMs:          nowMs,
@@ -1151,14 +1151,14 @@ func TestScorer_DismissalPenalty_Permanent(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, dismissal.StatePermanent, state)
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:             db,
 		FreqStore:      freqStore,
 		DismissalStore: dismissalStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastTemplateID: "tmpl:prev_cmd",
 		Scope:          "global",
 		NowMs:          nowMs,
@@ -1188,13 +1188,13 @@ func TestScorer_DismissalPenalty_NilStore(t *testing.T) {
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "git status", nowMs))
 
 	// No dismissal store
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastTemplateID: "tmpl:prev_cmd",
 		Scope:          "global",
 		NowMs:          nowMs,
@@ -1219,13 +1219,13 @@ func TestScorer_PrefixFiltering_ExactMatch(t *testing.T) {
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "git commit", nowMs))
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "npm install", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		Prefix: "git",
 		NowMs:  nowMs,
 	})
@@ -1253,14 +1253,14 @@ func TestScorer_PrefixFiltering_EmptyPrefix(t *testing.T) {
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "git status", nowMs))
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "npm install", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	// Empty prefix: all suggestions should be returned
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		Prefix: "",
 		NowMs:  nowMs,
 	})
@@ -1283,7 +1283,7 @@ func TestScorer_PrefixFiltering_FuzzyTolerance(t *testing.T) {
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "git status", nowMs))
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "npm test", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
@@ -1294,7 +1294,7 @@ func TestScorer_PrefixFiltering_FuzzyTolerance(t *testing.T) {
 	// But the first word match: "git" HasPrefix "gti" -> false
 	// So "gti" should NOT match "git status" via basic fuzzy, unless the typo tolerance is
 	// within range. Let's test with a single-char typo instead.
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		Prefix: "gis", // edit distance 1 from "git"
 		NowMs:  nowMs,
 	})
@@ -1328,16 +1328,16 @@ func TestScorer_DeterministicTieBreaking(t *testing.T) {
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "beta-cmd", nowMs))
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "gamma-cmd", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	// Run twice to verify deterministic ordering
-	suggestions1, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+	suggestions1, err := scorer.Suggest(ctx, &SuggestContext{NowMs: nowMs})
 	require.NoError(t, err)
-	suggestions2, err := scorer.Suggest(ctx, SuggestContext{NowMs: nowMs})
+	suggestions2, err := scorer.Suggest(ctx, &SuggestContext{NowMs: nowMs})
 	require.NoError(t, err)
 
 	require.Equal(t, len(suggestions1), len(suggestions2))
@@ -1352,7 +1352,7 @@ func TestScorer_MaxTopK_Clamped(t *testing.T) {
 
 	db := createTestDB(t)
 
-	scorer, err := NewScorer(ScorerDependencies{DB: db}, ScorerConfig{TopK: 999})
+	scorer, err := NewScorer(&ScorerDependencies{DB: db}, &ScorerConfig{TopK: 999})
 	require.NoError(t, err)
 	assert.Equal(t, MaxTopK, scorer.TopK())
 }
@@ -1370,14 +1370,14 @@ func TestScorer_SuggestContext_Defaults(t *testing.T) {
 	nowMs := time.Now().UnixMilli()
 	require.NoError(t, freqStore.Update(ctx, score.ScopeGlobal, "ls", nowMs))
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:        db,
 		FreqStore: freqStore,
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	// With empty NowMs and Scope, defaults should be applied
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{})
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{})
 	require.NoError(t, err)
 	// Should still work with defaulted NowMs and Scope
 	assert.NotEmpty(t, suggestions)
@@ -1388,7 +1388,7 @@ func TestScorer_ConfidenceWithNewFeatures(t *testing.T) {
 
 	db := createTestDB(t)
 
-	scorer, err := NewScorer(ScorerDependencies{DB: db}, DefaultScorerConfig())
+	scorer, err := NewScorer(&ScorerDependencies{DB: db}, DefaultScorerConfig())
 	require.NoError(t, err)
 
 	// Test confidence with all 10 features active
@@ -1480,7 +1480,7 @@ func TestScorer_Suggest_CombinedFeatures(t *testing.T) {
 	}
 	tracker := workflow.NewTracker(patterns, workflow.DefaultTrackerConfig())
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
@@ -1489,7 +1489,7 @@ func TestScorer_Suggest_CombinedFeatures(t *testing.T) {
 	}, DefaultScorerConfig())
 	require.NoError(t, err)
 
-	suggestions, err := scorer.Suggest(ctx, SuggestContext{
+	suggestions, err := scorer.Suggest(ctx, &SuggestContext{
 		LastCmd:        "git add .",
 		LastTemplateID: "tmpl:git_add",
 		Scope:          "global",

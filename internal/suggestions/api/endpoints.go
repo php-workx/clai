@@ -27,16 +27,16 @@ type SuggestRequest struct {
 // SuggestResponse is the response for /suggest endpoint.
 // Per spec Section 15.2.
 type SuggestResponse struct {
-	Suggestions []SuggestionItem `json:"suggestions"`
 	Context     SuggestContext   `json:"context"`
+	Suggestions []SuggestionItem `json:"suggestions"`
 }
 
 // SuggestionItem represents a single suggestion.
 type SuggestionItem struct {
 	Cmd        string   `json:"cmd"`
 	CmdNorm    string   `json:"cmd_norm"`
-	Score      float64  `json:"score"`
 	Reasons    []string `json:"reasons"`
+	Score      float64  `json:"score"`
 	Confidence float64  `json:"confidence"`
 }
 
@@ -67,9 +67,9 @@ type SearchResponse struct {
 // SearchResult represents a single search result.
 type SearchResult struct {
 	CmdRaw  string `json:"cmd_raw"`
-	Ts      int64  `json:"ts"`
 	Cwd     string `json:"cwd"`
 	RepoKey string `json:"repo_key,omitempty"`
+	TS      int64  `json:"ts"`
 }
 
 // ErrorResponse represents an error response.
@@ -88,7 +88,7 @@ type DebugScoreEntry struct {
 	Scope   string  `json:"scope"`
 	CmdNorm string  `json:"cmd_norm"`
 	Score   float64 `json:"score"`
-	LastTs  int64   `json:"last_ts"`
+	LastTS  int64   `json:"last_ts"`
 }
 
 // DebugCacheResponse is the response for /debug/cache.
@@ -191,7 +191,7 @@ func (h *Handler) HandleSuggest(w http.ResponseWriter, r *http.Request) {
 		}
 
 		var err error
-		suggestions, err = h.scorer.Suggest(ctx, suggestCtx)
+		suggestions, err = h.scorer.Suggest(ctx, &suggestCtx)
 		if err != nil {
 			h.logger.Error("suggestion failed", "error", err)
 			h.writeError(w, http.StatusInternalServerError, "suggest_failed", "Failed to compute suggestions")
@@ -290,7 +290,7 @@ func (h *Handler) HandleSearch(w http.ResponseWriter, r *http.Request) {
 		r := results[i]
 		items[i] = SearchResult{
 			CmdRaw:  r.CmdRaw,
-			Ts:      r.Timestamp,
+			TS:      r.Timestamp,
 			Cwd:     r.Cwd,
 			RepoKey: r.RepoKey,
 		}
@@ -340,7 +340,7 @@ func (h *Handler) HandleDebugScores(w http.ResponseWriter, r *http.Request) {
 			Scope:   s.Scope,
 			CmdNorm: s.CmdNorm,
 			Score:   s.Score,
-			LastTs:  s.LastTs,
+			LastTS:  s.LastTS,
 		}
 	}
 
@@ -352,7 +352,7 @@ func (h *Handler) HandleDebugScores(w http.ResponseWriter, r *http.Request) {
 
 // HandleDebugCache handles the /debug/cache endpoint.
 // Per spec Section 15.4.
-func (h *Handler) HandleDebugCache(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleDebugCache(w http.ResponseWriter, _ *http.Request) {
 	var entries []DebugCacheEntry
 	size := 0
 
@@ -371,7 +371,7 @@ func (h *Handler) HandleDebugCache(w http.ResponseWriter, r *http.Request) {
 
 // HandleDebugDiscoveryErrors handles the /debug/discovery-errors endpoint.
 // Per spec Section 10.2.1.
-func (h *Handler) HandleDebugDiscoveryErrors(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleDebugDiscoveryErrors(w http.ResponseWriter, _ *http.Request) {
 	var errors []discovery.DiscoveryError
 	count := 0
 
@@ -405,7 +405,7 @@ func (h *Handler) writeError(w http.ResponseWriter, status int, errorCode, messa
 }
 
 // SuggestFromContext generates suggestions from a context (for pre-computation).
-func (h *Handler) SuggestFromContext(ctx context.Context, suggestCtx suggest.SuggestContext) ([]suggest.Suggestion, error) {
+func (h *Handler) SuggestFromContext(ctx context.Context, suggestCtx *suggest.SuggestContext) ([]suggest.Suggestion, error) {
 	if h.scorer == nil {
 		return nil, nil
 	}

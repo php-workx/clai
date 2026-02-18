@@ -27,26 +27,24 @@ const DefaultMemoryBudgetBytes = 50 * 1024 * 1024
 // It coordinates L1 (per-session), L2 (per-repo), and L3 (SQLite) caches
 // with memory budget enforcement and async precompute support.
 type MultiCache struct {
-	l1      *L1Cache
-	l2      *L2Cache
-	l3      *L3Cache
-	metrics *CacheMetrics
-
-	memoryBudget int64
+	l1           *L1Cache
+	l2           *L2Cache
+	l3           *L3Cache
+	metrics      *CacheMetrics
 	logger       *slog.Logger
-
-	precompute *PrecomputeTracker
-	pressureMu sync.Mutex // serializes memory pressure enforcement
+	precompute   *PrecomputeTracker
+	memoryBudget int64
+	pressureMu   sync.Mutex
 }
 
 // MultiCacheConfig configures the multi-layer cache.
 type MultiCacheConfig struct {
+	DB           *sql.DB
+	Logger       *slog.Logger
 	L1Capacity   int
 	L2Capacity   int
 	TTL          time.Duration
 	MemoryBudget int64
-	DB           *sql.DB
-	Logger       *slog.Logger
 }
 
 // NewMultiCache creates a new multi-layer cache.
@@ -287,7 +285,7 @@ func (mc *MultiCache) L3() *L3Cache {
 	return mc.l3
 }
 
-// PrecomputeTracker returns the precompute tracker.
+// PrecomputeTrackerInstance returns the precompute tracker.
 func (mc *MultiCache) PrecomputeTrackerInstance() *PrecomputeTracker {
 	return mc.precompute
 }

@@ -43,35 +43,15 @@ var priorityWeight = map[string]int{
 
 // Task represents a single entry in the playbook.
 type Task struct {
-	// Name is the unique task identifier (required).
-	Name string `yaml:"name"`
-
-	// Command is the shell command to execute (required).
-	Command string `yaml:"command"`
-
-	// Description is an optional human-readable description.
-	Description string `yaml:"description,omitempty"`
-
-	// After specifies a task name that must complete successfully before
-	// this task is suggested. Forms a DAG dependency.
-	After string `yaml:"after,omitempty"`
-
-	// AfterFailure specifies a task name; this task is suggested only when
-	// the referenced task (or matching command) fails.
-	AfterFailure string `yaml:"after_failure,omitempty"`
-
-	// Priority controls ordering weight: "low", "normal" (default), "high".
-	Priority string `yaml:"priority,omitempty"`
-
-	// Workflows lists workflow pattern names this task is associated with.
-	// These are seeded into the workflow_pattern table.
-	Workflows []string `yaml:"workflows,omitempty"`
-
-	// Tags are labels for search and describe-mode matching.
-	Tags []string `yaml:"tags,omitempty"`
-
-	// Enabled controls whether this task is active (default: true).
-	Enabled *bool `yaml:"enabled,omitempty"`
+	Enabled      *bool    `yaml:"enabled,omitempty"`
+	Name         string   `yaml:"name"`
+	Command      string   `yaml:"command"`
+	Description  string   `yaml:"description,omitempty"`
+	After        string   `yaml:"after,omitempty"`
+	AfterFailure string   `yaml:"after_failure,omitempty"`
+	Priority     string   `yaml:"priority,omitempty"`
+	Workflows    []string `yaml:"workflows,omitempty"`
+	Tags         []string `yaml:"tags,omitempty"`
 }
 
 // IsEnabled returns whether the task is enabled.
@@ -100,29 +80,19 @@ type playbookFile struct {
 // It provides methods to query tasks and their dependencies.
 // It is safe for concurrent use.
 type Playbook struct {
-	mu sync.RWMutex
-
-	// tasks stores all tasks keyed by name.
-	tasks map[string]*Task
-
-	// taskOrder stores tasks in their defined order.
-	taskOrder []*Task
-
-	// afterDeps maps task name -> list of tasks that come after it.
-	afterDeps map[string][]*Task
-
-	// afterFailureDeps maps task name -> list of tasks triggered on failure.
+	tasks            map[string]*Task
+	afterDeps        map[string][]*Task
 	afterFailureDeps map[string][]*Task
-
-	// workflowTasks maps workflow name -> list of associated tasks.
-	workflowTasks map[string][]*Task
+	workflowTasks    map[string][]*Task
+	taskOrder        []*Task
+	mu               sync.RWMutex
 }
 
 // LoadPlaybook reads and parses a .clai/tasks.yaml file from the given path.
 // It validates the structure, checks for circular dependencies, and builds
 // the internal DAG representation.
 func LoadPlaybook(path string) (*Playbook, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // reads user-specified path
 	if err != nil {
 		return nil, fmt.Errorf("reading playbook: %w", err)
 	}

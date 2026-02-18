@@ -49,7 +49,7 @@ type featureEntry struct {
 //
 // The prevCmd parameter is used to fill in the "{prev_cmd}" placeholder
 // in transition-based reason descriptions. It may be empty.
-func Explain(s suggest.Suggestion, cfg Config, prevCmd string) []Reason {
+func Explain(s *suggest.Suggestion, cfg Config, prevCmd string) []Reason {
 	if cfg.MaxReasons <= 0 {
 		cfg.MaxReasons = 3
 	}
@@ -61,7 +61,7 @@ func Explain(s suggest.Suggestion, cfg Config, prevCmd string) []Reason {
 	}
 
 	// Collect all non-zero feature contributions.
-	features := collectFeatures(breakdown, cfg.IncludeAmplifiers)
+	features := collectFeatures(&breakdown, cfg.IncludeAmplifiers)
 	if len(features) == 0 {
 		return nil
 	}
@@ -96,7 +96,7 @@ func Explain(s suggest.Suggestion, cfg Config, prevCmd string) []Reason {
 }
 
 // collectFeatures gathers all non-zero score features from the breakdown.
-func collectFeatures(b suggest.ScoreBreakdown, includeAmplifiers bool) []featureEntry {
+func collectFeatures(b *suggest.ScoreBreakdown, includeAmplifiers bool) []featureEntry {
 	entries := make([]featureEntry, 0, 12)
 
 	addIfNonZero := func(tag string, val float64) {

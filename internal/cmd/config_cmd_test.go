@@ -45,15 +45,15 @@ func TestConfigCmd_List(t *testing.T) {
 
 func TestFormatSize(t *testing.T) {
 	tests := []struct {
-		bytes    int64
 		expected string
+		bytes    int64
 	}{
-		{0, "0 B"},
-		{100, "100 B"},
-		{1024, "1.0 KB"},
-		{1536, "1.5 KB"},
-		{1048576, "1.0 MB"},
-		{1073741824, "1.0 GB"},
+		{"0 B", 0},
+		{"100 B", 100},
+		{"1.0 KB", 1024},
+		{"1.5 KB", 1536},
+		{"1.0 MB", 1048576},
+		{"1.0 GB", 1073741824},
 	}
 
 	for _, tt := range tests {

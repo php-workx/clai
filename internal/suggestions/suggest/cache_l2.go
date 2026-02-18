@@ -9,13 +9,13 @@ import (
 // Items are evicted via LRU when the count exceeds capacity.
 type L2Cache struct {
 	lru     *LRU[string, *l2Entry]
-	ttl     time.Duration
 	metrics *CacheMetrics
+	ttl     time.Duration
 }
 
 type l2Entry struct {
-	suggestions []Suggestion
 	createdAt   time.Time
+	suggestions []Suggestion
 }
 
 // DefaultL2Capacity is the default max number of L2 cache entries.

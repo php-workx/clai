@@ -22,8 +22,9 @@ import (
 // rely on the fact that Suggestion.ScoreBreakdown() returns an exported
 // struct. We create suggestions with known breakdowns by using
 // SuggestionForTest.
-func buildSuggestion(totalScore float64, breakdown suggest.ScoreBreakdown) suggest.Suggestion {
-	return suggest.SuggestionForTest(totalScore, breakdown)
+func buildSuggestion(totalScore float64, breakdown suggest.ScoreBreakdown) *suggest.Suggestion {
+	s := suggest.SuggestionForTest(totalScore, &breakdown)
+	return &s
 }
 
 func TestExplain_SingleDominantFeature(t *testing.T) {
@@ -120,9 +121,9 @@ func TestExplain_MaxReasonsCapping(t *testing.T) {
 func TestExplain_AllReasonTagDescriptions(t *testing.T) {
 	tests := []struct {
 		tag        string
-		breakdown  suggest.ScoreBreakdown
 		prevCmd    string
 		wantSubstr string
+		breakdown  suggest.ScoreBreakdown
 	}{
 		{
 			tag:        suggest.ReasonRepoTransition,

@@ -49,7 +49,7 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	defer v2db.Close()
 
 	paths := &config.Paths{BaseDir: tmpDir}
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -104,13 +104,13 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	socketPath := paths.SocketFile()
 	for i := 0; i < 100; i++ {
 		time.Sleep(20 * time.Millisecond)
-		if _, err := os.Stat(socketPath); err == nil {
+		if _, statErr := os.Stat(socketPath); statErr == nil {
 			break
 		}
 		select {
-		case err := <-serverErr:
-			if err != nil {
-				t.Fatalf("server.Start failed: %v", err)
+		case srvErr := <-serverErr:
+			if srvErr != nil {
+				t.Fatalf("server.Start failed: %v", srvErr)
 			}
 		default:
 		}
@@ -206,9 +206,9 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	server.Shutdown()
 
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			t.Errorf("unexpected server error: %v", err)
+	case srvErr := <-serverErr:
+		if srvErr != nil {
+			t.Errorf("unexpected server error: %v", srvErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("server did not stop in time")
@@ -238,7 +238,7 @@ func TestV2Integration_GracefulDegradation_NilDB(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	paths := &config.Paths{BaseDir: tmpDir}
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -294,7 +294,7 @@ func TestV2Integration_GracefulDegradation_NilDB(t *testing.T) {
 	socketPath := paths.SocketFile()
 	for i := 0; i < 100; i++ {
 		time.Sleep(20 * time.Millisecond)
-		if _, err := os.Stat(socketPath); err == nil {
+		if _, statErr := os.Stat(socketPath); statErr == nil {
 			break
 		}
 	}
@@ -350,9 +350,9 @@ func TestV2Integration_GracefulDegradation_NilDB(t *testing.T) {
 	server.Shutdown()
 
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			t.Errorf("unexpected server error: %v", err)
+	case srvErr := <-serverErr:
+		if srvErr != nil {
+			t.Errorf("unexpected server error: %v", srvErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("server did not stop in time")
@@ -441,7 +441,7 @@ func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
 	defer v2db.Close()
 
 	paths := &config.Paths{BaseDir: tmpDir}
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -477,7 +477,7 @@ func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
 	socketPath := paths.SocketFile()
 	for i := 0; i < 100; i++ {
 		time.Sleep(20 * time.Millisecond)
-		if _, err := os.Stat(socketPath); err == nil {
+		if _, statErr := os.Stat(socketPath); statErr == nil {
 			break
 		}
 	}
@@ -525,9 +525,9 @@ func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
 	server.Shutdown()
 
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			t.Errorf("unexpected server error: %v", err)
+	case srvErr := <-serverErr:
+		if srvErr != nil {
+			t.Errorf("unexpected server error: %v", srvErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("server did not stop in time")

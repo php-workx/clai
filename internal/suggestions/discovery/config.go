@@ -18,7 +18,7 @@ var (
 	ErrConfigInvalid  = errors.New("discovery config invalid")
 )
 
-// Default config location.
+// DefaultConfigPath is the default config file location.
 const DefaultConfigPath = "~/.config/clai/discovery.yaml"
 
 // Parser types per spec Section 10.2.2.
@@ -32,39 +32,20 @@ const (
 // ConfigEntry represents a single discovery rule from the config file.
 // Per spec Section 10.2.
 type ConfigEntry struct {
-	// FilePattern is the filename to match (e.g., "Justfile", "*.gradle").
-	FilePattern string `yaml:"file_pattern"`
-
-	// Kind is the task source identifier (e.g., "just", "gradle").
-	Kind string `yaml:"kind"`
-
-	// Runner is the command to execute for discovery.
-	Runner string `yaml:"runner"`
-
-	// Parser defines how to parse the runner output.
-	Parser ParserConfig `yaml:"parser"`
-
-	// TimeoutMs overrides the default timeout (optional).
-	TimeoutMs int `yaml:"timeout_ms,omitempty"`
-
-	// MaxOutputBytes overrides the default output limit (optional).
-	MaxOutputBytes int64 `yaml:"max_output_bytes,omitempty"`
+	Parser         ParserConfig `yaml:"parser"`
+	FilePattern    string       `yaml:"file_pattern"`
+	Kind           string       `yaml:"kind"`
+	Runner         string       `yaml:"runner"`
+	TimeoutMs      int          `yaml:"timeout_ms,omitempty"`
+	MaxOutputBytes int64        `yaml:"max_output_bytes,omitempty"`
 }
 
 // ParserConfig defines how to parse discovery output.
 type ParserConfig struct {
-	// Type is the parser type: json_keys, json_array, regex_lines, make_qp.
-	Type string `yaml:"type"`
-
-	// Path is the JSON path for json_keys and json_array parsers.
-	Path string `yaml:"path,omitempty"`
-
-	// Pattern is the regex pattern for regex_lines parser.
-	// First capture group defines the task name.
-	Pattern string `yaml:"pattern,omitempty"`
-
-	// compiledRegex is the compiled regex (internal).
 	compiledRegex *regexp.Regexp
+	Type          string `yaml:"type"`
+	Path          string `yaml:"path,omitempty"`
+	Pattern       string `yaml:"pattern,omitempty"`
 }
 
 // Config represents the full discovery configuration.
@@ -74,18 +55,18 @@ type Config struct {
 
 // ConfigManager manages the discovery configuration with hot-reload support.
 type ConfigManager struct {
-	mu       sync.RWMutex
 	config   *Config
-	path     string
 	logger   *slog.Logger
-	onReload func(*Config) // Callback for hot-reload (e.g., SIGHUP)
+	onReload func(*Config)
+	path     string
+	mu       sync.RWMutex
 }
 
 // ConfigManagerOptions configures the config manager.
 type ConfigManagerOptions struct {
-	Path     string
 	Logger   *slog.Logger
 	OnReload func(*Config)
+	Path     string
 }
 
 // NewConfigManager creates a new config manager.

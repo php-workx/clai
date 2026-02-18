@@ -38,16 +38,13 @@ type normalizedEntry struct {
 // templateInfo tracks aggregate data for a unique command template during the
 // in-memory dedup phase.
 type templateInfo struct {
-	cmdNorm   string
-	tags      []string
-	slotCount int
-
+	cmdNorm         string
+	tags            []string
+	timestamps      []int64
+	slotCount       int
 	firstSeenMs     int64
 	lastSeenMs      int64
 	occurrenceCount int
-
-	// timestamps of every occurrence (chronological) for decay calculation
-	timestamps []int64
 }
 
 // transitionKey identifies a directed bigram between two command templates.
@@ -153,17 +150,17 @@ func buildTemplateAggregates(normalized []normalizedEntry) map[string]*templateI
 	return templates
 }
 
-func buildTransitionAggregates(normalized []normalizedEntry) (map[transitionKey]int, map[transitionKey]int64) {
-	transitions := make(map[transitionKey]int)
-	transitionLastMs := make(map[transitionKey]int64)
+func buildTransitionAggregates(normalized []normalizedEntry) (transitions map[transitionKey]int, lastMs map[transitionKey]int64) {
+	transitions = make(map[transitionKey]int)
+	lastMs = make(map[transitionKey]int64)
 	for i := 1; i < len(normalized); i++ {
 		prev := normalized[i-1].preNorm.TemplateID
 		next := normalized[i].preNorm.TemplateID
 		key := transitionKey{prevTemplateID: prev, nextTemplateID: next}
 		transitions[key]++
-		transitionLastMs[key] = normalized[i].tsMs
+		lastMs[key] = normalized[i].tsMs
 	}
-	return transitions, transitionLastMs
+	return transitions, lastMs
 }
 
 func seedNormalizedEntries(
@@ -178,10 +175,10 @@ func seedNormalizedEntries(
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback on error
 
-	if err := insertBackfillSession(ctx, tx, sessionID, shell, normalized[0].tsMs); err != nil {
-		return err
+	if sessErr := insertBackfillSession(ctx, tx, sessionID, shell, normalized[0].tsMs); sessErr != nil {
+		return sessErr
 	}
 	eventIDs, err := insertCommandEvents(ctx, tx, normalized, sessionID)
 	if err != nil {
@@ -475,7 +472,7 @@ func insertPipelineData(ctx context.Context, tx *sql.Tx, entries []normalizedEnt
 		if err := insertPipelineTransitionRows(ctx, stmts.transStmt, i, ne.tsMs, segInfos); err != nil {
 			return err
 		}
-		if err := insertPipelinePatternRow(ctx, stmts.patternStmt, i, ne, segments, segInfos); err != nil {
+		if err := insertPipelinePatternRow(ctx, stmts.patternStmt, i, &ne, segments, segInfos); err != nil {
 			return err
 		}
 	}
@@ -596,7 +593,7 @@ func insertPipelinePatternRow(
 	ctx context.Context,
 	stmt *sql.Stmt,
 	entryIndex int,
-	ne normalizedEntry,
+	ne *normalizedEntry,
 	segments []normalize.Segment,
 	segInfos []pipelineSegmentInfo,
 ) error {

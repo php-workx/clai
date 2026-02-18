@@ -227,22 +227,22 @@ func TestProvider_NextStepError(t *testing.T) {
 
 // errorProvider is a provider that always returns an error.
 type errorProvider struct {
-	name string
 	err  error
+	name string
 }
 
 func (p *errorProvider) Name() string    { return p.name }
 func (p *errorProvider) Available() bool { return true }
 
-func (p *errorProvider) TextToCommand(ctx context.Context, req *provider.TextToCommandRequest) (*provider.TextToCommandResponse, error) {
+func (p *errorProvider) TextToCommand(_ context.Context, _ *provider.TextToCommandRequest) (*provider.TextToCommandResponse, error) {
 	return nil, p.err
 }
 
-func (p *errorProvider) NextStep(ctx context.Context, req *provider.NextStepRequest) (*provider.NextStepResponse, error) {
+func (p *errorProvider) NextStep(_ context.Context, _ *provider.NextStepRequest) (*provider.NextStepResponse, error) {
 	return nil, p.err
 }
 
-func (p *errorProvider) Diagnose(ctx context.Context, req *provider.DiagnoseRequest) (*provider.DiagnoseResponse, error) {
+func (p *errorProvider) Diagnose(_ context.Context, _ *provider.DiagnoseRequest) (*provider.DiagnoseResponse, error) {
 	return nil, p.err
 }
 
@@ -299,7 +299,7 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 	paths := &config.Paths{
 		BaseDir: tempDir,
 	}
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		os.RemoveAll(tempDir)
 		t.Fatalf("failed to create directories: %v", err)
 	}
@@ -335,7 +335,7 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 		_ = server.Start(ctx)
 	}()
 
-	if err := waitForSocket(socketPath, 5*time.Second); err != nil {
+	if err = waitForSocket(socketPath, 5*time.Second); err != nil {
 		cancel()
 		store.Close()
 		os.RemoveAll(tempDir)
@@ -400,9 +400,9 @@ func dialSocketWithRetry(path string, retries int) (*grpc.ClientConn, pb.ClaiSer
 // trackingProvider wraps a provider to track calls.
 type trackingProvider struct {
 	provider.Provider
-	mu         sync.Mutex
-	calls      []string
 	callCounts map[string]int
+	calls      []string
+	mu         sync.Mutex
 }
 
 func newTrackingProvider(wrapped provider.Provider) *trackingProvider {

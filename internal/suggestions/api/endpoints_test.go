@@ -125,7 +125,7 @@ func TestHandler_HandleSuggest_CacheMiss(t *testing.T) {
 	db := createTestDB(t)
 	cache := suggest.NewCache(suggest.DefaultCacheConfig())
 
-	scorer, err := suggest.NewScorer(suggest.ScorerDependencies{DB: db}, suggest.DefaultScorerConfig())
+	scorer, err := suggest.NewScorer(&suggest.ScorerDependencies{DB: db}, suggest.DefaultScorerConfig())
 	require.NoError(t, err)
 
 	handler := NewHandler(HandlerDependencies{
@@ -428,7 +428,7 @@ func TestHandler_SuggestFromContext(t *testing.T) {
 	t.Parallel()
 
 	db := createTestDB(t)
-	scorer, err := suggest.NewScorer(suggest.ScorerDependencies{DB: db}, suggest.DefaultScorerConfig())
+	scorer, err := suggest.NewScorer(&suggest.ScorerDependencies{DB: db}, suggest.DefaultScorerConfig())
 	require.NoError(t, err)
 
 	handler := NewHandler(HandlerDependencies{
@@ -436,7 +436,7 @@ func TestHandler_SuggestFromContext(t *testing.T) {
 	})
 
 	ctx := context.Background()
-	suggestions, err := handler.SuggestFromContext(ctx, suggest.SuggestContext{
+	suggestions, err := handler.SuggestFromContext(ctx, &suggest.SuggestContext{
 		SessionID: "session123",
 	})
 	require.NoError(t, err)

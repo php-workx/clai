@@ -90,7 +90,7 @@ func TestLogStartup(t *testing.T) {
 		PID:           12345,
 	}
 
-	LogStartup(logger, info)
+	LogStartup(logger, &info)
 
 	var logEntry map[string]interface{}
 	err := json.Unmarshal(buf.Bytes(), &logEntry)

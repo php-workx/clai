@@ -27,8 +27,8 @@ type SessionInfo struct {
 
 // SessionManager tracks active sessions.
 type SessionManager struct {
-	mu       sync.RWMutex
 	sessions map[string]*SessionInfo
+	mu       sync.RWMutex
 }
 
 // NewSessionManager creates a new SessionManager.

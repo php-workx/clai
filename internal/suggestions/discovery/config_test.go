@@ -221,7 +221,7 @@ func TestConfigManager_Reload(t *testing.T) {
 	reloadCalled := false
 	cm := NewConfigManager(ConfigManagerOptions{
 		Path: configPath,
-		OnReload: func(cfg *Config) {
+		OnReload: func(_ *Config) {
 			reloadCalled = true
 		},
 	})

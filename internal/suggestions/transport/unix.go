@@ -18,8 +18,8 @@ const daemonSocketName = "daemon.sock"
 
 // UnixTransport implements Transport using Unix domain sockets.
 type UnixTransport struct {
-	socketPath string
 	listener   net.Listener
+	socketPath string
 	mu         sync.Mutex
 }
 

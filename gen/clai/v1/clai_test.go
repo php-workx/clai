@@ -122,8 +122,8 @@ func TestGetStatusRPC(t *testing.T) {
 
 func TestMessageSerialization(t *testing.T) {
 	tests := []struct {
-		name string
 		msg  interface{ String() string }
+		name string
 	}{
 		{
 			name: "ClientInfo",

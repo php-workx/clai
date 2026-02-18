@@ -44,9 +44,9 @@ func init() {
 
 type searchOutput struct {
 	CmdRaw  string `json:"cmd_raw"`
-	Ts      int64  `json:"ts,omitempty"`
 	Cwd     string `json:"cwd,omitempty"`
 	RepoKey string `json:"repo_key,omitempty"`
+	TS      int64  `json:"ts,omitempty"`
 }
 
 type searchResponse struct {

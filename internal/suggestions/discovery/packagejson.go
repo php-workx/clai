@@ -23,7 +23,7 @@ func (s *Service) discoverPackageJSON(ctx context.Context, repoRoot string, nowM
 	}
 
 	// Read and parse package.json
-	data, err := os.ReadFile(packagePath)
+	data, err := os.ReadFile(packagePath) //nolint:gosec // reads user-specified path
 	if err != nil {
 		return err
 	}

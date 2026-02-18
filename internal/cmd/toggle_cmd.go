@@ -37,7 +37,7 @@ func init() {
 	offCmd.Flags().BoolVar(&offSessionOnly, "session", false, "Disable for this session only")
 }
 
-func toggleIntegration(enable bool, sessionOnly bool) error {
+func toggleIntegration(enable, sessionOnly bool) error {
 	if sessionOnly {
 		if err := cache.SetSessionOff(!enable); err != nil {
 			return err

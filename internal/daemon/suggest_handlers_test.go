@@ -475,29 +475,29 @@ func TestV2SuggestionDescription_CoversBranches(t *testing.T) {
 
 	s := suggest2.Suggestion{Command: "git status"}
 	why := []explain.Reason{{Tag: "repo_trans", Description: "From repository workflow", Contribution: 0.4}}
-	if got := v2SuggestionDescription(s, why, "git add ."); got != "From repository workflow" {
+	if got := v2SuggestionDescription(&s, why, "git add ."); got != "From repository workflow" {
 		t.Fatalf("expected why-first description, got %q", got)
 	}
 
 	s2 := suggest2.Suggestion{Command: "git commit"}
 	setSuggestionPrivateInt(&s2, "maxTransCount", 2)
-	if got := v2SuggestionDescription(s2, nil, "a very long previous command that should be truncated for display in description"); got == "" || got[:15] != "Often run after" {
+	if got := v2SuggestionDescription(&s2, nil, "a very long previous command that should be truncated for display in description"); got == "" || got[:15] != "Often run after" {
 		t.Fatalf("expected transition description, got %q", got)
 	}
 
 	s3 := suggest2.Suggestion{Command: "npm test"}
 	setSuggestionPrivateFloat64(&s3, "maxFreqScore", 1.1)
-	if got := v2SuggestionDescription(s3, nil, ""); got != "Frequently used command." {
+	if got := v2SuggestionDescription(&s3, nil, ""); got != "Frequently used command." {
 		t.Fatalf("expected frequency description, got %q", got)
 	}
 
 	s4 := suggest2.Suggestion{Command: "ls"}
 	setSuggestionPrivateInt64(&s4, "lastSeenMs", 1700000000000)
-	if got := v2SuggestionDescription(s4, nil, ""); got != "Used recently." {
+	if got := v2SuggestionDescription(&s4, nil, ""); got != "Used recently." {
 		t.Fatalf("expected recency description, got %q", got)
 	}
 
-	if got := v2SuggestionDescription(suggest2.Suggestion{Command: "echo hi"}, nil, ""); got != "" {
+	if got := v2SuggestionDescription(&suggest2.Suggestion{Command: "echo hi"}, nil, ""); got != "" {
 		t.Fatalf("expected empty description fallback, got %q", got)
 	}
 }
@@ -513,7 +513,7 @@ func TestV2SuggestionReasons_IncludesExplainAndSignals(t *testing.T) {
 	why := []explain.Reason{
 		{Tag: "repo_trans", Description: "Common in this repo", Contribution: 0.3},
 	}
-	reasons := v2SuggestionReasons(s, why, nowMs)
+	reasons := v2SuggestionReasons(&s, why, nowMs)
 	if len(reasons) < 4 {
 		t.Fatalf("expected explain + recency + frequency + transition reasons, got %d", len(reasons))
 	}
@@ -539,7 +539,7 @@ func TestV2SuggestionToProto_MapsFields(t *testing.T) {
 	}
 	setSuggestionPrivateInt64(&s, "lastSeenMs", 1_700_000_000_000)
 	cfg := explain.DefaultConfig()
-	got := v2SuggestionToProto(s, "git clean", nowMs, cfg)
+	got := v2SuggestionToProto(&s, "git clean", nowMs, cfg)
 
 	if got.Text != s.Command || got.CmdNorm != s.Command {
 		t.Fatalf("expected command text/cmd_norm to match, got %+v", got)
@@ -604,7 +604,7 @@ func TestV2SuggestionSource_DominantSignals(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s := suggest2.Suggestion{Command: "git status"}
 			tc.setter(&s)
-			if got := v2SuggestionSource(s); got != tc.wantSrc {
+			if got := v2SuggestionSource(&s); got != tc.wantSrc {
 				t.Fatalf("v2SuggestionSource()=%q want %q", got, tc.wantSrc)
 			}
 		})
@@ -614,14 +614,14 @@ func TestV2SuggestionSource_DominantSignals(t *testing.T) {
 func TestFormatAgo_CoversRanges(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
-		delta int64
 		want  string
+		delta int64
 	}{
-		{-1, "0s"},
-		{30 * 1000, "30s"},
-		{2 * 60 * 1000, "2m"},
-		{3 * 60 * 60 * 1000, "3h"},
-		{2 * 24 * 60 * 60 * 1000, "2d"},
+		{"0s", -1},
+		{"30s", 30 * 1000},
+		{"2m", 2 * 60 * 1000},
+		{"3h", 3 * 60 * 60 * 1000},
+		{"2d", 2 * 24 * 60 * 60 * 1000},
 	}
 	for _, tc := range cases {
 		if got := formatAgo(tc.delta); got != tc.want {
