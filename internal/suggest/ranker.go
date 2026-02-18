@@ -30,6 +30,21 @@ type Suggestion struct {
 	Source      string  // "session", "cwd", "global", "ai"
 	Score       float64 // Ranking score (0.0 to 1.0)
 	Risk        string  // "safe", "destructive", or empty
+
+	// Enrichment fields for explainability/UX.
+	CmdNorm        string
+	LastSeenUnixMs int64
+	SuccessCount   int
+	FailureCount   int
+	Reasons        []Reason // weighted scoring reasons (type + contribution)
+}
+
+// Reason describes a single "why" component for a suggestion score.
+// Contribution is the weighted contribution (0.0 to 1.0) to the final score.
+type Reason struct {
+	Type         string
+	Description  string
+	Contribution float64
 }
 
 // DefaultRanker implements the Ranker interface using the scoring formula
@@ -78,6 +93,14 @@ func (r *DefaultRanker) Rank(ctx context.Context, req *RankRequest) ([]Suggestio
 	}
 
 	candidates := aggregateCandidates(results)
+	// Never suggest the exact last command again; users can re-run via shell history.
+	// This prevents the common "next suggestion == last command" annoyance.
+	if req.LastCommand != "" {
+		lastNorm := NormalizeCommand(req.LastCommand)
+		if lastNorm != "" {
+			delete(candidates, DeduplicateKey(lastNorm))
+		}
+	}
 	suggestions := scoreCandidates(candidates, time.Now(), GetToolPrefix(req.LastCommand))
 	return limitResults(suggestions, maxResults), nil
 }
@@ -153,12 +176,55 @@ func scoreCandidates(candidates map[string]*candidate, now time.Time, lastToolPr
 	suggestions := make([]Suggestion, 0, len(candidates))
 
 	for _, c := range candidates {
-		score := calculateScore(c.source, c.latestTime, now, c.successCount, c.failureCount, c.cmd.Command, lastToolPrefix)
+		sourceScore := SourceWeight(c.source)
+		recencyScore := calculateRecencyScore(c.latestTime, now)
+		successScore := calculateSuccessScore(c.successCount, c.failureCount)
+		affinityScore := calculateAffinityScore(c.cmd.Command, lastToolPrefix)
+
+		score := (sourceScore * weightSource) +
+			(recencyScore * weightRecency) +
+			(successScore * weightSuccess) +
+			(affinityScore * weightAffinity)
+
+		reasons := make([]Reason, 0, 4)
+		reasons = append(reasons,
+			Reason{
+				Type:         "source",
+				Description:  "", // UI already shows source; keep tags compact
+				Contribution: sourceScore * weightSource,
+			},
+			Reason{
+				Type:         "recency",
+				Description:  "", // human-friendly "last ..." hint is added at RPC boundary
+				Contribution: recencyScore * weightRecency,
+			},
+			Reason{
+				Type:         "success",
+				Description:  "", // human-friendly hint is added at RPC boundary
+				Contribution: successScore * weightSuccess,
+			},
+		)
+		if affinityScore != 0 {
+			desc := ""
+			if lastToolPrefix != "" {
+				desc = "same tool: " + lastToolPrefix
+			}
+			reasons = append(reasons, Reason{
+				Type:         "affinity",
+				Description:  desc,
+				Contribution: affinityScore * weightAffinity,
+			})
+		}
 		suggestions = append(suggestions, Suggestion{
-			Text:   c.cmd.Command,
-			Source: string(c.source),
-			Score:  score,
-			Risk:   "", // Risk assessment to be added by caller if needed
+			Text:           c.cmd.Command,
+			Source:         string(c.source),
+			Score:          score,
+			Risk:           "", // Risk assessment to be added by caller if needed
+			CmdNorm:        c.cmd.CommandNorm,
+			LastSeenUnixMs: c.latestTime,
+			SuccessCount:   c.successCount,
+			FailureCount:   c.failureCount,
+			Reasons:        reasons,
 		})
 	}
 

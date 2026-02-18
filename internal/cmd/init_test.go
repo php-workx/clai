@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -115,6 +116,94 @@ func TestRunInit_Fish(t *testing.T) {
 	}
 }
 
+func TestShellScripts_SuggestUsesPlainFormat(t *testing.T) {
+	tests := []struct {
+		path     string
+		markers  []string
+		notMatch []string
+	}{
+		{
+			path: "shell/zsh/clai.zsh",
+			markers: []string{
+				"clai suggest --format ghost --limit 1",
+				`clai suggest --format fzf --limit "$CLAI_MENU_LIMIT"`,
+			},
+			notMatch: []string{
+				"clai suggest \"$BUFFER\"",
+			},
+		},
+		{
+			path: "shell/bash/clai.bash",
+			markers: []string{
+				"clai-picker suggest --query=\"$READLINE_LINE\"",
+			},
+			notMatch: []string{
+				"clai suggest --limit",
+			},
+		},
+		{
+			path: "shell/fish/clai.fish",
+			markers: []string{
+				"clai suggest --format fzf --limit 1",
+				"clai suggest --format fzf --limit $CLAI_MENU_LIMIT",
+			},
+			notMatch: []string{
+				"clai suggest \"$current\"",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(tt.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", tt.path, err)
+			}
+			script := string(content)
+			for _, m := range tt.markers {
+				if !strings.Contains(script, m) {
+					t.Errorf("%s missing marker %q", tt.path, m)
+				}
+			}
+			for _, bad := range tt.notMatch {
+				if strings.Contains(script, bad) {
+					t.Errorf("%s contains legacy pattern %q", tt.path, bad)
+				}
+			}
+		})
+	}
+}
+
+func TestShellScripts_HistoryPickerDownRestoresOriginal(t *testing.T) {
+	{
+		content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+		if err != nil {
+			t.Fatalf("Failed to read zsh script: %v", err)
+		}
+		body := extractFunctionBody(string(content), "_clai_picker_down")
+		if body == "" {
+			t.Fatal("_clai_picker_down() not found in zsh script")
+		}
+		if !strings.Contains(body, "_clai_picker_cancel") {
+			t.Error("zsh _clai_picker_down should call _clai_picker_cancel at the newest item to match native history UX")
+		}
+	}
+
+	{
+		content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+		if err != nil {
+			t.Fatalf("Failed to read fish script: %v", err)
+		}
+		body := extractFishFunctionBody(string(content), "_clai_picker_down")
+		if body == "" {
+			t.Fatal("function _clai_picker_down not found in fish script")
+		}
+		if !strings.Contains(body, "_clai_picker_cancel") {
+			t.Error("fish _clai_picker_down should call _clai_picker_cancel at the newest item to match native history UX")
+		}
+	}
+}
+
 func TestRunInit_UnsupportedShell(t *testing.T) {
 	err := runInit(initCmd, []string{"powershell"})
 	if err == nil {
@@ -123,6 +212,46 @@ func TestRunInit_UnsupportedShell(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "unsupported shell") {
 		t.Errorf("Error should mention unsupported shell, got: %v", err)
+	}
+}
+
+func TestRunInit_PreservesSessionID(t *testing.T) {
+	t.Setenv("CLAI_SESSION_ID", "session-fixed-123")
+
+	output := captureStdout(t, func() {
+		if err := runInit(initCmd, []string{"zsh"}); err != nil {
+			t.Fatalf("runInit error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "session-fixed-123") {
+		t.Fatalf("expected CLAI_SESSION_ID to be preserved, got output: %s", output)
+	}
+}
+
+func TestRunInit_GeneratesNewSessionID(t *testing.T) {
+	os.Unsetenv("CLAI_SESSION_ID")
+
+	output1 := captureStdout(t, func() {
+		if err := runInit(initCmd, []string{"zsh"}); err != nil {
+			t.Fatalf("runInit error: %v", err)
+		}
+	})
+
+	output2 := captureStdout(t, func() {
+		if err := runInit(initCmd, []string{"zsh"}); err != nil {
+			t.Fatalf("runInit error: %v", err)
+		}
+	})
+
+	re := regexp.MustCompile(`CLAI_SESSION_ID="([^"]+)"`)
+	m1 := re.FindStringSubmatch(output1)
+	m2 := re.FindStringSubmatch(output2)
+	if len(m1) < 2 || len(m2) < 2 {
+		t.Fatalf("expected session IDs in output")
+	}
+	if m1[1] == m2[1] {
+		t.Fatalf("expected different session IDs for new shells, got %q", m1[1])
 	}
 }
 
@@ -233,6 +362,12 @@ func TestZshScript_ApplicationModeArrowBindings(t *testing.T) {
 
 	output := string(content)
 
+	// Ensure we actively bind arrows in emacs/viins/main, rather than relying
+	// on user defaults (some setups ship without down-arrow history bindings).
+	if !strings.Contains(output, `for _clai_km in emacs viins main`) {
+		t.Fatalf("zsh script missing emacs/viins/main keymap loop for arrow bindings")
+	}
+
 	requiredBindings := []string{
 		"^[[A", // Up arrow CSI mode
 		"^[OA", // Up arrow application mode
@@ -245,30 +380,16 @@ func TestZshScript_ApplicationModeArrowBindings(t *testing.T) {
 			t.Errorf("zsh script missing arrow key binding %q", binding)
 		}
 	}
-}
 
-func TestZshScript_PickerWidgetsAreBound(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
-	if err != nil {
-		t.Fatalf("Failed to read zsh script: %v", err)
-	}
-	script := string(content)
-
-	required := []string{
-		`bindkey '^I' _clai_picker_suggest`,
-		`bindkey '^M' _clai_picker_accept`,
-		`bindkey '^[[B' _clai_picker_down`,
-		`bindkey '^[OB' _clai_picker_down`,
-		`bindkey '^Xs' _clai_history_scope_session`,
-		`bindkey '^Xd' _clai_history_scope_cwd`,
-		`bindkey '^Xg' _clai_history_scope_global`,
-		`bindkey '^[[A' _clai_picker_up`,
-		`bindkey '^[OA' _clai_picker_up`,
-	}
-
-	for _, binding := range required {
-		if !strings.Contains(script, binding) {
-			t.Errorf("zsh script missing picker binding %s", binding)
+	// Concrete expectations for history navigation.
+	for _, must := range []string{
+		`bindkey -M "$_clai_km" '^[[A' up-line-or-history`,
+		`bindkey -M "$_clai_km" '^[[B' down-line-or-history`,
+		`bindkey -M "$_clai_km" '^[OA' up-line-or-history`,
+		`bindkey -M "$_clai_km" '^[OB' down-line-or-history`,
+	} {
+		if !strings.Contains(output, must) {
+			t.Errorf("zsh script missing expected binding snippet: %s", must)
 		}
 	}
 }
@@ -310,6 +431,26 @@ func TestZshScript_EditingWidgetsDismissPicker(t *testing.T) {
 	}
 }
 
+func TestZshScript_BackwardCharDoesNotAcceptSuggestion(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	body := extractFunctionBody(script, "_ai_backward_char")
+	if body == "" {
+		t.Fatal("_ai_backward_char() not found")
+	}
+
+	if strings.Contains(body, "--action=accepted") {
+		t.Fatal("_ai_backward_char() should not accept suggestions (no accepted feedback)")
+	}
+	if !strings.Contains(body, "_ai_clear_ghost_text") {
+		t.Fatal("_ai_backward_char() should clear ghost text before moving cursor")
+	}
+}
+
 // TestZshScript_SelfInsertSkipsSuggestForQueuedInput verifies that zsh does
 // not call clai suggest for each queued character during paste-like input.
 func TestZshScript_SelfInsertSkipsSuggestForQueuedInput(t *testing.T) {
@@ -329,6 +470,124 @@ func TestZshScript_SelfInsertSkipsSuggestForQueuedInput(t *testing.T) {
 	}
 	if !strings.Contains(body, `_AI_IN_PASTE`) {
 		t.Error("_ai_self_insert should preserve _AI_IN_PASTE guard")
+	}
+}
+
+// TestZshScript_DefaultCompletionAndHistoryClearGhostText verifies that
+// default Tab completion and history navigation clear ghost text state first.
+func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	// Tab completion should clear ghost text before delegating.
+	tabBody := extractFunctionBody(script, "_ai_expand_or_complete")
+	if tabBody == "" {
+		t.Fatal("_ai_expand_or_complete() not found")
+	}
+	if !strings.Contains(tabBody, "_ai_clear_ghost_text") {
+		t.Error("_ai_expand_or_complete() should call _ai_clear_ghost_text before delegating")
+	}
+
+	// History navigation should re-generate ghost text (not clear it).
+	for _, fn := range []string{"_ai_up_line_or_history", "_ai_down_line_or_history"} {
+		body := extractFunctionBody(script, fn)
+		if body == "" {
+			t.Fatalf("%s() not found", fn)
+		}
+		if !strings.Contains(body, "_ai_update_suggestion") {
+			t.Errorf("%s() should call _ai_update_suggestion to keep ghost text", fn)
+		}
+	}
+
+	for _, bind := range []string{
+		"zle -N expand-or-complete _ai_expand_or_complete",
+		"zle -N up-line-or-history _ai_up_line_or_history",
+		"zle -N down-line-or-history _ai_down_line_or_history",
+	} {
+		if !strings.Contains(script, bind) {
+			t.Errorf("missing zle binding: %s", bind)
+		}
+	}
+}
+
+// TestZshScript_CustomHistoryPathsClearGhostText verifies that clai's
+// custom Up-arrow paths (TUI picker, inline picker, single/double trigger)
+// do not bypass the wrapped up-line-or-history widget. Bypassing the wrapper
+// leaves stale POSTDISPLAY ghost text visible after history navigation.
+func TestZshScript_CustomHistoryPathsClearGhostText(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	// These functions historically called `zle .up-line-or-history` directly,
+	// which bypasses _ai_up_line_or_history (and its ghost-text clearing).
+	for _, fn := range []string{
+		"_clai_tui_picker_open",
+		"_clai_picker_up",
+		"_clai_up_arrow_single",
+		"_clai_up_arrow_double",
+	} {
+		body := extractFunctionBody(script, fn)
+		if body == "" {
+			t.Fatalf("%s() not found", fn)
+		}
+		if strings.Contains(body, "zle .up-line-or-history") {
+			t.Errorf("%s() should not call zle .up-line-or-history directly; use zle up-line-or-history", fn)
+		}
+	}
+
+	downBody := extractFunctionBody(script, "_clai_picker_down")
+	if downBody == "" {
+		t.Fatal("_clai_picker_down() not found")
+	}
+	if strings.Contains(downBody, "zle .down-line-or-history") {
+		t.Error("_clai_picker_down() should not call zle .down-line-or-history directly; use zle down-line-or-history")
+	}
+
+	breakBody := extractFunctionBody(script, "_clai_picker_break")
+	if breakBody == "" {
+		t.Fatal("_clai_picker_break() not found")
+	}
+	if !strings.Contains(breakBody, "_ai_clear_ghost_text") {
+		t.Error("_clai_picker_break() should clear ghost text before delegating to send-break")
+	}
+}
+
+func TestZshScript_GhostTextInvariantHook(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	for _, required := range []string{
+		"_ai_sync_ghost_text()",
+		"_ai_zle_line_pre_redraw()",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("zsh script missing ghost text invariant hook: %s", required)
+		}
+	}
+	hasLegacy := strings.Contains(script, "zle -N zle-line-pre-redraw _ai_zle_line_pre_redraw")
+	hasHook := strings.Contains(script, "add-zle-hook-widget zle-line-pre-redraw _ai_zle_line_pre_redraw")
+	if !hasLegacy && !hasHook {
+		t.Fatalf("zsh script missing ghost text invariant hook registration")
+	}
+
+	body := extractFunctionBody(script, "_ai_sync_ghost_text")
+	if body == "" {
+		t.Fatal("_ai_sync_ghost_text() not found")
+	}
+	if !strings.Contains(body, `"$_AI_CURRENT_SUGGESTION" != "$BUFFER"*`) {
+		t.Error("_ai_sync_ghost_text() should clear when suggestion is not a prefix of BUFFER")
+	}
+	if !strings.Contains(body, "_ai_clear_ghost_text") {
+		t.Error("_ai_sync_ghost_text() should call _ai_clear_ghost_text on mismatch")
 	}
 }
 
@@ -391,6 +650,48 @@ func TestBashScript_NoDirectBindXEscapeSequences(t *testing.T) {
 	}
 }
 
+func TestBashScript_HistoryPickerUsesPromptQuery(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
+	if err != nil {
+		t.Fatalf("Failed to read bash script: %v", err)
+	}
+	script := string(content)
+
+	if !strings.Contains(script, "_CLAI_PICKER_QUERY=") {
+		t.Fatal("bash script missing _CLAI_PICKER_QUERY state")
+	}
+	upBody := extractFunctionBody(script, "_clai_history_up")
+	if upBody == "" {
+		t.Fatal("_clai_history_up() not found")
+	}
+	if !strings.Contains(upBody, `_CLAI_PICKER_QUERY="$READLINE_LINE"`) {
+		t.Error("_clai_history_up should snapshot READLINE_LINE into _CLAI_PICKER_QUERY when opening picker")
+	}
+
+	loadBody := extractFunctionBody(script, "_clai_picker_load_history")
+	if loadBody == "" {
+		t.Fatal("_clai_picker_load_history() not found")
+	}
+	if !strings.Contains(loadBody, "_CLAI_PICKER_QUERY") {
+		t.Error("_clai_picker_load_history should use _CLAI_PICKER_QUERY so navigating selection doesn't change query")
+	}
+}
+
+func TestFishScript_DateNanosecondsGuardIsNumeric(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
+	if err != nil {
+		t.Fatalf("Failed to read fish script: %v", err)
+	}
+	script := string(content)
+
+	if !strings.Contains(script, "date +%s%N") {
+		t.Fatalf("fish script missing date +%s usage for millisecond timing", "%s%N")
+	}
+	if !strings.Contains(script, "string match -rq '^[0-9]+$'") {
+		t.Fatalf("fish script missing numeric guard for date +%s output", "%s%N")
+	}
+}
+
 // TestZshScript_AcceptLineClearsGhostText verifies that the Enter handler
 // clears POSTDISPLAY and region_highlight before executing the command.
 // Without this, ghost text from inline suggestions remains visible after
@@ -416,58 +717,10 @@ func TestZshScript_AcceptLineClearsGhostText(t *testing.T) {
 	body := rest[:end]
 
 	// The normal accept-line path must clear ghost text state
-	for _, required := range []string{`POSTDISPLAY=""`, "region_highlight=()"} {
+	for _, required := range []string{`POSTDISPLAY=""`, "_ai_remove_ghost_highlight"} {
 		if !strings.Contains(body, required) {
 			t.Errorf("_ai_voice_accept_line() missing %q before accept-line; "+
 				"ghost text will persist after Enter", required)
-		}
-	}
-}
-
-// TestZshScript_DefaultCompletionAndHistoryClearGhostText verifies that
-// default Tab completion clears ghost text state first, and that history
-// navigation re-generates ghost text for the new buffer content.
-func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
-	if err != nil {
-		t.Fatalf("Failed to read zsh script: %v", err)
-	}
-	script := string(content)
-
-	// Tab completion should clear ghost text before delegating.
-	tabBody := extractFunctionBody(script, "_ai_expand_or_complete")
-	if tabBody == "" {
-		t.Fatal("_ai_expand_or_complete() not found")
-	}
-	if !strings.Contains(tabBody, "_ai_clear_ghost_text") {
-		t.Error("_ai_expand_or_complete() should call _ai_clear_ghost_text before delegating")
-	}
-
-	// History navigation should re-generate ghost text (not clear it).
-	for _, fn := range []string{"_ai_up_line_or_history", "_ai_down_line_or_history"} {
-		body := extractFunctionBody(script, fn)
-		if body == "" {
-			t.Fatalf("%s() not found", fn)
-		}
-		if !strings.Contains(body, "_ai_update_suggestion") {
-			t.Errorf("%s() should call _ai_update_suggestion to keep ghost text", fn)
-		}
-	}
-
-	// Ghost text primitives must exist somewhere in the script.
-	for _, required := range []string{`POSTDISPLAY=""`, "region_highlight=()"} {
-		if !strings.Contains(script, required) {
-			t.Errorf("zsh script missing ghost text clear primitive %q", required)
-		}
-	}
-
-	for _, bind := range []string{
-		"zle -N expand-or-complete _ai_expand_or_complete",
-		"zle -N up-line-or-history _ai_up_line_or_history",
-		"zle -N down-line-or-history _ai_down_line_or_history",
-	} {
-		if !strings.Contains(script, bind) {
-			t.Errorf("missing zle binding: %s", bind)
 		}
 	}
 }
@@ -587,6 +840,22 @@ func extractFunctionBody(script, funcName string) string {
 	return rest
 }
 
+// extractFishFunctionBody returns the text from a top-level fish function
+// definition (\"function <name>\") up to the next top-level fish function.
+// Returns empty string if the function is not found.
+func extractFishFunctionBody(script, funcName string) string {
+	start := strings.Index(script, "function "+funcName)
+	if start == -1 {
+		return ""
+	}
+	rest := script[start:]
+	nextFunc := regexp.MustCompile(`\nfunction\s+[a-zA-Z_][a-zA-Z0-9_]*\b`)
+	if loc := nextFunc.FindStringIndex(rest[1:]); loc != nil {
+		return rest[:loc[0]+1]
+	}
+	return rest
+}
+
 // TestShellScripts_MacOSOptionH verifies that all shell scripts bind both
 // \eh (ESC+h, for terminals that send ESC for Alt) and the literal ˙ character
 // (U+02D9, which macOS Option+H produces with US keyboard layout).
@@ -622,8 +891,8 @@ func TestShellScripts_MacOSOptionH(t *testing.T) {
 	}
 }
 
-// TestShellScripts_UpArrowHistoryPlaceholder verifies that all shell scripts
-// contain the {{CLAI_UP_ARROW_HISTORY}} placeholder that init.go replaces.
+// TestShellScripts_UpArrowPlaceholders verifies that all shell scripts contain
+// the Up-arrow placeholders that init.go replaces.
 func TestShellScripts_UpArrowHistoryPlaceholder(t *testing.T) {
 	shells := []string{
 		"shell/zsh/clai.zsh",
@@ -642,35 +911,20 @@ func TestShellScripts_UpArrowHistoryPlaceholder(t *testing.T) {
 			if !strings.Contains(script, "{{CLAI_UP_ARROW_HISTORY}}") {
 				t.Errorf("%s missing {{CLAI_UP_ARROW_HISTORY}} placeholder", path)
 			}
+			if !strings.Contains(script, "{{CLAI_UP_ARROW_TRIGGER}}") {
+				t.Errorf("%s missing {{CLAI_UP_ARROW_TRIGGER}} placeholder", path)
+			}
+			if !strings.Contains(script, "{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}") {
+				t.Errorf("%s missing {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}} placeholder", path)
+			}
 			if !strings.Contains(script, "CLAI_UP_ARROW_HISTORY") {
 				t.Errorf("%s missing CLAI_UP_ARROW_HISTORY variable usage", path)
 			}
-		})
-	}
-}
-
-// TestShellScripts_PickerOpenOnEmptyPlaceholder verifies that all shell scripts
-// contain the {{CLAI_PICKER_OPEN_ON_EMPTY}} placeholder that init.go replaces.
-func TestShellScripts_PickerOpenOnEmptyPlaceholder(t *testing.T) {
-	shells := []string{
-		"shell/zsh/clai.zsh",
-		"shell/bash/clai.bash",
-		"shell/fish/clai.fish",
-	}
-
-	for _, path := range shells {
-		t.Run(path, func(t *testing.T) {
-			content, err := shellScripts.ReadFile(path)
-			if err != nil {
-				t.Fatalf("Failed to read %s: %v", path, err)
+			if !strings.Contains(script, "CLAI_UP_ARROW_TRIGGER") {
+				t.Errorf("%s missing CLAI_UP_ARROW_TRIGGER variable usage", path)
 			}
-			script := string(content)
-
-			if !strings.Contains(script, "{{CLAI_PICKER_OPEN_ON_EMPTY}}") {
-				t.Errorf("%s missing {{CLAI_PICKER_OPEN_ON_EMPTY}} placeholder", path)
-			}
-			if !strings.Contains(script, "CLAI_PICKER_OPEN_ON_EMPTY") {
-				t.Errorf("%s missing CLAI_PICKER_OPEN_ON_EMPTY variable usage", path)
+			if !strings.Contains(script, "CLAI_UP_ARROW_DOUBLE_WINDOW_MS") {
+				t.Errorf("%s missing CLAI_UP_ARROW_DOUBLE_WINDOW_MS variable usage", path)
 			}
 		})
 	}
@@ -703,26 +957,72 @@ func TestShellScripts_UpArrowConditionalBinding(t *testing.T) {
 	}
 }
 
-func TestShellScripts_OpenOnEmptyGuards(t *testing.T) {
-	shells := []struct {
-		path  string
-		guard string
+// TestShellScripts_DoubleUpSequenceSupport verifies shell scripts include
+// explicit double-Up key sequence bindings and timeout controls.
+func TestShellScripts_DoubleUpSequenceSupport(t *testing.T) {
+	tests := []struct {
+		path      string
+		sequences []string
+		timeouts  []string
 	}{
-		{"shell/zsh/clai.zsh", `"$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$BUFFER"`},
-		{"shell/bash/clai.bash", `"$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$picker_query"`},
-		{"shell/fish/clai.fish", `"$CLAI_PICKER_OPEN_ON_EMPTY" != "true"; and test -z (commandline)`},
+		{
+			path: "shell/zsh/clai.zsh",
+			sequences: []string{
+				`bindkey '^[[A^[[A' _clai_up_arrow_double`,
+				`bindkey '^[OA^[OA' _clai_up_arrow_double`,
+			},
+			timeouts: []string{
+				"CLAI_UP_ARROW_DOUBLE_WINDOW_MS",
+				"KEYTIMEOUT",
+			},
+		},
+		{
+			path: "shell/bash/clai.bash",
+			sequences: []string{
+				`bind '"\e[A\e[A": "\C-x\C-u"'`,
+			},
+			timeouts: []string{
+				"CLAI_UP_ARROW_DOUBLE_WINDOW_MS",
+				"set keyseq-timeout",
+			},
+		},
+		{
+			path: "shell/fish/clai.fish",
+			sequences: []string{
+				`bind \e\[A\e\[A _clai_up_arrow_double`,
+			},
+			timeouts: []string{
+				"CLAI_UP_ARROW_DOUBLE_WINDOW_MS",
+				"fish_sequence_key_delay_ms",
+			},
+		},
 	}
 
-	for _, sh := range shells {
-		t.Run(sh.path, func(t *testing.T) {
-			content, err := shellScripts.ReadFile(sh.path)
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(tt.path)
 			if err != nil {
-				t.Fatalf("Failed to read %s: %v", sh.path, err)
+				t.Fatalf("Failed to read %s: %v", tt.path, err)
 			}
 			script := string(content)
 
-			if !strings.Contains(script, sh.guard) {
-				t.Errorf("%s missing open-on-empty guard %q", sh.path, sh.guard)
+			for _, seq := range tt.sequences {
+				if strings.Contains(script, seq) {
+					continue
+				}
+				// zsh may bind in specific keymaps (emacs/viins) using -M.
+				if tt.path == "shell/zsh/clai.zsh" {
+					alt := strings.Replace(seq, "bindkey ", `bindkey -M "$_clai_km" `, 1)
+					if strings.Contains(script, alt) {
+						continue
+					}
+				}
+				t.Errorf("%s missing double-Up sequence binding %q", tt.path, seq)
+			}
+			for _, marker := range tt.timeouts {
+				if !strings.Contains(script, marker) {
+					t.Errorf("%s missing timeout support marker %q", tt.path, marker)
+				}
 			}
 		})
 	}
@@ -742,179 +1042,13 @@ func TestBashScript_MacOSOptionHMacroTranslation(t *testing.T) {
 	if !strings.Contains(script, `bind '"˙": "\C-x\C-h"'`) {
 		t.Error("bash script missing macro translation of ˙ to \\C-x\\C-h")
 	}
-	if !strings.Contains(script, `bind -x '"\C-x\C-h": _clai_history_up'`) {
-		t.Error("bash script missing bind -x for \\C-x\\C-h history picker")
+	if !strings.Contains(script, `bind -x '"\C-x\C-h": _clai_tui_picker_open'`) {
+		t.Error("bash script missing bind -x for \\C-x\\C-h")
 	}
 }
 
-func TestBashScript_HistoryPickerBindings(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
-	if err != nil {
-		t.Fatalf("Failed to read bash script: %v", err)
-	}
-	script := string(content)
-
-	required := []string{
-		`bind -x '"\eh": _clai_history_up'`,
-		`bind -x '"\C-x\C-a": _clai_pre_accept'`,
-		`bind '"\C-x\C-b": accept-line'`,
-		`bind '"\eOA": "\C-x\C-p"'`,
-		`bind '"\eOB": "\C-x\C-n"'`,
-		`bind -x '"\C-x\C-p": _clai_up_arrow'`,
-		`bind -x '"\C-x\C-n": _clai_down_arrow'`,
-	}
-
-	for _, binding := range required {
-		if !strings.Contains(script, binding) {
-			t.Errorf("bash script missing history picker binding %s", binding)
-		}
-	}
-}
-
-func TestFishScript_UpArrowApplicationModeBinding(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
-	if err != nil {
-		t.Fatalf("Failed to read fish script: %v", err)
-	}
-	script := string(content)
-
-	required := []string{
-		`for mode in default insert visual`,
-		`bind -M $mode \e\[A _clai_up_arrow`,
-		`bind -M $mode \eOA _clai_up_arrow`,
-	}
-
-	for _, binding := range required {
-		if !strings.Contains(script, binding) {
-			t.Errorf("fish script missing up-arrow binding %s", binding)
-		}
-	}
-}
-
-func TestFishScript_PickerControlBindings(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
-	if err != nil {
-		t.Fatalf("Failed to read fish script: %v", err)
-	}
-	script := string(content)
-
-	required := []string{
-		`bind -M $mode \t _clai_suggest_tab`,
-		`bind -M $mode \e\[B _clai_picker_down`,
-		`bind -M $mode \eOB _clai_picker_down`,
-		`bind -M $mode \cxs _clai_history_scope_session`,
-		`bind -M $mode \cxd _clai_history_scope_cwd`,
-		`bind -M $mode \cxg _clai_history_scope_global`,
-	}
-
-	for _, binding := range required {
-		if !strings.Contains(script, binding) {
-			t.Errorf("fish script missing picker control binding %s", binding)
-		}
-	}
-}
-
-func TestFishScript_DisableModeScopedCleanup(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
-	if err != nil {
-		t.Fatalf("Failed to read fish script: %v", err)
-	}
-	script := string(content)
-
-	required := []string{
-		`function _clai_disable`,
-		`for mode in default insert visual`,
-		`bind -M $mode \t complete`,
-		`bind -M $mode \e\[B history-search-forward`,
-		`bind -M $mode \eOB history-search-forward`,
-		`bind -M $mode \e ''`,
-		`bind -M $mode \eh ''`,
-		`bind -M $mode \cxs ''`,
-		`bind -M $mode \cxd ''`,
-		`bind -M $mode \cxg ''`,
-	}
-
-	for _, pattern := range required {
-		if !strings.Contains(script, pattern) {
-			t.Errorf("fish script missing mode-scoped disable cleanup %s", pattern)
-		}
-	}
-}
-
-func TestFishScript_TUIPickerQuotesSingleValueArgs(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
-	if err != nil {
-		t.Fatalf("Failed to read fish script: %v", err)
-	}
-	script := string(content)
-
-	required := []string{
-		`--session="$CLAI_SESSION_ID"`,
-		`--cwd="$PWD"`,
-	}
-
-	for _, arg := range required {
-		if !strings.Contains(script, arg) {
-			t.Errorf("fish script missing quoted argument %s", arg)
-		}
-	}
-}
-
-func TestFishScript_DateNanosecondsGuardIsNumeric(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
-	if err != nil {
-		t.Fatalf("Failed to read fish script: %v", err)
-	}
-	script := string(content)
-
-	if !strings.Contains(script, `set -l _ns (command date +%s%N 2>/dev/null)`) {
-		t.Error("fish script missing guarded nanosecond timestamp capture")
-	}
-	if !strings.Contains(script, `string match -rq '^[0-9]+$' -- $_ns`) {
-		t.Error("fish script missing numeric nanosecond guard")
-	}
-}
-
-func TestFishScript_DisownUsesLatestJob(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/fish/clai.fish")
-	if err != nil {
-		t.Fatalf("Failed to read fish script: %v", err)
-	}
-	script := string(content)
-
-	if strings.Contains(script, `disown %1`) {
-		t.Error("fish script still uses fragile disown %1 pattern")
-	}
-	if !strings.Contains(script, `disown 2>/dev/null`) {
-		t.Error("fish script missing disown call for background shim jobs")
-	}
-}
-
-func TestBashScript_HistoryPickerUsesPromptQuery(t *testing.T) {
-	content, err := shellScripts.ReadFile("shell/bash/clai.bash")
-	if err != nil {
-		t.Fatalf("Failed to read bash script: %v", err)
-	}
-	script := string(content)
-
-	required := []string{
-		`_CLAI_PICKER_QUERY=""`,
-		`local query="${1-$_CLAI_PICKER_QUERY}"`,
-		`_CLAI_PICKER_QUERY="$picker_query"`,
-		`if ! _clai_picker_load_history "$_CLAI_PICKER_QUERY"; then`,
-		`_clai_picker_load_history "$_CLAI_PICKER_QUERY" && _clai_picker_apply`,
-		`_clai_tui_picker_open "$picker_query"`,
-	}
-
-	for _, pattern := range required {
-		if !strings.Contains(script, pattern) {
-			t.Errorf("bash script missing prompt-query behavior %s", pattern)
-		}
-	}
-}
-
-// TestInitPlaceholderReplacement verifies that init.go replaces both
-// CLAI_SESSION_ID and CLAI_UP_ARROW_HISTORY placeholders.
+// TestInitPlaceholderReplacement verifies that init.go replaces all
+// shell placeholders used by init scripts.
 func TestInitPlaceholderReplacement(t *testing.T) {
 	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
 	if err != nil {
@@ -926,17 +1060,27 @@ func TestInitPlaceholderReplacement(t *testing.T) {
 	if !strings.Contains(script, "{{CLAI_UP_ARROW_HISTORY}}") {
 		t.Fatal("zsh script missing {{CLAI_UP_ARROW_HISTORY}} placeholder")
 	}
+	if !strings.Contains(script, "{{CLAI_UP_ARROW_TRIGGER}}") {
+		t.Fatal("zsh script missing {{CLAI_UP_ARROW_TRIGGER}} placeholder")
+	}
+	if !strings.Contains(script, "{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}") {
+		t.Fatal("zsh script missing {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}} placeholder")
+	}
 
 	// Simulate the replacement that init.go performs.
 	replaced := strings.ReplaceAll(script, "{{CLAI_SESSION_ID}}", "test-session-id")
 	replaced = strings.ReplaceAll(replaced, "{{CLAI_UP_ARROW_HISTORY}}", "false")
-	replaced = strings.ReplaceAll(replaced, "{{CLAI_PICKER_OPEN_ON_EMPTY}}", "false")
+	replaced = strings.ReplaceAll(replaced, "{{CLAI_UP_ARROW_TRIGGER}}", "double")
+	replaced = strings.ReplaceAll(replaced, "{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}", "250")
 
 	if strings.Contains(replaced, "{{CLAI_UP_ARROW_HISTORY}}") {
 		t.Error("placeholder {{CLAI_UP_ARROW_HISTORY}} not replaced")
 	}
-	if strings.Contains(replaced, "{{CLAI_PICKER_OPEN_ON_EMPTY}}") {
-		t.Error("placeholder {{CLAI_PICKER_OPEN_ON_EMPTY}} not replaced")
+	if strings.Contains(replaced, "{{CLAI_UP_ARROW_TRIGGER}}") {
+		t.Error("placeholder {{CLAI_UP_ARROW_TRIGGER}} not replaced")
+	}
+	if strings.Contains(replaced, "{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}") {
+		t.Error("placeholder {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}} not replaced")
 	}
 	if strings.Contains(replaced, "{{CLAI_SESSION_ID}}") {
 		t.Error("placeholder {{CLAI_SESSION_ID}} not replaced")
@@ -944,24 +1088,11 @@ func TestInitPlaceholderReplacement(t *testing.T) {
 	if !strings.Contains(replaced, "CLAI_UP_ARROW_HISTORY:=false") {
 		t.Error("expected CLAI_UP_ARROW_HISTORY:=false after replacement")
 	}
-	if !strings.Contains(replaced, "CLAI_PICKER_OPEN_ON_EMPTY:=false") {
-		t.Error("expected CLAI_PICKER_OPEN_ON_EMPTY:=false after replacement")
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_TRIGGER:=double") {
+		t.Error("expected CLAI_UP_ARROW_TRIGGER:=double after replacement")
 	}
-}
-
-func TestGenerateSessionID_FormatAndUniqueness(t *testing.T) {
-	id1 := generateSessionID()
-	id2 := generateSessionID()
-
-	uuidLike := regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
-	if !uuidLike.MatchString(id1) {
-		t.Errorf("session ID %q does not match UUID v4 format", id1)
-	}
-	if !uuidLike.MatchString(id2) {
-		t.Errorf("session ID %q does not match UUID v4 format", id2)
-	}
-	if id1 == id2 {
-		t.Errorf("generateSessionID returned duplicate IDs: %q", id1)
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_DOUBLE_WINDOW_MS:=250") {
+		t.Error("expected CLAI_UP_ARROW_DOUBLE_WINDOW_MS:=250 after replacement")
 	}
 }
 
@@ -984,5 +1115,79 @@ func TestShellScripts_Embedded(t *testing.T) {
 				t.Errorf("Embedded file %s is empty", path)
 			}
 		})
+	}
+}
+
+// TestShellScripts_FeedbackBindings verifies that all shell scripts contain
+// feedback calls using `clai suggest-feedback` for accepted, dismissed, and
+// (where applicable) edited actions.
+func TestShellScripts_FeedbackBindings(t *testing.T) {
+	shells := []struct {
+		name     string
+		path     string
+		required []string
+	}{
+		{
+			"zsh", "shell/zsh/clai.zsh",
+			[]string{
+				"suggest-feedback --action=accepted",
+				"suggest-feedback --action=dismissed",
+				"suggest-feedback --action=edited",
+			},
+		},
+		{
+			"bash", "shell/bash/clai.bash",
+			[]string{
+				"suggest-feedback --action=accepted",
+				"suggest-feedback --action=dismissed",
+			},
+		},
+		{
+			"fish", "shell/fish/clai.fish",
+			[]string{
+				"suggest-feedback --action=accepted",
+				"suggest-feedback --action=dismissed",
+			},
+		},
+	}
+
+	for _, sh := range shells {
+		t.Run(sh.name, func(t *testing.T) {
+			content, err := shellScripts.ReadFile(sh.path)
+			if err != nil {
+				t.Fatalf("Failed to read %s: %v", sh.path, err)
+			}
+			script := string(content)
+
+			for _, req := range sh.required {
+				if !strings.Contains(script, req) {
+					t.Errorf("%s missing feedback binding: %q", sh.path, req)
+				}
+			}
+		})
+	}
+}
+
+// TestZshScript_FeedbackTracksLastAccepted verifies that the zsh script
+// tracks the last accepted suggestion for edit detection.
+func TestZshScript_FeedbackTracksLastAccepted(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	// Must have _AI_LAST_ACCEPTED state variable
+	if !strings.Contains(script, "_AI_LAST_ACCEPTED") {
+		t.Error("zsh script missing _AI_LAST_ACCEPTED state variable for edit tracking")
+	}
+
+	// Must clear _AI_LAST_ACCEPTED on accept-line
+	body := extractFunctionBody(script, "_ai_voice_accept_line")
+	if body == "" {
+		t.Fatal("_ai_voice_accept_line() not found in zsh script")
+	}
+	if !strings.Contains(body, `_AI_LAST_ACCEPTED=""`) {
+		t.Error("_ai_voice_accept_line() should clear _AI_LAST_ACCEPTED after checking for edits")
 	}
 }

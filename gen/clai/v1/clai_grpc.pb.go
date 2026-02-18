@@ -28,6 +28,8 @@ const (
 	ClaiService_TextToCommand_FullMethodName      = "/clai.v1.ClaiService/TextToCommand"
 	ClaiService_NextStep_FullMethodName           = "/clai.v1.ClaiService/NextStep"
 	ClaiService_Diagnose_FullMethodName           = "/clai.v1.ClaiService/Diagnose"
+	ClaiService_RecordFeedback_FullMethodName     = "/clai.v1.ClaiService/RecordFeedback"
+	ClaiService_SuggestFeedback_FullMethodName    = "/clai.v1.ClaiService/SuggestFeedback"
 	ClaiService_FetchHistory_FullMethodName       = "/clai.v1.ClaiService/FetchHistory"
 	ClaiService_ImportHistory_FullMethodName      = "/clai.v1.ClaiService/ImportHistory"
 	ClaiService_Ping_FullMethodName               = "/clai.v1.ClaiService/Ping"
@@ -52,6 +54,9 @@ type ClaiServiceClient interface {
 	TextToCommand(ctx context.Context, in *TextToCommandRequest, opts ...grpc.CallOption) (*TextToCommandResponse, error)
 	NextStep(ctx context.Context, in *NextStepRequest, opts ...grpc.CallOption) (*NextStepResponse, error)
 	Diagnose(ctx context.Context, in *DiagnoseRequest, opts ...grpc.CallOption) (*DiagnoseResponse, error)
+	// Feedback (V2)
+	RecordFeedback(ctx context.Context, in *RecordFeedbackRequest, opts ...grpc.CallOption) (*RecordFeedbackResponse, error)
+	SuggestFeedback(ctx context.Context, in *RecordFeedbackRequest, opts ...grpc.CallOption) (*RecordFeedbackResponse, error)
 	// History
 	FetchHistory(ctx context.Context, in *HistoryFetchRequest, opts ...grpc.CallOption) (*HistoryFetchResponse, error)
 	ImportHistory(ctx context.Context, in *HistoryImportRequest, opts ...grpc.CallOption) (*HistoryImportResponse, error)
@@ -153,6 +158,26 @@ func (c *claiServiceClient) Diagnose(ctx context.Context, in *DiagnoseRequest, o
 	return out, nil
 }
 
+func (c *claiServiceClient) RecordFeedback(ctx context.Context, in *RecordFeedbackRequest, opts ...grpc.CallOption) (*RecordFeedbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordFeedbackResponse)
+	err := c.cc.Invoke(ctx, ClaiService_RecordFeedback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *claiServiceClient) SuggestFeedback(ctx context.Context, in *RecordFeedbackRequest, opts ...grpc.CallOption) (*RecordFeedbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordFeedbackResponse)
+	err := c.cc.Invoke(ctx, ClaiService_SuggestFeedback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *claiServiceClient) FetchHistory(ctx context.Context, in *HistoryFetchRequest, opts ...grpc.CallOption) (*HistoryFetchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HistoryFetchResponse)
@@ -247,6 +272,9 @@ type ClaiServiceServer interface {
 	TextToCommand(context.Context, *TextToCommandRequest) (*TextToCommandResponse, error)
 	NextStep(context.Context, *NextStepRequest) (*NextStepResponse, error)
 	Diagnose(context.Context, *DiagnoseRequest) (*DiagnoseResponse, error)
+	// Feedback (V2)
+	RecordFeedback(context.Context, *RecordFeedbackRequest) (*RecordFeedbackResponse, error)
+	SuggestFeedback(context.Context, *RecordFeedbackRequest) (*RecordFeedbackResponse, error)
 	// History
 	FetchHistory(context.Context, *HistoryFetchRequest) (*HistoryFetchResponse, error)
 	ImportHistory(context.Context, *HistoryImportRequest) (*HistoryImportResponse, error)
@@ -291,6 +319,12 @@ func (UnimplementedClaiServiceServer) NextStep(context.Context, *NextStepRequest
 }
 func (UnimplementedClaiServiceServer) Diagnose(context.Context, *DiagnoseRequest) (*DiagnoseResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Diagnose not implemented")
+}
+func (UnimplementedClaiServiceServer) RecordFeedback(context.Context, *RecordFeedbackRequest) (*RecordFeedbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordFeedback not implemented")
+}
+func (UnimplementedClaiServiceServer) SuggestFeedback(context.Context, *RecordFeedbackRequest) (*RecordFeedbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SuggestFeedback not implemented")
 }
 func (UnimplementedClaiServiceServer) FetchHistory(context.Context, *HistoryFetchRequest) (*HistoryFetchResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method FetchHistory not implemented")
@@ -481,6 +515,42 @@ func _ClaiService_Diagnose_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClaiService_RecordFeedback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordFeedbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).RecordFeedback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_RecordFeedback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).RecordFeedback(ctx, req.(*RecordFeedbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClaiService_SuggestFeedback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordFeedbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).SuggestFeedback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_SuggestFeedback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).SuggestFeedback(ctx, req.(*RecordFeedbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ClaiService_FetchHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HistoryFetchRequest)
 	if err := dec(in); err != nil {
@@ -663,6 +733,14 @@ var ClaiService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Diagnose",
 			Handler:    _ClaiService_Diagnose_Handler,
+		},
+		{
+			MethodName: "RecordFeedback",
+			Handler:    _ClaiService_RecordFeedback_Handler,
+		},
+		{
+			MethodName: "SuggestFeedback",
+			Handler:    _ClaiService_SuggestFeedback_Handler,
 		},
 		{
 			MethodName: "FetchHistory",

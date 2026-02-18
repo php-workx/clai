@@ -93,6 +93,45 @@ func TestDefaultRanker_Rank_OrderedByScore(t *testing.T) {
 	}
 }
 
+func TestDefaultRanker_Rank_DoesNotSuggestLastCommand(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UnixMilli()
+
+	createTestSession(t, store, "session-1")
+	createTestCommand(t, store, "session-1", "cmd-1", "/tmp", "make build", now-2000, true)
+	createTestCommand(t, store, "session-1", "cmd-2", "/tmp", "make install", now-1000, true)
+
+	ranker := NewRanker(store)
+	suggestions, err := ranker.Rank(ctx, &RankRequest{
+		SessionID:   "session-1",
+		CWD:         "/tmp",
+		Prefix:      "make",
+		LastCommand: "make install",
+		MaxResults:  10,
+	})
+	if err != nil {
+		t.Fatalf("Rank() error = %v", err)
+	}
+
+	foundBuild := false
+	for _, s := range suggestions {
+		if s.Text == "make install" {
+			t.Fatalf("suggestions should not include last command %q", s.Text)
+		}
+		if s.Text == "make build" {
+			foundBuild = true
+		}
+	}
+	if !foundBuild {
+		t.Fatalf("expected suggestions to include %q", "make build")
+	}
+}
+
 func TestDefaultRanker_Rank_SessionWeightHighest(t *testing.T) {
 	t.Parallel()
 

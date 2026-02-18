@@ -18,15 +18,13 @@ import (
 // --- Mock provider ---
 
 type mockProvider struct {
-	items []string
+	items []Item
 	atEnd bool
 	err   error
 	delay time.Duration // Optional delay to simulate slow fetch
-	last  Request
 }
 
 func (p *mockProvider) Fetch(ctx context.Context, req Request) (Response, error) {
-	p.last = req
 	if p.delay > 0 {
 		select {
 		case <-time.After(p.delay):
@@ -42,6 +40,22 @@ func (p *mockProvider) Fetch(ctx context.Context, req Request) (Response, error)
 		Items:     p.items,
 		AtEnd:     p.atEnd,
 	}, nil
+}
+
+func itemsFromStrings(ss []string) []Item {
+	items := make([]Item, 0, len(ss))
+	for _, s := range ss {
+		items = append(items, Item{Value: s, Display: s})
+	}
+	return items
+}
+
+func itemValues(items []Item) []string {
+	out := make([]string, 0, len(items))
+	for _, it := range items {
+		out = append(out, it.Value)
+	}
+	return out
 }
 
 func defaultTabs() []config.TabDef {
@@ -134,39 +148,18 @@ func TestInitialState(t *testing.T) {
 }
 
 func TestInit_TransitionsToLoading(t *testing.T) {
-	p := &mockProvider{items: []string{"ls", "cd"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls", "cd"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
 
 	assert.Equal(t, stateLoaded, m.state)
-	assert.Equal(t, []string{"ls", "cd"}, m.items)
+	assert.Equal(t, []string{"ls", "cd"}, itemValues(m.items))
 	assert.True(t, m.atEnd)
 }
 
-func TestInit_FetchUsesConfiguredPageSize(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
-	m := newTestModel(p).WithPageSize(7)
-
-	m = initAndLoad(t, m)
-
-	assert.Equal(t, stateLoaded, m.state)
-	assert.Equal(t, 7, p.last.Limit)
-}
-
-func TestInit_FetchDefaultsToVisibleListHeight(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
-	m := newTestModel(p)
-	expected := m.listHeight()
-
-	m = initAndLoad(t, m)
-
-	assert.Equal(t, stateLoaded, m.state)
-	assert.Equal(t, expected, p.last.Limit)
-}
-
 func TestLoading_ToEmpty(t *testing.T) {
-	p := &mockProvider{items: []string{}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -187,7 +180,7 @@ func TestLoading_ToError(t *testing.T) {
 }
 
 func TestLoaded_ToLoading_OnTabChange(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -201,7 +194,7 @@ func TestLoaded_ToLoading_OnTabChange(t *testing.T) {
 }
 
 func TestAnyCancelledOnEsc(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -218,7 +211,7 @@ func TestAnyCancelledOnEsc(t *testing.T) {
 }
 
 func TestCtrlC_CopiesSelectedItem(t *testing.T) {
-	p := &mockProvider{items: []string{"ls -la", "pwd"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls -la", "pwd"}), atEnd: true}
 	m := newTestModel(p)
 	m = initAndLoad(t, m)
 	assert.Equal(t, 0, m.selection)
@@ -251,7 +244,7 @@ func TestError_ToLoading_OnTabChange(t *testing.T) {
 
 	// Fix the provider and press Tab
 	p.err = nil
-	p.items = []string{"ls"}
+	p.items = itemsFromStrings([]string{"ls"})
 	p.atEnd = true
 
 	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
@@ -267,14 +260,14 @@ func TestError_ToLoading_OnTabChange(t *testing.T) {
 // --- Selection bounds tests ---
 
 func TestSelectionClamped_AfterItemsShrink(t *testing.T) {
-	p := &mockProvider{items: []string{"a", "b", "c", "d", "e"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a", "b", "c", "d", "e"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
 	m.selection = 4
 
 	// New fetch returns fewer items
-	p.items = []string{"a", "b"}
+	p.items = itemsFromStrings([]string{"a", "b"})
 	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = result.(Model)
 	msg := runCmd(cmd)
@@ -286,14 +279,14 @@ func TestSelectionClamped_AfterItemsShrink(t *testing.T) {
 }
 
 func TestSelectionClamped_EmptyItems(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
 	assert.Equal(t, 0, m.selection)
 
 	// Fetch returns empty
-	p.items = []string{}
+	p.items = itemsFromStrings([]string{})
 	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = result.(Model)
 	msg := runCmd(cmd)
@@ -305,7 +298,7 @@ func TestSelectionClamped_EmptyItems(t *testing.T) {
 }
 
 func TestSelectionClamped_NegativeToZero(t *testing.T) {
-	p := &mockProvider{items: []string{"a", "b"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a", "b"}), atEnd: true}
 	m := newTestModel(p)
 	m.selection = -1 // Starts at -1
 
@@ -317,7 +310,7 @@ func TestSelectionClamped_NegativeToZero(t *testing.T) {
 // --- Stale response tests ---
 
 func TestStaleResponse_Discarded(t *testing.T) {
-	p := &mockProvider{items: []string{"first"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"first"}), atEnd: true}
 	m := newTestModel(p)
 
 	m, _ = initToLoading(t, m)
@@ -326,7 +319,7 @@ func TestStaleResponse_Discarded(t *testing.T) {
 	// Simulate a stale response from an earlier request
 	staleMsg := fetchDoneMsg{
 		requestID: currentID - 1,
-		items:     []string{"stale"},
+		items:     itemsFromStrings([]string{"stale"}),
 	}
 	result, _ := m.Update(staleMsg)
 	m = result.(Model)
@@ -336,7 +329,7 @@ func TestStaleResponse_Discarded(t *testing.T) {
 }
 
 func TestCurrentResponse_Accepted(t *testing.T) {
-	p := &mockProvider{items: []string{"current"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"current"}), atEnd: true}
 	m := newTestModel(p)
 
 	m, fetchCmd := initToLoading(t, m)
@@ -349,13 +342,13 @@ func TestCurrentResponse_Accepted(t *testing.T) {
 	result, _ := m.Update(msg)
 	m = result.(Model)
 	assert.Equal(t, stateLoaded, m.state)
-	assert.Equal(t, []string{"current"}, m.items)
+	assert.Equal(t, []string{"current"}, itemValues(m.items))
 }
 
 // --- Key handling tests ---
 
 func TestUpDown_Navigation(t *testing.T) {
-	p := &mockProvider{items: []string{"a", "b", "c"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a", "b", "c"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -393,7 +386,7 @@ func TestUpDown_Navigation(t *testing.T) {
 }
 
 func TestUpDown_NoOp_DuringLoading(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 
 	m, _ = initToLoading(t, m)
@@ -405,7 +398,7 @@ func TestUpDown_NoOp_DuringLoading(t *testing.T) {
 }
 
 func TestEnter_SelectsItem(t *testing.T) {
-	p := &mockProvider{items: []string{"ls -la", "pwd"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls -la", "pwd"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -423,7 +416,7 @@ func TestEnter_SelectsItem(t *testing.T) {
 }
 
 func TestEnter_EmptyList_NoResult(t *testing.T) {
-	p := &mockProvider{items: []string{}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -434,7 +427,7 @@ func TestEnter_EmptyList_NoResult(t *testing.T) {
 }
 
 func TestTabCycling(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -451,8 +444,35 @@ func TestTabCycling(t *testing.T) {
 	assert.Equal(t, 0, m.activeTab)
 }
 
+func TestRightRefine_SetsQueryToSelectedItem(t *testing.T) {
+	p := &mockProvider{items: itemsFromStrings([]string{"first cmd", "second cmd"}), atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	// Move selection to second item.
+	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = result.(Model)
+	require.Equal(t, 1, m.selection)
+
+	m.textInput.SetValue("sec")
+	m.offset = 10
+
+	// Left arrow should not "refine" (it should be available for cursor motion).
+	result, _ = m.Update(tea.KeyMsg{Type: tea.KeyLeft})
+	m = result.(Model)
+	assert.Equal(t, "sec", m.textInput.Value())
+
+	// Right arrow should replace query with selected item and start debounce.
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRight})
+	m = result.(Model)
+	assert.Equal(t, "second cmd", m.textInput.Value())
+	assert.Equal(t, 0, m.offset)
+	assert.NotNil(t, cmd)
+	assert.Greater(t, m.debounceID, uint64(0))
+}
+
 func TestTabResetsOffset(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 	m.offset = 50
 
@@ -461,10 +481,67 @@ func TestTabResetsOffset(t *testing.T) {
 	assert.Equal(t, 0, m.offset)
 }
 
+func TestHintLabels_UTF8Locale(t *testing.T) {
+	t.Setenv("LC_ALL", "en_US.UTF-8")
+	assert.Equal(t, "→ use and refine", rightRefineHintLabel())
+	assert.Equal(t, "⇥ switch context", tabSwitchHintLabel())
+}
+
+func TestHintLabels_ASCIILocaleFallback(t *testing.T) {
+	t.Setenv("LC_ALL", "C")
+	assert.Equal(t, "Right: use and refine", rightRefineHintLabel())
+	assert.Equal(t, "Tab: switch context", tabSwitchHintLabel())
+}
+
+func TestViewTabBar_HidesTabHintForSingleTab(t *testing.T) {
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
+	m := NewModel([]config.TabDef{{Label: "Global", Provider: "global"}}, p)
+	m = initAndLoad(t, m)
+
+	view := m.viewTabBar()
+	assert.NotContains(t, view, "⇥")
+	assert.NotContains(t, view, "Tab: switch context")
+}
+
+func TestViewList_SelectedLineShowsRightRefineHint(t *testing.T) {
+	t.Setenv("LC_ALL", "en_US.UTF-8")
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	view := m.viewList()
+	assert.Contains(t, view, "→ use and refine")
+}
+
+func TestViewList_DimsSuggestionMetadataAsGhosttext(t *testing.T) {
+	p := &mockProvider{items: []Item{{
+		Value:   "make test-all",
+		Display: "make test-all  · global  · score 0.49  · last 2h ago",
+	}}, atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	view := m.viewList()
+
+	// Metadata suffix should be rendered using dimStyle (ghosttext-like).
+	assert.Contains(t, view, dimStyle.Render("  · global  · score 0.49  · last 2h ago"))
+}
+
+func TestViewFooter_ShowsShortcuts(t *testing.T) {
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	footer := m.viewFooter()
+	assert.Contains(t, footer, "Enter accept")
+	assert.Contains(t, footer, "Ctrl+U delete")
+	assert.Contains(t, footer, "Esc cancel")
+}
+
 // --- Query / debounce tests ---
 
 func TestTyping_AppendsToQuery(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
@@ -476,8 +553,20 @@ func TestTyping_AppendsToQuery(t *testing.T) {
 	assert.Equal(t, "ls", m.textInput.Value())
 }
 
+func TestCtrlU_ClearsQueryAndFetches(t *testing.T) {
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
+	m := newTestModel(p)
+	m = initAndLoad(t, m)
+
+	m.textInput.SetValue("abc")
+	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlU})
+	m = result.(Model)
+	assert.Equal(t, "", m.textInput.Value())
+	assert.NotNil(t, cmd)
+}
+
 func TestBackspace_RemovesFromQuery(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 	m.textInput.SetValue("ls")
 
@@ -487,7 +576,7 @@ func TestBackspace_RemovesFromQuery(t *testing.T) {
 }
 
 func TestBackspace_EmptyQuery_NoOp(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 	m.textInput.SetValue("")
 
@@ -499,7 +588,7 @@ func TestBackspace_EmptyQuery_NoOp(t *testing.T) {
 }
 
 func TestDebounce_NewKeystrokeCancelsPrevious(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 
 	// Type 'l' - starts debounce with debounceID 1
@@ -521,7 +610,7 @@ func TestDebounce_NewKeystrokeCancelsPrevious(t *testing.T) {
 }
 
 func TestDebounce_CurrentTimerTriggersFetch(t *testing.T) {
-	p := &mockProvider{items: []string{"found"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"found"}), atEnd: true}
 	m := newTestModel(p)
 
 	// Type 'l' - starts debounce
@@ -539,7 +628,7 @@ func TestDebounce_CurrentTimerTriggersFetch(t *testing.T) {
 // --- WindowSizeMsg ---
 
 func TestWindowResize(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 
 	result, _ := m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
@@ -549,7 +638,7 @@ func TestWindowResize(t *testing.T) {
 }
 
 func TestWindowResize_PreservesSelection(t *testing.T) {
-	p := &mockProvider{items: []string{"a", "b", "c"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a", "b", "c"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -563,7 +652,7 @@ func TestWindowResize_PreservesSelection(t *testing.T) {
 // --- View rendering ---
 
 func TestView_ShowsTabBar(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -571,11 +660,10 @@ func TestView_ShowsTabBar(t *testing.T) {
 	view := m.View()
 	assert.Contains(t, view, "Session")
 	assert.Contains(t, view, "Global")
-	assert.Contains(t, view, tabSwitchHintLabel())
 }
 
 func TestView_ShowsQueryLine(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 	m.textInput.SetValue("test")
 
@@ -584,7 +672,7 @@ func TestView_ShowsQueryLine(t *testing.T) {
 }
 
 func TestView_ShowsLoadingState(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 	m.state = stateLoading
 
@@ -593,7 +681,7 @@ func TestView_ShowsLoadingState(t *testing.T) {
 }
 
 func TestView_ShowsEmptyState(t *testing.T) {
-	p := &mockProvider{items: []string{}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{}), atEnd: true}
 	m := newTestModel(p)
 	m.state = stateEmpty
 
@@ -612,7 +700,7 @@ func TestView_ShowsErrorState(t *testing.T) {
 }
 
 func TestResult_EmptyOnCancel(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 
 	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -623,7 +711,7 @@ func TestResult_EmptyOnCancel(t *testing.T) {
 // --- Single tab: Tab key is no-op ---
 
 func TestSingleTab_TabIsNoOp(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	tabs := []config.TabDef{{ID: "session", Label: "Session"}}
 	m := NewModel(tabs, p)
 	m.width = 80
@@ -640,7 +728,7 @@ func TestSingleTab_TabIsNoOp(t *testing.T) {
 // --- Empty list: Up/Down are no-ops ---
 
 func TestUpDown_NoOp_WhenEmpty(t *testing.T) {
-	p := &mockProvider{items: []string{}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -659,7 +747,7 @@ func TestUpDown_NoOp_WhenEmpty(t *testing.T) {
 }
 
 func TestEsc_WorksWhenEmpty(t *testing.T) {
-	p := &mockProvider{items: []string{}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -675,7 +763,7 @@ func TestEsc_WorksWhenEmpty(t *testing.T) {
 // --- Zero search results: Enter is no-op, query still editable ---
 
 func TestZeroResults_EnterIsNoOp(t *testing.T) {
-	p := &mockProvider{items: []string{}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -688,7 +776,7 @@ func TestZeroResults_EnterIsNoOp(t *testing.T) {
 }
 
 func TestZeroResults_QueryEditable(t *testing.T) {
-	p := &mockProvider{items: []string{}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -704,14 +792,14 @@ func TestZeroResults_QueryEditable(t *testing.T) {
 // --- Selection bounds: items grow ---
 
 func TestSelectionClamped_ItemsGrow(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
 	assert.Equal(t, 0, m.selection)
 
 	// Tab to switch to a result with more items.
-	p.items = []string{"a", "b", "c", "d", "e"}
+	p.items = itemsFromStrings([]string{"a", "b", "c", "d", "e"})
 	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyTab})
 	m = result.(Model)
 	msg := runCmd(cmd)
@@ -726,7 +814,7 @@ func TestSelectionClamped_ItemsGrow(t *testing.T) {
 // --- Query change triggers loading (via debounce -> fetch) ---
 
 func TestQueryChange_TriggersLoadingViaDebounce(t *testing.T) {
-	p := &mockProvider{items: []string{"abc"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"abc"}), atEnd: true}
 	m := newTestModel(p)
 
 	m = initAndLoad(t, m)
@@ -744,7 +832,7 @@ func TestQueryChange_TriggersLoadingViaDebounce(t *testing.T) {
 	assert.Equal(t, stateLoading, m.state)
 
 	// Complete the fetch.
-	p.items = []string{"abc"}
+	p.items = itemsFromStrings([]string{"abc"})
 	fetchResult := runCmd(fetchCmd)
 	result, _ = m.Update(fetchResult)
 	m = result.(Model)
@@ -765,7 +853,7 @@ func TestError_QueryEditableAndRetryViaDebounce(t *testing.T) {
 
 	// Fix the provider.
 	p.err = nil
-	p.items = []string{"recovered"}
+	p.items = itemsFromStrings([]string{"recovered"})
 	p.atEnd = true
 
 	// Type to start a new search.
@@ -784,13 +872,13 @@ func TestError_QueryEditableAndRetryViaDebounce(t *testing.T) {
 	result, _ = m.Update(fetchResult)
 	m = result.(Model)
 	assert.Equal(t, stateLoaded, m.state)
-	assert.Equal(t, []string{"recovered"}, m.items)
+	assert.Equal(t, []string{"recovered"}, itemValues(m.items))
 }
 
 // --- Cancelled state: View shows "Cancelled" ---
 
 func TestView_ShowsCancelledState(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 	m.state = stateCancelled
 
@@ -801,14 +889,14 @@ func TestView_ShowsCancelledState(t *testing.T) {
 // --- WithQuery sets initial query ---
 
 func TestWithQuery(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 	m = m.WithQuery("initial")
 	assert.Equal(t, "initial", m.textInput.Value())
 }
 
 func TestWithQuery_CursorAtEnd(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 	m = m.WithQuery("hello world")
 	// Cursor should be at the end of the initial query so the user
@@ -819,7 +907,7 @@ func TestWithQuery_CursorAtEnd(t *testing.T) {
 // --- Init returns a cmd ---
 
 func TestInit_ReturnsCmd(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p)
 	cmd := m.Init()
 	assert.NotNil(t, cmd)
@@ -828,7 +916,7 @@ func TestInit_ReturnsCmd(t *testing.T) {
 // --- Loading state: Enter is no-op ---
 
 func TestEnter_NoOp_DuringLoading(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true, delay: 1 * time.Second}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true, delay: 1 * time.Second}
 	m := newTestModel(p)
 
 	m, _ = initToLoading(t, m)
@@ -850,7 +938,7 @@ func newBottomUpModel(p Provider) Model {
 }
 
 func TestBottomUp_ViewList_ReversesItems(t *testing.T) {
-	p := &mockProvider{items: []string{"newest", "middle", "oldest"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"newest", "middle", "oldest"}), atEnd: true}
 	m := newBottomUpModel(p)
 	m = initAndLoad(t, m)
 
@@ -874,7 +962,7 @@ func TestBottomUp_ViewList_ReversesItems(t *testing.T) {
 }
 
 func TestBottomUp_ViewList_BottomAligned(t *testing.T) {
-	p := &mockProvider{items: []string{"a", "b"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a", "b"}), atEnd: true}
 	m := newBottomUpModel(p)
 	m = initAndLoad(t, m)
 
@@ -893,7 +981,7 @@ func TestBottomUp_ViewList_BottomAligned(t *testing.T) {
 }
 
 func TestBottomUp_View_HasSeparator(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newBottomUpModel(p)
 	m = initAndLoad(t, m)
 
@@ -902,7 +990,7 @@ func TestBottomUp_View_HasSeparator(t *testing.T) {
 }
 
 func TestBottomUp_UpDown_InvertedNavigation(t *testing.T) {
-	p := &mockProvider{items: []string{"newest", "middle", "oldest"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"newest", "middle", "oldest"}), atEnd: true}
 	m := newBottomUpModel(p)
 	m = initAndLoad(t, m)
 	assert.Equal(t, 0, m.selection) // Starts at newest
@@ -939,7 +1027,7 @@ func TestBottomUp_UpDown_InvertedNavigation(t *testing.T) {
 }
 
 func TestBottomUp_SelectionMarkerOnCorrectItem(t *testing.T) {
-	p := &mockProvider{items: []string{"newest", "oldest"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"newest", "oldest"}), atEnd: true}
 	m := newBottomUpModel(p)
 	m = initAndLoad(t, m)
 	// Selection 0 = "newest", which should be at the bottom visually.
@@ -959,7 +1047,7 @@ func TestBottomUp_SelectionMarkerOnCorrectItem(t *testing.T) {
 }
 
 func TestTopDown_ViewList_PreservesOrder(t *testing.T) {
-	p := &mockProvider{items: []string{"a", "b", "c"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a", "b", "c"}), atEnd: true}
 	m := newTestModel(p) // Default LayoutTopDown
 	m = initAndLoad(t, m)
 
@@ -974,78 +1062,12 @@ func TestTopDown_ViewList_PreservesOrder(t *testing.T) {
 }
 
 func TestTopDown_View_NoSeparator(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"a"}), atEnd: true}
 	m := newTestModel(p) // Default LayoutTopDown
 	m = initAndLoad(t, m)
 
 	view := m.View()
 	assert.NotContains(t, view, "──")
-}
-
-func TestRightArrow_CopiesSelectedItemToFilterForRefinement(t *testing.T) {
-	p := &mockProvider{items: []string{"git status", "git stash pop"}, atEnd: true}
-	m := newTestModel(p)
-	m = initAndLoad(t, m)
-
-	// Select second item.
-	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = result.(Model)
-	require.Equal(t, 1, m.selection)
-
-	// Simulate prior pagination to confirm refinement resets offset.
-	m.offset = 10
-	prevDebounceID := m.debounceID
-
-	result, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRight})
-	m = result.(Model)
-
-	assert.Equal(t, "git stash pop", m.textInput.Value())
-	assert.Equal(t, 0, m.offset)
-	assert.Greater(t, m.debounceID, prevDebounceID)
-	assert.NotNil(t, cmd, "right arrow should schedule a debounced fetch")
-}
-
-func TestViewList_SelectedLineShowsRightRefineHint(t *testing.T) {
-	p := &mockProvider{items: []string{"git status", "git stash pop"}, atEnd: true}
-	m := newTestModel(p)
-	m = initAndLoad(t, m)
-
-	view := m.viewList()
-	assert.Contains(t, view, rightRefineHintLabel())
-	assert.Equal(t, 1, strings.Count(view, rightRefineHintLabel()))
-
-	// Move selection and ensure the hint is still shown exactly once.
-	result, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
-	m = result.(Model)
-	view = m.viewList()
-	assert.Equal(t, 1, strings.Count(view, rightRefineHintLabel()))
-}
-
-func TestHintLabels_UTF8Locale(t *testing.T) {
-	t.Setenv("LC_ALL", "en_US.UTF-8")
-
-	assert.Equal(t, "→", rightRefineHintLabel())
-	assert.Equal(t, "⇥", tabSwitchHintLabel())
-}
-
-func TestHintLabels_ASCIILocaleFallback(t *testing.T) {
-	t.Setenv("LC_ALL", "C")
-
-	assert.Equal(t, "Right: refine", rightRefineHintLabel())
-	assert.Equal(t, "Tab: switch scope", tabSwitchHintLabel())
-}
-
-func TestViewTabBar_HidesTabHintForSingleTab(t *testing.T) {
-	p := &mockProvider{items: []string{"a"}, atEnd: true}
-	tabs := []config.TabDef{{ID: "session", Label: "Session"}}
-	m := NewModel(tabs, p)
-	m.width = 80
-	m.height = 24
-	m = initAndLoad(t, m)
-
-	bar := m.viewTabBar()
-	assert.NotContains(t, bar, "Tab: switch scope")
-	assert.NotContains(t, bar, "⇥")
 }
 
 func TestWithLayout(t *testing.T) {
@@ -1058,7 +1080,7 @@ func TestWithLayout(t *testing.T) {
 }
 
 func TestBottomUp_StatusMessages_BottomAligned(t *testing.T) {
-	p := &mockProvider{items: []string{}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{}), atEnd: true}
 	m := newBottomUpModel(p)
 	m = initAndLoad(t, m)
 	assert.Equal(t, stateEmpty, m.state)
@@ -1143,7 +1165,7 @@ func TestHighlightQuery_SelectedStyle(t *testing.T) {
 }
 
 func TestViewList_HighlightsQuery(t *testing.T) {
-	p := &mockProvider{items: []string{"make build", "make test", "go build"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"make build", "make test", "go build"}), atEnd: true}
 	m := newTestModel(p)
 	m = initAndLoad(t, m)
 
@@ -1179,7 +1201,7 @@ func TestViewList_HighlightsQuery(t *testing.T) {
 func TestViewList_TruncationStyled(t *testing.T) {
 	// Use a very long item that will be truncated.
 	longItem := strings.Repeat("abcdef", 20) // 120 chars
-	p := &mockProvider{items: []string{longItem}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{longItem}), atEnd: true}
 	m := newTestModel(p)
 	m.width = 40 // Force truncation
 	m = initAndLoad(t, m)
@@ -1209,7 +1231,7 @@ func TestRenderItem_WithTruncation(t *testing.T) {
 // --- Clipboard + copied indicator tests ---
 
 func TestClipboardMsg_SetsCopied(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls"}), atEnd: true}
 	m := newTestModel(p)
 	m = initAndLoad(t, m)
 
@@ -1220,7 +1242,7 @@ func TestClipboardMsg_SetsCopied(t *testing.T) {
 }
 
 func TestClipboardMsg_Error_NoCopied(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls"}), atEnd: true}
 	m := newTestModel(p)
 	m = initAndLoad(t, m)
 
@@ -1231,7 +1253,7 @@ func TestClipboardMsg_Error_NoCopied(t *testing.T) {
 }
 
 func TestCopiedClearMsg_ClearsCopied(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls"}), atEnd: true}
 	m := newTestModel(p)
 	m.copied = true
 
@@ -1241,7 +1263,7 @@ func TestCopiedClearMsg_ClearsCopied(t *testing.T) {
 }
 
 func TestViewQuery_ShowsCopiedIndicator(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls"}), atEnd: true}
 	m := newTestModel(p)
 	m.copied = true
 
@@ -1250,7 +1272,7 @@ func TestViewQuery_ShowsCopiedIndicator(t *testing.T) {
 }
 
 func TestViewQuery_NoCopiedIndicator(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls"}), atEnd: true}
 	m := newTestModel(p)
 	m.copied = false
 
@@ -1259,7 +1281,7 @@ func TestViewQuery_NoCopiedIndicator(t *testing.T) {
 }
 
 func TestEsc_StillCancels(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls"}), atEnd: true}
 	m := newTestModel(p)
 	m = initAndLoad(t, m)
 
@@ -1270,7 +1292,7 @@ func TestEsc_StillCancels(t *testing.T) {
 }
 
 func TestIsCancelled_TrueAfterEsc(t *testing.T) {
-	p := &mockProvider{items: []string{"ls"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls"}), atEnd: true}
 	m := newTestModel(p)
 	m = initAndLoad(t, m)
 
@@ -1286,7 +1308,7 @@ func TestIsCancelled_TrueAfterEsc(t *testing.T) {
 }
 
 func TestIsCancelled_FalseAfterEnter(t *testing.T) {
-	p := &mockProvider{items: []string{"ls -la"}, atEnd: true}
+	p := &mockProvider{items: itemsFromStrings([]string{"ls -la"}), atEnd: true}
 	m := newTestModel(p)
 	m = initAndLoad(t, m)
 

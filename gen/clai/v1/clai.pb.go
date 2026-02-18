@@ -22,6 +22,62 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// SearchMode controls the search strategy for history queries.
+type SearchMode int32
+
+const (
+	SearchMode_SEARCH_MODE_UNSPECIFIED SearchMode = 0 // Default: auto-detect best strategy
+	SearchMode_SEARCH_MODE_FTS         SearchMode = 1 // Full-text search (SQLite FTS5)
+	SearchMode_SEARCH_MODE_PREFIX      SearchMode = 2 // Prefix/LIKE scan
+	SearchMode_SEARCH_MODE_DESCRIBE    SearchMode = 3 // Tag-based descriptive search (no LLM)
+	SearchMode_SEARCH_MODE_AUTO        SearchMode = 4 // Auto-select best backend
+)
+
+// Enum value maps for SearchMode.
+var (
+	SearchMode_name = map[int32]string{
+		0: "SEARCH_MODE_UNSPECIFIED",
+		1: "SEARCH_MODE_FTS",
+		2: "SEARCH_MODE_PREFIX",
+		3: "SEARCH_MODE_DESCRIBE",
+		4: "SEARCH_MODE_AUTO",
+	}
+	SearchMode_value = map[string]int32{
+		"SEARCH_MODE_UNSPECIFIED": 0,
+		"SEARCH_MODE_FTS":         1,
+		"SEARCH_MODE_PREFIX":      2,
+		"SEARCH_MODE_DESCRIBE":    3,
+		"SEARCH_MODE_AUTO":        4,
+	}
+)
+
+func (x SearchMode) Enum() *SearchMode {
+	p := new(SearchMode)
+	*p = x
+	return p
+}
+
+func (x SearchMode) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SearchMode) Descriptor() protoreflect.EnumDescriptor {
+	return file_clai_v1_clai_proto_enumTypes[0].Descriptor()
+}
+
+func (SearchMode) Type() protoreflect.EnumType {
+	return &file_clai_v1_clai_proto_enumTypes[0]
+}
+
+func (x SearchMode) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SearchMode.Descriptor instead.
+func (SearchMode) EnumDescriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{0}
+}
+
 type ClientInfo struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Version       string                 `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
@@ -150,6 +206,69 @@ func (x *Ack) GetError() string {
 	return ""
 }
 
+// ApiError provides structured error details per Section 13.3 error model.
+// Standard codes: E_INVALID_ARGUMENT, E_DAEMON_UNAVAILABLE, E_STORAGE_BUSY,
+// E_STORAGE_CORRUPT, E_TIMEOUT, E_UNSUPPORTED_TTY, E_INTERNAL.
+type ApiError struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`            // Machine-readable error code (e.g. "E_TIMEOUT")
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`      // Human-readable error description
+	Retryable     bool                   `protobuf:"varint,3,opt,name=retryable,proto3" json:"retryable,omitempty"` // Whether the client should retry
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApiError) Reset() {
+	*x = ApiError{}
+	mi := &file_clai_v1_clai_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApiError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApiError) ProtoMessage() {}
+
+func (x *ApiError) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApiError.ProtoReflect.Descriptor instead.
+func (*ApiError) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *ApiError) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ApiError) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *ApiError) GetRetryable() bool {
+	if x != nil {
+		return x.Retryable
+	}
+	return false
+}
+
 type SessionStartRequest struct {
 	state           protoimpl.MessageState `protogen:"open.v1"`
 	Client          *ClientInfo            `protobuf:"bytes,1,opt,name=client,proto3" json:"client,omitempty"`
@@ -162,7 +281,7 @@ type SessionStartRequest struct {
 
 func (x *SessionStartRequest) Reset() {
 	*x = SessionStartRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[2]
+	mi := &file_clai_v1_clai_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -174,7 +293,7 @@ func (x *SessionStartRequest) String() string {
 func (*SessionStartRequest) ProtoMessage() {}
 
 func (x *SessionStartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[2]
+	mi := &file_clai_v1_clai_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -187,7 +306,7 @@ func (x *SessionStartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionStartRequest.ProtoReflect.Descriptor instead.
 func (*SessionStartRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{2}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SessionStartRequest) GetClient() *ClientInfo {
@@ -228,7 +347,7 @@ type SessionEndRequest struct {
 
 func (x *SessionEndRequest) Reset() {
 	*x = SessionEndRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[3]
+	mi := &file_clai_v1_clai_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -240,7 +359,7 @@ func (x *SessionEndRequest) String() string {
 func (*SessionEndRequest) ProtoMessage() {}
 
 func (x *SessionEndRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[3]
+	mi := &file_clai_v1_clai_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -253,7 +372,7 @@ func (x *SessionEndRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionEndRequest.ProtoReflect.Descriptor instead.
 func (*SessionEndRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{3}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *SessionEndRequest) GetSessionId() string {
@@ -289,7 +408,7 @@ type CommandStartRequest struct {
 
 func (x *CommandStartRequest) Reset() {
 	*x = CommandStartRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[4]
+	mi := &file_clai_v1_clai_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -301,7 +420,7 @@ func (x *CommandStartRequest) String() string {
 func (*CommandStartRequest) ProtoMessage() {}
 
 func (x *CommandStartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[4]
+	mi := &file_clai_v1_clai_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -314,7 +433,7 @@ func (x *CommandStartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandStartRequest.ProtoReflect.Descriptor instead.
 func (*CommandStartRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{4}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CommandStartRequest) GetSessionId() string {
@@ -393,7 +512,7 @@ type CommandEndRequest struct {
 
 func (x *CommandEndRequest) Reset() {
 	*x = CommandEndRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[5]
+	mi := &file_clai_v1_clai_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -405,7 +524,7 @@ func (x *CommandEndRequest) String() string {
 func (*CommandEndRequest) ProtoMessage() {}
 
 func (x *CommandEndRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[5]
+	mi := &file_clai_v1_clai_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -418,7 +537,7 @@ func (x *CommandEndRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandEndRequest.ProtoReflect.Descriptor instead.
 func (*CommandEndRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{5}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CommandEndRequest) GetSessionId() string {
@@ -457,20 +576,27 @@ func (x *CommandEndRequest) GetDurationMs() int64 {
 }
 
 type SuggestRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
-	Cwd           string                 `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	Buffer        string                 `protobuf:"bytes,3,opt,name=buffer,proto3" json:"buffer,omitempty"`                            // Current typing buffer (prefix)
-	CursorPos     int32                  `protobuf:"varint,4,opt,name=cursor_pos,json=cursorPos,proto3" json:"cursor_pos,omitempty"`    // Cursor position in buffer
-	IncludeAi     bool                   `protobuf:"varint,5,opt,name=include_ai,json=includeAi,proto3" json:"include_ai,omitempty"`    // Request AI suggestions (explicit trigger)
-	MaxResults    int32                  `protobuf:"varint,6,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"` // Max suggestions to return (default: 5)
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	SessionId  string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Cwd        string                 `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	Buffer     string                 `protobuf:"bytes,3,opt,name=buffer,proto3" json:"buffer,omitempty"`                            // Current typing buffer (prefix)
+	CursorPos  int32                  `protobuf:"varint,4,opt,name=cursor_pos,json=cursorPos,proto3" json:"cursor_pos,omitempty"`    // Cursor position in buffer
+	IncludeAi  bool                   `protobuf:"varint,5,opt,name=include_ai,json=includeAi,proto3" json:"include_ai,omitempty"`    // Request AI suggestions (explicit trigger)
+	MaxResults int32                  `protobuf:"varint,6,opt,name=max_results,json=maxResults,proto3" json:"max_results,omitempty"` // Max suggestions to return (default: 5)
+	// V2 fields: last-command context for improved suggestion ranking
+	RepoKey              string `protobuf:"bytes,7,opt,name=repo_key,json=repoKey,proto3" json:"repo_key,omitempty"`                                            // Repository identifier for scoped suggestions
+	LastCmdRaw           string `protobuf:"bytes,8,opt,name=last_cmd_raw,json=lastCmdRaw,proto3" json:"last_cmd_raw,omitempty"`                                 // Raw text of the last executed command
+	LastCmdNorm          string `protobuf:"bytes,9,opt,name=last_cmd_norm,json=lastCmdNorm,proto3" json:"last_cmd_norm,omitempty"`                              // Normalized form of the last executed command
+	LastCmdTsMs          int64  `protobuf:"varint,10,opt,name=last_cmd_ts_ms,json=lastCmdTsMs,proto3" json:"last_cmd_ts_ms,omitempty"`                          // Timestamp of last command (unix ms)
+	LastEventSeq         int64  `protobuf:"varint,11,opt,name=last_event_seq,json=lastEventSeq,proto3" json:"last_event_seq,omitempty"`                         // Monotonic event sequence number
+	IncludeLowConfidence bool   `protobuf:"varint,12,opt,name=include_low_confidence,json=includeLowConfidence,proto3" json:"include_low_confidence,omitempty"` // Include lower-confidence suggestions
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *SuggestRequest) Reset() {
 	*x = SuggestRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[6]
+	mi := &file_clai_v1_clai_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -482,7 +608,7 @@ func (x *SuggestRequest) String() string {
 func (*SuggestRequest) ProtoMessage() {}
 
 func (x *SuggestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[6]
+	mi := &file_clai_v1_clai_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -495,7 +621,7 @@ func (x *SuggestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestRequest.ProtoReflect.Descriptor instead.
 func (*SuggestRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{6}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *SuggestRequest) GetSessionId() string {
@@ -540,20 +666,66 @@ func (x *SuggestRequest) GetMaxResults() int32 {
 	return 0
 }
 
+func (x *SuggestRequest) GetRepoKey() string {
+	if x != nil {
+		return x.RepoKey
+	}
+	return ""
+}
+
+func (x *SuggestRequest) GetLastCmdRaw() string {
+	if x != nil {
+		return x.LastCmdRaw
+	}
+	return ""
+}
+
+func (x *SuggestRequest) GetLastCmdNorm() string {
+	if x != nil {
+		return x.LastCmdNorm
+	}
+	return ""
+}
+
+func (x *SuggestRequest) GetLastCmdTsMs() int64 {
+	if x != nil {
+		return x.LastCmdTsMs
+	}
+	return 0
+}
+
+func (x *SuggestRequest) GetLastEventSeq() int64 {
+	if x != nil {
+		return x.LastEventSeq
+	}
+	return 0
+}
+
+func (x *SuggestRequest) GetIncludeLowConfidence() bool {
+	if x != nil {
+		return x.IncludeLowConfidence
+	}
+	return false
+}
+
 type Suggestion struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`               // The suggested command
-	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"` // Optional description
-	Source        string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`           // "session", "cwd", "global", "ai"
-	Score         float64                `protobuf:"fixed64,4,opt,name=score,proto3" json:"score,omitempty"`           // Ranking score (0.0 to 1.0)
-	Risk          string                 `protobuf:"bytes,5,opt,name=risk,proto3" json:"risk,omitempty"`               // "safe", "destructive", or empty
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Text        string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`               // The suggested command
+	Description string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"` // Optional description
+	Source      string                 `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`           // "session", "cwd", "global", "ai"
+	Score       float64                `protobuf:"fixed64,4,opt,name=score,proto3" json:"score,omitempty"`           // Ranking score (0.0 to 1.0)
+	Risk        string                 `protobuf:"bytes,5,opt,name=risk,proto3" json:"risk,omitempty"`               // "safe", "destructive", or empty
+	// V2 fields: per-suggestion enrichment
+	CmdNorm       string              `protobuf:"bytes,6,opt,name=cmd_norm,json=cmdNorm,proto3" json:"cmd_norm,omitempty"` // Normalized command form
+	Confidence    float64             `protobuf:"fixed64,7,opt,name=confidence,proto3" json:"confidence,omitempty"`        // Confidence score (0.0 to 1.0)
+	Reasons       []*SuggestionReason `protobuf:"bytes,8,rep,name=reasons,proto3" json:"reasons,omitempty"`                // Why this suggestion was ranked here
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Suggestion) Reset() {
 	*x = Suggestion{}
-	mi := &file_clai_v1_clai_proto_msgTypes[7]
+	mi := &file_clai_v1_clai_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -565,7 +737,7 @@ func (x *Suggestion) String() string {
 func (*Suggestion) ProtoMessage() {}
 
 func (x *Suggestion) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[7]
+	mi := &file_clai_v1_clai_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -578,7 +750,7 @@ func (x *Suggestion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Suggestion.ProtoReflect.Descriptor instead.
 func (*Suggestion) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{7}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *Suggestion) GetText() string {
@@ -616,17 +788,156 @@ func (x *Suggestion) GetRisk() string {
 	return ""
 }
 
-type SuggestResponse struct {
+func (x *Suggestion) GetCmdNorm() string {
+	if x != nil {
+		return x.CmdNorm
+	}
+	return ""
+}
+
+func (x *Suggestion) GetConfidence() float64 {
+	if x != nil {
+		return x.Confidence
+	}
+	return 0
+}
+
+func (x *Suggestion) GetReasons() []*SuggestionReason {
+	if x != nil {
+		return x.Reasons
+	}
+	return nil
+}
+
+// SuggestionReason explains why a particular suggestion was ranked.
+type SuggestionReason struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Suggestions   []*Suggestion          `protobuf:"bytes,1,rep,name=suggestions,proto3" json:"suggestions,omitempty"`
-	FromCache     bool                   `protobuf:"varint,2,opt,name=from_cache,json=fromCache,proto3" json:"from_cache,omitempty"` // True if served from cache
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`                   // Reason type (e.g. "recency", "frequency", "cwd_match")
+	Description   string                 `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`     // Human-readable description
+	Contribution  float32                `protobuf:"fixed32,3,opt,name=contribution,proto3" json:"contribution,omitempty"` // Weight contribution to final score (0.0 to 1.0)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SuggestionReason) Reset() {
+	*x = SuggestionReason{}
+	mi := &file_clai_v1_clai_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SuggestionReason) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SuggestionReason) ProtoMessage() {}
+
+func (x *SuggestionReason) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SuggestionReason.ProtoReflect.Descriptor instead.
+func (*SuggestionReason) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SuggestionReason) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *SuggestionReason) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *SuggestionReason) GetContribution() float32 {
+	if x != nil {
+		return x.Contribution
+	}
+	return 0
+}
+
+// TimingHint provides adaptive timing information for shell integrations.
+type TimingHint struct {
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	UserSpeedClass            string                 `protobuf:"bytes,1,opt,name=user_speed_class,json=userSpeedClass,proto3" json:"user_speed_class,omitempty"`                                     // e.g. "fast", "moderate", "slow"
+	SuggestedPauseThresholdMs int32                  `protobuf:"varint,2,opt,name=suggested_pause_threshold_ms,json=suggestedPauseThresholdMs,proto3" json:"suggested_pause_threshold_ms,omitempty"` // Suggested pause before showing suggestions
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
+}
+
+func (x *TimingHint) Reset() {
+	*x = TimingHint{}
+	mi := &file_clai_v1_clai_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TimingHint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TimingHint) ProtoMessage() {}
+
+func (x *TimingHint) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TimingHint.ProtoReflect.Descriptor instead.
+func (*TimingHint) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *TimingHint) GetUserSpeedClass() string {
+	if x != nil {
+		return x.UserSpeedClass
+	}
+	return ""
+}
+
+func (x *TimingHint) GetSuggestedPauseThresholdMs() int32 {
+	if x != nil {
+		return x.SuggestedPauseThresholdMs
+	}
+	return 0
+}
+
+type SuggestResponse struct {
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Suggestions []*Suggestion          `protobuf:"bytes,1,rep,name=suggestions,proto3" json:"suggestions,omitempty"`
+	FromCache   bool                   `protobuf:"varint,2,opt,name=from_cache,json=fromCache,proto3" json:"from_cache,omitempty"` // True if served from cache
+	// V2 fields: response-level metadata
+	CacheStatus   string      `protobuf:"bytes,3,opt,name=cache_status,json=cacheStatus,proto3" json:"cache_status,omitempty"` // "hit", "miss", "stale" (more granular than from_cache)
+	LatencyMs     int64       `protobuf:"varint,4,opt,name=latency_ms,json=latencyMs,proto3" json:"latency_ms,omitempty"`      // Server-side processing time
+	TimingHint    *TimingHint `protobuf:"bytes,5,opt,name=timing_hint,json=timingHint,proto3" json:"timing_hint,omitempty"`    // Adaptive timing guidance for shell integration
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SuggestResponse) Reset() {
 	*x = SuggestResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[8]
+	mi := &file_clai_v1_clai_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -638,7 +949,7 @@ func (x *SuggestResponse) String() string {
 func (*SuggestResponse) ProtoMessage() {}
 
 func (x *SuggestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[8]
+	mi := &file_clai_v1_clai_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -651,7 +962,7 @@ func (x *SuggestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SuggestResponse.ProtoReflect.Descriptor instead.
 func (*SuggestResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{8}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *SuggestResponse) GetSuggestions() []*Suggestion {
@@ -668,6 +979,166 @@ func (x *SuggestResponse) GetFromCache() bool {
 	return false
 }
 
+func (x *SuggestResponse) GetCacheStatus() string {
+	if x != nil {
+		return x.CacheStatus
+	}
+	return ""
+}
+
+func (x *SuggestResponse) GetLatencyMs() int64 {
+	if x != nil {
+		return x.LatencyMs
+	}
+	return 0
+}
+
+func (x *SuggestResponse) GetTimingHint() *TimingHint {
+	if x != nil {
+		return x.TimingHint
+	}
+	return nil
+}
+
+// RecordFeedbackRequest captures user feedback on suggestions.
+// Primary feedback path is automatic from shell integrations.
+type RecordFeedbackRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`             // Session that generated the suggestion
+	Action        string                 `protobuf:"bytes,2,opt,name=action,proto3" json:"action,omitempty"`                                    // "accepted", "dismissed", "edited", "never", "unblock"
+	SuggestedText string                 `protobuf:"bytes,3,opt,name=suggested_text,json=suggestedText,proto3" json:"suggested_text,omitempty"` // The suggestion that was shown
+	ExecutedText  string                 `protobuf:"bytes,4,opt,name=executed_text,json=executedText,proto3" json:"executed_text,omitempty"`    // What the user actually executed (for "edited")
+	Prefix        string                 `protobuf:"bytes,5,opt,name=prefix,proto3" json:"prefix,omitempty"`                                    // The prefix/buffer when suggestion was shown
+	LatencyMs     int64                  `protobuf:"varint,6,opt,name=latency_ms,json=latencyMs,proto3" json:"latency_ms,omitempty"`            // Time from suggestion display to user action
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordFeedbackRequest) Reset() {
+	*x = RecordFeedbackRequest{}
+	mi := &file_clai_v1_clai_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordFeedbackRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordFeedbackRequest) ProtoMessage() {}
+
+func (x *RecordFeedbackRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordFeedbackRequest.ProtoReflect.Descriptor instead.
+func (*RecordFeedbackRequest) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *RecordFeedbackRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *RecordFeedbackRequest) GetAction() string {
+	if x != nil {
+		return x.Action
+	}
+	return ""
+}
+
+func (x *RecordFeedbackRequest) GetSuggestedText() string {
+	if x != nil {
+		return x.SuggestedText
+	}
+	return ""
+}
+
+func (x *RecordFeedbackRequest) GetExecutedText() string {
+	if x != nil {
+		return x.ExecutedText
+	}
+	return ""
+}
+
+func (x *RecordFeedbackRequest) GetPrefix() string {
+	if x != nil {
+		return x.Prefix
+	}
+	return ""
+}
+
+func (x *RecordFeedbackRequest) GetLatencyMs() int64 {
+	if x != nil {
+		return x.LatencyMs
+	}
+	return 0
+}
+
+// RecordFeedbackResponse confirms feedback recording.
+type RecordFeedbackResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
+	Error         *ApiError              `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"` // Structured error if ok=false
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RecordFeedbackResponse) Reset() {
+	*x = RecordFeedbackResponse{}
+	mi := &file_clai_v1_clai_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordFeedbackResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordFeedbackResponse) ProtoMessage() {}
+
+func (x *RecordFeedbackResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_clai_v1_clai_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordFeedbackResponse.ProtoReflect.Descriptor instead.
+func (*RecordFeedbackResponse) Descriptor() ([]byte, []int) {
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RecordFeedbackResponse) GetOk() bool {
+	if x != nil {
+		return x.Ok
+	}
+	return false
+}
+
+func (x *RecordFeedbackResponse) GetError() *ApiError {
+	if x != nil {
+		return x.Error
+	}
+	return nil
+}
+
 type TextToCommandRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	SessionId      string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
@@ -680,7 +1151,7 @@ type TextToCommandRequest struct {
 
 func (x *TextToCommandRequest) Reset() {
 	*x = TextToCommandRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[9]
+	mi := &file_clai_v1_clai_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -692,7 +1163,7 @@ func (x *TextToCommandRequest) String() string {
 func (*TextToCommandRequest) ProtoMessage() {}
 
 func (x *TextToCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[9]
+	mi := &file_clai_v1_clai_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -705,7 +1176,7 @@ func (x *TextToCommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextToCommandRequest.ProtoReflect.Descriptor instead.
 func (*TextToCommandRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{9}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *TextToCommandRequest) GetSessionId() string {
@@ -747,7 +1218,7 @@ type TextToCommandResponse struct {
 
 func (x *TextToCommandResponse) Reset() {
 	*x = TextToCommandResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[10]
+	mi := &file_clai_v1_clai_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -759,7 +1230,7 @@ func (x *TextToCommandResponse) String() string {
 func (*TextToCommandResponse) ProtoMessage() {}
 
 func (x *TextToCommandResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[10]
+	mi := &file_clai_v1_clai_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -772,7 +1243,7 @@ func (x *TextToCommandResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TextToCommandResponse.ProtoReflect.Descriptor instead.
 func (*TextToCommandResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{10}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *TextToCommandResponse) GetSuggestions() []*Suggestion {
@@ -808,7 +1279,7 @@ type NextStepRequest struct {
 
 func (x *NextStepRequest) Reset() {
 	*x = NextStepRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[11]
+	mi := &file_clai_v1_clai_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -820,7 +1291,7 @@ func (x *NextStepRequest) String() string {
 func (*NextStepRequest) ProtoMessage() {}
 
 func (x *NextStepRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[11]
+	mi := &file_clai_v1_clai_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -833,7 +1304,7 @@ func (x *NextStepRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NextStepRequest.ProtoReflect.Descriptor instead.
 func (*NextStepRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{11}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *NextStepRequest) GetSessionId() string {
@@ -873,7 +1344,7 @@ type NextStepResponse struct {
 
 func (x *NextStepResponse) Reset() {
 	*x = NextStepResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[12]
+	mi := &file_clai_v1_clai_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -885,7 +1356,7 @@ func (x *NextStepResponse) String() string {
 func (*NextStepResponse) ProtoMessage() {}
 
 func (x *NextStepResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[12]
+	mi := &file_clai_v1_clai_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -898,7 +1369,7 @@ func (x *NextStepResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NextStepResponse.ProtoReflect.Descriptor instead.
 func (*NextStepResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{12}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *NextStepResponse) GetSuggestions() []*Suggestion {
@@ -920,7 +1391,7 @@ type DiagnoseRequest struct {
 
 func (x *DiagnoseRequest) Reset() {
 	*x = DiagnoseRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[13]
+	mi := &file_clai_v1_clai_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -932,7 +1403,7 @@ func (x *DiagnoseRequest) String() string {
 func (*DiagnoseRequest) ProtoMessage() {}
 
 func (x *DiagnoseRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[13]
+	mi := &file_clai_v1_clai_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -945,7 +1416,7 @@ func (x *DiagnoseRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiagnoseRequest.ProtoReflect.Descriptor instead.
 func (*DiagnoseRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{13}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *DiagnoseRequest) GetSessionId() string {
@@ -986,7 +1457,7 @@ type DiagnoseResponse struct {
 
 func (x *DiagnoseResponse) Reset() {
 	*x = DiagnoseResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[14]
+	mi := &file_clai_v1_clai_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -998,7 +1469,7 @@ func (x *DiagnoseResponse) String() string {
 func (*DiagnoseResponse) ProtoMessage() {}
 
 func (x *DiagnoseResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[14]
+	mi := &file_clai_v1_clai_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1011,7 +1482,7 @@ func (x *DiagnoseResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiagnoseResponse.ProtoReflect.Descriptor instead.
 func (*DiagnoseResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{14}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *DiagnoseResponse) GetExplanation() string {
@@ -1029,19 +1500,23 @@ func (x *DiagnoseResponse) GetFixes() []*Suggestion {
 }
 
 type HistoryFetchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // Optional: filter by session (UUID v4)
-	Query         string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`                          // Substring filter (provider-side)
-	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`                         // Page size
-	Offset        int32                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`                       // Pagination offset
-	Global        bool                   `protobuf:"varint,5,opt,name=global,proto3" json:"global,omitempty"`                       // True = all sessions
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	SessionId string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // Optional: filter by session (UUID v4)
+	Query     string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`                          // Substring filter (provider-side)
+	Limit     int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`                         // Page size
+	Offset    int32                  `protobuf:"varint,4,opt,name=offset,proto3" json:"offset,omitempty"`                       // Pagination offset
+	Global    bool                   `protobuf:"varint,5,opt,name=global,proto3" json:"global,omitempty"`                       // True = all sessions
+	// V2 fields: extended search capabilities
+	RepoKey       string     `protobuf:"bytes,6,opt,name=repo_key,json=repoKey,proto3" json:"repo_key,omitempty"`     // Filter by repository
+	Mode          SearchMode `protobuf:"varint,7,opt,name=mode,proto3,enum=clai.v1.SearchMode" json:"mode,omitempty"` // Search strategy (fts, prefix, describe, auto)
+	Scope         string     `protobuf:"bytes,8,opt,name=scope,proto3" json:"scope,omitempty"`                        // "session", "repo", "global"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *HistoryFetchRequest) Reset() {
 	*x = HistoryFetchRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[15]
+	mi := &file_clai_v1_clai_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1053,7 +1528,7 @@ func (x *HistoryFetchRequest) String() string {
 func (*HistoryFetchRequest) ProtoMessage() {}
 
 func (x *HistoryFetchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[15]
+	mi := &file_clai_v1_clai_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1066,7 +1541,7 @@ func (x *HistoryFetchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryFetchRequest.ProtoReflect.Descriptor instead.
 func (*HistoryFetchRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{15}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *HistoryFetchRequest) GetSessionId() string {
@@ -1104,17 +1579,41 @@ func (x *HistoryFetchRequest) GetGlobal() bool {
 	return false
 }
 
+func (x *HistoryFetchRequest) GetRepoKey() string {
+	if x != nil {
+		return x.RepoKey
+	}
+	return ""
+}
+
+func (x *HistoryFetchRequest) GetMode() SearchMode {
+	if x != nil {
+		return x.Mode
+	}
+	return SearchMode_SEARCH_MODE_UNSPECIFIED
+}
+
+func (x *HistoryFetchRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
 type HistoryFetchResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Items         []*HistoryItem         `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
-	AtEnd         bool                   `protobuf:"varint,2,opt,name=at_end,json=atEnd,proto3" json:"at_end,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Items []*HistoryItem         `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	AtEnd bool                   `protobuf:"varint,2,opt,name=at_end,json=atEnd,proto3" json:"at_end,omitempty"`
+	// V2 fields: search metadata
+	LatencyMs     int64  `protobuf:"varint,3,opt,name=latency_ms,json=latencyMs,proto3" json:"latency_ms,omitempty"` // Server-side search time
+	Backend       string `protobuf:"bytes,4,opt,name=backend,proto3" json:"backend,omitempty"`                       // Which backend served the query ("fts5", "fallback")
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *HistoryFetchResponse) Reset() {
 	*x = HistoryFetchResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[16]
+	mi := &file_clai_v1_clai_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1126,7 +1625,7 @@ func (x *HistoryFetchResponse) String() string {
 func (*HistoryFetchResponse) ProtoMessage() {}
 
 func (x *HistoryFetchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[16]
+	mi := &file_clai_v1_clai_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1139,7 +1638,7 @@ func (x *HistoryFetchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryFetchResponse.ProtoReflect.Descriptor instead.
 func (*HistoryFetchResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{16}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *HistoryFetchResponse) GetItems() []*HistoryItem {
@@ -1156,17 +1655,37 @@ func (x *HistoryFetchResponse) GetAtEnd() bool {
 	return false
 }
 
+func (x *HistoryFetchResponse) GetLatencyMs() int64 {
+	if x != nil {
+		return x.LatencyMs
+	}
+	return 0
+}
+
+func (x *HistoryFetchResponse) GetBackend() string {
+	if x != nil {
+		return x.Backend
+	}
+	return ""
+}
+
 type HistoryItem struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Command       string                 `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
-	TimestampMs   int64                  `protobuf:"varint,2,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	Command     string                 `protobuf:"bytes,1,opt,name=command,proto3" json:"command,omitempty"`
+	TimestampMs int64                  `protobuf:"varint,2,opt,name=timestamp_ms,json=timestampMs,proto3" json:"timestamp_ms,omitempty"`
+	// V2 fields: enriched result data
+	CmdNorm       string   `protobuf:"bytes,3,opt,name=cmd_norm,json=cmdNorm,proto3" json:"cmd_norm,omitempty"`             // Normalized command form
+	RepoKey       string   `protobuf:"bytes,4,opt,name=repo_key,json=repoKey,proto3" json:"repo_key,omitempty"`             // Repository key for this command
+	RankScore     float64  `protobuf:"fixed64,5,opt,name=rank_score,json=rankScore,proto3" json:"rank_score,omitempty"`     // Relevance score from search
+	Tags          []string `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"`                                  // Descriptive tags for the command
+	MatchedTags   []string `protobuf:"bytes,7,rep,name=matched_tags,json=matchedTags,proto3" json:"matched_tags,omitempty"` // Tags that matched the query
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *HistoryItem) Reset() {
 	*x = HistoryItem{}
-	mi := &file_clai_v1_clai_proto_msgTypes[17]
+	mi := &file_clai_v1_clai_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1178,7 +1697,7 @@ func (x *HistoryItem) String() string {
 func (*HistoryItem) ProtoMessage() {}
 
 func (x *HistoryItem) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[17]
+	mi := &file_clai_v1_clai_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1191,7 +1710,7 @@ func (x *HistoryItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryItem.ProtoReflect.Descriptor instead.
 func (*HistoryItem) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{17}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *HistoryItem) GetCommand() string {
@@ -1208,6 +1727,41 @@ func (x *HistoryItem) GetTimestampMs() int64 {
 	return 0
 }
 
+func (x *HistoryItem) GetCmdNorm() string {
+	if x != nil {
+		return x.CmdNorm
+	}
+	return ""
+}
+
+func (x *HistoryItem) GetRepoKey() string {
+	if x != nil {
+		return x.RepoKey
+	}
+	return ""
+}
+
+func (x *HistoryItem) GetRankScore() float64 {
+	if x != nil {
+		return x.RankScore
+	}
+	return 0
+}
+
+func (x *HistoryItem) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+func (x *HistoryItem) GetMatchedTags() []string {
+	if x != nil {
+		return x.MatchedTags
+	}
+	return nil
+}
+
 type HistoryImportRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Shell         string                 `protobuf:"bytes,1,opt,name=shell,proto3" json:"shell,omitempty"`                                   // "bash", "zsh", "fish", or "auto"
@@ -1220,7 +1774,7 @@ type HistoryImportRequest struct {
 
 func (x *HistoryImportRequest) Reset() {
 	*x = HistoryImportRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[18]
+	mi := &file_clai_v1_clai_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1232,7 +1786,7 @@ func (x *HistoryImportRequest) String() string {
 func (*HistoryImportRequest) ProtoMessage() {}
 
 func (x *HistoryImportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[18]
+	mi := &file_clai_v1_clai_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1245,7 +1799,7 @@ func (x *HistoryImportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryImportRequest.ProtoReflect.Descriptor instead.
 func (*HistoryImportRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{18}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *HistoryImportRequest) GetShell() string {
@@ -1287,7 +1841,7 @@ type HistoryImportResponse struct {
 
 func (x *HistoryImportResponse) Reset() {
 	*x = HistoryImportResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[19]
+	mi := &file_clai_v1_clai_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1299,7 +1853,7 @@ func (x *HistoryImportResponse) String() string {
 func (*HistoryImportResponse) ProtoMessage() {}
 
 func (x *HistoryImportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[19]
+	mi := &file_clai_v1_clai_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1312,7 +1866,7 @@ func (x *HistoryImportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HistoryImportResponse.ProtoReflect.Descriptor instead.
 func (*HistoryImportResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{19}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *HistoryImportResponse) GetImportedCount() int32 {
@@ -1348,7 +1902,7 @@ type StatusResponse struct {
 
 func (x *StatusResponse) Reset() {
 	*x = StatusResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[20]
+	mi := &file_clai_v1_clai_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1360,7 +1914,7 @@ func (x *StatusResponse) String() string {
 func (*StatusResponse) ProtoMessage() {}
 
 func (x *StatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[20]
+	mi := &file_clai_v1_clai_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1373,7 +1927,7 @@ func (x *StatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusResponse.ProtoReflect.Descriptor instead.
 func (*StatusResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{20}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *StatusResponse) GetVersion() string {
@@ -1417,7 +1971,7 @@ type WorkflowRunStartRequest struct {
 
 func (x *WorkflowRunStartRequest) Reset() {
 	*x = WorkflowRunStartRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[21]
+	mi := &file_clai_v1_clai_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1429,7 +1983,7 @@ func (x *WorkflowRunStartRequest) String() string {
 func (*WorkflowRunStartRequest) ProtoMessage() {}
 
 func (x *WorkflowRunStartRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[21]
+	mi := &file_clai_v1_clai_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1442,7 +1996,7 @@ func (x *WorkflowRunStartRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowRunStartRequest.ProtoReflect.Descriptor instead.
 func (*WorkflowRunStartRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{21}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *WorkflowRunStartRequest) GetRunId() string {
@@ -1490,7 +2044,7 @@ type WorkflowRunStartResponse struct {
 
 func (x *WorkflowRunStartResponse) Reset() {
 	*x = WorkflowRunStartResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[22]
+	mi := &file_clai_v1_clai_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1502,7 +2056,7 @@ func (x *WorkflowRunStartResponse) String() string {
 func (*WorkflowRunStartResponse) ProtoMessage() {}
 
 func (x *WorkflowRunStartResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[22]
+	mi := &file_clai_v1_clai_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1515,7 +2069,7 @@ func (x *WorkflowRunStartResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowRunStartResponse.ProtoReflect.Descriptor instead.
 func (*WorkflowRunStartResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{22}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *WorkflowRunStartResponse) GetOk() bool {
@@ -1544,7 +2098,7 @@ type WorkflowRunEndRequest struct {
 
 func (x *WorkflowRunEndRequest) Reset() {
 	*x = WorkflowRunEndRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[23]
+	mi := &file_clai_v1_clai_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1556,7 +2110,7 @@ func (x *WorkflowRunEndRequest) String() string {
 func (*WorkflowRunEndRequest) ProtoMessage() {}
 
 func (x *WorkflowRunEndRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[23]
+	mi := &file_clai_v1_clai_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1569,7 +2123,7 @@ func (x *WorkflowRunEndRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowRunEndRequest.ProtoReflect.Descriptor instead.
 func (*WorkflowRunEndRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{23}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *WorkflowRunEndRequest) GetRunId() string {
@@ -1610,7 +2164,7 @@ type WorkflowRunEndResponse struct {
 
 func (x *WorkflowRunEndResponse) Reset() {
 	*x = WorkflowRunEndResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[24]
+	mi := &file_clai_v1_clai_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1622,7 +2176,7 @@ func (x *WorkflowRunEndResponse) String() string {
 func (*WorkflowRunEndResponse) ProtoMessage() {}
 
 func (x *WorkflowRunEndResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[24]
+	mi := &file_clai_v1_clai_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1635,7 +2189,7 @@ func (x *WorkflowRunEndResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowRunEndResponse.ProtoReflect.Descriptor instead.
 func (*WorkflowRunEndResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{24}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *WorkflowRunEndResponse) GetOk() bool {
@@ -1670,7 +2224,7 @@ type WorkflowStepUpdateRequest struct {
 
 func (x *WorkflowStepUpdateRequest) Reset() {
 	*x = WorkflowStepUpdateRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[25]
+	mi := &file_clai_v1_clai_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1682,7 +2236,7 @@ func (x *WorkflowStepUpdateRequest) String() string {
 func (*WorkflowStepUpdateRequest) ProtoMessage() {}
 
 func (x *WorkflowStepUpdateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[25]
+	mi := &file_clai_v1_clai_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1695,7 +2249,7 @@ func (x *WorkflowStepUpdateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowStepUpdateRequest.ProtoReflect.Descriptor instead.
 func (*WorkflowStepUpdateRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{25}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *WorkflowStepUpdateRequest) GetRunId() string {
@@ -1778,7 +2332,7 @@ type WorkflowStepUpdateResponse struct {
 
 func (x *WorkflowStepUpdateResponse) Reset() {
 	*x = WorkflowStepUpdateResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[26]
+	mi := &file_clai_v1_clai_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1790,7 +2344,7 @@ func (x *WorkflowStepUpdateResponse) String() string {
 func (*WorkflowStepUpdateResponse) ProtoMessage() {}
 
 func (x *WorkflowStepUpdateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[26]
+	mi := &file_clai_v1_clai_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1803,7 +2357,7 @@ func (x *WorkflowStepUpdateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowStepUpdateResponse.ProtoReflect.Descriptor instead.
 func (*WorkflowStepUpdateResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{26}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *WorkflowStepUpdateResponse) GetOk() bool {
@@ -1835,7 +2389,7 @@ type AnalyzeStepOutputRequest struct {
 
 func (x *AnalyzeStepOutputRequest) Reset() {
 	*x = AnalyzeStepOutputRequest{}
-	mi := &file_clai_v1_clai_proto_msgTypes[27]
+	mi := &file_clai_v1_clai_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1847,7 +2401,7 @@ func (x *AnalyzeStepOutputRequest) String() string {
 func (*AnalyzeStepOutputRequest) ProtoMessage() {}
 
 func (x *AnalyzeStepOutputRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[27]
+	mi := &file_clai_v1_clai_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1860,7 +2414,7 @@ func (x *AnalyzeStepOutputRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyzeStepOutputRequest.ProtoReflect.Descriptor instead.
 func (*AnalyzeStepOutputRequest) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{27}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *AnalyzeStepOutputRequest) GetRunId() string {
@@ -1923,7 +2477,7 @@ type AnalyzeStepOutputResponse struct {
 
 func (x *AnalyzeStepOutputResponse) Reset() {
 	*x = AnalyzeStepOutputResponse{}
-	mi := &file_clai_v1_clai_proto_msgTypes[28]
+	mi := &file_clai_v1_clai_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1935,7 +2489,7 @@ func (x *AnalyzeStepOutputResponse) String() string {
 func (*AnalyzeStepOutputResponse) ProtoMessage() {}
 
 func (x *AnalyzeStepOutputResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_clai_v1_clai_proto_msgTypes[28]
+	mi := &file_clai_v1_clai_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1948,7 +2502,7 @@ func (x *AnalyzeStepOutputResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnalyzeStepOutputResponse.ProtoReflect.Descriptor instead.
 func (*AnalyzeStepOutputResponse) Descriptor() ([]byte, []int) {
-	return file_clai_v1_clai_proto_rawDescGZIP(), []int{28}
+	return file_clai_v1_clai_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *AnalyzeStepOutputResponse) GetDecision() string {
@@ -1986,7 +2540,11 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\busername\x18\x05 \x01(\tR\busername\"+\n" +
 	"\x03Ack\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\xa0\x01\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"V\n" +
+	"\bApiError\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1c\n" +
+	"\tretryable\x18\x03 \x01(\bR\tretryable\"\xa0\x01\n" +
 	"\x13SessionStartRequest\x12+\n" +
 	"\x06client\x18\x01 \x01(\v2\x13.clai.v1.ClientInfoR\x06client\x12\x1d\n" +
 	"\n" +
@@ -2020,7 +2578,7 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"ts_unix_ms\x18\x03 \x01(\x03R\btsUnixMs\x12\x1b\n" +
 	"\texit_code\x18\x04 \x01(\x05R\bexitCode\x12\x1f\n" +
 	"\vduration_ms\x18\x05 \x01(\x03R\n" +
-	"durationMs\"\xb8\x01\n" +
+	"durationMs\"\x9a\x03\n" +
 	"\x0eSuggestRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x10\n" +
@@ -2031,18 +2589,56 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\n" +
 	"include_ai\x18\x05 \x01(\bR\tincludeAi\x12\x1f\n" +
 	"\vmax_results\x18\x06 \x01(\x05R\n" +
-	"maxResults\"\x84\x01\n" +
+	"maxResults\x12\x19\n" +
+	"\brepo_key\x18\a \x01(\tR\arepoKey\x12 \n" +
+	"\flast_cmd_raw\x18\b \x01(\tR\n" +
+	"lastCmdRaw\x12\"\n" +
+	"\rlast_cmd_norm\x18\t \x01(\tR\vlastCmdNorm\x12#\n" +
+	"\x0elast_cmd_ts_ms\x18\n" +
+	" \x01(\x03R\vlastCmdTsMs\x12$\n" +
+	"\x0elast_event_seq\x18\v \x01(\x03R\flastEventSeq\x124\n" +
+	"\x16include_low_confidence\x18\f \x01(\bR\x14includeLowConfidence\"\xf4\x01\n" +
 	"\n" +
 	"Suggestion\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12 \n" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\x16\n" +
 	"\x06source\x18\x03 \x01(\tR\x06source\x12\x14\n" +
 	"\x05score\x18\x04 \x01(\x01R\x05score\x12\x12\n" +
-	"\x04risk\x18\x05 \x01(\tR\x04risk\"g\n" +
+	"\x04risk\x18\x05 \x01(\tR\x04risk\x12\x19\n" +
+	"\bcmd_norm\x18\x06 \x01(\tR\acmdNorm\x12\x1e\n" +
+	"\n" +
+	"confidence\x18\a \x01(\x01R\n" +
+	"confidence\x123\n" +
+	"\areasons\x18\b \x03(\v2\x19.clai.v1.SuggestionReasonR\areasons\"l\n" +
+	"\x10SuggestionReason\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12 \n" +
+	"\vdescription\x18\x02 \x01(\tR\vdescription\x12\"\n" +
+	"\fcontribution\x18\x03 \x01(\x02R\fcontribution\"w\n" +
+	"\n" +
+	"TimingHint\x12(\n" +
+	"\x10user_speed_class\x18\x01 \x01(\tR\x0euserSpeedClass\x12?\n" +
+	"\x1csuggested_pause_threshold_ms\x18\x02 \x01(\x05R\x19suggestedPauseThresholdMs\"\xdf\x01\n" +
 	"\x0fSuggestResponse\x125\n" +
 	"\vsuggestions\x18\x01 \x03(\v2\x13.clai.v1.SuggestionR\vsuggestions\x12\x1d\n" +
 	"\n" +
-	"from_cache\x18\x02 \x01(\bR\tfromCache\"\x88\x01\n" +
+	"from_cache\x18\x02 \x01(\bR\tfromCache\x12!\n" +
+	"\fcache_status\x18\x03 \x01(\tR\vcacheStatus\x12\x1d\n" +
+	"\n" +
+	"latency_ms\x18\x04 \x01(\x03R\tlatencyMs\x124\n" +
+	"\vtiming_hint\x18\x05 \x01(\v2\x13.clai.v1.TimingHintR\n" +
+	"timingHint\"\xd1\x01\n" +
+	"\x15RecordFeedbackRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x16\n" +
+	"\x06action\x18\x02 \x01(\tR\x06action\x12%\n" +
+	"\x0esuggested_text\x18\x03 \x01(\tR\rsuggestedText\x12#\n" +
+	"\rexecuted_text\x18\x04 \x01(\tR\fexecutedText\x12\x16\n" +
+	"\x06prefix\x18\x05 \x01(\tR\x06prefix\x12\x1d\n" +
+	"\n" +
+	"latency_ms\x18\x06 \x01(\x03R\tlatencyMs\"Q\n" +
+	"\x16RecordFeedbackResponse\x12\x0e\n" +
+	"\x02ok\x18\x01 \x01(\bR\x02ok\x12'\n" +
+	"\x05error\x18\x02 \x01(\v2\x11.clai.v1.ApiErrorR\x05error\"\x88\x01\n" +
 	"\x14TextToCommandRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x16\n" +
@@ -2070,20 +2666,32 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\x03cwd\x18\x04 \x01(\tR\x03cwd\"_\n" +
 	"\x10DiagnoseResponse\x12 \n" +
 	"\vexplanation\x18\x01 \x01(\tR\vexplanation\x12)\n" +
-	"\x05fixes\x18\x02 \x03(\v2\x13.clai.v1.SuggestionR\x05fixes\"\x90\x01\n" +
+	"\x05fixes\x18\x02 \x03(\v2\x13.clai.v1.SuggestionR\x05fixes\"\xea\x01\n" +
 	"\x13HistoryFetchRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x14\n" +
 	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x16\n" +
 	"\x06offset\x18\x04 \x01(\x05R\x06offset\x12\x16\n" +
-	"\x06global\x18\x05 \x01(\bR\x06global\"Y\n" +
+	"\x06global\x18\x05 \x01(\bR\x06global\x12\x19\n" +
+	"\brepo_key\x18\x06 \x01(\tR\arepoKey\x12'\n" +
+	"\x04mode\x18\a \x01(\x0e2\x13.clai.v1.SearchModeR\x04mode\x12\x14\n" +
+	"\x05scope\x18\b \x01(\tR\x05scope\"\x92\x01\n" +
 	"\x14HistoryFetchResponse\x12*\n" +
 	"\x05items\x18\x01 \x03(\v2\x14.clai.v1.HistoryItemR\x05items\x12\x15\n" +
-	"\x06at_end\x18\x02 \x01(\bR\x05atEnd\"J\n" +
+	"\x06at_end\x18\x02 \x01(\bR\x05atEnd\x12\x1d\n" +
+	"\n" +
+	"latency_ms\x18\x03 \x01(\x03R\tlatencyMs\x12\x18\n" +
+	"\abackend\x18\x04 \x01(\tR\abackend\"\xd6\x01\n" +
 	"\vHistoryItem\x12\x18\n" +
 	"\acommand\x18\x01 \x01(\tR\acommand\x12!\n" +
-	"\ftimestamp_ms\x18\x02 \x01(\x03R\vtimestampMs\"\x89\x01\n" +
+	"\ftimestamp_ms\x18\x02 \x01(\x03R\vtimestampMs\x12\x19\n" +
+	"\bcmd_norm\x18\x03 \x01(\tR\acmdNorm\x12\x19\n" +
+	"\brepo_key\x18\x04 \x01(\tR\arepoKey\x12\x1d\n" +
+	"\n" +
+	"rank_score\x18\x05 \x01(\x01R\trankScore\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x12!\n" +
+	"\fmatched_tags\x18\a \x03(\tR\vmatchedTags\"\x89\x01\n" +
 	"\x14HistoryImportRequest\x12\x14\n" +
 	"\x05shell\x18\x01 \x01(\tR\x05shell\x12!\n" +
 	"\fhistory_path\x18\x02 \x01(\tR\vhistoryPath\x12\"\n" +
@@ -2149,7 +2757,15 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\bdecision\x18\x01 \x01(\tR\bdecision\x12\x1c\n" +
 	"\treasoning\x18\x02 \x01(\tR\treasoning\x12\x1d\n" +
 	"\n" +
-	"flags_json\x18\x03 \x01(\tR\tflagsJson2\xe5\b\n" +
+	"flags_json\x18\x03 \x01(\tR\tflagsJson*\x86\x01\n" +
+	"\n" +
+	"SearchMode\x12\x1b\n" +
+	"\x17SEARCH_MODE_UNSPECIFIED\x10\x00\x12\x13\n" +
+	"\x0fSEARCH_MODE_FTS\x10\x01\x12\x16\n" +
+	"\x12SEARCH_MODE_PREFIX\x10\x02\x12\x18\n" +
+	"\x14SEARCH_MODE_DESCRIBE\x10\x03\x12\x14\n" +
+	"\x10SEARCH_MODE_AUTO\x10\x042\x8c\n" +
+	"\n" +
 	"\vClaiService\x12:\n" +
 	"\fSessionStart\x12\x1c.clai.v1.SessionStartRequest\x1a\f.clai.v1.Ack\x126\n" +
 	"\n" +
@@ -2159,7 +2775,9 @@ const file_clai_v1_clai_proto_rawDesc = "" +
 	"\aSuggest\x12\x17.clai.v1.SuggestRequest\x1a\x18.clai.v1.SuggestResponse\x12N\n" +
 	"\rTextToCommand\x12\x1d.clai.v1.TextToCommandRequest\x1a\x1e.clai.v1.TextToCommandResponse\x12?\n" +
 	"\bNextStep\x12\x18.clai.v1.NextStepRequest\x1a\x19.clai.v1.NextStepResponse\x12?\n" +
-	"\bDiagnose\x12\x18.clai.v1.DiagnoseRequest\x1a\x19.clai.v1.DiagnoseResponse\x12K\n" +
+	"\bDiagnose\x12\x18.clai.v1.DiagnoseRequest\x1a\x19.clai.v1.DiagnoseResponse\x12Q\n" +
+	"\x0eRecordFeedback\x12\x1e.clai.v1.RecordFeedbackRequest\x1a\x1f.clai.v1.RecordFeedbackResponse\x12R\n" +
+	"\x0fSuggestFeedback\x12\x1e.clai.v1.RecordFeedbackRequest\x1a\x1f.clai.v1.RecordFeedbackResponse\x12K\n" +
 	"\fFetchHistory\x12\x1c.clai.v1.HistoryFetchRequest\x1a\x1d.clai.v1.HistoryFetchResponse\x12N\n" +
 	"\rImportHistory\x12\x1d.clai.v1.HistoryImportRequest\x1a\x1e.clai.v1.HistoryImportResponse\x12\"\n" +
 	"\x04Ping\x12\f.clai.v1.Ack\x1a\f.clai.v1.Ack\x122\n" +
@@ -2181,82 +2799,97 @@ func file_clai_v1_clai_proto_rawDescGZIP() []byte {
 	return file_clai_v1_clai_proto_rawDescData
 }
 
-var file_clai_v1_clai_proto_msgTypes = make([]protoimpl.MessageInfo, 29)
+var file_clai_v1_clai_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_clai_v1_clai_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
 var file_clai_v1_clai_proto_goTypes = []any{
-	(*ClientInfo)(nil),                 // 0: clai.v1.ClientInfo
-	(*Ack)(nil),                        // 1: clai.v1.Ack
-	(*SessionStartRequest)(nil),        // 2: clai.v1.SessionStartRequest
-	(*SessionEndRequest)(nil),          // 3: clai.v1.SessionEndRequest
-	(*CommandStartRequest)(nil),        // 4: clai.v1.CommandStartRequest
-	(*CommandEndRequest)(nil),          // 5: clai.v1.CommandEndRequest
-	(*SuggestRequest)(nil),             // 6: clai.v1.SuggestRequest
-	(*Suggestion)(nil),                 // 7: clai.v1.Suggestion
-	(*SuggestResponse)(nil),            // 8: clai.v1.SuggestResponse
-	(*TextToCommandRequest)(nil),       // 9: clai.v1.TextToCommandRequest
-	(*TextToCommandResponse)(nil),      // 10: clai.v1.TextToCommandResponse
-	(*NextStepRequest)(nil),            // 11: clai.v1.NextStepRequest
-	(*NextStepResponse)(nil),           // 12: clai.v1.NextStepResponse
-	(*DiagnoseRequest)(nil),            // 13: clai.v1.DiagnoseRequest
-	(*DiagnoseResponse)(nil),           // 14: clai.v1.DiagnoseResponse
-	(*HistoryFetchRequest)(nil),        // 15: clai.v1.HistoryFetchRequest
-	(*HistoryFetchResponse)(nil),       // 16: clai.v1.HistoryFetchResponse
-	(*HistoryItem)(nil),                // 17: clai.v1.HistoryItem
-	(*HistoryImportRequest)(nil),       // 18: clai.v1.HistoryImportRequest
-	(*HistoryImportResponse)(nil),      // 19: clai.v1.HistoryImportResponse
-	(*StatusResponse)(nil),             // 20: clai.v1.StatusResponse
-	(*WorkflowRunStartRequest)(nil),    // 21: clai.v1.WorkflowRunStartRequest
-	(*WorkflowRunStartResponse)(nil),   // 22: clai.v1.WorkflowRunStartResponse
-	(*WorkflowRunEndRequest)(nil),      // 23: clai.v1.WorkflowRunEndRequest
-	(*WorkflowRunEndResponse)(nil),     // 24: clai.v1.WorkflowRunEndResponse
-	(*WorkflowStepUpdateRequest)(nil),  // 25: clai.v1.WorkflowStepUpdateRequest
-	(*WorkflowStepUpdateResponse)(nil), // 26: clai.v1.WorkflowStepUpdateResponse
-	(*AnalyzeStepOutputRequest)(nil),   // 27: clai.v1.AnalyzeStepOutputRequest
-	(*AnalyzeStepOutputResponse)(nil),  // 28: clai.v1.AnalyzeStepOutputResponse
+	(SearchMode)(0),                    // 0: clai.v1.SearchMode
+	(*ClientInfo)(nil),                 // 1: clai.v1.ClientInfo
+	(*Ack)(nil),                        // 2: clai.v1.Ack
+	(*ApiError)(nil),                   // 3: clai.v1.ApiError
+	(*SessionStartRequest)(nil),        // 4: clai.v1.SessionStartRequest
+	(*SessionEndRequest)(nil),          // 5: clai.v1.SessionEndRequest
+	(*CommandStartRequest)(nil),        // 6: clai.v1.CommandStartRequest
+	(*CommandEndRequest)(nil),          // 7: clai.v1.CommandEndRequest
+	(*SuggestRequest)(nil),             // 8: clai.v1.SuggestRequest
+	(*Suggestion)(nil),                 // 9: clai.v1.Suggestion
+	(*SuggestionReason)(nil),           // 10: clai.v1.SuggestionReason
+	(*TimingHint)(nil),                 // 11: clai.v1.TimingHint
+	(*SuggestResponse)(nil),            // 12: clai.v1.SuggestResponse
+	(*RecordFeedbackRequest)(nil),      // 13: clai.v1.RecordFeedbackRequest
+	(*RecordFeedbackResponse)(nil),     // 14: clai.v1.RecordFeedbackResponse
+	(*TextToCommandRequest)(nil),       // 15: clai.v1.TextToCommandRequest
+	(*TextToCommandResponse)(nil),      // 16: clai.v1.TextToCommandResponse
+	(*NextStepRequest)(nil),            // 17: clai.v1.NextStepRequest
+	(*NextStepResponse)(nil),           // 18: clai.v1.NextStepResponse
+	(*DiagnoseRequest)(nil),            // 19: clai.v1.DiagnoseRequest
+	(*DiagnoseResponse)(nil),           // 20: clai.v1.DiagnoseResponse
+	(*HistoryFetchRequest)(nil),        // 21: clai.v1.HistoryFetchRequest
+	(*HistoryFetchResponse)(nil),       // 22: clai.v1.HistoryFetchResponse
+	(*HistoryItem)(nil),                // 23: clai.v1.HistoryItem
+	(*HistoryImportRequest)(nil),       // 24: clai.v1.HistoryImportRequest
+	(*HistoryImportResponse)(nil),      // 25: clai.v1.HistoryImportResponse
+	(*StatusResponse)(nil),             // 26: clai.v1.StatusResponse
+	(*WorkflowRunStartRequest)(nil),    // 27: clai.v1.WorkflowRunStartRequest
+	(*WorkflowRunStartResponse)(nil),   // 28: clai.v1.WorkflowRunStartResponse
+	(*WorkflowRunEndRequest)(nil),      // 29: clai.v1.WorkflowRunEndRequest
+	(*WorkflowRunEndResponse)(nil),     // 30: clai.v1.WorkflowRunEndResponse
+	(*WorkflowStepUpdateRequest)(nil),  // 31: clai.v1.WorkflowStepUpdateRequest
+	(*WorkflowStepUpdateResponse)(nil), // 32: clai.v1.WorkflowStepUpdateResponse
+	(*AnalyzeStepOutputRequest)(nil),   // 33: clai.v1.AnalyzeStepOutputRequest
+	(*AnalyzeStepOutputResponse)(nil),  // 34: clai.v1.AnalyzeStepOutputResponse
 }
 var file_clai_v1_clai_proto_depIdxs = []int32{
-	0,  // 0: clai.v1.SessionStartRequest.client:type_name -> clai.v1.ClientInfo
-	7,  // 1: clai.v1.SuggestResponse.suggestions:type_name -> clai.v1.Suggestion
-	7,  // 2: clai.v1.TextToCommandResponse.suggestions:type_name -> clai.v1.Suggestion
-	7,  // 3: clai.v1.NextStepResponse.suggestions:type_name -> clai.v1.Suggestion
-	7,  // 4: clai.v1.DiagnoseResponse.fixes:type_name -> clai.v1.Suggestion
-	17, // 5: clai.v1.HistoryFetchResponse.items:type_name -> clai.v1.HistoryItem
-	2,  // 6: clai.v1.ClaiService.SessionStart:input_type -> clai.v1.SessionStartRequest
-	3,  // 7: clai.v1.ClaiService.SessionEnd:input_type -> clai.v1.SessionEndRequest
-	4,  // 8: clai.v1.ClaiService.CommandStarted:input_type -> clai.v1.CommandStartRequest
-	5,  // 9: clai.v1.ClaiService.CommandEnded:input_type -> clai.v1.CommandEndRequest
-	6,  // 10: clai.v1.ClaiService.Suggest:input_type -> clai.v1.SuggestRequest
-	9,  // 11: clai.v1.ClaiService.TextToCommand:input_type -> clai.v1.TextToCommandRequest
-	11, // 12: clai.v1.ClaiService.NextStep:input_type -> clai.v1.NextStepRequest
-	13, // 13: clai.v1.ClaiService.Diagnose:input_type -> clai.v1.DiagnoseRequest
-	15, // 14: clai.v1.ClaiService.FetchHistory:input_type -> clai.v1.HistoryFetchRequest
-	18, // 15: clai.v1.ClaiService.ImportHistory:input_type -> clai.v1.HistoryImportRequest
-	1,  // 16: clai.v1.ClaiService.Ping:input_type -> clai.v1.Ack
-	1,  // 17: clai.v1.ClaiService.GetStatus:input_type -> clai.v1.Ack
-	21, // 18: clai.v1.ClaiService.WorkflowRunStart:input_type -> clai.v1.WorkflowRunStartRequest
-	23, // 19: clai.v1.ClaiService.WorkflowRunEnd:input_type -> clai.v1.WorkflowRunEndRequest
-	25, // 20: clai.v1.ClaiService.WorkflowStepUpdate:input_type -> clai.v1.WorkflowStepUpdateRequest
-	27, // 21: clai.v1.ClaiService.AnalyzeStepOutput:input_type -> clai.v1.AnalyzeStepOutputRequest
-	1,  // 22: clai.v1.ClaiService.SessionStart:output_type -> clai.v1.Ack
-	1,  // 23: clai.v1.ClaiService.SessionEnd:output_type -> clai.v1.Ack
-	1,  // 24: clai.v1.ClaiService.CommandStarted:output_type -> clai.v1.Ack
-	1,  // 25: clai.v1.ClaiService.CommandEnded:output_type -> clai.v1.Ack
-	8,  // 26: clai.v1.ClaiService.Suggest:output_type -> clai.v1.SuggestResponse
-	10, // 27: clai.v1.ClaiService.TextToCommand:output_type -> clai.v1.TextToCommandResponse
-	12, // 28: clai.v1.ClaiService.NextStep:output_type -> clai.v1.NextStepResponse
-	14, // 29: clai.v1.ClaiService.Diagnose:output_type -> clai.v1.DiagnoseResponse
-	16, // 30: clai.v1.ClaiService.FetchHistory:output_type -> clai.v1.HistoryFetchResponse
-	19, // 31: clai.v1.ClaiService.ImportHistory:output_type -> clai.v1.HistoryImportResponse
-	1,  // 32: clai.v1.ClaiService.Ping:output_type -> clai.v1.Ack
-	20, // 33: clai.v1.ClaiService.GetStatus:output_type -> clai.v1.StatusResponse
-	22, // 34: clai.v1.ClaiService.WorkflowRunStart:output_type -> clai.v1.WorkflowRunStartResponse
-	24, // 35: clai.v1.ClaiService.WorkflowRunEnd:output_type -> clai.v1.WorkflowRunEndResponse
-	26, // 36: clai.v1.ClaiService.WorkflowStepUpdate:output_type -> clai.v1.WorkflowStepUpdateResponse
-	28, // 37: clai.v1.ClaiService.AnalyzeStepOutput:output_type -> clai.v1.AnalyzeStepOutputResponse
-	22, // [22:38] is the sub-list for method output_type
-	6,  // [6:22] is the sub-list for method input_type
-	6,  // [6:6] is the sub-list for extension type_name
-	6,  // [6:6] is the sub-list for extension extendee
-	0,  // [0:6] is the sub-list for field type_name
+	1,  // 0: clai.v1.SessionStartRequest.client:type_name -> clai.v1.ClientInfo
+	10, // 1: clai.v1.Suggestion.reasons:type_name -> clai.v1.SuggestionReason
+	9,  // 2: clai.v1.SuggestResponse.suggestions:type_name -> clai.v1.Suggestion
+	11, // 3: clai.v1.SuggestResponse.timing_hint:type_name -> clai.v1.TimingHint
+	3,  // 4: clai.v1.RecordFeedbackResponse.error:type_name -> clai.v1.ApiError
+	9,  // 5: clai.v1.TextToCommandResponse.suggestions:type_name -> clai.v1.Suggestion
+	9,  // 6: clai.v1.NextStepResponse.suggestions:type_name -> clai.v1.Suggestion
+	9,  // 7: clai.v1.DiagnoseResponse.fixes:type_name -> clai.v1.Suggestion
+	0,  // 8: clai.v1.HistoryFetchRequest.mode:type_name -> clai.v1.SearchMode
+	23, // 9: clai.v1.HistoryFetchResponse.items:type_name -> clai.v1.HistoryItem
+	4,  // 10: clai.v1.ClaiService.SessionStart:input_type -> clai.v1.SessionStartRequest
+	5,  // 11: clai.v1.ClaiService.SessionEnd:input_type -> clai.v1.SessionEndRequest
+	6,  // 12: clai.v1.ClaiService.CommandStarted:input_type -> clai.v1.CommandStartRequest
+	7,  // 13: clai.v1.ClaiService.CommandEnded:input_type -> clai.v1.CommandEndRequest
+	8,  // 14: clai.v1.ClaiService.Suggest:input_type -> clai.v1.SuggestRequest
+	15, // 15: clai.v1.ClaiService.TextToCommand:input_type -> clai.v1.TextToCommandRequest
+	17, // 16: clai.v1.ClaiService.NextStep:input_type -> clai.v1.NextStepRequest
+	19, // 17: clai.v1.ClaiService.Diagnose:input_type -> clai.v1.DiagnoseRequest
+	13, // 18: clai.v1.ClaiService.RecordFeedback:input_type -> clai.v1.RecordFeedbackRequest
+	13, // 19: clai.v1.ClaiService.SuggestFeedback:input_type -> clai.v1.RecordFeedbackRequest
+	21, // 20: clai.v1.ClaiService.FetchHistory:input_type -> clai.v1.HistoryFetchRequest
+	24, // 21: clai.v1.ClaiService.ImportHistory:input_type -> clai.v1.HistoryImportRequest
+	2,  // 22: clai.v1.ClaiService.Ping:input_type -> clai.v1.Ack
+	2,  // 23: clai.v1.ClaiService.GetStatus:input_type -> clai.v1.Ack
+	27, // 24: clai.v1.ClaiService.WorkflowRunStart:input_type -> clai.v1.WorkflowRunStartRequest
+	29, // 25: clai.v1.ClaiService.WorkflowRunEnd:input_type -> clai.v1.WorkflowRunEndRequest
+	31, // 26: clai.v1.ClaiService.WorkflowStepUpdate:input_type -> clai.v1.WorkflowStepUpdateRequest
+	33, // 27: clai.v1.ClaiService.AnalyzeStepOutput:input_type -> clai.v1.AnalyzeStepOutputRequest
+	2,  // 28: clai.v1.ClaiService.SessionStart:output_type -> clai.v1.Ack
+	2,  // 29: clai.v1.ClaiService.SessionEnd:output_type -> clai.v1.Ack
+	2,  // 30: clai.v1.ClaiService.CommandStarted:output_type -> clai.v1.Ack
+	2,  // 31: clai.v1.ClaiService.CommandEnded:output_type -> clai.v1.Ack
+	12, // 32: clai.v1.ClaiService.Suggest:output_type -> clai.v1.SuggestResponse
+	16, // 33: clai.v1.ClaiService.TextToCommand:output_type -> clai.v1.TextToCommandResponse
+	18, // 34: clai.v1.ClaiService.NextStep:output_type -> clai.v1.NextStepResponse
+	20, // 35: clai.v1.ClaiService.Diagnose:output_type -> clai.v1.DiagnoseResponse
+	14, // 36: clai.v1.ClaiService.RecordFeedback:output_type -> clai.v1.RecordFeedbackResponse
+	14, // 37: clai.v1.ClaiService.SuggestFeedback:output_type -> clai.v1.RecordFeedbackResponse
+	22, // 38: clai.v1.ClaiService.FetchHistory:output_type -> clai.v1.HistoryFetchResponse
+	25, // 39: clai.v1.ClaiService.ImportHistory:output_type -> clai.v1.HistoryImportResponse
+	2,  // 40: clai.v1.ClaiService.Ping:output_type -> clai.v1.Ack
+	26, // 41: clai.v1.ClaiService.GetStatus:output_type -> clai.v1.StatusResponse
+	28, // 42: clai.v1.ClaiService.WorkflowRunStart:output_type -> clai.v1.WorkflowRunStartResponse
+	30, // 43: clai.v1.ClaiService.WorkflowRunEnd:output_type -> clai.v1.WorkflowRunEndResponse
+	32, // 44: clai.v1.ClaiService.WorkflowStepUpdate:output_type -> clai.v1.WorkflowStepUpdateResponse
+	34, // 45: clai.v1.ClaiService.AnalyzeStepOutput:output_type -> clai.v1.AnalyzeStepOutputResponse
+	28, // [28:46] is the sub-list for method output_type
+	10, // [10:28] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_clai_v1_clai_proto_init() }
@@ -2269,13 +2902,14 @@ func file_clai_v1_clai_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_clai_v1_clai_proto_rawDesc), len(file_clai_v1_clai_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   29,
+			NumEnums:      1,
+			NumMessages:   34,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_clai_v1_clai_proto_goTypes,
 		DependencyIndexes: file_clai_v1_clai_proto_depIdxs,
+		EnumInfos:         file_clai_v1_clai_proto_enumTypes,
 		MessageInfos:      file_clai_v1_clai_proto_msgTypes,
 	}.Build()
 	File_clai_v1_clai_proto = out.File

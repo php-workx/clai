@@ -2,6 +2,7 @@ package claude
 
 import (
 	"os"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -44,5 +45,13 @@ func TestIdleTimeout(t *testing.T) {
 func TestDefaultIdleTimeout(t *testing.T) {
 	if defaultIdleTimeout != 2*time.Hour {
 		t.Errorf("defaultIdleTimeout = %v, want 2h", defaultIdleTimeout)
+	}
+}
+
+func TestNewDaemonStartCommandUsesClaudeDaemonRun(t *testing.T) {
+	cmd := newDaemonStartCommand("/tmp/clai")
+	want := []string{"/tmp/clai", daemonSubcommand, daemonRunSubcommand}
+	if !reflect.DeepEqual(cmd.Args, want) {
+		t.Fatalf("newDaemonStartCommand args = %v, want %v", cmd.Args, want)
 	}
 }

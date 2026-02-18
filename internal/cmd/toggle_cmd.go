@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 
@@ -61,7 +60,7 @@ func toggleIntegration(enable bool, sessionOnly bool) error {
 	}
 	// Also clear/set session flag so all disable sources are consistent.
 	if err := cache.SetSessionOff(!enable); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to update session state: %v\n", err)
+		return fmt.Errorf("failed to update session flag: %w", err)
 	}
 	if enable {
 		fmt.Println("Integrations enabled")

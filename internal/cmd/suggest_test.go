@@ -22,8 +22,12 @@ func TestRunSuggest_DisabledByEnv_JSON(t *testing.T) {
 		}
 	})
 
-	if strings.TrimSpace(output) != "[]" {
-		t.Fatalf("expected empty JSON array, got %q", output)
+	var resp suggestJSONResponse
+	if err := json.Unmarshal([]byte(output), &resp); err != nil {
+		t.Fatalf("json unmarshal error: %v", err)
+	}
+	if len(resp.Suggestions) != 0 {
+		t.Fatalf("expected empty suggestions, got %d", len(resp.Suggestions))
 	}
 }
 
@@ -70,18 +74,18 @@ func TestRunSuggest_HistoryFallback_JSONRisk(t *testing.T) {
 		}
 	})
 
-	var out []suggestOutput
-	if err := json.Unmarshal([]byte(output), &out); err != nil {
+	var resp suggestJSONResponse
+	if err := json.Unmarshal([]byte(output), &resp); err != nil {
 		t.Fatalf("json unmarshal error: %v", err)
 	}
-	if len(out) != 1 {
-		t.Fatalf("expected 1 suggestion, got %d", len(out))
+	if len(resp.Suggestions) != 1 {
+		t.Fatalf("expected 1 suggestion, got %d", len(resp.Suggestions))
 	}
-	if out[0].Text != "rm -rf /" {
-		t.Fatalf("unexpected suggestion: %q", out[0].Text)
+	if resp.Suggestions[0].Text != "rm -rf /" {
+		t.Fatalf("unexpected suggestion: %q", resp.Suggestions[0].Text)
 	}
-	if out[0].Risk != "destructive" {
-		t.Fatalf("expected destructive risk, got %q", out[0].Risk)
+	if resp.Suggestions[0].Risk != "destructive" {
+		t.Fatalf("expected destructive risk, got %q", resp.Suggestions[0].Risk)
 	}
 }
 
@@ -104,7 +108,61 @@ func TestRunSuggest_DisabledByConfig(t *testing.T) {
 		}
 	})
 
-	if strings.TrimSpace(output) != "[]" {
-		t.Fatalf("expected empty JSON array, got %q", output)
+	var resp suggestJSONResponse
+	if err := json.Unmarshal([]byte(output), &resp); err != nil {
+		t.Fatalf("json unmarshal error: %v", err)
+	}
+	if len(resp.Suggestions) != 0 {
+		t.Fatalf("expected empty suggestions, got %d", len(resp.Suggestions))
+	}
+}
+
+func TestRunSuggest_HistoryFallback_NoDaemon(t *testing.T) {
+	withSuggestGlobals(t, suggestGlobals{limit: 2, json: false})
+	t.Setenv("CLAI_HOME", t.TempDir())
+	t.Setenv("CLAI_CACHE", t.TempDir())
+	t.Setenv("CLAI_SESSION_ID", "")
+
+	histFile := filepath.Join(t.TempDir(), "zsh_history")
+	content := strings.Join([]string{
+		": 1700000000:0;git status",
+		": 1700000001:0;git diff",
+	}, "\n")
+	if err := os.WriteFile(histFile, []byte(content), 0644); err != nil {
+		t.Fatalf("WriteFile error: %v", err)
+	}
+	t.Setenv("HISTFILE", histFile)
+
+	output := captureStdout(t, func() {
+		if err := runSuggest(suggestCmd, []string{"git"}); err != nil {
+			t.Fatalf("runSuggest error: %v", err)
+		}
+	})
+
+	if strings.TrimSpace(output) == "" {
+		t.Fatalf("expected history fallback suggestion, got empty output")
+	}
+}
+
+func TestOutputSuggestions_GhostFormat(t *testing.T) {
+	out := captureStdout(t, func() {
+		suggestions := []suggestOutput{
+			{Text: "make install", Source: "global", Score: 0.47},
+			{Text: "rm -rf /", Source: "global", Score: 0.99, Risk: "destructive"},
+		}
+		if err := outputSuggestions(suggestions, "ghost", nil); err != nil {
+			t.Fatalf("outputSuggestions error: %v", err)
+		}
+	})
+
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("expected 2 lines, got %d: %q", len(lines), out)
+	}
+	if lines[0] != "make install\t· global  · score 0.47" {
+		t.Fatalf("unexpected ghost line 1: %q", lines[0])
+	}
+	if lines[1] != "rm -rf /\t· global  · score 0.99  · [!] destructive" {
+		t.Fatalf("unexpected ghost line 2: %q", lines[1])
 	}
 }

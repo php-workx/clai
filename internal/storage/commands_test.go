@@ -1296,15 +1296,16 @@ func TestSQLiteStore_QueryHistoryCommands_EmptyResult(t *testing.T) {
 	}
 }
 
-func TestSQLiteStore_QueryHistoryCommands_TimestampTieStillDedupes(t *testing.T) {
+func TestSQLiteStore_QueryHistoryCommands_DoesNotCollapseNormalizedArgs(t *testing.T) {
 	t.Parallel()
 
 	store := newTestStore(t)
 	defer store.Close()
 
 	ctx := context.Background()
+
 	session := &Session{
-		SessionID:       "tie-session",
+		SessionID:       "hist-path-session",
 		StartedAtUnixMs: 1700000000000,
 		Shell:           "zsh",
 		OS:              "darwin",
@@ -1314,83 +1315,47 @@ func TestSQLiteStore_QueryHistoryCommands_TimestampTieStillDedupes(t *testing.T)
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 
-	// Same normalized command and identical timestamp.
-	for i, cmdText := range []string{"git status", "git   status"} {
-		cmd := &Command{
-			CommandID:     "tie-cmd-" + string(rune('a'+i)),
+	// These normalize to the same command_norm ("cd <path>") but should remain
+	// distinct history items when deduplicating for pickers.
+	cmds := []*Command{
+		{
+			CommandID:     "hist-path-cmd-1",
 			SessionID:     session.SessionID,
-			TsStartUnixMs: 1700000005000,
+			TsStartUnixMs: 1000,
 			CWD:           "/tmp",
-			Command:       cmdText,
-			IsSuccess:     boolPtr(true),
-		}
-		if err := store.CreateCommand(ctx, cmd); err != nil {
-			t.Fatalf("CreateCommand() error = %v", err)
+			Command:       "cd /tmp",
+		},
+		{
+			CommandID:     "hist-path-cmd-2",
+			SessionID:     session.SessionID,
+			TsStartUnixMs: 2000,
+			CWD:           "/tmp",
+			Command:       "cd /Users/example/project",
+		},
+	}
+	for _, c := range cmds {
+		if err := store.CreateCommand(ctx, c); err != nil {
+			t.Fatalf("CreateCommand(%s) error = %v", c.CommandID, err)
 		}
 	}
 
-	results, err := store.QueryHistoryCommands(ctx, CommandQuery{Limit: 100})
+	results, err := store.QueryHistoryCommands(ctx, CommandQuery{
+		Substring:   "cd",
+		Limit:       10,
+		Deduplicate: true,
+	})
 	if err != nil {
 		t.Fatalf("QueryHistoryCommands() error = %v", err)
 	}
-	if len(results) != 1 {
-		t.Fatalf("got %d results, want 1 deduped result", len(results))
-	}
-}
 
-func TestSQLiteStore_QueryCommands_LikeEscaping(t *testing.T) {
-	t.Parallel()
-
-	store := newTestStore(t)
-	defer store.Close()
-
-	ctx := context.Background()
-	session := &Session{
-		SessionID:       "escape-session",
-		StartedAtUnixMs: 1700000000000,
-		Shell:           "zsh",
-		OS:              "darwin",
-		InitialCWD:      "/tmp",
+	if len(results) != 2 {
+		t.Fatalf("Got %d results, want 2", len(results))
 	}
-	if err := store.CreateSession(ctx, session); err != nil {
-		t.Fatalf("CreateSession() error = %v", err)
+	if results[0].Command != "cd /Users/example/project" {
+		t.Errorf("results[0].Command = %q, want %q", results[0].Command, "cd /Users/example/project")
 	}
-
-	commands := []string{"abc%def", "abcXdef", "foo_bar", "fooXbar"}
-	for i, c := range commands {
-		cmd := &Command{
-			CommandID:     "escape-cmd-" + string(rune('a'+i)),
-			SessionID:     session.SessionID,
-			TsStartUnixMs: int64(1700000001000 + i),
-			CWD:           "/tmp",
-			Command:       c,
-			IsSuccess:     boolPtr(true),
-		}
-		if err := store.CreateCommand(ctx, cmd); err != nil {
-			t.Fatalf("CreateCommand() error = %v", err)
-		}
-	}
-
-	prefixResults, err := store.QueryCommands(ctx, CommandQuery{
-		Prefix: "abc%def",
-		Limit:  100,
-	})
-	if err != nil {
-		t.Fatalf("QueryCommands(prefix) error = %v", err)
-	}
-	if len(prefixResults) != 1 || prefixResults[0].Command != "abc%def" {
-		t.Fatalf("prefix escape mismatch: got %+v", prefixResults)
-	}
-
-	substringResults, err := store.QueryCommands(ctx, CommandQuery{
-		Substring: "foo_bar",
-		Limit:     100,
-	})
-	if err != nil {
-		t.Fatalf("QueryCommands(substring) error = %v", err)
-	}
-	if len(substringResults) != 1 || substringResults[0].Command != "foo_bar" {
-		t.Fatalf("substring escape mismatch: got %+v", substringResults)
+	if results[1].Command != "cd /tmp" {
+		t.Errorf("results[1].Command = %q, want %q", results[1].Command, "cd /tmp")
 	}
 }
 

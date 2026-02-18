@@ -31,7 +31,7 @@ Use Claude Code with Playwright to execute structured test plans against a web-b
 
 ### 2.1 Architecture Overview
 
-```text
+```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Browser (Playwright-controlled by Claude)                      │
 │  ┌───────────────────────────────────────────────────────────┐  │
@@ -87,10 +87,10 @@ go install github.com/sorenisanerd/gotty@latest
 **Usage:**
 ```bash
 # Start with bash + clai integration
-gotty -a 127.0.0.1 -w bash --rcfile <(echo 'source ~/.clai/shell/bash.sh')
+gotty -w bash --rcfile <(echo 'source ~/.clai/shell/bash.sh')
 
 # Start with zsh
-gotty -a 127.0.0.1 -w zsh -c 'source ~/.clai/shell/zsh.zsh; exec zsh'
+gotty -w zsh -c 'source ~/.clai/shell/zsh.zsh; exec zsh'
 ```
 
 ### 3.2 Option B: ttyd
@@ -163,7 +163,7 @@ Tests are defined in YAML files. See `tests/e2e/example-test-plan.yaml` for the 
 
 ### 5.1 Manual Execution (Phase 1)
 
-```text
+```
 User                    Claude                      Browser
   │                        │                           │
   │  "Run e2e tests"       │                           │
@@ -243,7 +243,7 @@ Each test should pass in:
 For UI-heavy features (picker, suggestions), capture screenshots and compare against baselines.
 
 **Storage:**
-```text
+```
 tests/e2e/
   screenshots/
     baseline/
@@ -298,7 +298,7 @@ Store in `tests/e2e/artifacts/`:
 ```makefile
 # Start terminal server for testing
 test-server:
-    gotty -a 127.0.0.1 -w -p 8080 bash --rcfile scripts/test-shell-init.sh
+    gotty -w -p 8080 bash --rcfile scripts/test-shell-init.sh
 
 # Run tests (requires Claude session)
 test-e2e:

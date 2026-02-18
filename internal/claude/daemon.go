@@ -14,9 +14,16 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/execabs"
 )
 
 const defaultIdleTimeout = 2 * time.Hour
+
+const (
+	daemonSubcommand    = "claude-daemon"
+	daemonRunSubcommand = "run"
+)
 
 func idleTimeout() time.Duration {
 	if val := os.Getenv("CLAI_IDLE_TIMEOUT"); val != "" {
@@ -113,7 +120,7 @@ func StartDaemonProcess() error {
 		logFile = nil
 	}
 
-	cmd := exec.Command(exe, "claude-daemon", "run") //nolint:gosec // G204: exe is our own binary path
+	cmd := newDaemonStartCommand(exe)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
@@ -147,6 +154,12 @@ func StartDaemonProcess() error {
 	}
 
 	return fmt.Errorf("daemon failed to start (check %s for details)", logPath())
+}
+
+func newDaemonStartCommand(exe string) *exec.Cmd {
+	// execabs prevents launching a relative-path executable unexpectedly.
+	// nosemgrep: go.lang.security.audit.os-exec.os-exec
+	return execabs.Command(exe, daemonSubcommand, daemonRunSubcommand)
 }
 
 // StopDaemon stops the running daemon

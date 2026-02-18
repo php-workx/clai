@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -82,6 +83,8 @@ func TestConfigGet(t *testing.T) {
 		{"history.picker_open_on_empty", "false"},
 		{"history.picker_page_size", "100"},
 		{"history.picker_case_sensitive", "false"},
+		{"history.up_arrow_trigger", "single"},
+		{"history.up_arrow_double_window_ms", "250"},
 	}
 
 	for _, tt := range tests {
@@ -144,6 +147,8 @@ func TestConfigSet(t *testing.T) {
 		{"history.picker_open_on_empty", "true", "true"},
 		{"history.picker_page_size", "50", "50"},
 		{"history.picker_case_sensitive", "true", "true"},
+		{"history.up_arrow_trigger", "double", "double"},
+		{"history.up_arrow_double_window_ms", "300", "300"},
 	}
 
 	for _, tt := range tests {
@@ -187,6 +192,8 @@ func TestConfigGetWithCustomValues(t *testing.T) {
 	cfg.Suggestions.MaxAI = 5
 	cfg.Suggestions.ShowRiskWarning = false
 	cfg.Privacy.SanitizeAICalls = false
+	cfg.History.UpArrowTrigger = "double"
+	cfg.History.UpArrowDoubleWindowMs = 275
 
 	tests := []struct {
 		key      string
@@ -209,6 +216,8 @@ func TestConfigGetWithCustomValues(t *testing.T) {
 		{"suggestions.max_ai", "5"},
 		{"suggestions.show_risk_warning", "false"},
 		{"privacy.sanitize_ai_calls", "false"},
+		{"history.up_arrow_trigger", "double"},
+		{"history.up_arrow_double_window_ms", "275"},
 	}
 
 	for _, tt := range tests {
@@ -336,6 +345,7 @@ func TestConfigSetInvalidValue(t *testing.T) {
 		{"privacy.sanitize_ai_calls", "maybe"},
 		{"history.picker_open_on_empty", "yes"},
 		{"history.picker_case_sensitive", "maybe"},
+		{"history.up_arrow_double_window_ms", "not_a_number"},
 		// Invalid log level
 		{"daemon.log_level", "trace"},
 		{"daemon.log_level", "DEBUG"},
@@ -352,6 +362,10 @@ func TestConfigSetInvalidValue(t *testing.T) {
 		// Invalid picker backend
 		{"history.picker_backend", "invalid"},
 		{"history.picker_backend", ""},
+		// Invalid up-arrow trigger
+		{"history.up_arrow_trigger", "off"},
+		{"history.up_arrow_trigger", "DOUBLE"},
+		{"history.up_arrow_trigger", ""},
 	}
 
 	for _, tt := range tests {
@@ -439,6 +453,11 @@ func TestConfigValidate(t *testing.T) {
 			name:    "empty_picker_backend",
 			modify:  func(c *Config) { c.History.PickerBackend = "" },
 			wantErr: "history.picker_backend",
+		},
+		{
+			name:    "invalid_up_arrow_trigger",
+			modify:  func(c *Config) { c.History.UpArrowTrigger = "invalid" },
+			wantErr: "history.up_arrow_trigger",
 		},
 		{
 			name: "zero_values_are_valid",
@@ -532,6 +551,63 @@ func TestSetPickerPageSizeClamping(t *testing.T) {
 	}
 }
 
+func TestValidateUpArrowDoubleWindowClamping(t *testing.T) {
+	tests := []struct {
+		name        string
+		windowMs    int
+		wantClamped int
+	}{
+		{"below_minimum", 1, 50},
+		{"at_minimum", 50, 50},
+		{"normal", 250, 250},
+		{"at_maximum", 1000, 1000},
+		{"above_maximum", 5000, 1000},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.History.UpArrowDoubleWindowMs = tt.windowMs
+			err := cfg.Validate()
+			if err != nil {
+				t.Fatalf("Validate() unexpected error: %v", err)
+			}
+			if cfg.History.UpArrowDoubleWindowMs != tt.wantClamped {
+				t.Errorf("UpArrowDoubleWindowMs = %d, want %d", cfg.History.UpArrowDoubleWindowMs, tt.wantClamped)
+			}
+		})
+	}
+}
+
+func TestSetUpArrowDoubleWindowClamping(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    string
+		expected string
+	}{
+		{"below_minimum", "1", "50"},
+		{"at_minimum", "50", "50"},
+		{"normal", "250", "250"},
+		{"at_maximum", "1000", "1000"},
+		{"above_maximum", "5000", "1000"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			err := cfg.Set("history.up_arrow_double_window_ms", tt.value)
+			if err != nil {
+				t.Errorf("Set up_arrow_double_window_ms=%q error: %v", tt.value, err)
+				return
+			}
+			got, _ := cfg.Get("history.up_arrow_double_window_ms")
+			if got != tt.expected {
+				t.Errorf("up_arrow_double_window_ms=%q: got %q, want %q", tt.value, got, tt.expected)
+			}
+		})
+	}
+}
+
 // ============================================================================
 // Validator helper tests
 // ============================================================================
@@ -580,6 +656,22 @@ func TestValidPickerBackends(t *testing.T) {
 	for _, backend := range invalidBackends {
 		if isValidPickerBackend(backend) {
 			t.Errorf("isValidPickerBackend(%q) = true, want false", backend)
+		}
+	}
+}
+
+func TestValidUpArrowTriggers(t *testing.T) {
+	validValues := []string{"single", "double"}
+	for _, v := range validValues {
+		if !isValidUpArrowTrigger(v) {
+			t.Errorf("isValidUpArrowTrigger(%q) = false, want true", v)
+		}
+	}
+
+	invalidValues := []string{"off", "SINGLE", "Double", ""}
+	for _, v := range invalidValues {
+		if isValidUpArrowTrigger(v) {
+			t.Errorf("isValidUpArrowTrigger(%q) = true, want false", v)
 		}
 	}
 }
@@ -753,20 +845,26 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		Privacy: PrivacyConfig{
 			SanitizeAICalls: false,
 		},
+		Workflows: WorkflowsConfig{
+			Enabled:           true,
+			DefaultMode:       "interactive",
+			DefaultShell:      "bash",
+			LogDir:            "/custom/workflows/logs",
+			SearchPaths:       []string{"./.clai/workflows", "./.github/workflows"},
+			RetainRuns:        50,
+			StrictPermissions: true,
+			SecretFile:        "/custom/workflows/.secrets",
+		},
 		History: HistoryConfig{
-			PickerBackend:       "fzf",
-			PickerOpenOnEmpty:   true,
-			PickerPageSize:      50,
-			PickerCaseSensitive: true,
+			PickerBackend:         "fzf",
+			PickerOpenOnEmpty:     true,
+			PickerPageSize:        50,
+			PickerCaseSensitive:   true,
+			UpArrowTrigger:        "double",
+			UpArrowDoubleWindowMs: 300,
 			PickerTabs: []TabDef{
 				{ID: "session", Label: "Session", Provider: "history", Args: map[string]string{"session": "$CLAI_SESSION_ID"}},
 			},
-		},
-		Workflows: WorkflowsConfig{
-			Enabled:           true,
-			StrictPermissions: true,
-			DefaultMode:       "interactive",
-			RetainRuns:        50,
 		},
 	}
 
@@ -855,19 +953,38 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if loaded.History.PickerCaseSensitive != true {
 		t.Errorf("History.PickerCaseSensitive: got %v, want true", loaded.History.PickerCaseSensitive)
 	}
+	if loaded.History.UpArrowTrigger != "double" {
+		t.Errorf("History.UpArrowTrigger: got %s, want double", loaded.History.UpArrowTrigger)
+	}
+	if loaded.History.UpArrowDoubleWindowMs != 300 {
+		t.Errorf("History.UpArrowDoubleWindowMs: got %d, want 300", loaded.History.UpArrowDoubleWindowMs)
+	}
 
-	// Verify Workflows values round-trip.
+	// Verify Workflows values
 	if loaded.Workflows.Enabled != true {
 		t.Errorf("Workflows.Enabled: got %v, want true", loaded.Workflows.Enabled)
-	}
-	if loaded.Workflows.StrictPermissions != true {
-		t.Errorf("Workflows.StrictPermissions: got %v, want true", loaded.Workflows.StrictPermissions)
 	}
 	if loaded.Workflows.DefaultMode != "interactive" {
 		t.Errorf("Workflows.DefaultMode: got %s, want interactive", loaded.Workflows.DefaultMode)
 	}
+	if loaded.Workflows.DefaultShell != "bash" {
+		t.Errorf("Workflows.DefaultShell: got %s, want bash", loaded.Workflows.DefaultShell)
+	}
+	if loaded.Workflows.LogDir != "/custom/workflows/logs" {
+		t.Errorf("Workflows.LogDir: got %s, want /custom/workflows/logs", loaded.Workflows.LogDir)
+	}
 	if loaded.Workflows.RetainRuns != 50 {
 		t.Errorf("Workflows.RetainRuns: got %d, want 50", loaded.Workflows.RetainRuns)
+	}
+	if loaded.Workflows.StrictPermissions != true {
+		t.Errorf("Workflows.StrictPermissions: got %v, want true", loaded.Workflows.StrictPermissions)
+	}
+	if loaded.Workflows.SecretFile != "/custom/workflows/.secrets" {
+		t.Errorf("Workflows.SecretFile: got %s, want /custom/workflows/.secrets", loaded.Workflows.SecretFile)
+	}
+	wantSearchPaths := []string{"./.clai/workflows", "./.github/workflows"}
+	if !reflect.DeepEqual(loaded.Workflows.SearchPaths, wantSearchPaths) {
+		t.Errorf("Workflows.SearchPaths: got %v, want %v", loaded.Workflows.SearchPaths, wantSearchPaths)
 	}
 }
 
@@ -887,11 +1004,14 @@ func TestListKeys(t *testing.T) {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
+		"suggestions.scorer_version",
+		"suggestions.picker_view",
 		"history.picker_backend",
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
 		"history.picker_case_sensitive",
-		"history.up_arrow_opens_history",
+		"history.up_arrow_trigger",
+		"history.up_arrow_double_window_ms",
 	}
 
 	if len(keys) != len(expectedKeys) {
@@ -928,14 +1048,17 @@ func TestListKeysAllSettable(t *testing.T) {
 	keys := ListKeys()
 
 	testValues := map[string]string{
-		"suggestions.enabled":            "false",
-		"suggestions.max_history":        "10",
-		"suggestions.show_risk_warning":  "false",
-		"history.picker_backend":         "fzf",
-		"history.picker_open_on_empty":   "true",
-		"history.picker_page_size":       "50",
-		"history.picker_case_sensitive":  "true",
-		"history.up_arrow_opens_history": "true",
+		"suggestions.enabled":               "false",
+		"suggestions.max_history":           "10",
+		"suggestions.show_risk_warning":     "false",
+		"suggestions.scorer_version":        "v2",
+		"suggestions.picker_view":           "compact",
+		"history.picker_backend":            "fzf",
+		"history.picker_open_on_empty":      "true",
+		"history.picker_page_size":          "50",
+		"history.picker_case_sensitive":     "true",
+		"history.up_arrow_trigger":          "double",
+		"history.up_arrow_double_window_ms": "300",
 	}
 
 	for _, key := range keys {
@@ -973,6 +1096,12 @@ func TestDefaultHistoryConfig(t *testing.T) {
 	if cfg.History.PickerCaseSensitive {
 		t.Error("Expected picker_case_sensitive=false")
 	}
+	if cfg.History.UpArrowTrigger != "single" {
+		t.Errorf("Expected up_arrow_trigger=single, got %s", cfg.History.UpArrowTrigger)
+	}
+	if cfg.History.UpArrowDoubleWindowMs != 250 {
+		t.Errorf("Expected up_arrow_double_window_ms=250, got %d", cfg.History.UpArrowDoubleWindowMs)
+	}
 	if len(cfg.History.PickerTabs) != 2 {
 		t.Fatalf("Expected 2 default tabs, got %d", len(cfg.History.PickerTabs))
 	}
@@ -988,368 +1117,5 @@ func TestDefaultConfigIsValid(t *testing.T) {
 	cfg := DefaultConfig()
 	if err := cfg.Validate(); err != nil {
 		t.Errorf("DefaultConfig() should be valid, but Validate() returned: %v", err)
-	}
-}
-
-// ============================================================================
-// Workflow config tests
-// ============================================================================
-
-func TestDefaultWorkflowsConfig(t *testing.T) {
-	cfg := DefaultConfig()
-
-	if cfg.Workflows.Enabled {
-		t.Error("Expected workflows.enabled=false by default")
-	}
-	if cfg.Workflows.DefaultMode != "interactive" {
-		t.Errorf("Expected workflows.default_mode=interactive, got %s", cfg.Workflows.DefaultMode)
-	}
-	if cfg.Workflows.DefaultShell != "" {
-		t.Errorf("Expected workflows.default_shell empty, got %s", cfg.Workflows.DefaultShell)
-	}
-	if cfg.Workflows.LogDir != "" {
-		t.Errorf("Expected workflows.log_dir empty, got %s", cfg.Workflows.LogDir)
-	}
-	if cfg.Workflows.RetainRuns != 100 {
-		t.Errorf("Expected workflows.retain_runs=100, got %d", cfg.Workflows.RetainRuns)
-	}
-	if cfg.Workflows.StrictPermissions {
-		t.Error("Expected workflows.strict_permissions=false by default")
-	}
-	if cfg.Workflows.SecretFile != "" {
-		t.Errorf("Expected workflows.secret_file empty, got %s", cfg.Workflows.SecretFile)
-	}
-	if cfg.Workflows.SearchPaths != nil {
-		t.Errorf("Expected workflows.search_paths nil, got %v", cfg.Workflows.SearchPaths)
-	}
-}
-
-func TestWorkflowsConfigGet(t *testing.T) {
-	cfg := DefaultConfig()
-
-	tests := []struct {
-		key      string
-		expected string
-	}{
-		{"workflows.enabled", "false"},
-		{"workflows.default_mode", "interactive"},
-		{"workflows.default_shell", ""},
-		{"workflows.log_dir", ""},
-		{"workflows.search_paths", ""},
-		{"workflows.retain_runs", "100"},
-		{"workflows.strict_permissions", "false"},
-		{"workflows.secret_file", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.key, func(t *testing.T) {
-			got, err := cfg.Get(tt.key)
-			if err != nil {
-				t.Errorf("Get(%q) error: %v", tt.key, err)
-				return
-			}
-			if got != tt.expected {
-				t.Errorf("Get(%q) = %q, want %q", tt.key, got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestWorkflowsConfigSet(t *testing.T) {
-	tests := []struct {
-		key      string
-		value    string
-		expected string
-	}{
-		{"workflows.enabled", "true", "true"},
-		{"workflows.enabled", "false", "false"},
-		{"workflows.default_mode", "interactive", "interactive"},
-		{"workflows.default_mode", "non-interactive-fail", "non-interactive-fail"},
-		{"workflows.default_shell", "/bin/bash", "/bin/bash"},
-		{"workflows.default_shell", "", ""},
-		{"workflows.log_dir", "/tmp/logs", "/tmp/logs"},
-		{"workflows.log_dir", "", ""},
-		{"workflows.search_paths", "/a,/b,/c", "/a,/b,/c"},
-		{"workflows.search_paths", "", ""},
-		{"workflows.retain_runs", "50", "50"},
-		{"workflows.retain_runs", "1", "1"},
-		{"workflows.strict_permissions", "true", "true"},
-		{"workflows.strict_permissions", "false", "false"},
-		{"workflows.secret_file", "/home/user/.secrets", "/home/user/.secrets"},
-		{"workflows.secret_file", "", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
-			cfg := DefaultConfig()
-			err := cfg.Set(tt.key, tt.value)
-			if err != nil {
-				t.Errorf("Set(%q, %q) error: %v", tt.key, tt.value, err)
-				return
-			}
-
-			got, err := cfg.Get(tt.key)
-			if err != nil {
-				t.Errorf("Get(%q) error: %v", tt.key, err)
-				return
-			}
-			if got != tt.expected {
-				t.Errorf("After Set, Get(%q) = %q, want %q", tt.key, got, tt.expected)
-			}
-		})
-	}
-}
-
-func TestWorkflowsConfigSetInvalid(t *testing.T) {
-	tests := []struct {
-		key   string
-		value string
-	}{
-		// Invalid booleans
-		{"workflows.enabled", "yes"},
-		{"workflows.strict_permissions", "maybe"},
-		// Invalid mode
-		{"workflows.default_mode", "non-interactive-auto"},
-		{"workflows.default_mode", "batch"},
-		{"workflows.default_mode", ""},
-		// Invalid retain_runs
-		{"workflows.retain_runs", "not_a_number"},
-		{"workflows.retain_runs", "0"},
-		{"workflows.retain_runs", "-1"},
-		// Unknown field
-		{"workflows.unknown_field", "value"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.key+"="+tt.value, func(t *testing.T) {
-			cfg := DefaultConfig()
-			err := cfg.Set(tt.key, tt.value)
-			if err == nil {
-				t.Errorf("Set(%q, %q) should have failed", tt.key, tt.value)
-			}
-		})
-	}
-}
-
-func TestWorkflowsConfigGetUnknownField(t *testing.T) {
-	cfg := DefaultConfig()
-	_, err := cfg.Get("workflows.unknown_field")
-	if err == nil {
-		t.Error("Get(workflows.unknown_field) should have failed")
-	}
-}
-
-func TestWorkflowsConfigValidation(t *testing.T) {
-	tests := []struct {
-		name    string
-		modify  func(*Config)
-		wantErr string
-	}{
-		{
-			name:    "valid_interactive",
-			modify:  func(c *Config) { c.Workflows.DefaultMode = "interactive" },
-			wantErr: "",
-		},
-		{
-			name:    "valid_non_interactive_fail",
-			modify:  func(c *Config) { c.Workflows.DefaultMode = "non-interactive-fail" },
-			wantErr: "",
-		},
-		{
-			name:    "rejects_non_interactive_auto",
-			modify:  func(c *Config) { c.Workflows.DefaultMode = "non-interactive-auto" },
-			wantErr: "workflows.default_mode must be \"interactive\" or \"non-interactive-fail\"",
-		},
-		{
-			name:    "rejects_invalid_mode",
-			modify:  func(c *Config) { c.Workflows.DefaultMode = "batch" },
-			wantErr: "workflows.default_mode must be \"interactive\" or \"non-interactive-fail\"",
-		},
-		{
-			name:    "rejects_empty_mode",
-			modify:  func(c *Config) { c.Workflows.DefaultMode = "" },
-			wantErr: "workflows.default_mode must be \"interactive\" or \"non-interactive-fail\"",
-		},
-		{
-			name:    "rejects_negative_retain_runs",
-			modify:  func(c *Config) { c.Workflows.RetainRuns = -1 },
-			wantErr: "invalid retain_runs: must be > 0",
-		},
-		{
-			name: "rejects_zero_retain_runs",
-			modify: func(c *Config) {
-				c.Workflows.RetainRuns = 0
-			},
-			wantErr: "invalid retain_runs: must be > 0",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			tt.modify(cfg)
-			err := cfg.Validate()
-
-			if tt.wantErr == "" {
-				if err != nil {
-					t.Errorf("Validate() error = %v, want nil", err)
-				}
-			} else {
-				if err == nil {
-					t.Errorf("Validate() error = nil, want error containing %q", tt.wantErr)
-				} else if !strings.Contains(err.Error(), tt.wantErr) {
-					t.Errorf("Validate() error = %q, want error containing %q", err.Error(), tt.wantErr)
-				}
-			}
-		})
-	}
-}
-
-func TestWorkflowsConfigYAMLParsing(t *testing.T) {
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
-
-	yamlContent := `
-workflows:
-  enabled: true
-  default_mode: non-interactive-fail
-  default_shell: /bin/zsh
-  log_dir: /tmp/wf-logs
-  search_paths:
-    - /home/user/workflows
-    - /etc/clai/workflows
-  retain_runs: 50
-  strict_permissions: true
-  secret_file: /home/user/.secrets
-`
-	if err := os.WriteFile(configFile, []byte(yamlContent), 0644); err != nil {
-		t.Fatalf("Failed to write YAML: %v", err)
-	}
-
-	cfg, err := LoadFromFile(configFile)
-	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
-	}
-
-	if !cfg.Workflows.Enabled {
-		t.Error("Expected workflows.enabled=true")
-	}
-	if cfg.Workflows.DefaultMode != "non-interactive-fail" {
-		t.Errorf("Expected default_mode=non-interactive-fail, got %s", cfg.Workflows.DefaultMode)
-	}
-	if cfg.Workflows.DefaultShell != "/bin/zsh" {
-		t.Errorf("Expected default_shell=/bin/zsh, got %s", cfg.Workflows.DefaultShell)
-	}
-	if cfg.Workflows.LogDir != "/tmp/wf-logs" {
-		t.Errorf("Expected log_dir=/tmp/wf-logs, got %s", cfg.Workflows.LogDir)
-	}
-	if len(cfg.Workflows.SearchPaths) != 2 {
-		t.Fatalf("Expected 2 search paths, got %d", len(cfg.Workflows.SearchPaths))
-	}
-	if cfg.Workflows.SearchPaths[0] != "/home/user/workflows" {
-		t.Errorf("Expected search_paths[0]=/home/user/workflows, got %s", cfg.Workflows.SearchPaths[0])
-	}
-	if cfg.Workflows.SearchPaths[1] != "/etc/clai/workflows" {
-		t.Errorf("Expected search_paths[1]=/etc/clai/workflows, got %s", cfg.Workflows.SearchPaths[1])
-	}
-	if cfg.Workflows.RetainRuns != 50 {
-		t.Errorf("Expected retain_runs=50, got %d", cfg.Workflows.RetainRuns)
-	}
-	if !cfg.Workflows.StrictPermissions {
-		t.Error("Expected strict_permissions=true")
-	}
-	if cfg.Workflows.SecretFile != "/home/user/.secrets" {
-		t.Errorf("Expected secret_file=/home/user/.secrets, got %s", cfg.Workflows.SecretFile)
-	}
-}
-
-func TestWorkflowsConfigYAMLPartial(t *testing.T) {
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
-
-	yamlContent := `
-workflows:
-  enabled: true
-`
-	if err := os.WriteFile(configFile, []byte(yamlContent), 0644); err != nil {
-		t.Fatalf("Failed to write YAML: %v", err)
-	}
-
-	cfg, err := LoadFromFile(configFile)
-	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
-	}
-
-	if !cfg.Workflows.Enabled {
-		t.Error("Expected workflows.enabled=true")
-	}
-	// retain_runs is inherited from DefaultConfig because it is omitted in YAML.
-	if cfg.Workflows.RetainRuns != 100 {
-		t.Errorf("Expected retain_runs inherited as 100, got %d", cfg.Workflows.RetainRuns)
-	}
-}
-
-func TestValidWorkflowModes(t *testing.T) {
-	validModes := []string{"interactive", "non-interactive-fail"}
-	for _, mode := range validModes {
-		if !isValidWorkflowMode(mode) {
-			t.Errorf("isValidWorkflowMode(%q) = false, want true", mode)
-		}
-	}
-
-	invalidModes := []string{"non-interactive-auto", "batch", "auto", "INTERACTIVE", ""}
-	for _, mode := range invalidModes {
-		if isValidWorkflowMode(mode) {
-			t.Errorf("isValidWorkflowMode(%q) = true, want false", mode)
-		}
-	}
-}
-
-func TestWorkflowsConfigSaveAndLoad(t *testing.T) {
-	tmpDir := t.TempDir()
-	configFile := filepath.Join(tmpDir, "config.yaml")
-
-	cfg := DefaultConfig()
-	cfg.Workflows.Enabled = true
-	cfg.Workflows.DefaultMode = "non-interactive-fail"
-	cfg.Workflows.DefaultShell = "/bin/bash"
-	cfg.Workflows.LogDir = "/tmp/logs"
-	cfg.Workflows.SearchPaths = []string{"/a", "/b"}
-	cfg.Workflows.RetainRuns = 25
-	cfg.Workflows.StrictPermissions = true
-	cfg.Workflows.SecretFile = "/home/user/.secrets"
-
-	if err := cfg.SaveToFile(configFile); err != nil {
-		t.Fatalf("SaveToFile failed: %v", err)
-	}
-
-	loaded, err := LoadFromFile(configFile)
-	if err != nil {
-		t.Fatalf("LoadFromFile failed: %v", err)
-	}
-
-	if !loaded.Workflows.Enabled {
-		t.Error("Expected workflows.enabled=true after round-trip")
-	}
-	if loaded.Workflows.DefaultMode != "non-interactive-fail" {
-		t.Errorf("Expected default_mode=non-interactive-fail, got %s", loaded.Workflows.DefaultMode)
-	}
-	if loaded.Workflows.DefaultShell != "/bin/bash" {
-		t.Errorf("Expected default_shell=/bin/bash, got %s", loaded.Workflows.DefaultShell)
-	}
-	if loaded.Workflows.LogDir != "/tmp/logs" {
-		t.Errorf("Expected log_dir=/tmp/logs, got %s", loaded.Workflows.LogDir)
-	}
-	if len(loaded.Workflows.SearchPaths) != 2 || loaded.Workflows.SearchPaths[0] != "/a" || loaded.Workflows.SearchPaths[1] != "/b" {
-		t.Errorf("Expected search_paths=[/a, /b], got %v", loaded.Workflows.SearchPaths)
-	}
-	if loaded.Workflows.RetainRuns != 25 {
-		t.Errorf("Expected retain_runs=25, got %d", loaded.Workflows.RetainRuns)
-	}
-	if !loaded.Workflows.StrictPermissions {
-		t.Error("Expected strict_permissions=true after round-trip")
-	}
-	if loaded.Workflows.SecretFile != "/home/user/.secrets" {
-		t.Errorf("Expected secret_file=/home/user/.secrets, got %s", loaded.Workflows.SecretFile)
 	}
 }

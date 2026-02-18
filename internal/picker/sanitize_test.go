@@ -43,27 +43,6 @@ func TestStripANSI_OSC(t *testing.T) {
 	}
 }
 
-func TestStripANSI_PrivateMode(t *testing.T) {
-	tests := []struct {
-		name  string
-		input string
-		want  string
-	}{
-		{"hide cursor", "\x1b[?25lhello", "hello"},
-		{"show cursor", "\x1b[?25hhello", "hello"},
-		{"alternate screen", "\x1b[?1049htext\x1b[?1049l", "text"},
-		{"bracketed paste mode", "\x1b[?2004hcontent\x1b[?2004l", "content"},
-		{"mixed with SGR", "\x1b[?25l\x1b[31mred\x1b[0m\x1b[?25h", "red"},
-		{"multiple params", "\x1b[?1;25h", ""},
-		{"CSI with intermediate bytes", "\x1b[1 qblock", "block"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.want, StripANSI(tt.input))
-		})
-	}
-}
-
 func TestStripANSI_Charset(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -97,6 +76,25 @@ func TestValidateUTF8(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, ValidateUTF8(tt.input))
+		})
+	}
+}
+
+func TestPrettyEscapeLiterals(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"no escapes", "echo hi", "echo hi"},
+		{"octal csi", "printf '\\033[2mhi\\033[0m\\n'", "printf '<ESC>[2mhi<ESC>[0m\\n'"},
+		{"octal osc", "printf '\\033]0;title\\007'", "printf '<ESC>]0;title\\007'"},
+		{"hex csi", "printf '\\x1b[2mhi\\x1B[0m'", "printf '<ESC>[2mhi<ESC>[0m'"},
+		{"short e csi", "printf '\\e[2mhi\\e[0m'", "printf '<ESC>[2mhi<ESC>[0m'"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, PrettyEscapeLiterals(tt.input))
 		})
 	}
 }

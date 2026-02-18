@@ -63,6 +63,11 @@ func (p *Paths) PIDFile() string {
 	return filepath.Join(p.BaseDir, "clai.pid")
 }
 
+// LockFile returns the path to the daemon lock file.
+func (p *Paths) LockFile() string {
+	return filepath.Join(p.BaseDir, "clai.lock")
+}
+
 // LogDir returns the path to the log directory.
 func (p *Paths) LogDir() string {
 	return filepath.Join(p.BaseDir, "logs")
@@ -115,7 +120,7 @@ func (p *Paths) EnsureDirectories() error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
 		}
 	}

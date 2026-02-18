@@ -22,7 +22,8 @@ export CLAI_CURRENT_SHELL=zsh
 : ${CLAI_CACHE:="$HOME/.cache/clai"}
 : ${CLAI_MENU_LIMIT:=5}
 : ${CLAI_UP_ARROW_HISTORY:={{CLAI_UP_ARROW_HISTORY}}}
-: ${CLAI_PICKER_OPEN_ON_EMPTY:={{CLAI_PICKER_OPEN_ON_EMPTY}}}
+: ${CLAI_UP_ARROW_TRIGGER:={{CLAI_UP_ARROW_TRIGGER}}}
+: ${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:={{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}}
 
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
@@ -45,6 +46,9 @@ export CLAI_SESSION_ID="{{CLAI_SESSION_ID}}"
 _CLAI_COMMAND_ID=""
 _CLAI_COMMAND_START_TIME=""
 _CLAI_LAST_COMMAND=""
+if [[ -z "${_CLAI_ORIG_KEYTIMEOUT:-}" ]]; then
+    _CLAI_ORIG_KEYTIMEOUT="${KEYTIMEOUT:-}"
+fi
 
 # ============================================
 # Feature 1: Command Suggestion (History + AI)
@@ -60,7 +64,10 @@ zmodload -F zsh/datetime p:EPOCHREALTIME 2>/dev/null
 
 # Current suggestion state
 _AI_CURRENT_SUGGESTION=""
+_AI_LAST_ACCEPTED=""
 _AI_IN_PASTE=false
+_AI_GHOST_HIGHLIGHT=""
+_AI_GHOST_META=""
 
 # Double-tap up-arrow detection
 _CLAI_DOUBLE_TAP_THRESHOLD=0.5
@@ -94,33 +101,69 @@ _clai_session_off() {
     [[ -f "$CLAI_CACHE/off" ]]
 }
 
+_ai_remove_ghost_highlight() {
+    if [[ -z "$_AI_GHOST_HIGHLIGHT" ]]; then
+        return
+    fi
+    local kept=()
+    local h
+    for h in "${region_highlight[@]}"; do
+        if [[ "$h" == "$_AI_GHOST_HIGHLIGHT" ]]; then
+            continue
+        fi
+        kept+=("$h")
+    done
+    region_highlight=("${kept[@]}")
+    _AI_GHOST_HIGHLIGHT=""
+}
+
 # Update suggestion based on current buffer
 _ai_update_suggestion() {
     local suggestion=""
+    local meta=""
 
     # Hide ghost text when disabled, picker active, buffer empty, or cursor not at EOL
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] || [[ -z "$BUFFER" ]] || [[ $CURSOR -ne ${#BUFFER} ]]; then
         _clai_zsh_autosuggest_restore
+        # Dismiss feedback if suggestion was visible and buffer changed
+        if [[ -n "$_AI_CURRENT_SUGGESTION" ]]; then
+            (clai suggest-feedback --action=dismissed --suggested="$_AI_CURRENT_SUGGESTION" >/dev/null 2>&1 &)
+        fi
         _AI_CURRENT_SUGGESTION=""
+        _AI_GHOST_META=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         return
     fi
 
     _clai_zsh_autosuggest_disable
     # Has content - clai handles daemon vs history fallback
-    suggestion=$(clai suggest "$BUFFER" 2>/dev/null)
+    local out=""
+    out=$(clai suggest --format ghost --limit 1 "$BUFFER" 2>/dev/null)
+    suggestion="${out%%$'\t'*}"
+    if [[ "$out" == *$'\t'* ]]; then
+        meta="${out#*$'\t'}"
+    fi
 
     if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" && "$suggestion" == "$BUFFER"* ]]; then
         _AI_CURRENT_SUGGESTION="$suggestion"
+        _AI_GHOST_META="$meta"
         local ghost="${suggestion:${#BUFFER}}"
-        POSTDISPLAY="${ghost}"
-        # region_highlight colors POSTDISPLAY; positions past ${#BUFFER} target it
-        region_highlight=("${#BUFFER} $((${#BUFFER} + ${#ghost})) fg=242")
+        local display="${ghost}"
+        if [[ -n "$meta" ]]; then
+            display="${ghost}  ${meta}"
+        fi
+        POSTDISPLAY="${display}"
+        # region_highlight colors POSTDISPLAY; positions past ${#BUFFER} target it.
+        # Preserve any existing region_highlight from other plugins (e.g. zsh-syntax-highlighting).
+        _ai_remove_ghost_highlight
+        _AI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#display})) fg=242"
+        region_highlight+=("$_AI_GHOST_HIGHLIGHT")
     else
         _AI_CURRENT_SUGGESTION=""
+        _AI_GHOST_META=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
     fi
 
     [[ -n "$WIDGET" ]] && zle reset-prompt
@@ -139,6 +182,18 @@ _ai_self_insert() {
 }
 zle -N self-insert _ai_self_insert
 
+# ZLE widget: Space is often bound to magic-space (history expansion), not self-insert.
+# Wrap it so suggestions remain ghost-rendered and up-to-date after inserting a space.
+_ai_magic_space() {
+    _clai_dismiss_picker
+    zle .magic-space
+    if [[ "$_AI_IN_PASTE" == "true" ]] || [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
+        return
+    fi
+    _ai_update_suggestion
+}
+zle -N magic-space _ai_magic_space
+
 # Dismiss picker if active (called by editing/movement widgets).
 # Uses _clai_picker_close (defined in picker section) via forward reference;
 # safe because widgets are only invoked after full script is sourced.
@@ -148,10 +203,63 @@ _clai_dismiss_picker() {
 
 # Clear inline ghost text state (without touching suggestion cache on disk).
 _ai_clear_ghost_text() {
+    if [[ -n "$_AI_CURRENT_SUGGESTION" ]]; then
+        # Record dismissed feedback (fire and forget)
+        (clai suggest-feedback --action=dismissed --suggested="$_AI_CURRENT_SUGGESTION" >/dev/null 2>&1 &)
+    fi
     _AI_CURRENT_SUGGESTION=""
+    _AI_GHOST_META=""
     POSTDISPLAY=""
-    region_highlight=()
+    _ai_remove_ghost_highlight
 }
+
+# Safety net: keep ghost text consistent if BUFFER/CURSOR changes via an unwrapped ZLE widget.
+_ai_sync_ghost_text() {
+    # If POSTDISPLAY is somehow set without a suggestion, clear it.
+    if [[ -z "$_AI_CURRENT_SUGGESTION" ]]; then
+        if [[ -n "$POSTDISPLAY" ]]; then
+            POSTDISPLAY=""
+            _ai_remove_ghost_highlight
+        fi
+        return
+    fi
+
+    # Ghost text is only valid when suggestion is a prefix extension of BUFFER
+    # and the cursor is at EOL (otherwise POSTDISPLAY would appear in the wrong place).
+    if [[ -z "$BUFFER" ]] || [[ $CURSOR -ne ${#BUFFER} ]] || [[ "$_AI_CURRENT_SUGGESTION" != "$BUFFER"* ]]; then
+        _ai_clear_ghost_text
+        return
+    fi
+
+    # BUFFER still matches the current suggestion; recompute POSTDISPLAY and highlight
+    # based on the new BUFFER length (e.g., space inserts via magic-space).
+    local ghost="${_AI_CURRENT_SUGGESTION:${#BUFFER}}"
+    if [[ -z "$ghost" ]]; then
+        POSTDISPLAY=""
+        _ai_remove_ghost_highlight
+        return
+    fi
+    local display="${ghost}"
+    if [[ -n "$_AI_GHOST_META" ]]; then
+        display="${ghost}  ${_AI_GHOST_META}"
+    fi
+    POSTDISPLAY="${display}"
+    _ai_remove_ghost_highlight
+    _AI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#display})) fg=242"
+    region_highlight+=("$_AI_GHOST_HIGHLIGHT")
+}
+
+_ai_zle_line_pre_redraw() {
+    # Don't interfere while the inline picker owns the UI.
+    [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] && return
+    _ai_sync_ghost_text
+}
+autoload -U add-zle-hook-widget 2>/dev/null
+if (( ${+functions[add-zle-hook-widget]} )); then
+    add-zle-hook-widget zle-line-pre-redraw _ai_zle_line_pre_redraw
+else
+    zle -N zle-line-pre-redraw _ai_zle_line_pre_redraw
+fi
 
 # ZLE widget: Tab completion should dismiss ghost text first.
 _ai_expand_or_complete() {
@@ -187,6 +295,9 @@ zle -N backward-delete-char _ai_backward_delete_char
 # ZLE widget: Update suggestion after cursor movement
 _ai_backward_char() {
     _clai_dismiss_picker
+    # Left-arrow should never "accept" a suggestion. Clear ghost text so cursor
+    # movement doesn't feel like it jumps behind POSTDISPLAY.
+    _ai_clear_ghost_text
     zle .backward-char
     _ai_update_suggestion
 }
@@ -220,19 +331,25 @@ zle -N bracketed-paste _ai_bracketed_paste
 _ai_forward_char() {
     if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} && "$_AI_CURRENT_SUGGESTION" == "$BUFFER"* ]]; then
         # At end of buffer with valid suggestion prefix - accept it
+        local accepted="$_AI_CURRENT_SUGGESTION"
         BUFFER="$_AI_CURRENT_SUGGESTION"
         CURSOR=${#BUFFER}
         _AI_CURRENT_SUGGESTION=""
+        _AI_GHOST_META=""
+        _AI_LAST_ACCEPTED="$accepted"
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         # Clear AI suggestion file if we used it
         > "$_AI_SUGGEST_FILE"
+        # Record accepted feedback (fire and forget)
+        (clai suggest-feedback --action=accepted --suggested="$accepted" >/dev/null 2>&1 &)
         zle reset-prompt
     else
         # Normal forward char (or stale suggestion - ignore it)
         _AI_CURRENT_SUGGESTION=""
+        _AI_GHOST_META=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         zle .forward-char
     fi
 }
@@ -268,8 +385,12 @@ zle -N _ai_accept_token
 # Bind Alt+Right to accept next token (common escape sequence)
 bindkey '\e[1;3C' _ai_accept_token
 
-# ZLE widget: Clear suggestion
+# ZLE widget: Clear suggestion (Escape dismisses)
 _ai_clear_suggestion() {
+    if [[ -n "$_AI_CURRENT_SUGGESTION" ]]; then
+        # Record dismissed feedback (fire and forget)
+        (clai suggest-feedback --action=dismissed --suggested="$_AI_CURRENT_SUGGESTION" >/dev/null 2>&1 &)
+    fi
     _AI_CURRENT_SUGGESTION=""
     POSTDISPLAY=""
     > "$_AI_SUGGEST_FILE"
@@ -340,9 +461,15 @@ _ai_voice_accept_line() {
     fi
     # Normal accept-line behavior
     _AI_VOICE_MODE=false
+    # Track edited suggestion feedback: if user modified an accepted suggestion
+    if [[ -n "$_AI_LAST_ACCEPTED" && -n "$BUFFER" && "$BUFFER" != "$_AI_LAST_ACCEPTED" ]]; then
+        (clai suggest-feedback --action=edited --suggested="$_AI_LAST_ACCEPTED" --executed="$BUFFER" >/dev/null 2>&1 &)
+    fi
+    _AI_LAST_ACCEPTED=""
     _AI_CURRENT_SUGGESTION=""
+    _AI_GHOST_HIGHLIGHT=""
     POSTDISPLAY=""
-    region_highlight=()
+    _ai_remove_ghost_highlight
     zle accept-line
 }
 zle -N _ai_voice_accept_line
@@ -368,6 +495,7 @@ _ai_preexec() {
     # Store start time in milliseconds (macOS date doesn't support %N)
     _CLAI_COMMAND_START_TIME=$(($(date +%s) * 1000))
     _CLAI_LAST_COMMAND="$1"
+    export CLAI_LAST_COMMAND="$_CLAI_LAST_COMMAND"
 
     # Fire and forget - log command start to daemon
     (clai-shim log-start \
@@ -505,37 +633,117 @@ voice() {
 # If clai-picker is on PATH, Up arrow and Alt+H open the full TUI picker.
 # Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
 
+# Brief user feedback (throttled) when picker actions can't run.
+typeset -gi _CLAI_NOTIFY_LAST_TS=0
+_clai_notify_throttled() {
+    local msg="$1"
+    local now=${EPOCHSECONDS:-0}
+    if (( now - _CLAI_NOTIFY_LAST_TS >= 5 )); then
+        _CLAI_NOTIFY_LAST_TS=$now
+        zle -M "$msg"
+    fi
+}
+
+_clai_supports_utf8() {
+    # Prefer locale variables in order. If none are set, assume UTF-8.
+    local value
+    for value in "$LC_ALL" "$LC_CTYPE" "$LANG"; do
+        if [[ -n "$value" ]]; then
+            value="${value:l}"
+            if [[ "$value" == *"utf-8"* || "$value" == *"utf8"* ]]; then
+                return 0
+            fi
+            return 1
+        fi
+    done
+    return 0
+}
+
+_clai_picker_brief_error() {
+    local err="$1"
+    local lower="${err:l}"
+    if [[ "$lower" == *"rpc:"* || "$lower" == *"dial unix"* || "$lower" == *"no such file or directory"* || "$lower" == *"connection refused"* ]]; then
+        echo "clai: daemon unavailable"
+        return
+    fi
+    if [[ "$lower" == *"/dev/tty"* || "$lower" == *"requires a tty"* ]]; then
+        echo "clai: picker requires a TTY"
+        return
+    fi
+    echo "clai: picker failed"
+}
+
 _clai_has_tui_picker() {
     command -v clai-picker >/dev/null 2>&1
 }
 
 _clai_tui_picker_open() {
-    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
-        zle .up-line-or-history
-        return
-    fi
     if ! _clai_has_tui_picker; then
-        zle .up-line-or-history
+        _clai_notify_throttled "clai: clai-picker not installed"
+        zle up-line-or-history
         return
     fi
-    local result exit_code saved_buffer="$BUFFER"
-    result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    local result exit_code saved_buffer="$BUFFER" errfile errtxt
+    _ai_clear_ghost_text
+    errfile="$(mktemp -t clai-picker.XXXXXX 2>/dev/null || mktemp "/tmp/clai-picker.XXXXXX")"
+    result=$(clai-picker history --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>"$errfile")
     exit_code=$?
+    if [[ -f "$errfile" ]]; then
+        errtxt="$(<"$errfile")"
+        rm -f "$errfile"
+    fi
     if [[ $exit_code -eq 0 ]]; then
         # Clear ghost text before setting the new buffer.
-        _AI_CURRENT_SUGGESTION=""
-        POSTDISPLAY=""
-        region_highlight=()
+        _ai_clear_ghost_text
         BUFFER="$result"
         CURSOR=${#BUFFER}
     elif [[ $exit_code -eq 2 ]]; then
-        zle .up-line-or-history
+        [[ -n "$errtxt" ]] && _clai_notify_throttled "$(_clai_picker_brief_error "$errtxt")"
+        zle up-line-or-history
         return
+    elif [[ -n "$errtxt" ]]; then
+        _clai_notify_throttled "$(_clai_picker_brief_error "$errtxt")"
     fi
     # exit_code 1 = cancel, keep original buffer
     zle redisplay
 }
 zle -N _clai_tui_picker_open
+
+_clai_tui_suggest_picker_open() {
+    if ! _clai_has_tui_picker; then
+        _clai_notify_throttled "clai: clai-picker not installed"
+        return
+    fi
+    if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+        return
+    fi
+    local result exit_code errfile errtxt
+    _ai_clear_ghost_text
+    errfile="$(mktemp -t clai-picker.XXXXXX 2>/dev/null || mktemp "/tmp/clai-picker.XXXXXX")"
+    result=$(clai-picker suggest --query="$BUFFER" --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>"$errfile")
+    exit_code=$?
+    if [[ -f "$errfile" ]]; then
+        errtxt="$(<"$errfile")"
+        rm -f "$errfile"
+    fi
+    if [[ $exit_code -eq 0 ]]; then
+        _ai_clear_ghost_text
+        BUFFER="$result"
+        CURSOR=${#BUFFER}
+        zle redisplay
+        return
+    fi
+    # exit_code 1 = cancel, 2 = fallback, anything else = error
+    if [[ $exit_code -ne 1 ]]; then
+        if [[ -n "$errtxt" ]]; then
+            _clai_notify_throttled "$(_clai_picker_brief_error "$errtxt")"
+        else
+            _clai_notify_throttled "clai: suggestion picker unavailable"
+        fi
+    fi
+    zle redisplay
+}
+zle -N _clai_tui_suggest_picker_open
 
 # ============================================
 # Feature 4b: Suggestion + History Pickers
@@ -563,12 +771,15 @@ _clai_config_enabled() {
 }
 
 _clai_history_args() {
+    # Output one argument per line to handle paths with spaces
+    # Caller must use ${(f)...} to split on newlines
     case "$_CLAI_HISTORY_SCOPE" in
         session)
             echo "--session=$CLAI_SESSION_ID"
             ;;
         cwd)
-            echo "--session=$CLAI_SESSION_ID --cwd=$PWD"
+            echo "--session=$CLAI_SESSION_ID"
+            echo "--cwd=$PWD"
             ;;
         global)
             echo "--global"
@@ -584,7 +795,7 @@ _clai_picker_load() {
     local -a items
     if [[ "$_CLAI_PICKER_MODE" == "suggest" ]]; then
         if [[ -n "$BUFFER" ]]; then
-            items=(${(f)"$(clai suggest --limit "$CLAI_MENU_LIMIT" "$BUFFER" 2>/dev/null)"})
+            items=(${(f)"$(clai suggest --format fzf --limit "$CLAI_MENU_LIMIT" "$BUFFER" 2>/dev/null)"})
         else
             # Intentional: with empty BUFFER, 'clai suggest' only returns the
             # single cached AI suggestion which isn't useful for a picker list.
@@ -593,7 +804,7 @@ _clai_picker_load() {
         fi
     else
         local -a args
-        args=(${(z)$(_clai_history_args)})
+        args=(${(f)"$(_clai_history_args)"})
         if [[ -n "$BUFFER" ]]; then
             items=(${(f)"$(clai history "${args[@]}" --limit "$CLAI_MENU_LIMIT" --offset "$offset" "$BUFFER" 2>/dev/null)"})
         else
@@ -637,7 +848,7 @@ _clai_picker_render() {
         ((i++))
     done
     POSTDISPLAY=""
-    region_highlight=()
+    _ai_remove_ghost_highlight
     zle -M "$header (↑↓, Enter, Ctrl+C):$menu_text"
 }
 
@@ -681,7 +892,7 @@ _clai_picker_cancel() {
         CURSOR=$_CLAI_PICKER_ORIG_CURSOR
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         _clai_picker_close
         _ai_update_suggestion
         zle redisplay
@@ -696,7 +907,7 @@ _clai_picker_accept() {
         # Clear ghost text before closing picker and recalculating.
         _AI_CURRENT_SUGGESTION=""
         POSTDISPLAY=""
-        region_highlight=()
+        _ai_remove_ghost_highlight
         _clai_picker_close
         _ai_update_suggestion
         zle redisplay
@@ -769,7 +980,7 @@ _clai_picker_up() {
         return
     fi
     if ! _clai_config_enabled; then
-        _ai_up_line_or_history
+        zle up-line-or-history
         return
     fi
     _ai_clear_ghost_text
@@ -778,6 +989,12 @@ _clai_picker_up() {
 
 _clai_picker_down() {
     if [[ "$_CLAI_PICKER_ACTIVE" == "true" ]]; then
+        if [[ "$_CLAI_PICKER_MODE" == "history" && $_CLAI_PICKER_INDEX -le 0 ]]; then
+            # Match native history UX: at the newest item, Down should return to
+            # the original buffer (not stay stuck at the bottom of the picker).
+            _clai_picker_cancel
+            return
+        fi
         if [[ $_CLAI_PICKER_INDEX -gt 0 ]]; then
             # Move down in the visual list (toward newer items)
             ((_CLAI_PICKER_INDEX--))
@@ -786,7 +1003,7 @@ _clai_picker_down() {
         # At bottom (index 0): do nothing
         return
     fi
-    _ai_down_line_or_history
+    zle down-line-or-history
 }
 
 _clai_picker_suggest() {
@@ -847,6 +1064,7 @@ _clai_picker_break() {
         _clai_picker_cancel
         return
     fi
+    _ai_clear_ghost_text
     zle .send-break
 }
 
@@ -859,15 +1077,6 @@ zle -N _clai_history_scope_cwd
 zle -N _clai_history_scope_global
 zle -N send-break _clai_picker_break
 
-# Bind inline picker controls.
-bindkey '^I' _clai_picker_suggest
-bindkey '^M' _clai_picker_accept
-bindkey '^[[B' _clai_picker_down
-bindkey '^[OB' _clai_picker_down
-bindkey '^Xs' _clai_history_scope_session
-bindkey '^Xd' _clai_history_scope_cwd
-bindkey '^Xg' _clai_history_scope_global
-
 # Alt/Option+H opens TUI picker.
 # '\eh' works when the terminal sends ESC for Alt (Linux, or macOS with
 # "Use Option as Meta key" enabled). The literal '˙' covers macOS
@@ -875,11 +1084,103 @@ bindkey '^Xg' _clai_history_scope_global
 bindkey '\eh' _clai_tui_picker_open
 bindkey '˙' _clai_tui_picker_open
 
-# When up_arrow_opens_history is enabled, Up arrow opens the TUI picker
-# (with fallback to shell default). Otherwise shell defaults are used.
+# Alt/Option+S opens the suggestions TUI picker.
+# '\es' works when the terminal sends ESC for Alt. The literal 'ß' covers
+# common macOS defaults where Option+S produces U+00DF.
+bindkey '\es' _clai_tui_suggest_picker_open
+bindkey 'ß' _clai_tui_suggest_picker_open
+
+# When up_arrow_opens_history is enabled:
+# - trigger=single: Up opens TUI picker (fallback: native history)
+# - trigger=double: Up uses native history; Up+Up within window opens picker.
 if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
-    bindkey '^[[A' _clai_picker_up    # Up arrow (CSI mode)
-    bindkey '^[OA' _clai_picker_up    # Up arrow (application mode)
+    typeset -gi _clai_last_up_ms=0
+    typeset -gi _clai_window_ms="${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:-250}"
+    [[ "$_clai_window_ms" == <-> ]] || _clai_window_ms=250
+    (( _clai_window_ms < 50 )) && _clai_window_ms=50
+    (( _clai_window_ms > 1000 )) && _clai_window_ms=1000
+
+    _clai_up_arrow_single() {
+        if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+            zle up-line-or-history
+            return
+        fi
+
+        if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
+            local -i _clai_now_ms _clai_delta_ms
+            if [[ -n "${EPOCHREALTIME:-}" ]]; then
+                _clai_now_ms=$(( EPOCHREALTIME * 1000 ))
+            else
+                _clai_now_ms=$(( EPOCHSECONDS * 1000 ))
+            fi
+            _clai_delta_ms=$(( _clai_now_ms - _clai_last_up_ms ))
+            if (( _clai_last_up_ms > 0 && _clai_delta_ms >= 0 && _clai_delta_ms <= _clai_window_ms )); then
+                _clai_last_up_ms=0
+                if _clai_has_tui_picker; then
+                    _clai_tui_picker_open
+                    return
+                fi
+            fi
+            _clai_last_up_ms=$_clai_now_ms
+            zle up-line-or-history
+            return
+        fi
+
+        if _clai_has_tui_picker; then
+            _clai_tui_picker_open
+        else
+            zle up-line-or-history
+        fi
+    }
+    _clai_up_arrow_double() {
+        if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off; then
+            zle up-line-or-history
+            zle up-line-or-history
+            return
+        fi
+        if _clai_has_tui_picker; then
+            _clai_tui_picker_open
+            return
+        fi
+        zle up-line-or-history
+        zle up-line-or-history
+    }
+    zle -N _clai_up_arrow_single
+    zle -N _clai_up_arrow_double
+    for _clai_km in emacs viins main; do
+        bindkey -M "$_clai_km" '^[[A' _clai_up_arrow_single    # Up arrow (CSI mode)
+        bindkey -M "$_clai_km" '^[OA' _clai_up_arrow_single    # Up arrow (application mode)
+        # Ensure Down arrow still performs native history navigation in both keymaps.
+        bindkey -M "$_clai_km" '^[[B' down-line-or-history
+        bindkey -M "$_clai_km" '^[OB' down-line-or-history
+        bindkey -M "$_clai_km" -r '^[[A^[[A'
+        bindkey -M "$_clai_km" -r '^[OA^[OA'
+    done
+    if [[ "${CLAI_UP_ARROW_TRIGGER:-single}" == "double" ]]; then
+        # Keep KEYTIMEOUT side effects local: preserve and restore after binding setup.
+        typeset _clai_prev_keytimeout
+        _clai_prev_keytimeout="${KEYTIMEOUT:-}"
+        typeset -gi _clai_keytimeout_cs
+        _clai_keytimeout_cs=$(( (_clai_window_ms + 9) / 10 ))
+        (( _clai_keytimeout_cs < 1 )) && _clai_keytimeout_cs=1
+        KEYTIMEOUT=$_clai_keytimeout_cs
+        for _clai_km in emacs viins main; do
+            bindkey -M "$_clai_km" '^[[A^[[A' _clai_up_arrow_double
+            bindkey -M "$_clai_km" '^[OA^[OA' _clai_up_arrow_double
+        done
+        KEYTIMEOUT="$_clai_prev_keytimeout"
+    fi
+fi
+
+# Ensure arrow keys work in both emacs and viins keymaps even when
+# CLAI_UP_ARROW_HISTORY is disabled (some environments ship without defaults).
+if [[ "$CLAI_UP_ARROW_HISTORY" != "true" ]]; then
+    for _clai_km in emacs viins main; do
+        bindkey -M "$_clai_km" '^[[A' up-line-or-history
+        bindkey -M "$_clai_km" '^[OA' up-line-or-history
+        bindkey -M "$_clai_km" '^[[B' down-line-or-history
+        bindkey -M "$_clai_km" '^[OB' down-line-or-history
+    done
 fi
 
 # ============================================
@@ -890,9 +1191,6 @@ _clai_disable() {
     export CLAI_OFF=1
 
     # Restore default ZLE widgets (undo custom overrides)
-    zle -A .expand-or-complete expand-or-complete
-    zle -A .up-line-or-history up-line-or-history
-    zle -A .down-line-or-history down-line-or-history
     zle -A .self-insert self-insert
     zle -A .backward-delete-char backward-delete-char
     zle -A .backward-char backward-char
@@ -903,19 +1201,29 @@ _clai_disable() {
     zle -A .send-break send-break
 
     # Restore default keybindings
-    bindkey '^I' expand-or-complete
-    bindkey '^M' accept-line
-    bindkey '^[[A' up-line-or-history
-    bindkey '^[OA' up-line-or-history
-    bindkey '^[[B' down-line-or-history
-    bindkey '^[OB' down-line-or-history
-    bindkey '\e[1;3C' forward-word
+    for _clai_km in emacs viins main; do
+        bindkey -M "$_clai_km" '^I' expand-or-complete
+        bindkey -M "$_clai_km" '^M' accept-line
+        bindkey -M "$_clai_km" '^[[A' up-line-or-history
+        bindkey -M "$_clai_km" '^[OA' up-line-or-history
+        bindkey -M "$_clai_km" -r '^[[A^[[A'
+        bindkey -M "$_clai_km" -r '^[OA^[OA'
+        bindkey -M "$_clai_km" '^[[B' down-line-or-history
+        bindkey -M "$_clai_km" '^[OB' down-line-or-history
+        bindkey -M "$_clai_km" '\e[1;3C' forward-word
+    done
     bindkey -r '^X^V'
     bindkey -r '^Xs'
     bindkey -r '^Xd'
     bindkey -r '^Xg'
     bindkey -r '\eh'
     bindkey -r '˙'
+    bindkey -r '\es'
+    bindkey -r 'ß'
+
+    if [[ -n "${_CLAI_ORIG_KEYTIMEOUT:-}" ]]; then
+        KEYTIMEOUT="$_CLAI_ORIG_KEYTIMEOUT"
+    fi
 
     # Restore zsh-autosuggestions
     _clai_zsh_autosuggest_restore
@@ -926,7 +1234,7 @@ _clai_disable() {
 
     # Clear ghost text
     POSTDISPLAY=""
-    region_highlight=()
+    _ai_remove_ghost_highlight
 
     # Restore native history command
     unfunction history 2>/dev/null
@@ -1016,5 +1324,9 @@ if [[ -o interactive && -z "$_CLAI_REINIT" ]]; then
     trap '_clai_cleanup' EXIT HUP
 
     local short_id="${CLAI_SESSION_ID:0:8}"
-    echo -e "\033[2m🤖 clai [$short_id] Tab suggestions | ↑ history | → accept | ?\"describe task\"\033[0m"
+    if _clai_supports_utf8; then
+        printf '\033[2m🤖 clai [%s] Alt+S suggestions | Alt+H history | ?"describe task"\033[0m\n' "$short_id"
+    else
+        echo "clai [$short_id] Alt+S suggestions | Alt+H history | ?\"describe task\""
+    fi
 fi

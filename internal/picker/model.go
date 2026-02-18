@@ -45,7 +45,7 @@ const (
 // fetchDoneMsg is sent when an async Provider.Fetch completes.
 type fetchDoneMsg struct {
 	requestID uint64
-	items     []string
+	items     []Item
 	atEnd     bool
 	err       error
 }
@@ -74,7 +74,7 @@ type Model struct {
 	state     pickerState
 	tabs      []config.TabDef
 	activeTab int
-	items     []string
+	items     []Item
 	selection int // Index into items; -1 when empty
 	textInput textinput.Model
 	offset    int  // Pagination offset
@@ -86,8 +86,6 @@ type Model struct {
 
 	width  int // Terminal width
 	height int // Terminal height
-
-	pageSize int // Requested fetch page size (0 = auto by listHeight)
 
 	// result holds the selected command after the user presses Enter.
 	result string
@@ -136,11 +134,9 @@ func (m Model) WithLayout(l Layout) Model {
 	return m
 }
 
-// WithPageSize returns a copy of the Model with the given fetch page size.
-// Values <= 0 keep the default behavior (auto-size to visible list height).
-func (m Model) WithPageSize(size int) Model {
-	m.pageSize = size
-	return m
+// Layout returns the current layout mode (top-down or bottom-up).
+func (m Model) Layout() Layout {
+	return m.layout
 }
 
 // Result returns the selected command string, or "" if cancelled.
@@ -207,90 +203,53 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyEsc:
-		return m.handleEscKey()
+		m.state = stateCancelled
+		m.cancelInflight()
+		return m, tea.Quit
 
 	case tea.KeyCtrlC:
-		return m.handleCtrlCKey()
+		return m.handleCopy()
+
+	case tea.KeyCtrlU:
+		// Clear the query and refresh results immediately.
+		if m.textInput.Value() == "" {
+			return m, nil
+		}
+		m.textInput.SetValue("")
+		m.textInput.CursorEnd()
+		m.offset = 0
+		return m, m.startFetch()
 
 	case tea.KeyEnter:
-		return m.handleEnterKey()
+		return m.handleSelect()
 
 	case tea.KeyUp:
-		return m.handleUpKey()
+		m.moveSelection(-1)
+		return m, nil
 
 	case tea.KeyDown:
-		return m.handleDownKey()
+		m.moveSelection(+1)
+		return m, nil
 
 	case tea.KeyRight:
-		return m.handleRightKey()
+		return m.handleRightRefineKey()
 
 	case tea.KeyTab:
-		return m.handleTabKey()
+		return m.handleTabSwitch()
 	}
 
-	return m.handleTextInputKey(msg)
+	return m.handleTextInput(msg)
 }
 
-func (m Model) handleEscKey() (tea.Model, tea.Cmd) {
-	m.state = stateCancelled
-	m.cancelInflight()
-	return m, tea.Quit
-}
-
-func (m Model) handleCtrlCKey() (tea.Model, tea.Cmd) {
-	if m.selection < 0 || m.selection >= len(m.items) {
-		return m, nil
-	}
-	return m, copyToClipboard(m.items[m.selection])
-}
-
-func (m Model) handleEnterKey() (tea.Model, tea.Cmd) {
-	if m.selection >= 0 && m.selection < len(m.items) {
-		m.result = m.items[m.selection]
-	}
-	m.cancelInflight()
-	return m, tea.Quit
-}
-
-func (m Model) handleUpKey() (tea.Model, tea.Cmd) {
-	if m.state == stateLoading {
-		return m, nil
-	}
-	if m.layout == LayoutBottomUp {
-		if m.selection < len(m.items)-1 {
-			m.selection++
-		}
-		return m, nil
-	}
-	if m.selection > 0 {
-		m.selection--
-	}
-	return m, nil
-}
-
-func (m Model) handleDownKey() (tea.Model, tea.Cmd) {
-	if m.state == stateLoading {
-		return m, nil
-	}
-	if m.layout == LayoutBottomUp {
-		if m.selection > 0 {
-			m.selection--
-		}
-		return m, nil
-	}
-	if m.selection < len(m.items)-1 {
-		m.selection++
-	}
-	return m, nil
-}
-
-func (m Model) handleRightKey() (tea.Model, tea.Cmd) {
+// handleRightRefineKey replaces the query with the currently selected item and
+// triggers a debounced fetch. This enables a fast "select then refine" flow.
+func (m Model) handleRightRefineKey() (tea.Model, tea.Cmd) {
 	if m.selection < 0 || m.selection >= len(m.items) {
 		return m, nil
 	}
 
-	query := ValidateUTF8(StripANSI(m.items[m.selection]))
-	if m.textInput.Value() == query {
+	query := ValidateUTF8(StripANSI(m.items[m.selection].Value))
+	if query == "" || m.textInput.Value() == query {
 		return m, nil
 	}
 
@@ -300,19 +259,56 @@ func (m Model) handleRightKey() (tea.Model, tea.Cmd) {
 	return m, m.startDebounce()
 }
 
-func (m Model) handleTabKey() (tea.Model, tea.Cmd) {
-	if len(m.tabs) <= 1 {
-		return m, nil
+// handleCopy copies the selected item to the clipboard.
+func (m Model) handleCopy() (tea.Model, tea.Cmd) {
+	if m.selection >= 0 && m.selection < len(m.items) {
+		return m, copyToClipboard(m.items[m.selection].Value)
 	}
-	m.activeTab = (m.activeTab + 1) % len(m.tabs)
-	m.offset = 0
-	return m, m.startFetch()
+	return m, nil
 }
 
-func (m Model) handleTextInputKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+// handleSelect accepts the current selection and quits.
+func (m Model) handleSelect() (tea.Model, tea.Cmd) {
+	if m.selection >= 0 && m.selection < len(m.items) {
+		m.result = m.items[m.selection].Value
+	}
+	m.cancelInflight()
+	return m, tea.Quit
+}
+
+// moveSelection moves the selection cursor by delta, respecting layout direction.
+// A negative delta means "up" visually; positive means "down" visually.
+func (m *Model) moveSelection(delta int) {
+	if m.state == stateLoading {
+		return
+	}
+	// In bottom-up layout, visual "up" increases the index.
+	if m.layout == LayoutBottomUp {
+		delta = -delta
+	}
+	next := m.selection + delta
+	if next >= 0 && next < len(m.items) {
+		m.selection = next
+	}
+}
+
+// handleTabSwitch cycles to the next tab if multiple tabs exist.
+func (m Model) handleTabSwitch() (tea.Model, tea.Cmd) {
+	if len(m.tabs) > 1 {
+		m.activeTab = (m.activeTab + 1) % len(m.tabs)
+		m.offset = 0
+		return m, m.startFetch()
+	}
+	return m, nil
+}
+
+// handleTextInput delegates to the text input widget and triggers a
+// debounced search if the query changed.
+func (m Model) handleTextInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	prevQuery := m.textInput.Value()
 	var cmd tea.Cmd
 	m.textInput, cmd = m.textInput.Update(msg)
+
 	if m.textInput.Value() != prevQuery {
 		m.offset = 0
 		return m, tea.Batch(cmd, m.startDebounce())
@@ -335,7 +331,25 @@ func (m Model) handleFetchDone(msg fetchDoneMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	m.items = msg.items
+	items := msg.items
+	// Always apply a local substring filter. This keeps behavior consistent
+	// across providers (history + suggestions) and allows matching anywhere
+	// within the command text.
+	if q := strings.TrimSpace(m.textInput.Value()); q != "" {
+		qLower := strings.ToLower(q)
+		filtered := make([]Item, 0, len(items))
+		for _, it := range items {
+			// Filter against the raw command value (the thing we'd insert),
+			// not the decorated display text.
+			val := strings.ToLower(StripANSI(it.Value))
+			if strings.Contains(val, qLower) {
+				filtered = append(filtered, it)
+			}
+		}
+		items = filtered
+	}
+
+	m.items = items
 	m.atEnd = msg.atEnd
 
 	if len(m.items) == 0 {
@@ -378,18 +392,13 @@ func (m *Model) startFetch() tea.Cmd {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancelFetch = cancel
 
-	limit := m.pageSize
-	if limit <= 0 {
-		limit = m.listHeight()
-	}
-
 	tab := m.currentTab()
 	req := Request{
 		RequestID: reqID,
 		Query:     m.textInput.Value(),
 		TabID:     tab.ID,
 		Options:   tab.Args,
-		Limit:     limit,
+		Limit:     m.listHeight(),
 		Offset:    m.offset,
 	}
 
@@ -464,8 +473,8 @@ func (m Model) currentTab() config.TabDef {
 // header and footer).
 func (m Model) listHeight() int {
 	// 1 row for tab bar, 1 row for query line, 1 row for newlines between sections,
-	// 2 rows for top+bottom padding.
-	chrome := 5
+	// 1 row for footer hints, 2 rows for top+bottom padding.
+	chrome := 6
 	if m.layout == LayoutBottomUp {
 		chrome++ // +1 for separator line between items and query
 	}
@@ -498,6 +507,7 @@ var (
 	truncStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("208"))
 	errorStyle         = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	dimStyle           = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	hintStyle          = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("245"))
 )
 
 // Horizontal padding applied to the entire view for breathing room.
@@ -520,6 +530,10 @@ func (m Model) View() string {
 		b.WriteString(dimStyle.Render(strings.Repeat("─", m.contentWidth())))
 		b.WriteRune('\n')
 	}
+
+	// Footer hints (always above the query).
+	b.WriteString(m.viewFooter())
+	b.WriteRune('\n')
 
 	// Query line
 	b.WriteString(m.viewQuery())
@@ -547,9 +561,56 @@ func (m Model) viewTabBar() string {
 	}
 	bar := strings.Join(parts, " ")
 	if len(m.tabs) > 1 {
-		bar += dimStyle.Render("  " + tabSwitchHintLabel())
+		bar += hintStyle.Render("  " + tabSwitchHintLabel())
 	}
 	return bar
+}
+
+func (m Model) viewFooter() string {
+	lines := m.footerDetailLines()
+	parts := []string{
+		"Enter accept",
+		"Ctrl+U delete",
+		"Esc cancel",
+	}
+	if len(m.tabs) > 1 {
+		parts = append(parts, tabSwitchHintLabel())
+	}
+	if m.state == stateLoaded && len(m.items) > 0 {
+		parts = append(parts, rightRefineHintLabel())
+	}
+	lines = append(lines, dimStyle.Render(strings.Join(parts, " · ")))
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) footerDetailLines() []string {
+	if m.state != stateLoaded || len(m.items) == 0 || m.selection < 0 || m.selection >= len(m.items) {
+		return nil
+	}
+	details := m.items[m.selection].Details
+	if len(details) == 0 {
+		return nil
+	}
+	if len(details) > 2 {
+		details = details[:2]
+	}
+	cw := m.contentWidth()
+	lines := make([]string, 0, len(details))
+	for _, d := range details {
+		lines = append(lines, dimStyle.Render(truncateFooterDetail(d, cw)))
+	}
+	return lines
+}
+
+func truncateFooterDetail(detail string, width int) string {
+	if width <= 0 || lipgloss.Width(detail) <= width {
+		return detail
+	}
+	truncateWidth := width - 2
+	if truncateWidth < 0 {
+		truncateWidth = 0
+	}
+	return MiddleTruncate(detail, truncateWidth)
 }
 
 // viewContent renders the item list or a status message.
@@ -585,35 +646,6 @@ func (m Model) viewContent() string {
 	return text
 }
 
-// renderListItem builds the styled string for a single list row.
-func renderListItem(display, query string, selected bool) string {
-	var base, hl lipgloss.Style
-	var prefix string
-	if selected {
-		base, hl, prefix = selectedStyle, matchSelectedStyle, "> "
-	} else {
-		base, hl, prefix = normalStyle, matchStyle, "  "
-	}
-
-	line := base.Render(prefix) + renderItem(display, query, base, hl)
-	if selected {
-		line += dimStyle.Render("  " + rightRefineHintLabel())
-	}
-	return line
-}
-
-// reverseAndPad reverses lines in-place and prepends empty lines so the
-// total count equals maxItems (used for LayoutBottomUp).
-func reverseAndPad(lines []string, maxItems int) []string {
-	for i, j := 0, len(lines)-1; i < j; i, j = i+1, j-1 {
-		lines[i], lines[j] = lines[j], lines[i]
-	}
-	if pad := maxItems - len(lines); pad > 0 {
-		lines = append(make([]string, pad), lines...)
-	}
-	return lines
-}
-
 // viewList renders the item list with selection marker.
 func (m Model) viewList() string {
 	maxItems := m.listHeight()
@@ -622,22 +654,90 @@ func (m Model) viewList() string {
 		n = maxItems
 	}
 
-	query := m.textInput.Value()
-	cw := m.contentWidth()
 	lines := make([]string, 0, n)
 	for i := 0; i < n; i++ {
-		display := m.items[i]
-		if cw > 4 {
-			display = MiddleTruncate(StripANSI(display), cw-4)
-		}
-		lines = append(lines, renderListItem(display, query, i == m.selection))
+		lines = append(lines, m.renderListLine(i))
 	}
 
 	if m.layout == LayoutBottomUp {
-		lines = reverseAndPad(lines, maxItems)
+		lines = bottomAlignLines(reverseLines(lines), maxItems)
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderListLine(i int) string {
+	query := m.textInput.Value()
+	display := m.prepareDisplayForLine(i)
+	base, hl, prefix := m.lineStyles(i, strings.HasPrefix(display, "[G] "))
+	cmdPart, metaPart := splitDisplayMeta(display)
+	line := base.Render(prefix) + renderItem(cmdPart, query, base, hl)
+	if metaPart != "" {
+		line += dimStyle.Render(metaPart)
+	}
+	if i == m.selection {
+		line += hintStyle.Render("  " + rightRefineHintLabel())
+	}
+	return line
+}
+
+func (m Model) prepareDisplayForLine(i int) string {
+	display := StripANSI(m.items[i].displayText())
+	maxDisplayWidth := m.contentWidth() - lineReservedWidth(i == m.selection)
+	if maxDisplayWidth < 0 {
+		maxDisplayWidth = 0
+	}
+	if lipgloss.Width(display) <= maxDisplayWidth {
+		return display
+	}
+	truncateWidth := maxDisplayWidth - 2
+	if truncateWidth < 0 {
+		truncateWidth = 0
+	}
+	return MiddleTruncate(display, truncateWidth)
+}
+
+func lineReservedWidth(selected bool) int {
+	width := 2 // prefix: "> " or "  "
+	if selected {
+		width += lipgloss.Width("  " + rightRefineHintLabel())
+	}
+	return width
+}
+
+func (m Model) lineStyles(i int, isGlobalFallback bool) (lipgloss.Style, lipgloss.Style, string) {
+	if i == m.selection {
+		return selectedStyle, matchSelectedStyle, "> "
+	}
+	if isGlobalFallback {
+		return dimStyle, matchStyle, "  "
+	}
+	return normalStyle, matchStyle, "  "
+}
+
+func splitDisplayMeta(display string) (string, string) {
+	if idx := strings.Index(display, "  · "); idx >= 0 {
+		return display[:idx], display[idx:]
+	}
+	return display, ""
+}
+
+func reverseLines(lines []string) []string {
+	out := make([]string, len(lines))
+	copy(out, lines)
+	for i, j := 0, len(out)-1; i < j; i, j = i+1, j-1 {
+		out[i], out[j] = out[j], out[i]
+	}
+	return out
+}
+
+func bottomAlignLines(lines []string, maxItems int) []string {
+	pad := maxItems - len(lines)
+	if pad <= 0 {
+		return lines
+	}
+	padding := make([]string, pad)
+	return append(padding, lines...)
 }
 
 // ellipsis is the truncation marker used by MiddleTruncate.
@@ -696,16 +796,16 @@ func (m Model) viewQuery() string {
 
 func rightRefineHintLabel() string {
 	if supportsUnicodeHints() {
-		return "→"
+		return "→ use and refine"
 	}
-	return "Right: refine"
+	return "Right: use and refine"
 }
 
 func tabSwitchHintLabel() string {
 	if supportsUnicodeHints() {
-		return "⇥"
+		return "⇥ switch context"
 	}
-	return "Tab: switch scope"
+	return "Tab: switch context"
 }
 
 func supportsUnicodeHints() bool {

@@ -20,7 +20,7 @@ Add a first-party TUI picker (Bubble Tea) that provides a consistent **history**
 - Replacing native shell completion systems.
 - Windows/PowerShell support in this phase.
 - Mouse interaction (click/scroll) in v1.
-- Full-screen reader accessibility in v1.
+- Full screen reader accessibility in v1.
 
 ## User Experience
 ### Entry
@@ -85,12 +85,9 @@ Unknown flags cause exit 1 with usage printed to stderr. `--help` and `--version
 
 Exit behavior:
 - Success: exit 0 with selected item on stdout (followed by a single newline; `$()` capture strips it).
-- Cancel: exit 1 with no output on stdout or stderr.
+- Cancel: exit 1 with no output.
 - No terminal / TERM=dumb: exit 2 with no output (cannot open `/dev/tty` or terminal incapable).
 - Invalid flags/args: exit 1 with error to stderr.
-
-Shell glue only needs to branch on exit code; stderr remains diagnostic for
-human-facing error details.
 
 ### Query Semantics
 `--query` is **substring match** for v1 (no fuzzy). Filtered results are ordered by timestamp descending (most recent first) within the selected scope. Case sensitivity is controlled by config (default: case-insensitive).
@@ -135,7 +132,7 @@ These keys must be added to `internal/config/config.go` as a new `HistoryConfig`
 
 ## Input Sanitization
 - **--query:** max 4096 bytes. Strip control characters (0x00-0x1F except 0x09 tab). Reject embedded newlines. If exceeded, truncate to 4096 bytes and proceed.
-- **History items from providers:** strip ANSI escape sequences before display AND before stdout output. Use a comprehensive regex that covers CSI (`\x1b\[[0-9;?]*[ -/]*[@-~]`), OSC sequences (`\x1b\].*?(?:\x1b\\|\x07)`), and character set selection (`\x1b\([B0UK]`), or use an existing ANSI stripping library. Multi-line commands: display with a visual `\n` indicator in the list; output the full multi-line command as-is on stdout (shell handles multi-line insertion).
+- **History items from providers:** strip ANSI escape sequences before display AND before stdout output. Use a comprehensive regex that covers SGR (`\x1b\[[0-9;]*[a-zA-Z]`), OSC sequences (`\x1b\][^\a]*\a`), and character set selection (`\x1b\([B0UK]`), or use an existing ANSI stripping library. Multi-line commands: display with a visual `\n` indicator in the list; output the full multi-line command as-is on stdout (shell handles multi-line insertion).
 - **Selected output:** raw UTF-8 text only, no terminal escape codes. Followed by a single newline.
 
 ## Encoding
@@ -206,7 +203,7 @@ CLI remains `--tabs=session,global` for v1; tab ids map to config entries.
 ### 3) Picker Core (Bubble Tea)
 - Create `internal/picker` package with:
 	- `Model` with explicit state enum:
-	  ```text
+	  ```
 	  States: idle | loading | loaded | empty | error
 	  Transitions:
 		idle    → loading    (on open / fetch triggered)
@@ -246,7 +243,7 @@ CLI remains `--tabs=session,global` for v1; tab ids map to config entries.
 #### Provider Protocol (Daemon IPC)
 The history provider queries the daemon via gRPC. A new RPC method is required:
 
-```proto
+```
 rpc FetchHistory(HistoryFetchRequest) returns (HistoryFetchResponse)
 
 HistoryFetchRequest {

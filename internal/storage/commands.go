@@ -5,20 +5,19 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/runger/clai/internal/cmdutil"
 )
 
-const commandNormLikeClause = " AND command_norm LIKE ? ESCAPE '\\'"
-
 // ErrCommandNotFound is returned when a command is not found.
 var ErrCommandNotFound = errors.New("command not found")
+
+const commandNormLikeClause = " AND command_norm LIKE ?"
 
 // CreateCommand creates a new command record.
 // It automatically normalizes the command and generates a hash.
 func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
-	if err := validateCommandForCreate(cmd); err != nil {
+	if err := validateCreateCommandInput(cmd); err != nil {
 		return err
 	}
 
@@ -33,7 +32,7 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 	}
 
 	// Determine is_success value: nil = unknown (treated as success), false = failure, true = success
-	isSuccess := optionalBoolToInt(cmd.IsSuccess)
+	isSuccess := boolPtrToIntPtr(cmd.IsSuccess)
 
 	// Compute derived metadata from command text
 	cmd.IsSudo = cmdutil.IsSudo(cmd.Command)
@@ -88,32 +87,34 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 	return nil
 }
 
-func validateCommandForCreate(cmd *Command) error {
-	switch {
-	case cmd == nil:
+func validateCreateCommandInput(cmd *Command) error {
+	if cmd == nil {
 		return errors.New("command cannot be nil")
-	case cmd.CommandID == "":
-		return errors.New("command_id is required")
-	case cmd.SessionID == "":
-		return errors.New("session_id is required")
-	case cmd.CWD == "":
-		return errors.New("cwd is required")
-	case cmd.Command == "":
-		return errors.New("command is required")
-	default:
-		return nil
 	}
+	if cmd.CommandID == "" {
+		return errors.New("command_id is required")
+	}
+	if cmd.SessionID == "" {
+		return errors.New("session_id is required")
+	}
+	if cmd.CWD == "" {
+		return errors.New("cwd is required")
+	}
+	if cmd.Command == "" {
+		return errors.New("command is required")
+	}
+	return nil
 }
 
-func optionalBoolToInt(v *bool) *int {
-	if v == nil {
+func boolPtrToIntPtr(b *bool) *int {
+	if b == nil {
 		return nil
 	}
-	n := 0
-	if *v {
-		n = 1
+	v := 0
+	if *b {
+		v = 1
 	}
-	return &n
+	return &v
 }
 
 // UpdateCommandEnd updates a command's end time, duration, and exit code.
@@ -172,9 +173,14 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 	return commands, nil
 }
 
-// QueryHistoryCommands queries deduplicated command history.
-// It groups by command_norm and returns the most recent timestamp for each unique command.
+// QueryHistoryCommands queries command history rows intended for interactive pickers.
+// When q.Deduplicate is true, it groups by raw command text and returns the most
+// recent timestamp for each unique command string.
 func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) ([]HistoryRow, error) {
+	// This API is specifically for "history picker" style queries: always
+	// deduplicate to avoid overwhelming the UI with repeated commands.
+	q.Deduplicate = true
+
 	query, args := buildHistoryQuerySQL(q)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
@@ -200,68 +206,19 @@ func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) 
 }
 
 func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
-	innerWhere := " WHERE 1=1"
-	args := make([]interface{}, 0)
-
-	if q.SessionID != nil {
-		innerWhere += " AND session_id = ?"
-		args = append(args, *q.SessionID)
-	}
-	if q.ExcludeSessionID != "" {
-		innerWhere += " AND session_id != ?"
-		args = append(args, q.ExcludeSessionID)
-	}
-	if q.CWD != nil {
-		innerWhere += " AND cwd = ?"
-		args = append(args, *q.CWD)
-	}
-	if q.Prefix != "" {
-		prefix := escapeLikePattern(q.Prefix)
-		innerWhere += commandNormLikeClause
-		args = append(args, prefix+"%")
-	}
-	if q.Substring != "" {
-		substring := escapeLikePattern(q.Substring)
-		innerWhere += commandNormLikeClause
-		args = append(args, "%"+substring+"%")
-	}
-	if q.SuccessOnly {
-		innerWhere += " AND is_success = 1"
-	}
-	if q.FailureOnly {
-		innerWhere += " AND is_success = 0"
-	}
-
-	// Use a window function to deterministically keep only the latest row per
-	// command_norm. Include id as a tie-breaker when timestamps are equal.
+	// Deduplicate by exact command text. Do not group by command_norm: command_norm
+	// intentionally normalizes variable arguments (paths, URLs, numbers) and is too
+	// aggressive for history browsing.
 	query := `
-		SELECT command, ts_start_unix_ms
-		FROM (
-			SELECT
-				command,
-				ts_start_unix_ms,
-				ROW_NUMBER() OVER (
-					PARTITION BY command_norm
-					ORDER BY ts_start_unix_ms DESC, id DESC
-				) AS rn
-			FROM commands` + innerWhere + `
-		) ranked
-		WHERE rn = 1
-		ORDER BY ts_start_unix_ms DESC`
+		SELECT command, MAX(ts_start_unix_ms) as latest_ts
+		FROM commands
+		WHERE 1=1
+	`
+	args := make([]interface{}, 0)
+	query, args = appendCommandQueryFilters(query, args, q)
 
-	if q.Limit > 0 {
-		query += " LIMIT ?"
-		args = append(args, q.Limit)
-	} else {
-		query += " LIMIT 1000"
-	}
-
-	if q.Offset > 0 {
-		query += " OFFSET ?"
-		args = append(args, q.Offset)
-	} else if q.Offset < 0 {
-		q.Offset = 0
-	}
+	query += " GROUP BY command ORDER BY latest_ts DESC"
+	query, args = appendCommandQueryLimitOffset(query, args, q)
 
 	return query, args
 }
@@ -277,7 +234,15 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 		WHERE 1=1
 	`
 	args := make([]interface{}, 0)
+	query, args = appendCommandQueryFilters(query, args, q)
 
+	query += " ORDER BY ts_start_unix_ms DESC"
+	query, args = appendCommandQueryLimitOffset(query, args, q)
+
+	return query, args
+}
+
+func appendCommandQueryFilters(query string, args []interface{}, q CommandQuery) (string, []interface{}) {
 	if q.SessionID != nil {
 		query += " AND session_id = ?"
 		args = append(args, *q.SessionID)
@@ -292,11 +257,11 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	}
 	if q.Prefix != "" {
 		query += commandNormLikeClause
-		args = append(args, escapeLikePattern(q.Prefix)+"%")
+		args = append(args, q.Prefix+"%")
 	}
 	if q.Substring != "" {
 		query += commandNormLikeClause
-		args = append(args, "%"+escapeLikePattern(q.Substring)+"%")
+		args = append(args, "%"+q.Substring+"%")
 	}
 	if q.SuccessOnly {
 		query += " AND is_success = 1"
@@ -304,9 +269,10 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	if q.FailureOnly {
 		query += " AND is_success = 0"
 	}
+	return query, args
+}
 
-	query += " ORDER BY ts_start_unix_ms DESC"
-
+func appendCommandQueryLimitOffset(query string, args []interface{}, q CommandQuery) (string, []interface{}) {
 	if q.Limit > 0 {
 		query += " LIMIT ?"
 		args = append(args, q.Limit)
@@ -317,19 +283,8 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	if q.Offset > 0 {
 		query += " OFFSET ?"
 		args = append(args, q.Offset)
-	} else if q.Offset < 0 {
-		// Defense-in-depth: clamp negative offsets to 0
-		q.Offset = 0
 	}
-
 	return query, args
-}
-
-func escapeLikePattern(value string) string {
-	escaped := strings.ReplaceAll(value, `\`, `\\`)
-	escaped = strings.ReplaceAll(escaped, `%`, `\%`)
-	escaped = strings.ReplaceAll(escaped, `_`, `\_`)
-	return escaped
 }
 
 func scanCommandRow(rows *sql.Rows) (Command, error) {

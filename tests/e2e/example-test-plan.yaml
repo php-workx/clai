@@ -224,67 +224,6 @@ tests:
       - screen_contains: "history"
 
   # ===========================================================================
-  # Command Suggestion Tests
-  # ===========================================================================
-
-  - name: "Ghost text suggestion appears"
-    description: "Typing a known command prefix shows ghost text suggestion"
-    shell: bash
-    tags: [suggestions, ghost-text]
-    setup:
-      - "git status"
-      - "git log --oneline"
-    steps:
-      - type: "git st"
-      - wait: "500ms"
-    expect:
-      # Ghost text should complete the suggestion
-      - screen_contains: "atus"  # Suggestion completing "git status"
-
-  - name: "Right arrow accepts full suggestion"
-    description: "Pressing Right at end of line accepts the ghost text"
-    shell: bash
-    tags: [suggestions]
-    setup:
-      - "docker ps -a"
-    steps:
-      - type: "docker p"
-      - wait: "300ms"
-      - press: "Right"
-      - wait: "200ms"
-    expect:
-      - screen_contains: "docker ps"
-
-  - name: "Alt+Right accepts next token"
-    description: "Alt+Right accepts one token of the suggestion at a time"
-    shell: bash
-    tags: [suggestions, token]
-    setup:
-      - "kubectl get pods -n production"
-    steps:
-      - type: "kubectl"
-      - wait: "300ms"
-      - press: "Alt+Right"  # Accept "get"
-      - wait: "200ms"
-    expect:
-      - screen_contains: "kubectl get"
-      - screen_not_contains: "pods"  # Rest not accepted yet
-
-  - name: "Escape clears suggestion"
-    description: "Pressing Escape removes the ghost text"
-    shell: bash
-    tags: [suggestions]
-    setup:
-      - "npm install"
-    steps:
-      - type: "npm i"
-      - wait: "300ms"
-      - press: "Escape"
-      - wait: "200ms"
-    expect:
-      - screen_not_contains: "nstall"  # Ghost text gone
-
-  # ===========================================================================
   # Shell Integration Tests
   # ===========================================================================
 
@@ -506,20 +445,6 @@ tests:
       - screen_contains: "false"
       - screen_not_contains: "will_succeed"
 
-  - name: "clai suggest uses session context"
-    description: "Suggest command returns matches from session history"
-    shell: bash
-    tags: [cli, suggest]
-    setup:
-      - "git status"
-      - "git log --oneline"
-    steps:
-      - type: "clai suggest git"
-      - press: "Enter"
-      - wait: "500ms"
-    expect:
-      - screen_contains: "git"
-
   - name: "clai off disables integration"
     description: "Running clai off disables shell features"
     shell: bash
@@ -668,6 +593,297 @@ tests:
       - screen_contains: "history"
       - screen_contains: "test command"
 
+  # ===========================================================================
+  # Paths with Spaces Tests (P0)
+  # ===========================================================================
+
+  - name: "CWD scope works with paths containing spaces"
+    description: "History picker CWD scope handles directories with spaces correctly"
+    shell: bash
+    tags: [picker, history, scope, spaces, smoke]
+    setup:
+      - "mkdir -p '/tmp/test dir with spaces'"
+      - "cd '/tmp/test dir with spaces'"
+      - "echo 'command in spaced dir'"
+      - "ls -la"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Tab"  # Switch to CWD scope
+      - wait: "300ms"
+    expect:
+      - screen_contains: "CWD"
+      - screen_contains: "command in spaced dir"
+
+  - name: "CWD scope filters correctly with spaces in path"
+    description: "Only commands from current spaced directory appear"
+    shell: zsh
+    tags: [picker, history, scope, spaces]
+    setup:
+      - "mkdir -p '/tmp/my project'"
+      - "cd '/tmp/my project'"
+      - "echo 'in my project'"
+      - "cd /tmp"
+      - "echo 'in tmp root'"
+      - "cd '/tmp/my project'"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Tab"  # CWD scope
+      - wait: "300ms"
+    expect:
+      - screen_contains: "in my project"
+      - screen_not_contains: "in tmp root"
+
+  - name: "History args handle special path characters"
+    description: "Paths with quotes and special characters don't break filtering"
+    shell: bash
+    tags: [picker, history, scope, spaces, edge-case]
+    setup:
+      - "mkdir -p \"/tmp/path'with\\\"quotes\""
+      - "cd \"/tmp/path'with\\\"quotes\""
+      - "echo 'special path command'"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Tab"  # CWD scope
+      - wait: "500ms"
+    expect:
+      - screen_contains: "special path command"
+
+  # ===========================================================================
+  # Incognito Mode Tests (P0)
+  # ===========================================================================
+
+  - name: "Incognito mode can be enabled"
+    description: "clai incognito on sets ephemeral mode"
+    shell: bash
+    tags: [incognito, privacy, smoke]
+    steps:
+      - type: "clai incognito on"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "incognito"
+      - screen_matches: "(enabled|on)"
+
+  - name: "Commands in incognito mode not persisted"
+    description: "Commands run in incognito don't appear in global history"
+    shell: bash
+    tags: [incognito, privacy]
+    setup:
+      - "clai incognito on"
+    steps:
+      - type: "echo 'SECRET_INCOGNITO_COMMAND_12345'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai incognito off"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --global | grep SECRET_INCOGNITO"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      # Command should NOT be in global history
+      - screen_not_contains: "SECRET_INCOGNITO_COMMAND_12345"
+
+  - name: "Incognito mode can be disabled"
+    description: "clai incognito off returns to normal mode"
+    shell: bash
+    tags: [incognito, privacy]
+    setup:
+      - "clai incognito on"
+    steps:
+      - type: "clai incognito off"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "incognito"
+      - screen_matches: "(disabled|off)"
+
+  - name: "CLAI_NO_RECORD prevents all ingestion"
+    description: "Setting CLAI_NO_RECORD=1 stops all command recording"
+    shell: bash
+    tags: [incognito, privacy, env-var]
+    steps:
+      - type: "export CLAI_NO_RECORD=1"
+      - press: "Enter"
+      - wait: "200ms"
+      - type: "echo 'NO_RECORD_TEST_CMD'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "unset CLAI_NO_RECORD"
+      - press: "Enter"
+      - wait: "200ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_not_contains: "NO_RECORD_TEST_CMD"
+
+  # ===========================================================================
+  # Command Ingestion Tests (P1)
+  # ===========================================================================
+
+  - name: "Command ingestion captures exit code success"
+    description: "Exit code 0 is recorded correctly"
+    shell: bash
+    tags: [ingestion, exit-code, bash]
+    steps:
+      - type: "true"  # Exit 0
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID --json | tail -1"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "exit_code"
+      - screen_contains: "0"
+
+  - name: "Command ingestion captures exit code failure"
+    description: "Non-zero exit codes are recorded"
+    shell: bash
+    tags: [ingestion, exit-code, bash]
+    steps:
+      - type: "false"  # Exit 1
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID --json | tail -1"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "exit_code"
+      - screen_not_contains: "\"exit_code\":0"
+
+  - name: "Command ingestion captures CWD"
+    description: "Working directory is recorded with each command"
+    shell: bash
+    tags: [ingestion, cwd, bash]
+    steps:
+      - type: "cd /tmp && echo 'ingestion_cwd_test'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --cwd=/tmp --global"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "ingestion_cwd_test"
+
+  - name: "Command ingestion in zsh"
+    description: "Commands are logged correctly in zsh"
+    shell: zsh
+    tags: [ingestion, zsh, cross-shell]
+    steps:
+      - type: "echo 'zsh_ingestion_test_12345'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "zsh_ingestion_test_12345"
+
+  - name: "Command ingestion in fish"
+    description: "Commands are logged correctly in fish"
+    shell: fish
+    tags: [ingestion, fish, cross-shell]
+    steps:
+      - type: "echo 'fish_ingestion_test_12345'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "fish_ingestion_test_12345"
+
+  - name: "Command with special characters ingested"
+    description: "Quotes, pipes, and redirects are captured correctly"
+    shell: bash
+    tags: [ingestion, special-chars]
+    steps:
+      - type: "echo \"hello | world\" > /dev/null && echo 'done'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "hello | world"
+
+  - name: "Command with unicode characters ingested"
+    description: "Unicode characters are captured without corruption"
+    shell: bash
+    tags: [ingestion, unicode]
+    steps:
+      - type: "echo '日本語 émoji 🎉'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "clai history --session=$CLAI_SESSION_ID"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "日本語"
+
+  # ===========================================================================
+  # Daemon Management Tests (P1)
+  # ===========================================================================
+
+  - name: "clai daemon status shows state"
+    description: "Status command reports daemon running/stopped"
+    shell: bash
+    tags: [daemon, management, smoke]
+    steps:
+      - type: "clai daemon status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(running|stopped|pid|PID)"
+
+  - name: "clai daemon start works"
+    description: "Start command launches daemon successfully"
+    shell: bash
+    tags: [daemon, management]
+    steps:
+      - type: "clai daemon start"
+      - press: "Enter"
+      - wait: "2s"
+      - type: "clai daemon status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "running"
+
+  - name: "clai daemon stop graceful shutdown"
+    description: "Stop command shuts down daemon cleanly"
+    shell: bash
+    tags: [daemon, management]
+    setup:
+      - "clai daemon start"
+    steps:
+      - type: "clai daemon stop"
+      - press: "Enter"
+      - wait: "2s"
+      - type: "clai daemon status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_matches: "(stopped|not running)"
+
+  - name: "clai daemon restart sequence"
+    description: "Restart performs stop then start"
+    shell: bash
+    tags: [daemon, management]
+    steps:
+      - type: "clai daemon restart"
+      - press: "Enter"
+      - wait: "3s"
+      - type: "clai daemon status"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "running"
+
 # ===========================================================================
 # Test Plan Metadata
 # ===========================================================================
@@ -677,27 +893,36 @@ metadata:
   author: "clai team"
   purpose: "Reference implementation for AI-assisted terminal testing"
 
-  # Statistics
-  total_tests: 42
+  # Statistics (updated after moving suggestion-related tests)
+  total_tests: 55
   skipped_tests: 4
   by_tag:
-    smoke: 4
-    picker: 14
+    smoke: 5
+    picker: 17
     history: 13
-    scope: 3
+    scope: 6
+    spaces: 3
     truncation: 4
     clipboard: 1
-    suggestions: 4
     integration: 4
-    cli: 10
-    parameters: 3
+    cli: 9
+    parameters: 2
     pty: 3
     voice: 1
     edge-case: 3
-    cross-shell: 2
+    cross-shell: 4
     toggle: 2
     ai: 4
     skipped: 4
+    incognito: 4
+    privacy: 4
+    ingestion: 7
+    exit-code: 2
+    cwd: 1
+    unicode: 1
+    special-chars: 1
+    daemon: 4
+    management: 4
 
   # Execution notes
   notes:
@@ -709,3 +934,6 @@ metadata:
     - "Parameter tests verify CWD and exit code logging/filtering"
     - "AI tests (clai cmd, clai ask) are skipped until features are implemented"
     - "Truncation tests verify long commands show ellipsis but paste/copy full text"
+    - "Incognito tests verify privacy features work correctly"
+    - "Daemon tests may require stopping/starting the daemon"
+    - "Suggestion-related tests (search, discovery, debug, ghost text, typo, cache) are in suggestions-tests.yaml"

@@ -3,7 +3,6 @@ package history
 
 import (
 	"bufio"
-	"context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -82,14 +81,7 @@ func ImportBashHistory(path string) ([]ImportEntry, error) {
 // Zsh extended history format: `: <timestamp>:<duration>;<command>`
 // Handles multiline commands with backslash continuation.
 // Returns up to MaxImportEntries most recent entries.
-func ImportZshHistory(ctx context.Context, path string) ([]ImportEntry, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
+func ImportZshHistory(path string) ([]ImportEntry, error) {
 	if path == "" {
 		path = zshHistoryPath()
 	}
@@ -112,9 +104,6 @@ func ImportZshHistory(ctx context.Context, path string) ([]ImportEntry, error) {
 
 	var p importParser
 	for scanner.Scan() {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
 		p.processLine(scanner.Text())
 	}
 
@@ -127,9 +116,6 @@ func ImportZshHistory(ctx context.Context, path string) ([]ImportEntry, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
@@ -227,65 +213,60 @@ func ImportFishHistory(path string) ([]ImportEntry, error) {
 	}
 	defer file.Close()
 
+	parser := &fishHistoryParser{}
+
 	scanner := bufio.NewScanner(file)
 	buf := make([]byte, 0, 64*1024)
 	scanner.Buffer(buf, 1024*1024)
 
-	var parser fishImportParser
 	for scanner.Scan() {
-		parser.processLine(scanner.Text())
+		parser.parseLine(scanner.Text())
 	}
-
-	parser.flushCurrent()
 
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
 
-	return trimToLimit(parser.entries, MaxImportEntries), nil
+	return trimToLimit(parser.finish(), MaxImportEntries), nil
 }
 
-type fishImportParser struct {
+type fishHistoryParser struct {
 	entries          []ImportEntry
 	currentCmd       string
 	currentTimestamp time.Time
 	inPaths          bool
 }
 
-func (p *fishImportParser) processLine(line string) {
+func (p *fishHistoryParser) parseLine(line string) {
 	switch {
 	case strings.HasPrefix(line, "- cmd: "):
 		p.startEntry(strings.TrimPrefix(line, "- cmd: "))
 	case strings.HasPrefix(line, "  when: "):
-		p.parseTimestamp(strings.TrimPrefix(line, "  when: "))
+		p.setTimestamp(strings.TrimPrefix(line, "  when: "))
 	case strings.HasPrefix(line, "  paths:"):
 		p.inPaths = true
-	case p.inPaths && strings.HasPrefix(line, "    - "):
-		return
 	case p.inPaths && strings.HasPrefix(line, "    "):
-		return
-	default:
-		if !strings.HasPrefix(line, " ") {
-			p.inPaths = false
-		}
+		// Ignore paths section content.
+	case !strings.HasPrefix(line, " "):
+		p.inPaths = false
 	}
 }
 
-func (p *fishImportParser) startEntry(cmd string) {
+func (p *fishHistoryParser) startEntry(cmd string) {
 	p.flushCurrent()
 	p.currentCmd = cmd
 	p.currentTimestamp = time.Time{}
 	p.inPaths = false
 }
 
-func (p *fishImportParser) parseTimestamp(raw string) {
-	if ts, err := strconv.ParseInt(raw, 10, 64); err == nil {
+func (p *fishHistoryParser) setTimestamp(tsStr string) {
+	if ts, err := strconv.ParseInt(tsStr, 10, 64); err == nil {
 		p.currentTimestamp = time.Unix(ts, 0)
 	}
 	p.inPaths = false
 }
 
-func (p *fishImportParser) flushCurrent() {
+func (p *fishHistoryParser) flushCurrent() {
 	if p.currentCmd == "" {
 		return
 	}
@@ -295,6 +276,11 @@ func (p *fishImportParser) flushCurrent() {
 	})
 	p.currentCmd = ""
 	p.currentTimestamp = time.Time{}
+}
+
+func (p *fishHistoryParser) finish() []ImportEntry {
+	p.flushCurrent()
+	return p.entries
 }
 
 // decodeFishEscapes decodes fish shell escape sequences.
@@ -327,7 +313,7 @@ func decodeFishEscapes(s string) string {
 
 // bashHistoryPath returns the path to bash history file.
 func bashHistoryPath() string {
-	if histFile := os.Getenv("HISTFILE"); histFile != "" && shellLooksLikeBash() {
+	if histFile := os.Getenv("HISTFILE"); histFile != "" {
 		return histFile
 	}
 	home, err := os.UserHomeDir()
@@ -381,15 +367,6 @@ func DetectShell() string {
 // ImportForShell imports history for the specified shell.
 // Shell can be "bash", "zsh", "fish", or "auto" (detect from SHELL env).
 func ImportForShell(shell string) ([]ImportEntry, error) {
-	return ImportForShellWithContext(context.Background(), shell)
-}
-
-// ImportForShellWithContext imports history for the specified shell with
-// cancellation support for zsh history parsing.
-func ImportForShellWithContext(ctx context.Context, shell string) ([]ImportEntry, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if shell == "auto" || shell == "" {
 		shell = DetectShell()
 	}
@@ -398,18 +375,10 @@ func ImportForShellWithContext(ctx context.Context, shell string) ([]ImportEntry
 	case "bash":
 		return ImportBashHistory("")
 	case "zsh":
-		return ImportZshHistory(ctx, "")
+		return ImportZshHistory("")
 	case "fish":
 		return ImportFishHistory("")
 	default:
 		return nil, nil
 	}
-}
-
-func shellLooksLikeBash() bool {
-	if os.Getenv("BASH_VERSION") != "" {
-		return true
-	}
-	shell := strings.ToLower(os.Getenv("SHELL"))
-	return strings.Contains(shell, "bash")
 }

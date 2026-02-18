@@ -13,18 +13,25 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/status"
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	"github.com/runger/clai/internal/suggestions/batch"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/feedback"
+	"github.com/runger/clai/internal/suggestions/ingest"
+	"github.com/runger/clai/internal/suggestions/maintenance"
+	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
 // Version is set at build time
 var Version = "dev"
 
-// LLMQuerier abstracts LLM queries for testability (D23).
+// LLMQuerier abstracts LLM queries for testability.
 type LLMQuerier interface {
 	Query(ctx context.Context, prompt string) (string, error)
 }
@@ -35,6 +42,7 @@ type Server struct {
 
 	// Dependencies
 	store    storage.Store
+	v2db     *suggestdb.DB // V2 suggestions database (optional, enables V2 features)
 	ranker   suggest.Ranker
 	registry *provider.Registry
 	llm      LLMQuerier
@@ -54,6 +62,25 @@ type Server struct {
 	shutdownOnce sync.Once
 	wg           sync.WaitGroup
 
+	// Feedback
+	feedbackStore *feedback.Store
+
+	// Maintenance
+	maintenanceRunner *maintenance.Runner
+
+	// V2 batch writer (nil if V2 disabled)
+	batchWriter *batch.Writer
+
+	// V2 scorer (nil if V2 disabled)
+	v2Scorer *suggest2.Scorer
+
+	// Scorer version: "v1" (default), "v2", or "blend"
+	scorerVersion string
+
+	// Backpressure
+	ingestionQueue *IngestionQueue
+	circuitBreaker *CircuitBreaker
+
 	// Metrics
 	mu             sync.RWMutex
 	commandsLogged int64
@@ -70,7 +97,7 @@ type ServerConfig struct {
 	// Registry is the provider registry (optional, created if nil)
 	Registry *provider.Registry
 
-	// LLM is the LLM querier for workflow analysis (optional)
+	// LLM is the LLM querier for workflow analysis (optional).
 	LLM LLMQuerier
 
 	// Paths is the path configuration (optional, uses defaults if nil)
@@ -82,6 +109,36 @@ type ServerConfig struct {
 	// IdleTimeout is the duration after which the daemon exits if idle
 	// Default: 20 minutes
 	IdleTimeout time.Duration
+
+	// FeedbackStore is the suggestion feedback store (optional)
+	FeedbackStore *feedback.Store
+
+	// MaintenanceRunner is the background maintenance goroutine (optional).
+	// If non-nil, the runner is started with the server and notified on each
+	// ingested command event for activity tracking.
+	MaintenanceRunner *maintenance.Runner
+
+	// V2DB is the V2 suggestions database (optional, enables V2 features).
+	// If nil, V2 features are disabled and the daemon operates with V1 only.
+	V2DB *suggestdb.DB
+
+	// BatchWriter is the V2 batch event writer (optional).
+	// If nil and V2DB is non-nil, a default batch writer is created.
+	BatchWriter *batch.Writer
+
+	// V2Scorer is the V2 suggestion scorer (optional).
+	// If nil, V2 scoring is not available until dependencies are initialized
+	// (see the separate scorer dependency initialization).
+	V2Scorer *suggest2.Scorer
+
+	// ScorerVersion controls which suggestion scorer is used: "v1", "v2", or "blend".
+	// Default: "v1". When "v2" or "blend" is selected and V2Scorer is nil,
+	// falls back to "v1" with a warning.
+	ScorerVersion string
+
+	// ReloadFn is called on SIGHUP to reload configuration.
+	// If nil, SIGHUP is ignored.
+	ReloadFn ReloadFunc
 }
 
 // NewServer creates a new daemon server with the given configuration.
@@ -93,46 +150,121 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		return nil, fmt.Errorf("store is required")
 	}
 
-	// Set defaults
-	paths := cfg.Paths
-	if paths == nil {
-		paths = config.DefaultPaths()
-	}
+	paths := defaultPaths(cfg.Paths)
+	logger := defaultLogger(cfg.Logger)
+	ranker := defaultRanker(cfg.Ranker, cfg.Store)
+	registry := defaultRegistry(cfg.Registry)
+	idleTimeout := defaultIdleTimeout(cfg.IdleTimeout)
 
-	logger := cfg.Logger
-	if logger == nil {
-		logger = slog.Default()
-	}
+	// Create ingestion queue with default capacity (8192)
+	ingestQueue := NewIngestionQueue(0, logger)
 
-	ranker := cfg.Ranker
-	if ranker == nil {
-		ranker = suggest.NewRanker(cfg.Store)
-	}
+	// Create circuit breaker with defaults
+	cb := NewCircuitBreaker(&CircuitBreakerConfig{
+		Logger: logger,
+	})
 
-	registry := cfg.Registry
-	if registry == nil {
-		registry = provider.NewRegistry()
-	}
-
-	idleTimeout := cfg.IdleTimeout
-	if idleTimeout == 0 {
-		idleTimeout = 20 * time.Minute
-	}
+	bw := resolveBatchWriter(cfg.BatchWriter, cfg.V2DB)
+	v2scorer := resolveV2Scorer(cfg.V2Scorer, cfg.V2DB, logger)
+	scorerVersion := resolveScorerVersion(cfg.ScorerVersion, v2scorer, logger)
 
 	now := time.Now()
 	return &Server{
-		store:          cfg.Store,
-		ranker:         ranker,
-		registry:       registry,
-		llm:            cfg.LLM,
-		paths:          paths,
-		logger:         logger,
-		sessionManager: NewSessionManager(),
-		startTime:      now,
-		lastActivity:   now,
-		idleTimeout:    idleTimeout,
-		shutdownChan:   make(chan struct{}),
+		store:             cfg.Store,
+		v2db:              cfg.V2DB,
+		ranker:            ranker,
+		registry:          registry,
+		llm:               cfg.LLM,
+		paths:             paths,
+		logger:            logger,
+		sessionManager:    NewSessionManager(),
+		feedbackStore:     cfg.FeedbackStore,
+		startTime:         now,
+		lastActivity:      now,
+		idleTimeout:       idleTimeout,
+		shutdownChan:      make(chan struct{}),
+		maintenanceRunner: cfg.MaintenanceRunner,
+		batchWriter:       bw,
+		v2Scorer:          v2scorer,
+		scorerVersion:     scorerVersion,
+		ingestionQueue:    ingestQueue,
+		circuitBreaker:    cb,
 	}, nil
+}
+
+func defaultPaths(paths *config.Paths) *config.Paths {
+	if paths == nil {
+		return config.DefaultPaths()
+	}
+	return paths
+}
+
+func defaultLogger(logger *slog.Logger) *slog.Logger {
+	if logger == nil {
+		return slog.Default()
+	}
+	return logger
+}
+
+func defaultRanker(ranker suggest.Ranker, store storage.Store) suggest.Ranker {
+	if ranker == nil {
+		return suggest.NewRanker(store)
+	}
+	return ranker
+}
+
+func defaultRegistry(registry *provider.Registry) *provider.Registry {
+	if registry == nil {
+		return provider.NewRegistry()
+	}
+	return registry
+}
+
+func defaultIdleTimeout(timeout time.Duration) time.Duration {
+	if timeout == 0 {
+		return 20 * time.Minute
+	}
+	return timeout
+}
+
+func resolveBatchWriter(override *batch.Writer, v2db *suggestdb.DB) *batch.Writer {
+	if override != nil {
+		return override
+	}
+	if v2db == nil {
+		return nil
+	}
+	opts := batch.DefaultOptions()
+	opts.WritePathConfig = &ingest.WritePathConfig{}
+	return batch.NewWriter(v2db.DB(), opts)
+}
+
+func resolveV2Scorer(override *suggest2.Scorer, v2db *suggestdb.DB, logger *slog.Logger) *suggest2.Scorer {
+	if override != nil {
+		return override
+	}
+	if v2db == nil {
+		return nil
+	}
+	return initV2Scorer(v2db.DB(), logger)
+}
+
+func resolveScorerVersion(requested string, v2scorer *suggest2.Scorer, logger *slog.Logger) string {
+	version := requested
+	if version == "" {
+		if v2scorer != nil {
+			version = "blend"
+		} else {
+			version = "v1"
+		}
+	}
+	if (version == "v2" || version == "blend") && v2scorer == nil {
+		logger.Warn("scorer_version requires V2 scorer but V2 is unavailable; falling back to v1",
+			"requested", version,
+		)
+		return "v1"
+	}
+	return version
 }
 
 // Start starts the gRPC server and listens on the Unix socket.
@@ -162,7 +294,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Create gRPC server
-	s.grpcServer = grpc.NewServer()
+	s.grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(s.accessLogUnaryInterceptor()))
 	pb.RegisterClaiServiceServer(s.grpcServer, s)
 
 	// Write PID file
@@ -184,6 +316,20 @@ func (s *Server) Start(ctx context.Context) error {
 	// Start cache pruning
 	s.wg.Add(1)
 	go s.pruneCacheLoop(ctx)
+
+	// Start maintenance runner (if configured)
+	if s.maintenanceRunner != nil {
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.maintenanceRunner.Run(ctx, s.shutdownChan)
+		}()
+	}
+
+	// Start V2 batch writer (if configured)
+	if s.batchWriter != nil {
+		s.batchWriter.Start()
+	}
 
 	// Serve gRPC requests in a goroutine
 	errChan := make(chan error, 1)
@@ -207,6 +353,23 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 }
 
+func (s *Server) accessLogUnaryInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		start := time.Now()
+		resp, err := handler(ctx, req)
+
+		// "Web server"-style access log line, but structured. Do not log request bodies
+		// (buffers/commands) here.
+		s.logger.Info("rpc",
+			"method", info.FullMethod,
+			"code", status.Code(err).String(),
+			"duration_ms", time.Since(start).Milliseconds(),
+		)
+
+		return resp, err
+	}
+}
+
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown() {
 	s.shutdownOnce.Do(func() {
@@ -214,6 +377,11 @@ func (s *Server) Shutdown() {
 
 		// Signal shutdown
 		close(s.shutdownChan)
+
+		// Stop V2 batch writer (flushes pending events)
+		if s.batchWriter != nil {
+			s.batchWriter.Stop()
+		}
 
 		// Stop gRPC server
 		if s.grpcServer != nil {
@@ -270,11 +438,16 @@ func (s *Server) getLastActivity() time.Time {
 	return s.lastActivity
 }
 
-// incrementCommandsLogged safely increments the commands logged counter.
+// incrementCommandsLogged safely increments the commands logged counter
+// and notifies the maintenance runner (if configured) about the new event.
 func (s *Server) incrementCommandsLogged() {
 	s.mu.Lock()
 	s.commandsLogged++
 	s.mu.Unlock()
+
+	if s.maintenanceRunner != nil {
+		s.maintenanceRunner.RecordEvent()
+	}
 }
 
 // getCommandsLogged returns the number of commands logged.

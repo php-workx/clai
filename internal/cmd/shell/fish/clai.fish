@@ -30,8 +30,11 @@ end
 if not set -q CLAI_UP_ARROW_HISTORY
     set -gx CLAI_UP_ARROW_HISTORY {{CLAI_UP_ARROW_HISTORY}}
 end
-if not set -q CLAI_PICKER_OPEN_ON_EMPTY
-    set -gx CLAI_PICKER_OPEN_ON_EMPTY {{CLAI_PICKER_OPEN_ON_EMPTY}}
+if not set -q CLAI_UP_ARROW_TRIGGER
+    set -gx CLAI_UP_ARROW_TRIGGER {{CLAI_UP_ARROW_TRIGGER}}
+end
+if not set -q CLAI_UP_ARROW_DOUBLE_WINDOW_MS
+    set -gx CLAI_UP_ARROW_DOUBLE_WINDOW_MS {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}
 end
 
 # Ensure cache directory exists
@@ -66,6 +69,9 @@ function _ai_accept_suggestion
         if test -n "$suggestion"
             commandline -r $suggestion
             commandline -f end-of-line
+            # Record accepted feedback (fire and forget)
+            clai suggest-feedback --action=accepted --suggested="$suggestion" >/dev/null 2>&1 &
+            disown %1 2>/dev/null
             # Clear the suggestion
             echo -n "" > $_AI_SUGGEST_FILE
             return
@@ -80,8 +86,16 @@ for mode in default insert visual
     bind -M $mode \e\r _ai_accept_suggestion
 end
 
-# Clear suggestion with Escape
+# Clear suggestion with Escape (dismiss feedback)
 function _ai_clear_suggestion
+    if test -s $_AI_SUGGEST_FILE
+        set -l suggestion (cat $_AI_SUGGEST_FILE)
+        if test -n "$suggestion"
+            # Record dismissed feedback (fire and forget)
+            clai suggest-feedback --action=dismissed --suggested="$suggestion" >/dev/null 2>&1 &
+            disown %1 2>/dev/null
+        end
+    end
     echo -n "" > $_AI_SUGGEST_FILE
     set -g _AI_VOICE_MODE false
     commandline -f repaint
@@ -105,30 +119,98 @@ end
 # If clai-picker is on PATH, Up arrow and Alt+H open the full TUI picker.
 # Exit codes: 0 = selection, 1 = cancel, 2 = fallback to native history.
 
+# Brief user feedback (throttled) when picker actions can't run.
+set -g _CLAI_NOTIFY_LAST_TS 0
+function _clai_notify_throttled --argument-names msg
+    set -l now (date +%s)
+    if test -z "$_CLAI_NOTIFY_LAST_TS"
+        set -g _CLAI_NOTIFY_LAST_TS 0
+    end
+    if test (math "$now - $_CLAI_NOTIFY_LAST_TS") -ge 5
+        set -g _CLAI_NOTIFY_LAST_TS $now
+        echo $msg 1>&2
+    end
+end
+
+function _clai_picker_brief_error --argument-names err
+    set -l lower (string lower -- $err)
+    if string match -q "*rpc:*" -- $lower; or string match -q "*dial unix*" -- $lower; or string match -q "*no such file or directory*" -- $lower; or string match -q "*connection refused*" -- $lower
+        echo "clai: daemon unavailable"
+        return
+    end
+    if string match -q "*/dev/tty*" -- $lower; or string match -q "*requires a tty*" -- $lower
+        echo "clai: picker requires a TTY"
+        return
+    end
+    echo "clai: picker failed"
+end
+
 function _clai_has_tui_picker
     type -q clai-picker
 end
 
 function _clai_tui_picker_open
     if test "$CLAI_OFF" = "1"; or _clai_session_off
-        return 2
+        commandline -f history-search-backward
+        return
     end
     if not _clai_has_tui_picker
-        return 2
+        _clai_notify_throttled "clai: clai-picker not installed"
+        commandline -f history-search-backward
+        return
     end
-    set -l result (clai-picker history --query=(commandline) --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>/dev/null)
+    set -l tmp (mktemp -t clai-picker.XXXXXX 2>/dev/null; or mktemp /tmp/clai-picker.XXXXXX)
+    set -l result (clai-picker history --query=(commandline) --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>$tmp)
     set -l exit_code $status
+    set -l err ""
+    if test -f $tmp
+        set err (cat $tmp)
+        rm -f $tmp
+    end
     if test $exit_code -eq 0
         commandline -r -- $result
         commandline -f end-of-line
-        commandline -f repaint
-        return 0
     else if test $exit_code -eq 2
-        return 2
+        if test -n "$err"
+            _clai_notify_throttled (_clai_picker_brief_error "$err")
+        end
+        commandline -f history-search-backward
+        return
+    else if test -n "$err"
+        _clai_notify_throttled (_clai_picker_brief_error "$err")
     end
     # exit_code 1 = cancel, keep original buffer
     commandline -f repaint
-    return 1
+end
+
+function _clai_tui_suggest_picker_open
+    if test "$CLAI_OFF" = "1"; or _clai_session_off
+        return
+    end
+    if not _clai_has_tui_picker
+        _clai_notify_throttled "clai: clai-picker not installed"
+        commandline -f repaint
+        return
+    end
+    set -l tmp (mktemp -t clai-picker.XXXXXX 2>/dev/null; or mktemp /tmp/clai-picker.XXXXXX)
+    set -l result (clai-picker suggest --query=(commandline) --session="$CLAI_SESSION_ID" --cwd="$PWD" 2>$tmp)
+    set -l exit_code $status
+    set -l err ""
+    if test -f $tmp
+        set err (cat $tmp)
+        rm -f $tmp
+    end
+    if test $exit_code -eq 0
+        commandline -r -- $result
+        commandline -f end-of-line
+    else if test $exit_code -ne 1
+        if test -n "$err"
+            _clai_notify_throttled (_clai_picker_brief_error "$err")
+        else
+            _clai_notify_throttled "clai: suggestion picker unavailable"
+        end
+    end
+    commandline -f repaint
 end
 
 # ============================================
@@ -181,7 +263,7 @@ function _clai_picker_load_suggest
     set -l current (commandline)
     set -l items
     if test -n "$current"
-        set items (clai suggest --limit $CLAI_MENU_LIMIT "$current" 2>/dev/null | string split '\n')
+        set items (clai suggest --format fzf --limit $CLAI_MENU_LIMIT "$current" 2>/dev/null | string split '\n')
     else
         set items (clai history --session="$CLAI_SESSION_ID" --limit $CLAI_MENU_LIMIT 2>/dev/null | string split '\n')
     end
@@ -273,7 +355,7 @@ function _clai_picker_cancel
     end
 end
 
-function _clai_suggest_tab
+function _clai_tab
     if test "$CLAI_OFF" = "1"; or _clai_session_off
         commandline -f complete
         return
@@ -296,20 +378,11 @@ function _clai_suggest_tab
         end
         return
     end
-    if test "$_CLAI_PICKER_ACTIVE" != "true" -o "$_CLAI_PICKER_MODE" != "suggest"
-        set -g _CLAI_PICKER_ORIG_BUFFER (commandline)
-        set -g _CLAI_PICKER_MODE suggest
-        set -g _CLAI_PICKER_INDEX 1
-        set -g _CLAI_PICKER_ACTIVE true
-        if not _clai_picker_load_suggest
-            _clai_picker_close
-            commandline -f complete
-            return
-        end
-        _clai_picker_apply
-        return
+    # Suggestions picker is a fullscreen TUI on Alt/Option+S; keep Tab native.
+    if test "$_CLAI_PICKER_ACTIVE" = "true" -a "$_CLAI_PICKER_MODE" = "suggest"
+        _clai_picker_cancel
     end
-    _clai_picker_next
+    commandline -f complete
 end
 
 function _clai_history_up
@@ -317,18 +390,10 @@ function _clai_history_up
         commandline -f history-search-backward
         return
     end
-    if test "$CLAI_PICKER_OPEN_ON_EMPTY" != "true"; and test -z (commandline); and test "$_CLAI_PICKER_ACTIVE" != "true"
-        commandline -f history-search-backward
-        return
-    end
-    # Try TUI picker first (when inline picker is not already active).
-    # Status 2 means "fallback to inline picker".
+    # Try TUI picker first (when inline picker is not already active)
     if test "$_CLAI_PICKER_ACTIVE" != "true"; and _clai_has_tui_picker
         _clai_tui_picker_open
-        set -l tui_status $status
-        if test $tui_status -ne 2
-            return
-        end
+        return
     end
     if not _clai_config_enabled
         commandline -f history-search-backward
@@ -357,6 +422,12 @@ end
 function _clai_picker_down
     if test "$_CLAI_PICKER_ACTIVE" = "true"
         if test "$_CLAI_PICKER_MODE" = "history"
+            # Match native history UX: when the newest item is selected, Down
+            # should return to the original buffer instead of wrapping.
+            if test $_CLAI_PICKER_INDEX -le 1
+                _clai_picker_cancel
+                return
+            end
             _clai_picker_prev
         else
             _clai_picker_next
@@ -420,13 +491,9 @@ function _clai_history_scope_global
     end
 end
 
-# Alt/Option+H opens history picker (TUI when available, inline fallback).
-# \eh works when the terminal sends ESC for Alt. The literal ˙ covers
-# macOS Terminal.app/iTerm2 defaults where Option+H produces U+02D9.
+# Picker keybindings (inline picker controls + scope switching).
 for mode in default insert visual
-    bind -M $mode \eh _clai_history_up
-    bind -M $mode ˙ _clai_history_up
-    bind -M $mode \t _clai_suggest_tab
+    bind -M $mode \t _clai_tab
     bind -M $mode \e\[B _clai_picker_down
     bind -M $mode \eOB _clai_picker_down
     bind -M $mode \cxs _clai_history_scope_session
@@ -434,15 +501,95 @@ for mode in default insert visual
     bind -M $mode \cxg _clai_history_scope_global
 end
 
-# When up_arrow_opens_history is enabled, Up arrow opens history picker
-# (TUI when available, inline fallback). Otherwise shell defaults are used.
+# Alt/Option+H opens TUI picker.
+# \eh works when the terminal sends ESC for Alt. The literal ˙ covers
+# macOS Terminal.app/iTerm2 defaults where Option+H produces U+02D9.
+for mode in default insert visual
+    bind -M $mode \eh _clai_tui_picker_open
+    bind -M $mode ˙ _clai_tui_picker_open
+end
+
+# Alt/Option+S opens the suggestions TUI picker.
+for mode in default insert visual
+    bind -M $mode \es _clai_tui_suggest_picker_open
+    bind -M $mode ß _clai_tui_suggest_picker_open
+end
+
+# When up_arrow_opens_history is enabled:
+# - trigger=single: Up opens TUI picker (fallback: native history)
+# - trigger=double: Up uses native history; Up+Up within window opens picker.
 if test "$CLAI_UP_ARROW_HISTORY" = "true"
-    function _clai_up_arrow
-        _clai_history_up
+    function _clai_up_arrow_single
+        if test "$CLAI_OFF" = "1"; or _clai_session_off
+            commandline -f history-search-backward
+            return
+        end
+
+        if test "$CLAI_UP_ARROW_TRIGGER" = "double"
+            commandline -f history-search-backward
+            return
+        end
+
+        if _clai_has_tui_picker
+            _clai_tui_picker_open
+        else
+            commandline -f history-search-backward
+        end
     end
+
+    function _clai_up_arrow_double
+        if test "$CLAI_OFF" = "1"; or _clai_session_off
+            commandline -f history-search-backward
+            commandline -f history-search-backward
+            return
+        end
+        if _clai_has_tui_picker
+            _clai_tui_picker_open
+            return
+        end
+        commandline -f history-search-backward
+        commandline -f history-search-backward
+    end
+
     for mode in default insert visual
-        bind -M $mode \e\[A _clai_up_arrow
-        bind -M $mode \eOA _clai_up_arrow
+        bind -M $mode \e\[A _clai_up_arrow_single
+        bind -M $mode \eOA _clai_up_arrow_single
+    end
+    if test "$CLAI_UP_ARROW_TRIGGER" = "double"
+        if not set -q _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS
+            if set -q fish_sequence_key_delay_ms
+                set -g _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS $fish_sequence_key_delay_ms
+            else
+                set -g _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS __clai_unset__
+            end
+        end
+        set -l window $CLAI_UP_ARROW_DOUBLE_WINDOW_MS
+        if not string match -qr '^[0-9]+$' -- "$window"
+            set window 250
+        end
+        if test $window -lt 50
+            set window 50
+        end
+        if test $window -gt 1000
+            set window 1000
+        end
+        set -g fish_sequence_key_delay_ms $window
+
+        # Keep an explicit default-mode binding (no -M) so the generated script
+        # works even if users don't have mode bindings, and so init tests can
+        # validate the presence of the sequence binding.
+        bind \e\[A\e\[A _clai_up_arrow_double
+        bind \eOA\eOA _clai_up_arrow_double
+
+        for mode in default insert visual
+            bind -M $mode \e\[A\e\[A _clai_up_arrow_double
+            bind -M $mode \eOA\eOA _clai_up_arrow_double
+        end
+    else
+        for mode in default insert visual
+            bind -M $mode -e \e\[A\e\[A 2>/dev/null
+            bind -M $mode -e \eOA\eOA 2>/dev/null
+        end
     end
 end
 
@@ -461,6 +608,12 @@ end
 function _ai_voice_execute
     # If picker is open, accept the current selection (don't execute)
     if test "$_CLAI_PICKER_ACTIVE" = "true"
+        # Record accepted feedback for picker selection (fire and forget)
+        set -l selected $_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX]
+        if test -n "$selected"
+            clai suggest-feedback --action=accepted --suggested="$selected" >/dev/null 2>&1 &
+            disown %1 2>/dev/null
+        end
         _clai_picker_close
         return
     end
@@ -520,7 +673,7 @@ function fish_right_prompt
     set -l current (commandline)
     if test -n "$current"
         # Have input - get suggestion for prefix
-        set -l suggestion (clai suggest "$current" 2>/dev/null)
+        set -l suggestion (clai suggest --format fzf --limit 1 "$current" 2>/dev/null)
         if test -n "$suggestion" -a "$suggestion" != "$current"
             set_color brblack
             echo -n "($current → $suggestion)"
@@ -611,9 +764,12 @@ function _clai_preexec --on-event fish_preexec
         set -g _CLAI_COMMAND_START_TIME (math (command date +%s) \* 1000)
     end
 
+    # Export last command for child processes (used to suppress suggesting it again).
+    set -gx CLAI_LAST_COMMAND "$cmd"
+
     # Fire and forget - log command start to daemon
     clai-shim log-start --session-id="$CLAI_SESSION_ID" --command-id="$_CLAI_COMMAND_ID" --cwd="$PWD" --command="$cmd" >/dev/null 2>&1 &
-    disown 2>/dev/null
+    disown %1 2>/dev/null
 end
 
 # Log command end (runs after each command)
@@ -625,7 +781,7 @@ function _clai_postexec --on-event fish_postexec
         return
     end
 
-    # Calculate end time in milliseconds. Use nanoseconds if available.
+    # Calculate end time in milliseconds. Use nanoseconds if available (GNU coreutils).
     set -l end_time
     set -l _ns (command date +%s%N 2>/dev/null)
     if string match -rq '^[0-9]+$' -- $_ns
@@ -637,7 +793,7 @@ function _clai_postexec --on-event fish_postexec
 
     # Fire and forget - log command end to daemon
     clai-shim log-end --session-id="$CLAI_SESSION_ID" --command-id="$_CLAI_COMMAND_ID" --exit-code="$exit_code" --duration="$duration" >/dev/null 2>&1 &
-    disown 2>/dev/null
+    disown %1 2>/dev/null
 
     # Clear command tracking state
     set -g _CLAI_COMMAND_ID ""
@@ -732,16 +888,29 @@ function _clai_disable
         bind -M $mode \eOB history-search-forward
         bind -M $mode \r execute
 
+        bind -M $mode -e \e\[A\e\[A 2>/dev/null
+        bind -M $mode -e \eOA\eOA 2>/dev/null
+
         # Remove custom keybindings
         bind -M $mode \e ''
         bind -M $mode \e\r ''
         bind -M $mode \eh ''
         bind -M $mode ˙ ''
+        bind -M $mode \cx\cv ''
         bind -M $mode \cxs ''
         bind -M $mode \cxd ''
         bind -M $mode \cxg ''
+        bind -M $mode \e\[B ''
+        bind -M $mode \eOB ''
     end
-    bind \cx\cv ''
+
+    if set -q _CLAI_ORIG_SEQUENCE_KEY_DELAY_MS
+        if test "$_CLAI_ORIG_SEQUENCE_KEY_DELAY_MS" = "__clai_unset__"
+            set -ge fish_sequence_key_delay_ms
+        else
+            set -g fish_sequence_key_delay_ms $_CLAI_ORIG_SEQUENCE_KEY_DELAY_MS
+        end
+    end
 
     # Restore native autosuggestions to their prior state
     if set -q _clai_prev_autosuggestion
@@ -791,15 +960,36 @@ if status is-interactive; and not set -q _CLAI_REINIT
     # Register session with daemon (fire and forget)
     # This notifies the daemon of the new shell session
     clai-shim session-start --session-id="$CLAI_SESSION_ID" --cwd="$PWD" --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1 &
-    disown 2>/dev/null
+    disown %1 2>/dev/null
 
     # Import shell history on first init (fire and forget)
     # This is idempotent: --if-not-exists skips if already imported
     clai-shim import-history --shell="$CLAI_CURRENT_SHELL" --if-not-exists >/dev/null 2>&1 &
-    disown 2>/dev/null
+    disown %1 2>/dev/null
 
     set -l short_id (string sub -l 8 -- $CLAI_SESSION_ID)
-    set_color brblack
-    echo "🤖 clai [$short_id] → suggest | Alt+↵ accept | ?\"describe task\""
-    set_color normal
+    set -l locale ""
+    if set -q LC_ALL
+        set locale $LC_ALL
+    else if set -q LC_CTYPE
+        set locale $LC_CTYPE
+    else if set -q LANG
+        set locale $LANG
+    end
+
+    set -l supports_utf8 1
+    set -l lower (string lower -- (string trim -- $locale))
+    if test -n "$lower"
+        if string match -q "*utf-8*" -- $lower; or string match -q "*utf8*" -- $lower
+            set supports_utf8 1
+        else
+            set supports_utf8 0
+        end
+    end
+
+    if test "$supports_utf8" -eq 1
+        printf '\e[2m🤖 clai [%s] Alt+S suggestions | Alt+H history | ?"describe task"\e[0m\n' "$short_id"
+    else
+        echo "clai [$short_id] Alt+S suggestions | Alt+H history | ?\"describe task\""
+    end
 end

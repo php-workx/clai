@@ -1,15 +1,13 @@
 package cmd
 
 import (
-	"crypto/sha256"
 	"embed"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 
 	"github.com/runger/clai/internal/config"
@@ -69,49 +67,23 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// If CLAI_SESSION_ID is already set (re-sourcing), preserve it
 	sessionID := os.Getenv("CLAI_SESSION_ID")
 	if sessionID == "" {
-		sessionID = generateSessionID()
+		sessionID = uuid.New().String()
 	}
 
-	// Load config to inject settings into the shell script.
-	cfg, _ := config.Load() // Ignore errors; defaults are fine.
-	if cfg == nil {
-		cfg = config.DefaultConfig()
-	}
+	// Init must be extremely fast; avoid disk I/O (config file read) here.
+	// Users can override via env vars before sourcing, and other commands read
+	// config normally.
+	cfg := config.DefaultConfig()
+	cfg.ApplyEnvOverrides()
 
 	// Replace placeholders with actual values.
-	script := strings.ReplaceAll(string(content), "{{CLAI_SESSION_ID}}", sessionID)
-	script = strings.ReplaceAll(script, "{{CLAI_UP_ARROW_HISTORY}}", strconv.FormatBool(cfg.History.UpArrowOpensHistory))
-	script = strings.ReplaceAll(script, "{{CLAI_PICKER_OPEN_ON_EMPTY}}", strconv.FormatBool(cfg.History.PickerOpenOnEmpty))
-
-	fmt.Print(script)
-	return nil
-}
-
-// generateSessionID returns a UUID-v4 shaped ID without using crypto/rand so
-// shell startup does not depend on entropy availability.
-func generateSessionID() string {
-	hostname, _ := os.Hostname()
-	seed := strings.Join([]string{
-		hostname,
-		strconv.FormatInt(time.Now().UnixNano(), 10),
-		strconv.Itoa(os.Getpid()),
-		strconv.Itoa(os.Getppid()),
-	}, ":")
-
-	sum := sha256.Sum256([]byte(seed))
-	id := make([]byte, 16)
-	copy(id, sum[:16])
-
-	// Set UUID v4 version and variant bits for format compatibility.
-	id[6] = (id[6] & 0x0f) | 0x40
-	id[8] = (id[8] & 0x3f) | 0x80
-
-	hexID := hex.EncodeToString(id)
-	return fmt.Sprintf("%s-%s-%s-%s-%s",
-		hexID[0:8],
-		hexID[8:12],
-		hexID[12:16],
-		hexID[16:20],
-		hexID[20:32],
+	// Use a single-pass replacer to avoid repeated full-script copies (helps keep init fast).
+	replacer := strings.NewReplacer(
+		"{{CLAI_SESSION_ID}}", sessionID,
+		"{{CLAI_UP_ARROW_HISTORY}}", strconv.FormatBool(cfg.History.UpArrowOpensHistory),
+		"{{CLAI_UP_ARROW_TRIGGER}}", cfg.History.UpArrowTrigger,
+		"{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}", strconv.Itoa(cfg.History.UpArrowDoubleWindowMs),
 	)
+	fmt.Print(replacer.Replace(string(content)))
+	return nil
 }

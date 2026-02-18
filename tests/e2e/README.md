@@ -10,7 +10,7 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
    ```
 
 2. **Ask Claude to run tests:**
-   ```text
+   ```
    Run e2e tests from tests/e2e/example-test-plan.yaml against http://localhost:8080
    ```
 
@@ -18,15 +18,23 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
 
 ## Directory Structure
 
-```text
+```
 tests/e2e/
 ├── README.md                 # This file
-├── example-test-plan.yaml    # Reference test plan with schema docs
+├── example-test-plan.yaml    # Core functionality tests (picker, integration, CLI)
+├── suggestions-tests.yaml    # Suggestion engine tests (ghost text, typo, cache)
 ├── screenshots/
 │   ├── baseline/             # Expected screenshots for visual regression
 │   └── current/              # Screenshots from current test run
 └── artifacts/                # Failure logs, buffer dumps, etc.
 ```
+
+## Test Files
+
+| File | Description |
+|------|-------------|
+| `example-test-plan.yaml` | Core clai tests: history picker, shell integration, CLI commands, PTY wrapper, incognito, ingestion |
+| `suggestions-tests.yaml` | Suggestion engine tests: ghost text, clai suggest CLI, typo correction, slot filling, cache, FTS5 search, project discovery, debug endpoints (cross-shell coverage) |
 
 ## Writing Tests
 
@@ -56,8 +64,16 @@ Use tags to run subsets of tests:
 |-----|-------------|
 | `smoke` | Quick sanity checks |
 | `picker` | History/suggestion picker tests |
-| `suggestions` | Ghost text suggestion tests |
+| `suggest` | clai suggest CLI tests |
+| `ghost-text` | Ghost text inline suggestion tests |
+| `search` | FTS5 history search tests |
+| `discovery` | Project task discovery tests |
+| `cache` | Pre-computed cache tests |
+| `typo` | Typo correction tests |
+| `slots` | Slot filling tests |
+| `debug` | Debug endpoint tests |
 | `integration` | Shell integration tests |
+| `incognito` | Incognito/privacy mode tests |
 | `pty` | PTY wrapper tests |
 | `cross-shell` | Tests that should pass in all shells |
 

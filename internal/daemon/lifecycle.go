@@ -13,9 +13,34 @@ import (
 	"github.com/runger/clai/internal/config"
 )
 
+// ReloadFunc is a function called on SIGHUP to reload configuration.
+type ReloadFunc func() error
+
 // Run starts the daemon and blocks until shutdown.
-// It handles SIGTERM and SIGINT for graceful shutdown.
+// It handles signals for lifecycle management:
+//   - SIGTERM/SIGINT: graceful shutdown (drain queues, close DB, remove lock file)
+//   - SIGHUP: reload configuration from disk
+//   - SIGUSR1: graceful re-exec (exec self with same args after cleanup)
+//   - SIGPIPE: ignore (prevent crashes on broken pipe)
 func Run(ctx context.Context, cfg *ServerConfig) error {
+	// Check privilege safety
+	if err := CheckNotRoot(); err != nil {
+		return err
+	}
+
+	paths, err := resolveRunPaths(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to ensure secure base directory: %w", err)
+	}
+
+	// Acquire lock file to prevent double-start
+	lockPath := LockFilePath(paths.BaseDir)
+	lockFile := NewLockFile(lockPath)
+	if err := lockFile.Acquire(); err != nil {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer lockFile.Release()
+
 	server, err := NewServer(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create server: %w", err)
@@ -25,24 +50,102 @@ func Run(ctx context.Context, cfg *ServerConfig) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	// Ignore SIGPIPE to prevent crash on broken pipe
+	signal.Ignore(syscall.SIGPIPE)
+
 	// Handle signals
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
+	sigChan := make(chan os.Signal, 4)
+	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT, syscall.SIGHUP, syscall.SIGUSR1)
 	defer signal.Stop(sigChan)
 
-	go func() {
-		select {
-		case sig := <-sigChan:
-			server.logger.Info("received signal", "signal", sig)
-			server.Shutdown()
-			cancel()
-		case <-ctx.Done():
-			return
-		}
-	}()
+	go handleLifecycleSignals(ctx, sigChan, cancel, cfg, server, lockFile)
 
 	// Start server (blocking)
 	return server.Start(ctx)
+}
+
+func resolveRunPaths(cfg *ServerConfig) (*config.Paths, error) {
+	paths := cfg.Paths
+	if paths == nil {
+		paths = config.DefaultPaths()
+	}
+	if err := EnsureSecureDirectory(paths.BaseDir); err != nil {
+		return nil, err
+	}
+	return paths, nil
+}
+
+func handleLifecycleSignals(
+	ctx context.Context,
+	sigChan <-chan os.Signal,
+	cancel context.CancelFunc,
+	cfg *ServerConfig,
+	server *Server,
+	lockFile *LockFile,
+) {
+	for {
+		select {
+		case sig := <-sigChan:
+			if stop := handleLifecycleSignal(sig, cancel, cfg, server, lockFile); stop {
+				return
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func handleLifecycleSignal(
+	sig os.Signal,
+	cancel context.CancelFunc,
+	cfg *ServerConfig,
+	server *Server,
+	lockFile *LockFile,
+) bool {
+	switch sig {
+	case syscall.SIGTERM, syscall.SIGINT:
+		server.logger.Info("received shutdown signal", "signal", sig)
+		server.Shutdown()
+		cancel()
+		return true
+	case syscall.SIGHUP:
+		reloadConfigOnSIGHUP(cfg, server)
+		return false
+	case syscall.SIGUSR1:
+		server.logger.Info("received SIGUSR1, initiating graceful re-exec")
+		server.Shutdown()
+		lockFile.Release()
+		reExec()
+		// reExec should replace this process; reaching here means failure.
+		server.logger.Error("re-exec failed, shutting down")
+		cancel()
+		return true
+	default:
+		return false
+	}
+}
+
+func reloadConfigOnSIGHUP(cfg *ServerConfig, server *Server) {
+	server.logger.Info("received SIGHUP, reloading configuration")
+	if cfg.ReloadFn == nil {
+		server.logger.Debug("no reload function configured, ignoring SIGHUP")
+		return
+	}
+	if err := cfg.ReloadFn(); err != nil {
+		server.logger.Error("failed to reload configuration", "error", err)
+		return
+	}
+	server.logger.Info("configuration reloaded successfully")
+}
+
+// reExec replaces the current process with a fresh copy of itself.
+func reExec() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	// syscall.Exec replaces the current process
+	_ = syscall.Exec(exe, os.Args, os.Environ()) //nolint:gosec // G204: exe is current binary path from os.Executable
 }
 
 // IsRunning checks if the daemon is currently running.
@@ -54,18 +157,34 @@ func IsRunning() bool {
 func IsRunningWithPaths(paths *config.Paths) bool {
 	pid, err := ReadPID(paths.PIDFile())
 	if err != nil {
-		return false
+		// PID file missing/stale; fall through to lock-based detection.
+		pid = 0
 	}
 
 	// Check if process exists
-	process, err := os.FindProcess(pid)
-	if err != nil {
+	if pid > 0 {
+		process, err := os.FindProcess(pid)
+		if err == nil {
+			// On Unix, FindProcess always succeeds. Send signal 0 to check if alive.
+			if process.Signal(syscall.Signal(0)) == nil {
+				return true
+			}
+		}
+	}
+
+	// If the PID file is wrong, fall back to the held lock PID. This handles
+	// cases where the daemon is alive but the PID file was overwritten by a
+	// failed spawn attempt.
+	lockPID, held, err := ReadHeldPID(LockFilePath(paths.BaseDir))
+	if err != nil || !held || lockPID <= 0 {
 		return false
 	}
 
-	// On Unix, FindProcess always succeeds. Send signal 0 to check if alive.
-	err = process.Signal(syscall.Signal(0))
-	return err == nil
+	process, err := os.FindProcess(lockPID)
+	if err != nil {
+		return false
+	}
+	return process.Signal(syscall.Signal(0)) == nil
 }
 
 // ReadPID reads the PID from the PID file.
@@ -91,11 +210,10 @@ func Stop() error {
 
 // StopWithPaths stops the running daemon using the given paths.
 func StopWithPaths(paths *config.Paths) error {
-	pid, err := ReadPID(paths.PIDFile())
+	pid, err := resolveStopPID(paths)
 	if err != nil {
-		return fmt.Errorf("failed to read PID: %w", err)
+		return err
 	}
-
 	process, err := os.FindProcess(pid)
 	if err != nil {
 		return fmt.Errorf("failed to find process: %w", err)
@@ -105,22 +223,43 @@ func StopWithPaths(paths *config.Paths) error {
 	if err := process.Signal(syscall.SIGTERM); err != nil {
 		return fmt.Errorf("failed to send SIGTERM: %w", err)
 	}
+	return waitForProcessExit(process, 10*time.Second)
+}
 
-	// Wait for process to exit (with timeout)
-	timeout := time.After(10 * time.Second)
+func resolveStopPID(paths *config.Paths) (int, error) {
+	pid, err := ReadPID(paths.PIDFile())
+	if err == nil && pid > 0 && processExists(pid) {
+		return pid, nil
+	}
+	lockPID, held, lerr := ReadHeldPID(LockFilePath(paths.BaseDir))
+	if lerr != nil {
+		return 0, fmt.Errorf("failed to read PID and lock PID: %w", lerr)
+	}
+	if !held || lockPID <= 0 {
+		return 0, fmt.Errorf("daemon not running")
+	}
+	return lockPID, nil
+}
+
+func processExists(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	return proc.Signal(syscall.Signal(0)) == nil
+}
+
+func waitForProcessExit(process *os.Process, timeoutDuration time.Duration) error {
+	timeout := time.After(timeoutDuration)
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
-
 	for {
 		select {
 		case <-timeout:
-			// Force kill if graceful shutdown didn't work
-			process.Kill()
+			_ = process.Kill()
 			return nil
 		case <-ticker.C:
-			// Check if process is still running
 			if err := process.Signal(syscall.Signal(0)); err != nil {
-				// Process is gone
 				return nil
 			}
 		}

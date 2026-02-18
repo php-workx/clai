@@ -219,29 +219,3 @@ func TestImportHistory_CommandMetadata(t *testing.T) {
 	assert.Equal(t, 1, cmd.PipeCount)
 	assert.Greater(t, cmd.WordCount, 0)
 }
-
-func TestImportSessionStart_UsesOldestTimestamp(t *testing.T) {
-	now := time.Now()
-	fallback := now.UnixMilli()
-
-	entries := []history.ImportEntry{
-		{Command: "newest", Timestamp: now.Add(-1 * time.Hour)},
-		{Command: "oldest", Timestamp: now.Add(-3 * time.Hour)},
-		{Command: "middle", Timestamp: now.Add(-2 * time.Hour)},
-	}
-
-	got := importSessionStart(entries, fallback)
-	want := now.Add(-3 * time.Hour).UnixMilli()
-	assert.Equal(t, want, got)
-}
-
-func TestImportSessionStart_AllZeroTimestampsFallback(t *testing.T) {
-	fallback := int64(123456789)
-	entries := []history.ImportEntry{
-		{Command: "a"},
-		{Command: "b"},
-	}
-
-	got := importSessionStart(entries, fallback)
-	assert.Equal(t, fallback, got)
-}
