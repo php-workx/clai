@@ -174,7 +174,7 @@ type SuggestionsConfig struct {
 	DirectoryScopeMaxDepth  int  `yaml:"directory_scope_max_depth"` // Max directory scope depth
 
 	// --- Scorer version ---
-	ScorerVersion string `yaml:"scorer_version"` // v1|v2|blend - which suggestion scorer to use
+	ScorerVersion string `yaml:"scorer_version"` // v1|v2 - which suggestion scorer to use
 
 	// --- Explainability ---
 	ExplainEnabled         bool    `yaml:"explain_enabled"`          // Enable explainability
@@ -419,7 +419,7 @@ func DefaultSuggestionsConfig() SuggestionsConfig {
 		DirectoryScopeMaxDepth:  3,
 
 		// Scorer version
-		ScorerVersion: "blend",
+		ScorerVersion: "v2",
 
 		// Explainability
 		ExplainEnabled:         true,
@@ -806,7 +806,7 @@ func (c *Config) setSuggestionsShowRiskWarning(value string) error {
 
 func (c *Config) setSuggestionsScorerVersion(value string) error {
 	if !isValidScorerVersion(value) {
-		return fmt.Errorf("invalid scorer_version: %s (must be v1, v2, or blend)", value)
+		return fmt.Errorf("invalid scorer_version: %s (must be v1 or v2)", value)
 	}
 	c.Suggestions.ScorerVersion = value
 	return nil
@@ -1312,7 +1312,7 @@ func (s *SuggestionsConfig) validateEnumFields(warn func(string, string), defaul
 		s.ShimMode = defaults.ShimMode
 	}
 	if !isValidScorerVersion(s.ScorerVersion) {
-		warn("scorer_version", fmt.Sprintf("must be v1, v2, or blend, got %q; falling back to default %q", s.ScorerVersion, defaults.ScorerVersion))
+		warn("scorer_version", fmt.Sprintf("must be v1 or v2, got %q; falling back to default %q", s.ScorerVersion, defaults.ScorerVersion))
 		s.ScorerVersion = defaults.ScorerVersion
 	}
 	if !isValidFTSTokenizer(s.SearchFTSTokenizer) {
@@ -1373,7 +1373,7 @@ func isValidFTSTokenizer(tokenizer string) bool {
 
 func isValidScorerVersion(version string) bool {
 	switch version {
-	case "v1", "v2", "blend":
+	case "v1", "v2":
 		return true
 	default:
 		return false

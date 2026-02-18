@@ -32,9 +32,9 @@ func TestScorerVersion_DefaultsToV1WhenV2Unavailable(t *testing.T) {
 	}
 }
 
-// TestScorerVersion_DefaultsToBlendWhenV2Available verifies that a server with
-// no explicit scorer version defaults to "blend" when V2 is available.
-func TestScorerVersion_DefaultsToBlendWhenV2Available(t *testing.T) {
+// TestScorerVersion_DefaultsToV2WhenV2Available verifies that a server with
+// no explicit scorer version defaults to "v2" when V2 is available.
+func TestScorerVersion_DefaultsToV2WhenV2Available(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
@@ -57,8 +57,8 @@ func TestScorerVersion_DefaultsToBlendWhenV2Available(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
-	if server.scorerVersion != "blend" {
-		t.Errorf("expected scorerVersion='blend', got %q", server.scorerVersion)
+	if server.scorerVersion != "v2" {
+		t.Errorf("expected scorerVersion='v2', got %q", server.scorerVersion)
 	}
 	if server.v2Scorer == nil {
 		t.Error("v2Scorer should be initialized when V2DB is provided")
@@ -74,24 +74,6 @@ func TestScorerVersion_V2FallsBackWithoutScorer(t *testing.T) {
 		Store:         store,
 		ScorerVersion: "v2",
 		V2DB:          nil, // No V2 database
-	})
-	if err != nil {
-		t.Fatalf("NewServer failed: %v", err)
-	}
-	if server.scorerVersion != "v1" {
-		t.Errorf("expected scorerVersion='v1' (fallback), got %q", server.scorerVersion)
-	}
-}
-
-// TestScorerVersion_BlendFallsBackWithoutScorer verifies that requesting "blend"
-// scorer version without V2DB falls back to "v1".
-func TestScorerVersion_BlendFallsBackWithoutScorer(t *testing.T) {
-	t.Parallel()
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{
-		Store:         store,
-		ScorerVersion: "blend",
-		V2DB:          nil,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
@@ -294,8 +276,8 @@ func TestSuggest_V2_WithScorer(t *testing.T) {
 	_ = resp
 }
 
-// TestSuggest_Blend_MergesResults verifies blend mode merges V1 and V2 results.
-func TestSuggest_Blend_MergesResults(t *testing.T) {
+// TestSuggest_V2_MergesResults verifies V2 mode merges V1 and V2 results.
+func TestSuggest_V2_MergesResults(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
@@ -322,14 +304,14 @@ func TestSuggest_Blend_MergesResults(t *testing.T) {
 		Store:         store,
 		Ranker:        ranker,
 		V2DB:          v2db,
-		ScorerVersion: "blend",
+		ScorerVersion: "v2",
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
-	if server.scorerVersion != "blend" {
-		t.Fatalf("expected scorerVersion='blend', got %q", server.scorerVersion)
+	if server.scorerVersion != "v2" {
+		t.Fatalf("expected scorerVersion='v2', got %q", server.scorerVersion)
 	}
 
 	resp, err := server.Suggest(ctx, &pb.SuggestRequest{
@@ -342,43 +324,7 @@ func TestSuggest_Blend_MergesResults(t *testing.T) {
 	}
 	// V1 ranker should contribute at minimum
 	if len(resp.Suggestions) == 0 {
-		t.Error("expected at least V1 suggestions in blend mode")
-	}
-}
-
-// TestSuggest_Blend_NilV2FallsToV1Only verifies blend mode gracefully handles nil V2 scorer.
-func TestSuggest_Blend_NilV2FallsToV1Only(t *testing.T) {
-	t.Parallel()
-	store := newMockStore()
-	ranker := &mockRanker{
-		suggestions: []suggest.Suggestion{
-			{Text: "make build", Source: "history", Score: 0.9},
-		},
-	}
-	// blend without V2 will be forced to v1
-	server, err := NewServer(&ServerConfig{
-		Store:         store,
-		Ranker:        ranker,
-		ScorerVersion: "blend",
-	})
-	if err != nil {
-		t.Fatalf("NewServer failed: %v", err)
-	}
-
-	ctx := context.Background()
-	resp, err := server.Suggest(ctx, &pb.SuggestRequest{
-		SessionId:  "test-session",
-		Cwd:        "/tmp",
-		MaxResults: 5,
-	})
-	if err != nil {
-		t.Fatalf("Suggest failed: %v", err)
-	}
-	if len(resp.Suggestions) != 1 {
-		t.Errorf("expected 1 suggestion from V1 fallback, got %d", len(resp.Suggestions))
-	}
-	if resp.Suggestions[0].Text != "make build" {
-		t.Errorf("expected 'make build', got %q", resp.Suggestions[0].Text)
+		t.Error("expected at least V1 suggestions in v2 mode")
 	}
 }
 

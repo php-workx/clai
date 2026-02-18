@@ -278,7 +278,7 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 
 // Suggest handles the Suggest RPC.
 // It returns command suggestions based on history and optionally AI.
-// The scorer version (v1/v2/blend) determines which scoring engine is used.
+// The scorer version (v1/v2) determines which scoring engine is used.
 func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.SuggestResponse, error) {
 	s.touchActivity()
 
@@ -287,24 +287,11 @@ func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.Sugge
 		maxResults = 5
 	}
 
-	// V2-only mode: skip V1 entirely
 	if s.scorerVersion == "v2" {
-		if resp := s.suggestV2(ctx, req, maxResults); resp != nil {
-			return resp, nil
-		}
-		// V2 failed or unavailable; fall through to V1
-		s.logger.Debug("v2 scorer unavailable, falling back to v1")
+		return s.suggestV2Blend(ctx, req, maxResults), nil
 	}
 
-	// V1 scoring path
-	v1Resp := s.suggestV1(ctx, req, maxResults)
-
-	// Blend mode: merge V1 + V2
-	if s.scorerVersion == "blend" {
-		return s.suggestBlend(ctx, req, maxResults, v1Resp), nil
-	}
-
-	return v1Resp, nil
+	return s.suggestV1(ctx, req, maxResults), nil
 }
 
 // suggestV1 generates suggestions using the V1 ranker (history-based).

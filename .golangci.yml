@@ -65,6 +65,15 @@ linters:
     # Architecture
     - depguard
   settings:
+    staticcheck:
+      checks:
+        - "all"
+        - "-QF1012"  # WriteString(Sprintf(...)) is intentional for string builder patterns
+        - "-ST1000"  # Package comments - defer documentation work
+        - "-ST1003"  # Naming conventions (Ts vs TS) - too many to rename across codebase
+        - "-ST1020"  # Method comment form - defer documentation work
+        - "-ST1021"  # Type comment form - defer documentation work
+        - "-ST1022"  # Const comment form - defer documentation work
     govet:
       enable-all: true
       disable:
@@ -120,10 +129,15 @@ linters:
         - G104  # Unhandled errors - enable errcheck later to replace this
         - G101  # False positives on test credentials
         - G115  # Integer conversion in picker is bounded by terminal size
+        - G204  # Subprocess with variable args is expected for exec helpers
         - G301  # World-readable dirs (0755) are intentional for user access
         - G302  # World-readable files (0644) are intentional for logs
         - G304  # File paths from variables are expected for file operations
         - G306  # History files use 0644 intentionally for user readability
+        - G702  # CLI tools intentionally pass user input to shell commands
+        - G703  # Path traversal from variables is expected for file operations
+        - G705  # CLI output to stderr/stdout is not XSS-vulnerable
+        - G706  # Log injection from file paths is expected in CLI tools
     # Architecture rules
     depguard:
       rules:

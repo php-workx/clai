@@ -74,7 +74,7 @@ type Server struct {
 	// V2 scorer (nil if V2 disabled)
 	v2Scorer *suggest2.Scorer
 
-	// Scorer version: "v1" (default), "v2", or "blend"
+	// Scorer version: "v1" or "v2" (default when V2 available)
 	scorerVersion string
 
 	// Backpressure
@@ -131,9 +131,9 @@ type ServerConfig struct {
 	// (see the separate scorer dependency initialization).
 	V2Scorer *suggest2.Scorer
 
-	// ScorerVersion controls which suggestion scorer is used: "v1", "v2", or "blend".
-	// Default: "v1". When "v2" or "blend" is selected and V2Scorer is nil,
-	// falls back to "v1" with a warning.
+	// ScorerVersion controls which suggestion scorer is used: "v1" or "v2".
+	// Default: "v2" when V2Scorer is available. When "v2" is selected and
+	// V2Scorer is nil, falls back to "v1" with a warning.
 	ScorerVersion string
 
 	// ReloadFn is called on SIGHUP to reload configuration.
@@ -253,12 +253,12 @@ func resolveScorerVersion(requested string, v2scorer *suggest2.Scorer, logger *s
 	version := requested
 	if version == "" {
 		if v2scorer != nil {
-			version = "blend"
+			version = "v2"
 		} else {
 			version = "v1"
 		}
 	}
-	if (version == "v2" || version == "blend") && v2scorer == nil {
+	if version == "v2" && v2scorer == nil {
 		logger.Warn("scorer_version requires V2 scorer but V2 is unavailable; falling back to v1",
 			"requested", version,
 		)
