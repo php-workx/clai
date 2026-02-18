@@ -1,5 +1,5 @@
 // Package event defines the command event types for the suggestions engine.
-// These events are ingested from shell hooks via clai-hook and processed by
+// These events are ingested from shell hooks via clai-shim and processed by
 // the daemon for command suggestions.
 package event
 
@@ -53,6 +53,12 @@ type CommandEvent struct {
 
 	// Branch is the current git branch (empty if not in a repo).
 	Branch string `json:"branch,omitempty"`
+
+	// ProjectTypes are detected project markers active for this command context.
+	ProjectTypes []string `json:"project_types,omitempty"`
+
+	// Aliases is the shell alias snapshot for this session.
+	Aliases map[string]string `json:"aliases,omitempty"`
 
 	// ExitCode is the exit code of the command.
 	ExitCode int `json:"exit_code"`

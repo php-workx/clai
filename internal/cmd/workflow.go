@@ -403,7 +403,7 @@ func runAdHocCommand(ctx context.Context, command, workDir string, env []string)
 		if shellPath == "" {
 			shellPath = "/bin/sh"
 		}
-		// #nosec G204 -- command is explicitly provided by the human reviewer at runtime.
+		//nolint:gosec // command is explicitly provided by the human reviewer at runtime.
 		cmd = exec.CommandContext(ctx, shellPath, "-c", command)
 	}
 

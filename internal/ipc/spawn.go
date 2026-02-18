@@ -215,6 +215,7 @@ func findDaemonBinary() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to resolve CLAI_DAEMON_PATH: %w", err)
 		}
+		//nolint:gosec // path comes from explicit CLAI_DAEMON_PATH override.
 		if _, err := os.Stat(absPath); err == nil {
 			return absPath, nil
 		}

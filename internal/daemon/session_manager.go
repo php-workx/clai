@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"maps"
 	"sync"
 	"time"
 )
@@ -17,12 +18,15 @@ type SessionInfo struct {
 	LastActivity time.Time
 
 	// Stashed command data from CommandStarted for CommandEnded to read.
-	LastCmdRaw    string // Raw command from CommandStarted
-	LastCmdCWD    string // CWD from CommandStarted
-	LastGitRepo   string // Git repo name from CommandStarted
-	LastGitRoot   string // Git repo root from CommandStarted
-	LastGitBranch string // Git branch from CommandStarted
-	LastCmdID     string // Command ID from CommandStarted
+	LastCmdRaw     string // Raw command from CommandStarted
+	LastCmdCWD     string // CWD from CommandStarted
+	LastGitRepo    string // Git repo name from CommandStarted
+	LastGitRoot    string // Git repo root from CommandStarted
+	LastGitBranch  string // Git branch from CommandStarted
+	LastCmdID      string // Command ID from CommandStarted
+	LastTemplateID string
+	ProjectTypes   []string
+	Aliases        map[string]string
 }
 
 // SessionManager tracks active sessions.
@@ -52,6 +56,7 @@ func (m *SessionManager) Start(sessionID, shell, os, hostname, username, cwd str
 		CWD:          cwd,
 		StartedAt:    startedAt,
 		LastActivity: time.Now(),
+		Aliases:      make(map[string]string),
 	}
 }
 
@@ -75,6 +80,12 @@ func (m *SessionManager) Get(sessionID string) (*SessionInfo, bool) {
 
 	// Return a copy to avoid data races
 	infoCopy := *info
+	if len(info.ProjectTypes) > 0 {
+		infoCopy.ProjectTypes = append([]string(nil), info.ProjectTypes...)
+	}
+	if info.Aliases != nil {
+		infoCopy.Aliases = maps.Clone(info.Aliases)
+	}
 	return &infoCopy, true
 }
 
@@ -111,6 +122,37 @@ func (m *SessionManager) StashCommand(sessionID, cmdID, cmdRaw, cwd, gitRepo, gi
 		info.LastGitRoot = gitRoot
 		info.LastGitBranch = gitBranch
 		info.LastCmdID = cmdID
+		info.LastActivity = time.Now()
+	}
+}
+
+func (m *SessionManager) SetLastTemplateID(sessionID, templateID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if info, ok := m.sessions[sessionID]; ok {
+		info.LastTemplateID = templateID
+		info.LastActivity = time.Now()
+	}
+}
+
+func (m *SessionManager) SetProjectTypes(sessionID string, projectTypes []string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if info, ok := m.sessions[sessionID]; ok {
+		info.ProjectTypes = append([]string(nil), projectTypes...)
+		info.LastActivity = time.Now()
+	}
+}
+
+func (m *SessionManager) SetAliases(sessionID string, aliases map[string]string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if info, ok := m.sessions[sessionID]; ok {
+		if aliases == nil {
+			info.Aliases = make(map[string]string)
+		} else {
+			info.Aliases = maps.Clone(aliases)
+		}
 		info.LastActivity = time.Now()
 	}
 }

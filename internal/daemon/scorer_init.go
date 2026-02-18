@@ -1,10 +1,12 @@
 package daemon
 
 import (
+	"context"
 	"database/sql"
 	"io"
 	"log/slog"
 
+	"github.com/runger/clai/internal/suggestions/discover"
 	"github.com/runger/clai/internal/suggestions/discovery"
 	"github.com/runger/clai/internal/suggestions/dismissal"
 	"github.com/runger/clai/internal/suggestions/recovery"
@@ -25,18 +27,6 @@ func initV2Scorer(db *sql.DB, logger *slog.Logger) *suggest2.Scorer {
 	var deps suggest2.ScorerDependencies
 	deps.DB = db
 
-	if fs, err := score.NewFrequencyStore(db, score.DefaultFrequencyOptions()); err != nil {
-		logger.Warn("v2 scorer: frequency store unavailable", "error", err)
-	} else {
-		deps.FreqStore = fs
-	}
-
-	if ts, err := score.NewTransitionStore(db); err != nil {
-		logger.Warn("v2 scorer: transition store unavailable", "error", err)
-	} else {
-		deps.TransitionStore = ts
-	}
-
 	deps.PipelineStore = score.NewPipelineStore(db)
 
 	if ds, err := discovery.NewService(db, discovery.DefaultOptions()); err != nil {
@@ -45,7 +35,13 @@ func initV2Scorer(db *sql.DB, logger *slog.Logger) *suggest2.Scorer {
 		deps.DiscoveryService = ds
 	}
 
-	deps.WorkflowTracker = workflow.NewTracker(nil, workflow.DefaultTrackerConfig())
+	deps.DiscoverEngine = discover.NewEngine()
+
+	patterns, err := workflow.LoadPromotedPatterns(context.Background(), db, workflow.DefaultMinerConfig().MinOccurrences)
+	if err != nil {
+		logger.Warn("v2 scorer: workflow pattern load failed", "error", err)
+	}
+	deps.WorkflowTracker = workflow.NewTracker(patterns, workflow.DefaultTrackerConfig())
 
 	deps.DismissalStore = dismissal.NewStore(db, dismissal.DefaultConfig(), logger)
 

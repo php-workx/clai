@@ -7,12 +7,15 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/runger/clai/internal/claude"
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/daemon"
 	"github.com/runger/clai/internal/storage"
 	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/feedback"
+	"github.com/runger/clai/internal/suggestions/maintenance"
 )
 
 // claudeLLM adapts claude.QueryWithContext to the daemon.LLMQuerier interface.
@@ -38,6 +41,7 @@ func run() error {
 
 	// Load configuration
 	paths := config.DefaultPaths()
+	cfgObj, _ := config.Load()
 
 	// Ensure directories exist
 	if err := paths.EnsureDirectories(); err != nil {
@@ -62,13 +66,36 @@ func run() error {
 		defer v2db.Close()
 	}
 
+	var feedbackStore *feedback.Store
+	var maintenanceRunner *maintenance.Runner
+	if v2db != nil {
+		feedbackStore = feedback.NewStore(v2db.DB(), feedback.DefaultConfig(), logger)
+		mcfg := maintenance.Config{
+			Interval:      5 * time.Minute,
+			RetentionDays: 90,
+			DBPath:        v2db.Path(),
+			Logger:        logger,
+		}
+		if cfgObj != nil {
+			if ms := cfgObj.Suggestions.MaintenanceIntervalMs; ms > 0 {
+				mcfg.Interval = time.Duration(ms) * time.Millisecond
+			}
+			if days := cfgObj.Suggestions.RetentionDays; days >= 0 {
+				mcfg.RetentionDays = days
+			}
+		}
+		maintenanceRunner = maintenance.NewRunner(v2db.DB(), mcfg)
+	}
+
 	// Create server config
 	cfg := &daemon.ServerConfig{
-		Store:  store,
-		V2DB:   v2db,
-		Paths:  paths,
-		Logger: logger,
-		LLM:    &claudeLLM{},
+		Store:             store,
+		V2DB:              v2db,
+		Paths:             paths,
+		Logger:            logger,
+		LLM:               &claudeLLM{},
+		FeedbackStore:     feedbackStore,
+		MaintenanceRunner: maintenanceRunner,
 	}
 
 	// Run the daemon (blocks until shutdown)

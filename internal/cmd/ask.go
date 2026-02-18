@@ -43,14 +43,14 @@ func runAsk(cmd *cobra.Command, args []string) error {
 
 	// Build context
 	var contextBuilder strings.Builder
-	contextBuilder.WriteString(fmt.Sprintf("Working directory: %s\n", pwd))
-	contextBuilder.WriteString(fmt.Sprintf("Shell: %s\n", shell))
+	_, _ = fmt.Fprintf(&contextBuilder, "Working directory: %s\n", pwd)
+	_, _ = fmt.Fprintf(&contextBuilder, "Shell: %s\n", shell)
 
 	if recentCommands != "" {
-		contextBuilder.WriteString(fmt.Sprintf("Recent commands:\n%s\n", recentCommands))
+		_, _ = fmt.Fprintf(&contextBuilder, "Recent commands:\n%s\n", recentCommands)
 	}
 
-	contextBuilder.WriteString(fmt.Sprintf("\nQuestion: %s", question))
+	_, _ = fmt.Fprintf(&contextBuilder, "\nQuestion: %s", question)
 
 	// Set up context with Ctrl+C handling
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)

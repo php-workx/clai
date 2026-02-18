@@ -283,7 +283,7 @@ func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
 			sess.lastTemplateID,
 			sess.lastExitCode,
 			sess.lastFailed,
-			nil, // aliases
+			ev.Aliases,
 		)
 
 		result, err := ingest.WritePath(ctx, w.db, wctx, *w.opts.WritePathConfig)

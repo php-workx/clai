@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runger/clai/internal/suggestions/discover"
 	"github.com/runger/clai/internal/suggestions/discovery"
 	"github.com/runger/clai/internal/suggestions/dismissal"
 	"github.com/runger/clai/internal/suggestions/normalize"
@@ -237,10 +238,11 @@ func (s *Suggestion) ScoreBreakdown() ScoreBreakdown {
 // Scorer implements the multi-factor suggestion scoring algorithm.
 type Scorer struct {
 	db                *sql.DB
-	freqStore         *score.FrequencyStore
-	transitionStore   *score.TransitionStore
+	freqStore         *score.FrequencyStore  // legacy, retained for test compatibility
+	transitionStore   *score.TransitionStore // legacy, retained for test compatibility
 	pipelineStore     *score.PipelineStore
 	discoveryService  *discovery.Service
+	discoverEngine    *discover.Engine
 	workflowTracker   *workflow.Tracker
 	dismissalStore    *dismissal.Store
 	recoveryEngine    *recovery.Engine
@@ -255,6 +257,7 @@ type ScorerDependencies struct {
 	TransitionStore  *score.TransitionStore
 	PipelineStore    *score.PipelineStore
 	DiscoveryService *discovery.Service
+	DiscoverEngine   *discover.Engine
 	WorkflowTracker  *workflow.Tracker
 	DismissalStore   *dismissal.Store
 	RecoveryEngine   *recovery.Engine
@@ -282,6 +285,7 @@ func NewScorer(deps ScorerDependencies, cfg ScorerConfig) (*Scorer, error) {
 		transitionStore:   deps.TransitionStore,
 		pipelineStore:     deps.PipelineStore,
 		discoveryService:  deps.DiscoveryService,
+		discoverEngine:    deps.DiscoverEngine,
 		workflowTracker:   deps.WorkflowTracker,
 		dismissalStore:    deps.DismissalStore,
 		recoveryEngine:    deps.RecoveryEngine,
@@ -318,6 +322,7 @@ type SuggestContext struct {
 	NowMs          int64
 	DirScopeKey    string // Directory scope key (from dirscope.ComputeScopeKey)
 	Scope          string // Scope for dismissal/recovery lookups
+	ProjectTypes   []string
 }
 
 // Suggest generates scored suggestions based on the current context.
@@ -357,20 +362,23 @@ func (s *Scorer) normalizeSuggestContext(suggestCtx SuggestContext) SuggestConte
 	if suggestCtx.Scope == "" {
 		suggestCtx.Scope = score.ScopeGlobal
 	}
+	if suggestCtx.LastTemplateID == "" && suggestCtx.LastCmd != "" {
+		suggestCtx.LastTemplateID = normalize.PreNormalize(suggestCtx.LastCmd, normalize.PreNormConfig{}).TemplateID
+	}
 	return suggestCtx
 }
 
 func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx SuggestContext, candidates map[string]*Suggestion) {
 	s.collectTransitionCandidates(
-		ctx, candidates, suggestCtx.RepoKey, suggestCtx.LastCmd,
+		ctx, candidates, suggestCtx.RepoKey, suggestCtx.LastTemplateID, suggestCtx.LastCmd,
 		ReasonRepoTransition, s.cfg.Weights.RepoTransition, "repo transitions query failed",
 	)
 	s.collectTransitionCandidates(
-		ctx, candidates, score.ScopeGlobal, suggestCtx.LastCmd,
+		ctx, candidates, score.ScopeGlobal, suggestCtx.LastTemplateID, suggestCtx.LastCmd,
 		ReasonGlobalTransition, s.cfg.Weights.GlobalTransition, "global transitions query failed",
 	)
 	s.collectTransitionCandidates(
-		ctx, candidates, suggestCtx.DirScopeKey, suggestCtx.LastCmd,
+		ctx, candidates, suggestCtx.DirScopeKey, suggestCtx.LastTemplateID, suggestCtx.LastCmd,
 		ReasonDirTransition, s.cfg.Weights.DirTransition, "dir transitions query failed",
 	)
 
@@ -388,29 +396,74 @@ func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx SuggestContex
 	)
 
 	s.collectProjectTasks(ctx, candidates, suggestCtx.RepoKey)
+	s.collectProjectTypeCandidates(ctx, candidates, suggestCtx.ProjectTypes, suggestCtx.LastTemplateID)
+	s.collectDiscoveryPriors(candidates, suggestCtx)
 }
 
 func (s *Scorer) collectTransitionCandidates(
 	ctx context.Context,
 	candidates map[string]*Suggestion,
 	scope string,
+	lastTemplateID string,
 	lastCmd string,
 	reason string,
 	weight float64,
 	logMessage string,
 ) {
-	if s.transitionStore == nil || scope == "" || lastCmd == "" {
+	if scope == "" {
 		return
 	}
 
-	transitions, err := s.transitionStore.GetTopNextCommands(ctx, scope, lastCmd, 10)
+	if s.db == nil || lastTemplateID == "" {
+		if s.transitionStore == nil || lastCmd == "" {
+			return
+		}
+		transitions, err := s.transitionStore.GetTopNextCommands(ctx, scope, lastCmd, 10)
+		if err != nil {
+			s.cfg.Logger.Debug(logMessage, "error", err)
+			return
+		}
+		for _, t := range transitions {
+			s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTsMs)
+		}
+		return
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT ct.cmd_norm, ts.count, ts.last_seen_ms
+		FROM transition_stat ts
+		JOIN command_template ct ON ct.template_id = ts.next_template_id
+		WHERE ts.scope = ? AND ts.prev_template_id = ?
+		ORDER BY ts.weight DESC, ts.count DESC
+		LIMIT 10
+	`, scope, lastTemplateID)
 	if err != nil {
+		if s.transitionStore != nil && lastCmd != "" {
+			transitions, legacyErr := s.transitionStore.GetTopNextCommands(ctx, scope, lastCmd, 10)
+			if legacyErr == nil {
+				for _, t := range transitions {
+					s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTsMs)
+				}
+				return
+			}
+		}
 		s.cfg.Logger.Debug(logMessage, "error", err)
 		return
 	}
+	defer rows.Close()
 
-	for _, t := range transitions {
-		s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTsMs)
+	for rows.Next() {
+		var cmdNorm string
+		var count int
+		var lastSeenMs int64
+		if err := rows.Scan(&cmdNorm, &count, &lastSeenMs); err != nil {
+			s.cfg.Logger.Debug(logMessage, "error", err)
+			return
+		}
+		s.addCandidate(candidates, cmdNorm, float64(count), reason, weight, lastSeenMs)
+	}
+	if err := rows.Err(); err != nil {
+		s.cfg.Logger.Debug(logMessage, "error", err)
 	}
 }
 
@@ -423,18 +476,59 @@ func (s *Scorer) collectFrequencyCandidates(
 	nowMs int64,
 	logMessage string,
 ) {
-	if s.freqStore == nil || scope == "" {
+	if scope == "" {
+		return
+	}
+	if s.db == nil {
+		if s.freqStore == nil {
+			return
+		}
+		frequencies, err := s.freqStore.GetTopCommandsAt(ctx, scope, 10, nowMs)
+		if err != nil {
+			s.cfg.Logger.Debug(logMessage, "error", err)
+			return
+		}
+		for _, f := range frequencies {
+			s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTsMs)
+		}
 		return
 	}
 
-	frequencies, err := s.freqStore.GetTopCommandsAt(ctx, scope, 10, nowMs)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT ct.cmd_norm, cs.score, cs.last_seen_ms
+		FROM command_stat cs
+		JOIN command_template ct ON ct.template_id = cs.template_id
+		WHERE cs.scope = ?
+		ORDER BY cs.score DESC
+		LIMIT 10
+	`, scope)
 	if err != nil {
+		if s.freqStore != nil {
+			frequencies, legacyErr := s.freqStore.GetTopCommandsAt(ctx, scope, 10, nowMs)
+			if legacyErr == nil {
+				for _, f := range frequencies {
+					s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTsMs)
+				}
+				return
+			}
+		}
 		s.cfg.Logger.Debug(logMessage, "error", err)
 		return
 	}
+	defer rows.Close()
 
-	for _, f := range frequencies {
-		s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTsMs)
+	for rows.Next() {
+		var cmdNorm string
+		var scoreVal float64
+		var lastSeenMs int64
+		if err := rows.Scan(&cmdNorm, &scoreVal, &lastSeenMs); err != nil {
+			s.cfg.Logger.Debug(logMessage, "error", err)
+			return
+		}
+		s.addCandidate(candidates, cmdNorm, applyRecencyDecay(scoreVal, lastSeenMs, nowMs, s.cfg.Amplifiers.RecencyDecayTauMs), reason, weight, lastSeenMs)
+	}
+	if err := rows.Err(); err != nil {
+		s.cfg.Logger.Debug(logMessage, "error", err)
 	}
 }
 
@@ -442,6 +536,7 @@ func (s *Scorer) collectProjectTasks(ctx context.Context, candidates map[string]
 	if s.discoveryService == nil || repoKey == "" {
 		return
 	}
+	_ = s.discoveryService.DiscoverIfNeeded(ctx, repoKey)
 
 	tasks, err := s.discoveryService.GetTasks(ctx, repoKey)
 	if err != nil {
@@ -451,6 +546,81 @@ func (s *Scorer) collectProjectTasks(ctx context.Context, candidates map[string]
 
 	for _, t := range tasks {
 		s.addCandidate(candidates, t.Command, 1.0, ReasonProjectTask, s.cfg.Weights.ProjectTask, 0)
+	}
+}
+
+func (s *Scorer) collectProjectTypeCandidates(
+	ctx context.Context,
+	candidates map[string]*Suggestion,
+	projectTypes []string,
+	lastTemplateID string,
+) {
+	if s.db == nil || len(projectTypes) == 0 {
+		return
+	}
+	for _, pt := range projectTypes {
+		rows, err := s.db.QueryContext(ctx, `
+			SELECT ct.cmd_norm, pts.score, pts.last_seen_ms
+			FROM project_type_stat pts
+			JOIN command_template ct ON ct.template_id = pts.template_id
+			WHERE pts.project_type = ?
+			ORDER BY pts.score DESC
+			LIMIT 5
+		`, pt)
+		if err == nil {
+			for rows.Next() {
+				var cmdNorm string
+				var scoreVal float64
+				var lastSeenMs int64
+				if scanErr := rows.Scan(&cmdNorm, &scoreVal, &lastSeenMs); scanErr == nil {
+					s.addCandidate(candidates, cmdNorm, scoreVal, ReasonProjectTask, s.cfg.Weights.ProjectTask*0.8, lastSeenMs)
+				}
+			}
+			rows.Close()
+		}
+
+		if lastTemplateID == "" {
+			continue
+		}
+		transRows, err := s.db.QueryContext(ctx, `
+			SELECT ct.cmd_norm, ptt.count, ptt.last_seen_ms
+			FROM project_type_transition ptt
+			JOIN command_template ct ON ct.template_id = ptt.next_template_id
+			WHERE ptt.project_type = ? AND ptt.prev_template_id = ?
+			ORDER BY ptt.weight DESC, ptt.count DESC
+			LIMIT 5
+		`, pt, lastTemplateID)
+		if err != nil {
+			continue
+		}
+		for transRows.Next() {
+			var cmdNorm string
+			var count int
+			var lastSeenMs int64
+			if scanErr := transRows.Scan(&cmdNorm, &count, &lastSeenMs); scanErr == nil {
+				s.addCandidate(candidates, cmdNorm, float64(count), ReasonRepoTransition, s.cfg.Weights.RepoTransition*0.7, lastSeenMs)
+			}
+		}
+		transRows.Close()
+	}
+}
+
+func (s *Scorer) collectDiscoveryPriors(candidates map[string]*Suggestion, suggestCtx SuggestContext) {
+	if s.discoverEngine == nil {
+		return
+	}
+	// Prior discovery only supplements sparse/empty contexts.
+	if suggestCtx.Prefix != "" || len(candidates) >= 3 {
+		return
+	}
+
+	prior := s.discoverEngine.Discover(context.Background(), discover.DiscoverConfig{
+		ProjectTypes: suggestCtx.ProjectTypes,
+		Limit:        5,
+		CooldownMs:   0,
+	})
+	for _, c := range prior {
+		s.addCandidate(candidates, c.Command, float64(c.Priority), ReasonProjectTask, s.cfg.Weights.ProjectTask*0.5, 0)
 	}
 }
 
@@ -690,6 +860,11 @@ func (s *Scorer) applyDismissalPenalties(ctx context.Context, candidates map[str
 			s.cfg.Logger.Debug("dismissal state query failed", "error", err, "cmd", cmd)
 			continue
 		}
+		if state == dismissal.StateNone && templateID != cmd {
+			if fallbackState, fallbackErr := s.dismissalStore.GetState(ctx, suggestCtx.Scope, suggestCtx.LastTemplateID, cmd); fallbackErr == nil {
+				state = fallbackState
+			}
+		}
 
 		switch state {
 		case dismissal.StatePermanent:
@@ -842,6 +1017,17 @@ func (s *Scorer) addCandidate(candidates map[string]*Suggestion, cmd string, raw
 	candidates[cmd] = newCandidate(cmd, rawScore, reason, adjustedScore, lastSeenMs)
 }
 
+func applyRecencyDecay(scoreVal float64, lastSeenMs, nowMs, tauMs int64) float64 {
+	if scoreVal <= 0 || lastSeenMs <= 0 || nowMs <= 0 || tauMs <= 0 {
+		return scoreVal
+	}
+	elapsed := float64(nowMs - lastSeenMs)
+	if elapsed <= 0 {
+		return scoreVal
+	}
+	return scoreVal * math.Exp(-elapsed/float64(tauMs))
+}
+
 func (s *Scorer) mergeCandidate(existing *Suggestion, rawScore float64, reason string, adjustedScore float64, lastSeenMs int64) {
 	existing.Score += adjustedScore
 	existing.Reasons = append(existing.Reasons, reason)
@@ -858,8 +1044,10 @@ func (s *Scorer) mergeCandidate(existing *Suggestion, rawScore float64, reason s
 }
 
 func newCandidate(cmd string, rawScore float64, reason string, adjustedScore float64, lastSeenMs int64) *Suggestion {
+	templateID := normalize.PreNormalize(cmd, normalize.PreNormConfig{}).TemplateID
 	suggestion := &Suggestion{
 		Command:    cmd,
+		TemplateID: templateID,
 		Score:      adjustedScore,
 		Reasons:    []string{reason},
 		frequency:  rawScore,
@@ -973,6 +1161,14 @@ func (s *Scorer) TopK() int {
 	return s.cfg.TopK
 }
 
+// SetWorkflowPatterns refreshes workflow tracker patterns at runtime.
+func (s *Scorer) SetWorkflowPatterns(patterns []workflow.Pattern) {
+	if s.workflowTracker == nil {
+		return
+	}
+	s.workflowTracker.SetPatterns(patterns)
+}
+
 // Weights returns the configured weights.
 func (s *Scorer) Weights() Weights {
 	return s.cfg.Weights
@@ -993,8 +1189,9 @@ func (s *Scorer) DebugScores(ctx context.Context, limit int) ([]DebugScore, erro
 	}
 
 	query := `
-		SELECT scope, cmd_norm, score, last_ts
-		FROM command_score
+		SELECT cs.scope, ct.cmd_norm, cs.score, cs.last_seen_ms
+		FROM command_stat cs
+		JOIN command_template ct ON ct.template_id = cs.template_id
 		ORDER BY score DESC
 		LIMIT ?
 	`

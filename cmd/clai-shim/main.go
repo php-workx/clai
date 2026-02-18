@@ -15,6 +15,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strconv"
@@ -74,6 +75,8 @@ func main() {
 		runSessionStart()
 	case "session-end":
 		runSessionEnd()
+	case "alias-sync":
+		runAliasSync()
 	case "log-start":
 		runLogStart()
 	case "log-end":
@@ -111,7 +114,7 @@ Usage: clai-shim <command> [flags...]
 
 Commands:
   --persistent                                Enter persistent NDJSON stdin mode
-  session-start, session-end, log-start, log-end, suggest, text-to-command
+  session-start, session-end, alias-sync, log-start, log-end, suggest, text-to-command
   import-history, ping, status, version, help
 
 Environment:
@@ -192,6 +195,28 @@ func runSessionEnd() {
 	}
 	defer client.Close()
 	client.SessionEnd(sessionID)
+}
+
+func runAliasSync() {
+	flags := parseFlags(os.Args[2:])
+	sessionID := flags[flagSessionID]
+	shell := flags[flagShell]
+	if sessionID == "" {
+		return
+	}
+	rawSnapshot := ""
+	if flags["stdin"] == "true" {
+		data, err := io.ReadAll(os.Stdin)
+		if err == nil {
+			rawSnapshot = string(data)
+		}
+	}
+	client, err := ipc.NewClient()
+	if err != nil {
+		return
+	}
+	defer client.Close()
+	client.AliasSync(sessionID, shell, rawSnapshot)
 }
 
 func runLogStart() {

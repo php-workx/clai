@@ -2,12 +2,12 @@ package daemon
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/sanitize"
-	"github.com/runger/clai/internal/suggestions/dirscope"
 	"github.com/runger/clai/internal/suggestions/explain"
 	"github.com/runger/clai/internal/suggestions/normalize"
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
@@ -34,21 +34,17 @@ func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResul
 	if maxResults > 0 && len(suggestions) > maxResults {
 		suggestions = suggestions[:maxResults]
 	}
-
-	return s.v2SuggestionsToProto(suggestions, suggestCtx.LastCmd, suggestCtx.NowMs)
-}
-
-// suggestBlend generates suggestions by merging V1 and V2 results.
-// V2 results are interleaved with V1, deduplicated by command text,
-// with V2 suggestions taking priority on conflicts.
-func (s *Server) suggestBlend(ctx context.Context, req *pb.SuggestRequest, maxResults int, v1Resp *pb.SuggestResponse) *pb.SuggestResponse {
-	v2Resp := s.suggestV2(ctx, req, maxResults)
-	if v2Resp == nil {
-		// V2 unavailable -- return V1 results only
-		return v1Resp
+	if req.SessionId != "" {
+		s.snapshotMu.Lock()
+		s.lastSuggestSnapshots[req.SessionId] = suggestSnapshot{
+			Context:     suggestCtx,
+			Suggestions: append([]suggest2.Suggestion(nil), suggestions...),
+			ShownAtMs:   suggestCtx.NowMs,
+		}
+		s.snapshotMu.Unlock()
 	}
 
-	return mergeResponses(v1Resp, v2Resp, maxResults)
+	return s.v2SuggestionsToProto(suggestions, suggestCtx.LastCmd, suggestCtx.NowMs)
 }
 
 // mergeResponses merges V1 and V2 responses, deduplicating by command text.
@@ -110,15 +106,36 @@ func (s *Server) buildV2SuggestContext(req *pb.SuggestRequest) suggest2.SuggestC
 		SessionID: req.SessionId,
 		Prefix:    req.Buffer,
 		Cwd:       req.Cwd,
+		RepoKey:   req.RepoKey,
 	}
 
 	// Try to get the last command from session for transition scoring
 	if info, ok := s.sessionManager.Get(req.SessionId); ok {
-		// V2 scorer expects normalized command strings.
-		suggestCtx.LastCmd = normalize.NormalizeSimple(info.LastCmdRaw)
-		suggestCtx.RepoKey = info.LastGitRepo
-		// Directory scope key for cwd-scoped transitions/frequency (best-effort).
-		suggestCtx.DirScopeKey = dirscope.ComputeScopeKey(req.Cwd, info.LastGitRoot, dirscope.DefaultMaxDepth)
+		if suggestCtx.LastCmd == "" {
+			suggestCtx.LastCmd = normalize.NormalizeSimple(info.LastCmdRaw)
+		}
+		if suggestCtx.RepoKey == "" {
+			suggestCtx.RepoKey = info.LastGitRepo
+		}
+		suggestCtx.LastTemplateID = info.LastTemplateID
+		suggestCtx.ProjectTypes = append([]string(nil), info.ProjectTypes...)
+		// Keep scope key format aligned with write-path dir scope.
+		if req.Cwd != "" {
+			h := sha256.Sum256([]byte(req.Cwd))
+			suggestCtx.DirScopeKey = fmt.Sprintf("dir:%x", h[:8])
+		}
+	}
+	if req.LastCmdNorm != "" {
+		suggestCtx.LastCmd = normalize.NormalizeSimple(req.LastCmdNorm)
+	}
+	if req.LastCmdRaw != "" {
+		suggestCtx.LastCmd = normalize.NormalizeSimple(req.LastCmdRaw)
+		if suggestCtx.LastTemplateID == "" {
+			suggestCtx.LastTemplateID = normalize.PreNormalize(req.LastCmdRaw, normalize.PreNormConfig{}).TemplateID
+		}
+	}
+	if suggestCtx.LastTemplateID == "" && suggestCtx.LastCmd != "" {
+		suggestCtx.LastTemplateID = normalize.PreNormalize(suggestCtx.LastCmd, normalize.PreNormConfig{}).TemplateID
 	}
 
 	return suggestCtx
@@ -137,6 +154,11 @@ func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd
 	return &pb.SuggestResponse{
 		Suggestions: pbSuggestions,
 		FromCache:   false,
+		CacheStatus: "miss",
+		TimingHint: &pb.TimingHint{
+			UserSpeedClass:            "moderate",
+			SuggestedPauseThresholdMs: 250,
+		},
 	}
 }
 

@@ -1057,6 +1057,11 @@ if [[ $- == *i* && -z "$_CLAI_REINIT" ]]; then
             --cwd="$PWD" \
             --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1
 
+        alias -p | clai-shim alias-sync \
+            --session-id="$CLAI_SESSION_ID" \
+            --shell="$CLAI_CURRENT_SHELL" \
+            --stdin >/dev/null 2>&1
+
         # Idempotent: --if-not-exists skips if already imported
         clai-shim import-history \
             --shell="$CLAI_CURRENT_SHELL" \

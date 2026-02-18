@@ -10,7 +10,7 @@ import (
 // ParseEvent parses a JSON byte slice into a CommandEvent and validates it.
 // It returns the parsed event or an error if parsing or validation fails.
 //
-// This function handles NDJSON lines from shell hooks via clai-hook.
+// This function handles NDJSON lines from shell hooks via clai-shim.
 // The expected JSON format is defined in spec Section 15.1:
 //
 //	{
