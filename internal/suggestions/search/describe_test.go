@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -224,6 +225,27 @@ func TestDescribeService_Search_NetworkHTTP(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, results)
 	assert.Contains(t, results[0].MatchedTags, "http")
+}
+
+func TestDescribeService_Search_Offset(t *testing.T) {
+	t.Parallel()
+	db := createDescribeTestDB(t)
+	svc := NewDescribeService(db, DescribeConfig{})
+	ctx := context.Background()
+
+	for i := 0; i < 6; i++ {
+		templateID := fmt.Sprintf("tmpl-offset-%d", i)
+		insertDescribeTestData(t, db, templateID, "git status", "git status",
+			[]string{"vcs", "git"}, "", "/home/user", int64(1000+i))
+	}
+
+	page1, err := svc.Search(ctx, "version control", SearchOptions{Limit: 2, Offset: 0})
+	require.NoError(t, err)
+	page2, err := svc.Search(ctx, "version control", SearchOptions{Limit: 2, Offset: 2})
+	require.NoError(t, err)
+	require.Len(t, page1, 2)
+	require.Len(t, page2, 2)
+	assert.NotEqual(t, page1[0].ID, page2[0].ID)
 }
 
 func TestComputeMatchedTags(t *testing.T) {

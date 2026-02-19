@@ -245,6 +245,38 @@ func TestService_Search_Limit(t *testing.T) {
 	assert.Len(t, results, 30) // Only 30 events exist
 }
 
+func TestService_Search_Offset(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDB(t)
+	svc, err := NewService(db, DefaultConfig())
+	require.NoError(t, err)
+	defer svc.Close()
+
+	ctx := context.Background()
+	for i := 0; i < 6; i++ {
+		id := insertTestEvent(t, db, "offset command", "", "/home/user", false)
+		require.NoError(t, svc.IndexEvent(ctx, id))
+	}
+
+	page1, err := svc.Search(ctx, "offset", SearchOptions{Limit: 2, Offset: 0})
+	require.NoError(t, err)
+	page2, err := svc.Search(ctx, "offset", SearchOptions{Limit: 2, Offset: 2})
+	require.NoError(t, err)
+	require.Len(t, page1, 2)
+	require.Len(t, page2, 2)
+
+	seen := map[int64]struct{}{}
+	for _, r := range page1 {
+		seen[r.ID] = struct{}{}
+	}
+	for _, r := range page2 {
+		if _, ok := seen[r.ID]; ok {
+			t.Fatalf("expected non-overlapping paged results, repeated id=%d", r.ID)
+		}
+	}
+}
+
 func TestService_Search_EmptyQuery(t *testing.T) {
 	t.Parallel()
 

@@ -46,6 +46,9 @@ type SearchOptions struct {
 	// Limit is the maximum number of results.
 	Limit int
 
+	// Offset skips this many results for pagination.
+	Offset int
+
 	// IncludeRecency weights results by recency in addition to BM25.
 	IncludeRecency bool
 }
@@ -168,6 +171,7 @@ func (s *Service) prepareFTSStatements() error {
 		  AND ce.ephemeral = 0
 		ORDER BY score, ce.ts_ms DESC
 		LIMIT ?
+		OFFSET ?
 	`)
 	if err != nil {
 		return err
@@ -203,6 +207,7 @@ func (s *Service) prepareFallbackStatement() error {
 		  AND ephemeral = 0
 		ORDER BY ts_ms DESC
 		LIMIT ?
+		OFFSET ?
 	`)
 	if err != nil {
 		return err
@@ -253,22 +258,29 @@ func (s *Service) Search(ctx context.Context, query string, opts SearchOptions) 
 	if limit > MaxLimit {
 		limit = MaxLimit
 	}
+	offset := normalizeOffset(opts.Offset)
 
 	// Try FTS5 search first
 	if s.fts5Available {
-		return s.searchFTS5(ctx, query, opts, limit)
+		return s.searchFTS5(ctx, query, opts, limit, offset)
 	}
 
 	// Fall back to LIKE search if enabled
 	if s.fallbackEnabled {
-		return s.searchLike(ctx, query, opts, limit)
+		return s.searchLike(ctx, query, opts, limit, offset)
 	}
 
 	return nil, ErrFTS5Unavailable
 }
 
 // searchFTS5 performs FTS5-based search.
-func (s *Service) searchFTS5(ctx context.Context, query string, opts SearchOptions, limit int) ([]SearchResult, error) {
+func (s *Service) searchFTS5(
+	ctx context.Context,
+	query string,
+	opts SearchOptions,
+	limit int,
+	offset int,
+) ([]SearchResult, error) {
 	// Prepare FTS5 query - escape special characters
 	ftsQuery := escapeFTS5Query(query)
 
@@ -277,6 +289,7 @@ func (s *Service) searchFTS5(ctx context.Context, query string, opts SearchOptio
 		opts.RepoKey, opts.RepoKey,
 		opts.Cwd, opts.Cwd,
 		limit,
+		offset,
 	)
 	if err != nil {
 		return nil, err
@@ -294,7 +307,13 @@ func (s *Service) searchFTS5(ctx context.Context, query string, opts SearchOptio
 }
 
 // searchLike performs LIKE-based fallback search.
-func (s *Service) searchLike(ctx context.Context, query string, opts SearchOptions, limit int) ([]SearchResult, error) {
+func (s *Service) searchLike(
+	ctx context.Context,
+	query string,
+	opts SearchOptions,
+	limit int,
+	offset int,
+) ([]SearchResult, error) {
 	// Convert query to LIKE pattern
 	likePattern := "%" + escapeLikePattern(query) + "%"
 
@@ -303,6 +322,7 @@ func (s *Service) searchLike(ctx context.Context, query string, opts SearchOptio
 		opts.RepoKey, opts.RepoKey,
 		opts.Cwd, opts.Cwd,
 		limit,
+		offset,
 	)
 	if err != nil {
 		return nil, err
@@ -317,6 +337,13 @@ func (s *Service) searchLike(ctx context.Context, query string, opts SearchOptio
 		results[i].Backend = BackendFallback
 	}
 	return results, nil
+}
+
+func normalizeOffset(offset int) int {
+	if offset < 0 {
+		return 0
+	}
+	return offset
 }
 
 // scanResults scans search result rows.

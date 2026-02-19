@@ -30,6 +30,8 @@ const (
 	errNoAIProvider = "no AI provider available"
 	sourceAI        = "ai"
 	riskDestructive = "destructive"
+	// Expire per-session suggestion snapshots so stale feedback cannot update learning state.
+	maxSuggestSnapshotAge = 15 * time.Minute
 )
 
 func v1WhyNarrative(sug suggest.Suggestion, lastCmd string) string {
@@ -168,6 +170,7 @@ func (s *Server) SessionEnd(ctx context.Context, req *pb.SessionEndRequest) (*pb
 
 	// Remove from session manager
 	s.sessionManager.End(req.SessionId)
+	s.clearSuggestSnapshot(req.SessionId)
 
 	s.logger.Debug("session ended", "session_id", req.SessionId)
 
@@ -753,6 +756,10 @@ func (s *Server) applyFeedbackUpdates(ctx context.Context, req *pb.RecordFeedbac
 		return
 	}
 	nowMs := time.Now().UnixMilli()
+	if snapshot.ShownAtMs > 0 && nowMs-snapshot.ShownAtMs > int64(maxSuggestSnapshotAge/time.Millisecond) {
+		s.clearSuggestSnapshot(req.SessionId)
+		return
+	}
 	scope := snapshot.Context.Scope
 	if scope == "" {
 		if snapshot.Context.RepoKey != "" {
@@ -782,6 +789,9 @@ func (s *Server) applyFeedbackUpdates(ctx context.Context, req *pb.RecordFeedbac
 	if s.learner == nil {
 		return
 	}
+	if _, err := s.learner.LoadFromStore(ctx, scope); err != nil {
+		s.logger.Debug("failed to load learning profile", "scope", scope, "error", err)
+	}
 	pos, neg, ok := learningPairFromFeedback(snapshot.Suggestions, req)
 	if !ok {
 		return
@@ -794,6 +804,15 @@ func (s *Server) getSuggestSnapshot(sessionID string) (suggestSnapshot, bool) {
 	defer s.snapshotMu.RUnlock()
 	snap, ok := s.lastSuggestSnapshots[sessionID]
 	return snap, ok
+}
+
+func (s *Server) clearSuggestSnapshot(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	s.snapshotMu.Lock()
+	defer s.snapshotMu.Unlock()
+	delete(s.lastSuggestSnapshots, sessionID)
 }
 
 func findSnapshotSuggestion(suggestions []suggest2.Suggestion, text string) (suggest2.Suggestion, bool) {
@@ -925,13 +944,15 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 		(req.Mode == pb.SearchMode_SEARCH_MODE_FTS ||
 			req.Mode == pb.SearchMode_SEARCH_MODE_DESCRIBE ||
 			req.Mode == pb.SearchMode_SEARCH_MODE_AUTO) {
-		items, atEnd, backend := s.fetchHistoryV2Search(ctx, req, limit)
-		return &pb.HistoryFetchResponse{
-			Items:     items,
-			AtEnd:     atEnd,
-			LatencyMs: time.Since(start).Milliseconds(),
-			Backend:   backend,
-		}, nil
+		items, atEnd, backend, ok := s.fetchHistoryV2Search(ctx, req, limit)
+		if ok {
+			return &pb.HistoryFetchResponse{
+				Items:     items,
+				AtEnd:     atEnd,
+				LatencyMs: time.Since(start).Milliseconds(),
+				Backend:   backend,
+			}, nil
+		}
 	}
 
 	q := storage.CommandQuery{
@@ -1012,14 +1033,15 @@ func (s *Server) fetchHistoryV2Search(
 	ctx context.Context,
 	req *pb.HistoryFetchRequest,
 	limit int,
-) ([]*pb.HistoryItem, bool, string) {
+) ([]*pb.HistoryItem, bool, string, bool) {
 	if s.v2db == nil || limit <= 0 {
-		return nil, true, "storage"
+		return nil, true, "storage", false
 	}
 
 	opts := search2.SearchOptions{
 		RepoKey: req.RepoKey,
 		Limit:   limit + 1,
+		Offset:  int(req.Offset),
 	}
 
 	ftsSvc, err := search2.NewService(s.v2db.DB(), search2.Config{
@@ -1028,7 +1050,7 @@ func (s *Server) fetchHistoryV2Search(
 	})
 	if err != nil {
 		s.logger.Debug("history search init failed", "error", err)
-		return nil, true, "storage"
+		return nil, true, "storage", false
 	}
 	defer ftsSvc.Close()
 
@@ -1053,7 +1075,7 @@ func (s *Server) fetchHistoryV2Search(
 	}
 	if err != nil {
 		s.logger.Debug("history search failed", "error", err, "mode", req.Mode.String())
-		return nil, true, "storage"
+		return nil, true, "storage", false
 	}
 
 	atEnd := len(results) <= limit
@@ -1074,7 +1096,7 @@ func (s *Server) fetchHistoryV2Search(
 			MatchedTags: append([]string(nil), r.MatchedTags...),
 		})
 	}
-	return items, atEnd, backend
+	return items, atEnd, backend, true
 }
 
 // ImportHistory handles the ImportHistory RPC.

@@ -68,6 +68,7 @@ func (s *DescribeService) Search(ctx context.Context, query string, opts SearchO
 
 	s.logger.Debug("describe search: extracted tags", "query", query, "tags", queryTags)
 	limit := normalizeLimit(opts.Limit)
+	offset := normalizeOffset(opts.Offset)
 
 	rows, err := s.queryTemplatesWithTags(ctx, opts)
 	if err != nil {
@@ -93,6 +94,12 @@ func (s *DescribeService) Search(ctx context.Context, query string, opts SearchO
 	})
 
 	// Apply limit
+	if offset >= len(results) {
+		return nil, nil
+	}
+	if offset > 0 {
+		results = results[offset:]
+	}
 	if len(results) > limit {
 		results = results[:limit]
 	}

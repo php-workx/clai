@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"sort"
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/sanitize"
 	"github.com/runger/clai/internal/suggestions/explain"
+	"github.com/runger/clai/internal/suggestions/learning"
 	"github.com/runger/clai/internal/suggestions/normalize"
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
@@ -30,6 +32,7 @@ func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResul
 		s.logger.Warn("V2 scorer failed", "error", err)
 		return nil
 	}
+	s.applyLearningProfile(ctx, suggestCtx, suggestions)
 
 	if maxResults > 0 && len(suggestions) > maxResults {
 		suggestions = suggestions[:maxResults]
@@ -45,6 +48,65 @@ func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResul
 	}
 
 	return s.v2SuggestionsToProto(suggestions, suggestCtx.LastCmd, suggestCtx.NowMs)
+}
+
+func (s *Server) applyLearningProfile(
+	ctx context.Context,
+	suggestCtx suggest2.SuggestContext,
+	suggestions []suggest2.Suggestion,
+) {
+	if len(suggestions) == 0 || s.learningStore == nil {
+		return
+	}
+	scope := suggestCtx.Scope
+	if scope == "" {
+		if suggestCtx.RepoKey != "" {
+			scope = suggestCtx.RepoKey
+		} else {
+			scope = "global"
+		}
+	}
+	profile, err := s.learningStore.LoadWeights(ctx, scope)
+	if err != nil {
+		s.logger.Debug("failed to load scope learning profile", "scope", scope, "error", err)
+		return
+	}
+	if profile == nil && scope != "global" {
+		profile, err = s.learningStore.LoadWeights(ctx, "global")
+		if err != nil {
+			s.logger.Debug("failed to load global learning profile", "error", err)
+			return
+		}
+	}
+	if profile == nil || profile.SampleCount < learning.DefaultConfig().MinSamples {
+		return
+	}
+	for i := range suggestions {
+		suggestions[i].Score += learningDelta(suggestions[i], suggestCtx.Prefix, profile.Weights)
+	}
+	sort.SliceStable(suggestions, func(i, j int) bool {
+		if suggestions[i].Score != suggestions[j].Score {
+			return suggestions[i].Score > suggestions[j].Score
+		}
+		return suggestions[i].Command < suggestions[j].Command
+	})
+}
+
+func learningDelta(sug suggest2.Suggestion, prefix string, w learning.Weights) float64 {
+	// Keep adaptive contribution bounded so learned weights nudge ordering
+	// without overpowering base score signals.
+	const learningScale = 25.0
+
+	fv := featureVectorFromSuggestion(sug, &pb.RecordFeedbackRequest{Prefix: prefix})
+	positive := w.Transition*fv.Transition +
+		w.Frequency*fv.Frequency +
+		w.Prefix*fv.Prefix +
+		w.Affinity*fv.Affinity +
+		w.Task*fv.Task +
+		w.ProjectTypeAffinity*fv.ProjectTypeAffinity +
+		w.FailureRecovery*fv.FailureRecovery
+	negative := w.RiskPenalty * fv.RiskPenalty
+	return (positive - negative) * learningScale
 }
 
 // mergeResponses merges V1 and V2 responses, deduplicating by command text.
