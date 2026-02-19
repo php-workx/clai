@@ -296,7 +296,7 @@ func (p *HistoryProvider) fetchHistoryItems(
 		Global:    global,
 		Query:     query,
 		Limit:     int32(limit),  //nolint:gosec // G115: limit is bounded by picker page size
-		Offset:    int32(offset), //nolint:gosec // G115: offset is bounded by result count
+		Offset:    int32(offset), //nolint:gosec // G115: offset starts at 0, bounded by page size
 	}
 
 	grpcResp, err := client.FetchHistory(ctx, grpcReq)

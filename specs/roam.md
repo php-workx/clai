@@ -73,7 +73,7 @@ Top symbols by importance (PageRank):
 Follow these conventions when writing code in this project:
 
 - **Imports:** Prefer absolute imports (100% are cross-directory)
-- **Test files:** test_*.py
+- **Test files:** *_test.go
 
 ## Complexity Hotspots
 

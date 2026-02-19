@@ -104,6 +104,10 @@ type StartupInfo struct {
 
 // LogStartup logs daemon startup information.
 func LogStartup(logger *slog.Logger, info *StartupInfo) {
+	if info == nil {
+		logger.Info("daemon started")
+		return
+	}
 	logger.Info("daemon started",
 		"version", info.Version,
 		"git_commit", info.GitCommit,

@@ -35,6 +35,9 @@ func testSessionEnd(t *testing.T) {
 	if ev.Type != EventSessionEnd {
 		t.Errorf("type = %q, want %q", ev.Type, EventSessionEnd)
 	}
+	if ev.SessionID != "s1" {
+		t.Errorf("session_id = %q, want %q", ev.SessionID, "s1")
+	}
 }
 
 func testCommandStart(t *testing.T) {

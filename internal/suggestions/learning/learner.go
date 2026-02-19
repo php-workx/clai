@@ -86,6 +86,9 @@ type Learner struct {
 // and optional persistence store. If store is nil, weights are kept
 // in memory only.
 func NewLearner(initial *Weights, cfg Config, store *Store) *Learner {
+	if initial == nil {
+		initial = &Weights{}
+	}
 	if cfg.Logger == nil {
 		cfg.Logger = slog.Default()
 	}
@@ -151,6 +154,9 @@ func effectiveEta(etaInitial, etaDecayConstant, etaFloor float64, sampleCount in
 // "repo:<key>", or "global"). When a store is configured the updated
 // profile is persisted asynchronously.
 func (l *Learner) Update(ctx context.Context, scope string, fPos, fNeg *FeatureVector) {
+	if fPos == nil || fNeg == nil {
+		return
+	}
 	l.mu.Lock()
 	defer l.mu.Unlock()
 

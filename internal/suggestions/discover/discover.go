@@ -66,6 +66,8 @@ func NewEngine() *Engine {
 // Discover returns discovery candidates for an empty-session context.
 // It checks playbook, project-type priors, and tool-common sets in priority
 // order, applies cooldown filtering, and returns up to config.Limit candidates.
+//
+// The context parameter is reserved for future cancellation support.
 func (e *Engine) Discover(_ context.Context, config DiscoverConfig) []Candidate {
 	limit := config.Limit
 	if limit <= 0 {
