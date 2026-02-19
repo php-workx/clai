@@ -15,6 +15,8 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
+#[cfg(unix)]
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use tempfile::NamedTempFile;
@@ -187,7 +189,9 @@ fn spawn_clai_wrap_bash_shell() -> Option<(
 }
 
 #[cfg(unix)]
-fn spawn_clai_wrap_shell_path(shell_path: &Path) -> Option<(
+fn spawn_clai_wrap_shell_path(
+    shell_path: &Path,
+) -> Option<(
     Box<dyn portable_pty::MasterPty + Send>,
     Box<dyn portable_pty::Child + Send + Sync>,
 )> {
@@ -579,7 +583,10 @@ fn test_pty_spawn_sh_shell() {
     let mut cmd = CommandBuilder::new("/bin/sh");
     cmd.args(["-c", "echo shell_spawn_test && exit 0"]);
 
-    let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn shell");
+    let mut child = pair
+        .slave
+        .spawn_command(cmd)
+        .expect("Failed to spawn shell");
 
     let mut reader = pair
         .master
@@ -652,7 +659,10 @@ fn test_clai_wrap_login_shell_disabled_does_not_pass_l_flag() {
         "false",
     ]);
 
-    let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn clai-wrap");
+    let mut child = pair
+        .slave
+        .spawn_command(cmd)
+        .expect("Failed to spawn clai-wrap");
     let mut reader = pair
         .master
         .try_clone_reader()
@@ -698,7 +708,10 @@ fn test_clai_wrap_warns_on_nested_wrapper_env() {
     ]);
     cmd.env("CLAI_WRAP", "1");
 
-    let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn clai-wrap");
+    let mut child = pair
+        .slave
+        .spawn_command(cmd)
+        .expect("Failed to spawn clai-wrap");
     let mut reader = pair
         .master
         .try_clone_reader()
@@ -740,7 +753,10 @@ fn test_clai_wrap_fails_fast_with_invalid_history_file() {
         "/definitely/nonexistent/history-for-e2e-test",
     ]);
 
-    let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn clai-wrap");
+    let mut child = pair
+        .slave
+        .spawn_command(cmd)
+        .expect("Failed to spawn clai-wrap");
     let mut reader = pair
         .master
         .try_clone_reader()
@@ -754,7 +770,10 @@ fn test_clai_wrap_fails_fast_with_invalid_history_file() {
         output.contains("failed to load history file"),
         "Expected history file load error, got output: {output}"
     );
-    assert!(!status.success(), "Expected non-zero exit for invalid history file");
+    assert!(
+        !status.success(),
+        "Expected non-zero exit for invalid history file"
+    );
 }
 
 #[test]
@@ -945,9 +964,7 @@ fn test_clai_wrap_fullscreen_man_quit_resume_shell() {
     let mut reader = master.try_clone_reader().expect("Failed to get reader");
     let mut writer = master.take_writer().expect("Failed to get writer");
 
-    writer
-        .write_all(b"man sh\n")
-        .expect("write man command");
+    writer.write_all(b"man sh\n").expect("write man command");
     writer.flush().expect("flush man command");
     std::thread::sleep(Duration::from_millis(300));
     writer.write_all(b"q").expect("send q to man pager");
@@ -1201,7 +1218,9 @@ fn test_clai_wrap_io_line_editing_arrows_backspace_ctrl_a_ctrl_e() {
     let mut reader = master.try_clone_reader().expect("Failed to get reader");
     let mut writer = master.take_writer().expect("Failed to get writer");
 
-    writer.write_all(b"echo helo").expect("write line-edit test");
+    writer
+        .write_all(b"echo helo")
+        .expect("write line-edit test");
     writer
         .write_all(b"\x1b[D\x08ll\n")
         .expect("write arrow/backspace edits");
@@ -1539,7 +1558,13 @@ fn test_clai_wrap_encoding_non_utf8_locale_warning() {
         .expect("Failed to create PTY");
 
     let mut cmd = CommandBuilder::new(binary);
-    cmd.args(["--standalone", "--shell", "/bin/sh", "--login-shell", "false"]);
+    cmd.args([
+        "--standalone",
+        "--shell",
+        "/bin/sh",
+        "--login-shell",
+        "false",
+    ]);
     cmd.env("LANG", "C");
     cmd.env("LC_ALL", "C");
 
@@ -1651,7 +1676,10 @@ fn test_interactive_shell_session() {
     #[cfg(windows)]
     let cmd = { CommandBuilder::new("cmd") };
 
-    let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn shell");
+    let mut child = pair
+        .slave
+        .spawn_command(cmd)
+        .expect("Failed to spawn shell");
 
     let mut reader = pair
         .master
@@ -1679,11 +1707,7 @@ fn test_interactive_shell_session() {
 
     let status = child.wait().expect("Failed to wait");
 
-    assert!(
-        output.contains("interactive_test"),
-        "Output: {}",
-        output
-    );
+    assert!(output.contains("interactive_test"), "Output: {}", output);
     assert!(status.success());
 }
 
@@ -1816,10 +1840,22 @@ fn test_clai_wrap_osc133_bash_emits_all_sequences() {
         }
     };
 
-    assert!(has_osc133(&output, 'A'), "bash should emit OSC 133;A (prompt start)");
-    assert!(has_osc133(&output, 'B'), "bash should emit OSC 133;B (input start)");
-    assert!(has_osc133(&output, 'C'), "bash should emit OSC 133;C (output start)");
-    assert!(has_osc133(&output, 'D'), "bash should emit OSC 133;D (finished)");
+    assert!(
+        has_osc133(&output, 'A'),
+        "bash should emit OSC 133;A (prompt start)"
+    );
+    assert!(
+        has_osc133(&output, 'B'),
+        "bash should emit OSC 133;B (input start)"
+    );
+    assert!(
+        has_osc133(&output, 'C'),
+        "bash should emit OSC 133;C (output start)"
+    );
+    assert!(
+        has_osc133(&output, 'D'),
+        "bash should emit OSC 133;D (finished)"
+    );
 }
 
 /// Verify that zsh injection produces all four OSC 133 sequences.
@@ -1858,23 +1894,42 @@ fn test_clai_wrap_osc133_zsh_emits_all_sequences() {
     writer.flush().expect("flush");
     std::thread::sleep(Duration::from_millis(2000));
 
-    writer
-        .write_all(b"echo xR7_ZSH_FINAL_mK3\n")
-        .expect("write");
+    // Use a unique marker each run to avoid matching autosuggestion text from history.
+    let final_marker = format!(
+        "xR7_ZSH_FINAL_{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock should be after unix epoch")
+            .as_nanos()
+    );
+    let final_cmd = format!("echo {final_marker}\n");
+
+    writer.write_all(final_cmd.as_bytes()).expect("write");
     writer.flush().expect("flush");
 
     let output =
-        read_until_marker(&mut *reader, "xR7_ZSH_FINAL_mK3", Duration::from_secs(15))
-            .unwrap_or_default();
+        read_until_marker(&mut *reader, &final_marker, Duration::from_secs(15)).unwrap_or_default();
 
     writer.write_all(b"exit\n").expect("exit");
     writer.flush().expect("flush exit");
     let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(5));
 
-    assert!(has_osc133(&output, 'A'), "zsh should emit OSC 133;A (prompt start)");
-    assert!(has_osc133(&output, 'B'), "zsh should emit OSC 133;B (input start)");
-    assert!(has_osc133(&output, 'C'), "zsh should emit OSC 133;C (output start)");
-    assert!(has_osc133(&output, 'D'), "zsh should emit OSC 133;D (finished)");
+    assert!(
+        has_osc133(&output, 'A'),
+        "zsh should emit OSC 133;A (prompt start)"
+    );
+    assert!(
+        has_osc133(&output, 'B'),
+        "zsh should emit OSC 133;B (input start)"
+    );
+    assert!(
+        has_osc133(&output, 'C'),
+        "zsh should emit OSC 133;C (output start)"
+    );
+    assert!(
+        has_osc133(&output, 'D'),
+        "zsh should emit OSC 133;D (finished)"
+    );
 }
 
 /// Verify that fish injection produces all four OSC 133 sequences.
@@ -1901,10 +1956,22 @@ fn test_clai_wrap_osc133_fish_emits_all_sequences() {
         }
     };
 
-    assert!(has_osc133(&output, 'A'), "fish should emit OSC 133;A (prompt start)");
-    assert!(has_osc133(&output, 'B'), "fish should emit OSC 133;B (input start)");
-    assert!(has_osc133(&output, 'C'), "fish should emit OSC 133;C (output start)");
-    assert!(has_osc133(&output, 'D'), "fish should emit OSC 133;D (finished)");
+    assert!(
+        has_osc133(&output, 'A'),
+        "fish should emit OSC 133;A (prompt start)"
+    );
+    assert!(
+        has_osc133(&output, 'B'),
+        "fish should emit OSC 133;B (input start)"
+    );
+    assert!(
+        has_osc133(&output, 'C'),
+        "fish should emit OSC 133;C (output start)"
+    );
+    assert!(
+        has_osc133(&output, 'D'),
+        "fish should emit OSC 133;D (finished)"
+    );
 }
 
 /// Document /bin/sh injection behavior — on macOS /bin/sh is bash so injection occurs,

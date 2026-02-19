@@ -49,12 +49,13 @@
 
 #[cfg(unix)]
 use crate::daemon_client::{DaemonClient, DaemonClientError};
+use crate::jsonrpc::Notification;
 use crate::osc133::Osc133State;
 use crate::output_capture::{CapturedOutput, OutputCapture};
 use crate::standalone::{Feature, StandaloneReason, StandaloneState};
 
-use std::path::Path;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use thiserror::Error;
 use tracing::{debug, trace, warn};
@@ -85,6 +86,10 @@ pub type Result<T> = std::result::Result<T, ForwarderError>;
 pub struct ForwarderConfig {
     /// Session identifier for this wrapper instance.
     pub session_id: String,
+    /// Daemon socket path for reconnects (if explicitly configured).
+    pub daemon_socket_path: Option<PathBuf>,
+    /// Connection timeout for reconnect attempts.
+    pub connect_timeout: Duration,
     /// Whether to attempt reconnection on disconnect.
     pub reconnect_on_disconnect: bool,
     /// Maximum number of reconnection attempts.
@@ -97,6 +102,8 @@ impl Default for ForwarderConfig {
     fn default() -> Self {
         Self {
             session_id: Uuid::new_v4().to_string(),
+            daemon_socket_path: None,
+            connect_timeout: Duration::from_millis(500),
             reconnect_on_disconnect: true,
             max_reconnect_attempts: 1,
             output_buffer_capacity: 4 * 1024 * 1024, // 4MB
@@ -112,6 +119,20 @@ impl ForwarderConfig {
             session_id: session_id.into(),
             ..Default::default()
         }
+    }
+
+    /// Sets the daemon socket path used for reconnect attempts.
+    #[must_use]
+    pub fn daemon_socket_path(mut self, socket_path: PathBuf) -> Self {
+        self.daemon_socket_path = Some(socket_path);
+        self
+    }
+
+    /// Sets the reconnect connection timeout.
+    #[must_use]
+    pub const fn connect_timeout(mut self, timeout: Duration) -> Self {
+        self.connect_timeout = timeout;
+        self
     }
 
     /// Sets whether to attempt reconnection on disconnect.
@@ -163,6 +184,8 @@ pub struct DaemonEventForwarder {
     reconnect_attempts: u32,
     /// Whether we've warned about standalone mode.
     warned_standalone: bool,
+    /// Most recently completed command id (used for suggestion timing).
+    last_finished_command_id: Option<String>,
 }
 
 impl DaemonEventForwarder {
@@ -182,6 +205,7 @@ impl DaemonEventForwarder {
             standalone_state: Some(standalone_state),
             reconnect_attempts: 0,
             warned_standalone: false,
+            last_finished_command_id: None,
         }
     }
 
@@ -198,6 +222,7 @@ impl DaemonEventForwarder {
             standalone_state: None,
             reconnect_attempts: 0,
             warned_standalone: false,
+            last_finished_command_id: None,
         }
     }
 
@@ -412,6 +437,7 @@ impl DaemonEventForwarder {
 
         // Stop output capture and get captured data
         let captured = self.output_capture.stop_capture();
+        self.last_finished_command_id = Some(command_state.command_id.clone());
 
         debug!(
             "Command ended: {} (exit_code={}, captured={} bytes)",
@@ -439,6 +465,30 @@ impl DaemonEventForwarder {
         }
     }
 
+    /// Returns and clears the most recently finished command id.
+    #[must_use]
+    pub fn take_finished_command_id(&mut self) -> Option<String> {
+        self.last_finished_command_id.take()
+    }
+
+    /// Polls for daemon notifications in non-blocking mode.
+    ///
+    /// On socket/protocol error this gracefully degrades to standalone mode.
+    #[cfg(unix)]
+    pub fn poll_notification(&mut self) -> Option<Notification> {
+        if let Some(ref mut client) = self.client {
+            match client.poll_notifications() {
+                Ok(notification) => notification,
+                Err(err) => {
+                    self.handle_daemon_error(err);
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    }
+
     /// Handles a daemon communication error.
     ///
     /// This method attempts reconnection if configured, and falls back to
@@ -457,7 +507,18 @@ impl DaemonEventForwarder {
                 self.reconnect_attempts, self.config.max_reconnect_attempts
             );
 
-            if let Ok(mut client) = DaemonClient::connect_default() {
+            let reconnect = if let Some(socket_path) = self.config.daemon_socket_path.as_deref() {
+                DaemonClient::connect_with_timeout(socket_path, self.config.connect_timeout)
+            } else if let Some(default_socket_path) = DaemonClient::default_socket_path() {
+                DaemonClient::connect_with_timeout(
+                    &default_socket_path,
+                    self.config.connect_timeout,
+                )
+            } else {
+                Err(DaemonClientError::NoSocketPath)
+            };
+
+            if let Ok(mut client) = reconnect {
                 if client.ping().is_ok() {
                     debug!("Reconnection successful");
                     self.client = Some(client);
@@ -616,9 +677,16 @@ mod tests {
     fn test_forwarder_config_builder() {
         let config = ForwarderConfig::default()
             .reconnect_on_disconnect(false)
+            .daemon_socket_path(PathBuf::from("/tmp/custom-daemon.sock"))
+            .connect_timeout(Duration::from_millis(250))
             .output_buffer_capacity(1024);
 
         assert!(!config.reconnect_on_disconnect);
+        assert_eq!(
+            config.daemon_socket_path,
+            Some(PathBuf::from("/tmp/custom-daemon.sock"))
+        );
+        assert_eq!(config.connect_timeout, Duration::from_millis(250));
         assert_eq!(config.output_buffer_capacity, 1024);
     }
 

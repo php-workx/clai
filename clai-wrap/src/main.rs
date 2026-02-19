@@ -13,14 +13,18 @@ use anyhow::{Context, Result};
 #[cfg(unix)]
 use clai_wrap::alt_screen::{enter_alt_screen, AltScreenGuard};
 #[cfg(unix)]
+use clai_wrap::assistant_comment::{CommentManager, CommentRenderer, Shell};
+#[cfg(unix)]
 use clai_wrap::bracketed_paste::BracketedPasteTracker;
 use clai_wrap::cli::{Cli, Commands, OperationMode};
 use clai_wrap::config::Config;
 #[cfg(unix)]
+use clai_wrap::daemon_client::{DaemonClient, DaemonClientError};
+#[cfg(unix)]
+use clai_wrap::daemon_events::{DaemonEventForwarder, ForwarderConfig};
+#[cfg(unix)]
 use clai_wrap::echo_gap::EchoGapDetector;
 use clai_wrap::hotkey::HotkeyConfig;
-#[cfg(unix)]
-use clai_wrap::process_detect::get_foreground_process_or;
 #[cfg(unix)]
 use clai_wrap::hotkey::CHORD_COMPLETIONS_BYTE;
 #[cfg(unix)]
@@ -31,17 +35,21 @@ use clai_wrap::osc133::{Osc133Parser, Osc133State};
 #[cfg(unix)]
 use clai_wrap::output_capture::OutputCapture;
 #[cfg(unix)]
-use clai_wrap::suggestion_receiver::SuggestionReceiver;
-#[cfg(unix)]
-use clai_wrap::assistant_comment::{CommentManager, CommentRenderer, Shell};
-#[cfg(unix)]
 use clai_wrap::picker::Picker;
+#[cfg(unix)]
+use clai_wrap::process_detect::get_foreground_process_or;
 use clai_wrap::pty_host::PtyHost;
 use clai_wrap::selection_inject::SelectionInjector;
 #[cfg(unix)]
 use clai_wrap::standalone::{StandaloneReason, StandaloneState};
 #[cfg(unix)]
+use clai_wrap::suggestion_receiver::SuggestionReceiver;
+#[cfg(unix)]
+use clai_wrap::temp_dir::TempDirManager;
+#[cfg(unix)]
 use ratatui::{backend::CrosstermBackend, Terminal};
+#[cfg(unix)]
+use std::collections::VecDeque;
 use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::EnvFilter;
 
@@ -60,6 +68,12 @@ const IO_EVENT_TIMEOUT: Duration = Duration::from_millis(5);
 
 #[cfg(unix)]
 const PICKER_ESCAPE_TIMEOUT: Duration = Duration::from_millis(30);
+
+#[cfg(unix)]
+const OSC133_STARTUP_WATCHDOG_TIMEOUT: Duration = Duration::from_millis(500);
+
+#[cfg(unix)]
+const MAX_PENDING_COMMENT_COMMANDS: usize = 128;
 
 /// Warning printed when clai-wrap is started from inside another clai-wrap session.
 const NESTED_WRAPPER_WARNING: &str = "clai-wrap: nested wrapper detected (CLAI_WRAP already set)";
@@ -91,6 +105,20 @@ fn main() -> Result<()> {
     }
     if let Some(locale_warning) = locale_warning_message() {
         warn!("{locale_warning}");
+    }
+
+    #[cfg(unix)]
+    {
+        match TempDirManager::cleanup_stale() {
+            Ok(cleaned) if cleaned > 0 => {
+                warn!("Cleaned up {cleaned} stale shell injection temp directorie(s)");
+            }
+            Ok(_) => {}
+            Err(err) => {
+                // Startup should continue even if cleanup fails.
+                warn!("Failed to clean up stale shell injection temp directories: {err}");
+            }
+        }
     }
 
     // Run the main wrapper logic based on operation mode
@@ -167,40 +195,114 @@ fn reset_terminal() -> Result<()> {
 }
 
 /// Run in full mode with daemon connection and all features
+#[cfg(unix)]
 fn run_full_mode(cli: &Cli) -> Result<()> {
-    // For now, full mode falls back to standalone since daemon isn't implemented
     debug!("Full mode configuration:");
     debug!("  Daemon socket: {:?}", cli.daemon_socket);
     debug!("  Daemon timeout: {}ms", cli.daemon_timeout);
     debug!("  Hotkey: {:?}", cli.hotkey);
     debug!("  Hotkey timeout: {}ms", cli.hotkey_timeout);
 
-    warn!("Daemon connection not yet implemented, running in standalone mode");
+    let config = Config::load_and_merge(cli);
+    let socket_path = config
+        .daemon_socket
+        .clone()
+        .or_else(DaemonClient::default_socket_path)
+        .context("No daemon socket path configured")?;
+
+    let timeout = Duration::from_millis(cli.daemon_timeout);
+    let mut connected_forwarder = None;
+    let mut last_err = None;
+    let mut fallback_reason = StandaloneReason::DaemonUnavailable;
+
+    for attempt in 0..=1 {
+        match DaemonClient::connect_with_timeout(&socket_path, timeout) {
+            Ok(mut client) => match client.ping() {
+                Ok(()) => {
+                    info!(
+                        "Connected to daemon over JSON-RPC at {}",
+                        socket_path.display()
+                    );
+                    connected_forwarder = Some(DaemonEventForwarder::with_client(
+                        client,
+                        ForwarderConfig::default()
+                            .daemon_socket_path(socket_path.clone())
+                            .connect_timeout(timeout),
+                    ));
+                    break;
+                }
+                Err(err) => {
+                    last_err = Some(err.to_string());
+                    fallback_reason = map_daemon_error_to_standalone_reason(&err);
+                    warn!("Daemon ping failed on attempt {}/2: {}", attempt + 1, err);
+                }
+            },
+            Err(err) => {
+                last_err = Some(err.to_string());
+                fallback_reason = map_daemon_error_to_standalone_reason(&err);
+                warn!(
+                    "Daemon connect failed on attempt {}/2 ({}): {}",
+                    attempt + 1,
+                    socket_path.display(),
+                    err
+                );
+            }
+        }
+    }
+
+    if connected_forwarder.is_none() {
+        if let Some(err) = last_err {
+            warn!("Falling back to standalone mode after daemon connection failure: {err}");
+        } else {
+            warn!("Falling back to standalone mode (daemon unavailable)");
+        }
+    }
+
+    run_unix_mode(cli, connected_forwarder, fallback_reason)
+}
+
+#[cfg(not(unix))]
+fn run_full_mode(cli: &Cli) -> Result<()> {
+    warn!("Full mode daemon integration is currently Unix-only; using standalone mode");
     run_standalone_mode(cli)
 }
 
 /// Run in standalone mode without daemon connection
 #[cfg(unix)]
 fn run_standalone_mode(cli: &Cli) -> Result<()> {
+    run_unix_mode(cli, None, StandaloneReason::DaemonUnavailable)
+}
+
+#[cfg(unix)]
+fn run_unix_mode(
+    cli: &Cli,
+    mut daemon_forwarder: Option<DaemonEventForwarder>,
+    standalone_reason: StandaloneReason,
+) -> Result<()> {
     // Load config file and merge with CLI arguments (CLI wins)
     let config = Config::load_and_merge(cli);
     if let Some(ref path) = config.config_path {
         info!("Loaded configuration from {:?}", path);
     }
-    debug!("Merged config: hotkey={:?}, buffer_capacity={}, execute_on_select={}",
-        config.hotkey, config.buffer_capacity, config.execute_on_select);
+    debug!(
+        "Merged config: hotkey={:?}, buffer_capacity={}, execute_on_select={}",
+        config.hotkey, config.buffer_capacity, config.execute_on_select
+    );
 
     // Get shell path
     let shell_path = cli.shell_path();
     debug!("Using shell: {:?}", shell_path);
 
-    let standalone_state = init_standalone_history(cli, &shell_path)?;
+    let standalone_state = init_standalone_history(cli, &shell_path, standalone_reason)?;
     if standalone_state.has_history() {
         debug!(
             "Loaded {} history entries from {:?}",
             standalone_state.history_count(),
             standalone_state.history_path()
         );
+    }
+    if daemon_forwarder.is_none() {
+        standalone_state.log_warning();
     }
 
     // Initialize denylist for privacy gate (from merged config)
@@ -211,15 +313,9 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
 
     // Create PTY and spawn shell (with injection args/env if available)
     let (extra_args, extra_env) = match &shell_inject {
-        Some(ShellInjection::Bash(ref injector)) => {
-            (injector.shell_args(), Vec::new())
-        }
-        Some(ShellInjection::Zsh(ref injector)) => {
-            (Vec::new(), injector.env_vars())
-        }
-        Some(ShellInjection::Fish(ref injector)) => {
-            (injector.shell_args(), Vec::new())
-        }
+        Some(ShellInjection::Bash(ref injector)) => (injector.shell_args(), Vec::new()),
+        Some(ShellInjection::Zsh(ref injector)) => (Vec::new(), injector.env_vars()),
+        Some(ShellInjection::Fish(ref injector)) => (injector.shell_args(), Vec::new()),
         None => (Vec::new(), Vec::new()),
     };
 
@@ -240,8 +336,42 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
     let pty_reader = pty_host.reader().context("Failed to get PTY reader")?;
     let pty_writer = pty_host.writer().context("Failed to get PTY writer")?;
 
-    // Enter raw mode
-    let _raw_guard = enter_raw_mode().context("Failed to enter raw mode")?;
+    let tty_status = clai_wrap::raw_mode::detect_tty();
+    if !tty_status.any_tty() && !cli.force_non_tty {
+        anyhow::bail!(
+            "stdin/stdout/stderr are not TTYs; use --force-non-tty for pure passthrough mode"
+        );
+    }
+    let term_dumb = std::env::var("TERM")
+        .map(|term| term.trim().is_empty() || term == "dumb")
+        .unwrap_or(true);
+
+    let mut hotkey_enabled = cli.ui_enabled();
+    let mut picker_enabled = cli.ui_enabled();
+
+    if !tty_status.stdin {
+        warn!("stdin is not a TTY; hotkey detection is disabled");
+        hotkey_enabled = false;
+    }
+    if !tty_status.stdout {
+        warn!("stdout is not a TTY; picker UI is disabled");
+        picker_enabled = false;
+    }
+    if term_dumb {
+        warn!("TERM is unset or dumb; picker UI is disabled");
+        picker_enabled = false;
+    }
+    if !picker_enabled && hotkey_enabled {
+        hotkey_enabled = false;
+        warn!("Hotkey detection is disabled because picker UI is unavailable");
+    }
+
+    // Enter raw mode only when stdin is interactive.
+    let _raw_guard = if tty_status.stdin {
+        Some(enter_raw_mode().context("Failed to enter raw mode")?)
+    } else {
+        None
+    };
 
     // Install signal handlers
     let signal_handler = SignalHandler::new().context("Failed to install signal handlers")?;
@@ -271,6 +401,9 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
 
     // Create output capture buffer for AI analysis
     let mut output_capture = OutputCapture::new(buffer_cap);
+    if daemon_forwarder.is_none() {
+        output_capture.disable();
+    }
 
     // Create suggestion receiver for daemon suggestions (no-op in standalone mode)
     let mut suggestion_receiver = SuggestionReceiver::new();
@@ -288,7 +421,10 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
     let mut picker_session = None;
     let mut ui_picker_parser = PickerInputParser::default();
     let mut child_exit_status = None;
-    let mut command_counter: u64 = 0;
+    let mut osc133_watchdog_fired = false;
+    let startup_instant = Instant::now();
+    let mut pending_comment_commands: VecDeque<String> = VecDeque::new();
+    let mut picker_overflow_warning_emitted = false;
 
     loop {
         // Check for signals
@@ -315,7 +451,12 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
                 SignalEvent::Suspend => {
                     debug!("Received SIGTSTP");
                     if picker_session.is_some() {
-                        close_picker_session(&mut picker_session, &mut io_threads, &mut stdout)?;
+                        close_picker_session(
+                            &mut picker_session,
+                            &mut io_threads,
+                            &mut picker_overflow_warning_emitted,
+                            &mut stdout,
+                        )?;
                     }
                 }
                 SignalEvent::Continue => {
@@ -340,6 +481,21 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
             );
         }
 
+        if !osc133_watchdog_fired
+            && startup_instant.elapsed() >= OSC133_STARTUP_WATCHDOG_TIMEOUT
+            && matches!(osc133_parser.current_state(), Osc133State::Unknown)
+        {
+            osc133_watchdog_fired = true;
+            warn!(
+                "OSC 133 startup watchdog fired after {}ms; disabling capture and suggestion features for this session",
+                OSC133_STARTUP_WATCHDOG_TIMEOUT.as_millis()
+            );
+            if let Some(forwarder) = daemon_forwarder.as_mut() {
+                forwarder.disable_capture();
+            }
+            output_capture.disable();
+        }
+
         // Check for child exit
         if let Ok(Some(status)) = pty_host.try_wait() {
             info!("Shell exited with status: {:?}", status.code());
@@ -352,6 +508,9 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
                 event,
                 cli,
                 &config,
+                hotkey_enabled,
+                picker_enabled,
+                daemon_capture_enabled(&daemon_forwarder, osc133_watchdog_fired),
                 master_fd,
                 &denylist,
                 &mut io_threads,
@@ -359,14 +518,16 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
                 &mut bracketed_paste,
                 &mut echo_gap,
                 &mut output_capture,
-                &mut command_counter,
+                &mut daemon_forwarder,
                 &mut suggestion_receiver,
                 &mut comment_manager,
+                &mut pending_comment_commands,
                 &mut selection_injector,
                 &mut input_router,
                 &input_event_rx,
                 &mut ui_picker_parser,
                 &standalone_state,
+                &mut picker_overflow_warning_emitted,
                 &mut picker_session,
                 &mut stdout,
             )?;
@@ -377,6 +538,9 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
                 event,
                 cli,
                 &config,
+                hotkey_enabled,
+                picker_enabled,
+                daemon_capture_enabled(&daemon_forwarder, osc133_watchdog_fired),
                 master_fd,
                 &denylist,
                 &mut io_threads,
@@ -384,15 +548,37 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
                 &mut bracketed_paste,
                 &mut echo_gap,
                 &mut output_capture,
-                &mut command_counter,
+                &mut daemon_forwarder,
                 &mut suggestion_receiver,
                 &mut comment_manager,
+                &mut pending_comment_commands,
                 &mut selection_injector,
                 &mut input_router,
                 &input_event_rx,
                 &mut ui_picker_parser,
                 &standalone_state,
+                &mut picker_overflow_warning_emitted,
                 &mut picker_session,
+                &mut stdout,
+            )?;
+        }
+
+        if let Some(forwarder) = daemon_forwarder.as_mut() {
+            while let Some(notification) = forwarder.poll_notification() {
+                suggestion_receiver.handle_notification(&notification);
+            }
+        }
+
+        if picker_session.is_none()
+            && matches!(
+                osc133_parser.current_state(),
+                Osc133State::Prompt | Osc133State::Input
+            )
+        {
+            render_pending_comments(
+                &mut pending_comment_commands,
+                &mut suggestion_receiver,
+                &mut comment_manager,
                 &mut stdout,
             )?;
         }
@@ -403,11 +589,16 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
                 let should_close =
                     handle_picker_key(key, session, &io_threads, &selection_injector, &config)?;
                 if should_close {
-                    close_picker_session(&mut picker_session, &mut io_threads, &mut stdout)?;
+                    close_picker_session(
+                        &mut picker_session,
+                        &mut io_threads,
+                        &mut picker_overflow_warning_emitted,
+                        &mut stdout,
+                    )?;
                     break;
                 }
             }
-        } else if cli.ui_enabled() {
+        } else if hotkey_enabled {
             // Emit timeout-forwarded bytes for incomplete hotkey chords.
             input_router.check_timeout()?;
             process_input_router_events(
@@ -415,17 +606,20 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
                 &mut io_threads,
                 &mut picker_session,
                 &standalone_state,
+                picker_enabled,
+                &mut picker_overflow_warning_emitted,
                 &mut stdout,
             )?;
         }
     }
 
     if picker_session.is_some() {
-        close_picker_session(&mut picker_session, &mut io_threads, &mut stdout)?;
-    }
-
-    if io_threads.has_buffer_overflow() {
-        warn!("PTY output buffer overflowed while picker was open; oldest output was truncated");
+        close_picker_session(
+            &mut picker_session,
+            &mut io_threads,
+            &mut picker_overflow_warning_emitted,
+            &mut stdout,
+        )?;
     }
 
     io_threads.shutdown();
@@ -441,8 +635,11 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
 #[allow(clippy::too_many_arguments)]
 fn handle_io_event(
     event: IoEvent,
-    cli: &Cli,
+    _cli: &Cli,
     config: &Config,
+    hotkey_enabled: bool,
+    picker_enabled: bool,
+    capture_features_enabled: bool,
     master_fd: Option<std::os::unix::io::RawFd>,
     denylist: &clai_wrap::denylist::Denylist,
     io_threads: &mut IoThreads,
@@ -450,14 +647,16 @@ fn handle_io_event(
     bracketed_paste: &mut BracketedPasteTracker,
     echo_gap: &mut EchoGapDetector,
     output_capture: &mut OutputCapture,
-    command_counter: &mut u64,
+    daemon_forwarder: &mut Option<DaemonEventForwarder>,
     suggestion_receiver: &mut SuggestionReceiver,
     comment_manager: &mut CommentManager,
+    pending_comment_commands: &mut VecDeque<String>,
     selection_injector: &mut SelectionInjector,
     input_router: &mut InputRouter,
     input_event_rx: &std::sync::mpsc::Receiver<InputEvent>,
     ui_picker_parser: &mut PickerInputParser,
     standalone_state: &StandaloneState,
+    picker_overflow_warning_emitted: &mut bool,
     picker_session: &mut Option<PickerSession>,
     stdout: &mut std::io::Stdout,
 ) -> Result<()> {
@@ -471,6 +670,12 @@ fn handle_io_event(
             // Handle OSC 133 state transitions for output capture and denylist
             let new_osc_state = osc133_parser.current_state();
             if *new_osc_state != prev_osc_state {
+                if capture_features_enabled {
+                    if let Some(forwarder) = daemon_forwarder.as_mut() {
+                        forwarder.on_osc133_state_change(new_osc_state);
+                    }
+                }
+
                 match new_osc_state {
                     Osc133State::Output => {
                         // Command started executing — check denylist
@@ -486,56 +691,67 @@ fn handle_io_event(
                             false
                         };
 
-                        if !denied {
-                            *command_counter += 1;
-                            let cmd_id = format!("cmd-{command_counter}");
-                            output_capture.start_capture(&cmd_id);
+                        if denied {
+                            if let Some(forwarder) = daemon_forwarder.as_mut() {
+                                forwarder.disable_capture();
+                            }
+                        } else if capture_features_enabled {
+                            output_capture.enable();
+                            if let Some(forwarder) = daemon_forwarder.as_mut() {
+                                forwarder.enable_capture();
+                            }
                         }
                     }
-                    Osc133State::Finished(_) | Osc133State::Prompt => {
-                        // Command finished or new prompt — stop capture
-                        let finished_cmd_id = if let Some(captured) = output_capture.stop_capture() {
-                            debug!(
-                                "Captured {} bytes for {} (truncated: {}, duration: {:?})",
-                                captured.len(),
-                                captured.command_id,
-                                captured.truncated,
-                                captured.duration,
-                            );
-                            Some(captured.command_id.clone())
-                        } else {
-                            None
-                        };
-                        // Re-enable capture if it was disabled by denylist
-                        if !output_capture.is_enabled() {
-                            output_capture.enable();
+                    Osc133State::Finished(exit_code) => {
+                        if capture_features_enabled && *exit_code != 0 {
+                            if let Some(forwarder) = daemon_forwarder.as_mut() {
+                                if let Some(command_id) = forwarder.take_finished_command_id() {
+                                    if !pending_comment_commands
+                                        .iter()
+                                        .any(|existing| existing == &command_id)
+                                    {
+                                        if pending_comment_commands.len()
+                                            >= MAX_PENDING_COMMENT_COMMANDS
+                                        {
+                                            let _ = pending_comment_commands.pop_front();
+                                            warn!(
+                                                "Pending assistant-comment queue reached capacity; dropping oldest pending command"
+                                            );
+                                        }
+                                        pending_comment_commands.push_back(command_id);
+                                    }
+                                }
+                            }
                         }
-
-                        // Check for suggestions for the finished command and render as comments
-                        if let Some(ref cmd_id) = finished_cmd_id {
-                            let suggestions = suggestion_receiver.suggestions_for_command(cmd_id);
-                            for suggestion in suggestions {
-                                comment_manager.add_from_suggestion(suggestion);
+                    }
+                    Osc133State::Prompt => {
+                        if capture_features_enabled {
+                            if let Some(forwarder) = daemon_forwarder.as_mut() {
+                                forwarder.enable_capture();
                             }
-                            // Render shell comments for this command to PTY output
-                            let shell_output = comment_manager.render_shell_comments_for_command(cmd_id);
-                            if !shell_output.is_empty() && picker_session.is_none() {
-                                let comment_bytes = format!("\n{shell_output}\n");
-                                stdout.write_all(comment_bytes.as_bytes())?;
-                                stdout.flush()?;
-                                debug!("Rendered assistant comment for {}", cmd_id);
-                            }
-                            // Clean up rendered suggestions and comments
-                            suggestion_receiver.remove_suggestions_for_command(cmd_id);
-                            comment_manager.remove_for_command(cmd_id);
+                        }
+                        if picker_session.is_none() {
+                            render_pending_comments(
+                                pending_comment_commands,
+                                suggestion_receiver,
+                                comment_manager,
+                                stdout,
+                            )?;
                         }
                     }
                     _ => {}
                 }
             }
 
-            // Feed output bytes to capture buffer and echo-gap detector
-            output_capture.push(&data);
+            // Feed output bytes to daemon/output capture and echo-gap detector.
+            if capture_features_enabled {
+                if let Some(forwarder) = daemon_forwarder.as_mut() {
+                    forwarder.forward_output(&data);
+                }
+            }
+            if output_capture.is_enabled() {
+                output_capture.push(&data);
+            }
             let now = Instant::now();
             for &byte in &data {
                 echo_gap.record_output(byte, now);
@@ -544,6 +760,9 @@ fn handle_io_event(
             // Scrub captured output if echo-gap enters secure mode
             if echo_gap.is_secure_mode() && echo_gap.bytes_to_scrub() > 0 {
                 output_capture.disable();
+                if let Some(forwarder) = daemon_forwarder.as_mut() {
+                    forwarder.disable_capture();
+                }
                 debug!(
                     "Echo-gap secure mode: disabled output capture, {} bytes to scrub",
                     echo_gap.bytes_to_scrub()
@@ -551,7 +770,13 @@ fn handle_io_event(
             }
 
             if picker_session.is_some() {
-                io_threads.buffer_output(&data);
+                let overflowed = io_threads.buffer_output(&data);
+                if overflowed && !*picker_overflow_warning_emitted {
+                    warn!(
+                        "PTY output buffer overflowed while picker was open; truncating oldest buffered output"
+                    );
+                    *picker_overflow_warning_emitted = true;
+                }
             } else {
                 stdout.write_all(&data)?;
                 stdout.flush()?;
@@ -569,17 +794,24 @@ fn handle_io_event(
                     let should_close =
                         handle_picker_key(key, session, io_threads, selection_injector, config)?;
                     if should_close {
-                        close_picker_session(picker_session, io_threads, stdout)?;
+                        close_picker_session(
+                            picker_session,
+                            io_threads,
+                            picker_overflow_warning_emitted,
+                            stdout,
+                        )?;
                         break;
                     }
                 }
-            } else if cli.ui_enabled() {
+            } else if hotkey_enabled {
                 input_router.process_bytes(&data)?;
                 process_input_router_events(
                     input_event_rx,
                     io_threads,
                     picker_session,
                     standalone_state,
+                    picker_enabled,
+                    picker_overflow_warning_emitted,
                     stdout,
                 )?;
             } else {
@@ -608,6 +840,8 @@ fn process_input_router_events(
     io_threads: &mut IoThreads,
     picker_session: &mut Option<PickerSession>,
     standalone_state: &StandaloneState,
+    picker_enabled: bool,
+    picker_overflow_warning_emitted: &mut bool,
     stdout: &mut std::io::Stdout,
 ) -> Result<()> {
     while let Ok(input_event) = input_event_rx.try_recv() {
@@ -621,18 +855,28 @@ fn process_input_router_events(
             }
             InputEvent::OpenHistoryPicker => {
                 debug!("hotkey triggered history picker");
+                if !picker_enabled {
+                    warn!("History picker is disabled in this terminal mode");
+                    continue;
+                }
                 if picker_session.is_none() {
                     *picker_session = Some(PickerSession::open(standalone_state.create_picker())?);
+                    *picker_overflow_warning_emitted = false;
                     io_threads.set_picker_open(true);
                 }
             }
             InputEvent::OpenCompletionsPicker => {
                 debug!("hotkey triggered completions picker");
+                if !picker_enabled {
+                    warn!("Completions picker is disabled in this terminal mode");
+                    continue;
+                }
                 warn!(
                     "Completions picker is unavailable in standalone mode; opening history picker"
                 );
                 if picker_session.is_none() {
                     *picker_session = Some(PickerSession::open(standalone_state.create_picker())?);
+                    *picker_overflow_warning_emitted = false;
                     io_threads.set_picker_open(true);
                 }
             }
@@ -654,10 +898,12 @@ fn process_input_router_events(
 fn close_picker_session(
     picker_session: &mut Option<PickerSession>,
     io_threads: &mut IoThreads,
+    picker_overflow_warning_emitted: &mut bool,
     stdout: &mut std::io::Stdout,
 ) -> Result<()> {
     if picker_session.take().is_some() {
         io_threads.set_picker_open(false);
+        *picker_overflow_warning_emitted = false;
         let pending = io_threads.drain_output_buffer();
         if !pending.is_empty() {
             stdout.write_all(&pending)?;
@@ -679,9 +925,7 @@ fn build_hotkey_config_from(config: &Config, cli: &Cli) -> HotkeyConfig {
         hotkey_config.first_byte = first_byte;
         hotkey_config.history_byte = second_byte;
         hotkey_config.completions_byte = CHORD_COMPLETIONS_BYTE;
-        debug!(
-            "Using custom hotkey chord: first=0x{first_byte:02x}, second=0x{second_byte:02x}"
-        );
+        debug!("Using custom hotkey chord: first=0x{first_byte:02x}, second=0x{second_byte:02x}");
     } else if spec != clai_wrap::config::DEFAULT_HOTKEY {
         // Only warn if the user explicitly set a non-default hotkey that's invalid
         warn!(
@@ -1056,8 +1300,12 @@ fn is_utf8_locale(locale_value: &str) -> bool {
 }
 
 #[cfg(unix)]
-fn init_standalone_history(cli: &Cli, shell_path: &Path) -> Result<StandaloneState> {
-    let mut state = StandaloneState::new(StandaloneReason::DaemonUnavailable);
+fn init_standalone_history(
+    cli: &Cli,
+    shell_path: &Path,
+    standalone_reason: StandaloneReason,
+) -> Result<StandaloneState> {
+    let mut state = StandaloneState::new(standalone_reason);
 
     if let Some(history_path) = cli.history_file.as_deref() {
         state
@@ -1075,6 +1323,67 @@ fn init_standalone_history(cli: &Cli, shell_path: &Path) -> Result<StandaloneSta
     Ok(state)
 }
 
+#[cfg(unix)]
+fn daemon_capture_enabled(
+    daemon_forwarder: &Option<DaemonEventForwarder>,
+    osc133_watchdog_fired: bool,
+) -> bool {
+    if osc133_watchdog_fired {
+        return false;
+    }
+    daemon_forwarder
+        .as_ref()
+        .is_some_and(|forwarder| !forwarder.is_standalone())
+}
+
+#[cfg(unix)]
+fn map_daemon_error_to_standalone_reason(error: &DaemonClientError) -> StandaloneReason {
+    match error {
+        DaemonClientError::ConnectionTimeout(_) => StandaloneReason::ConnectionTimeout,
+        _ => StandaloneReason::SocketError(error.to_string()),
+    }
+}
+
+#[cfg(unix)]
+fn render_pending_comments(
+    pending_comment_commands: &mut VecDeque<String>,
+    suggestion_receiver: &mut SuggestionReceiver,
+    comment_manager: &mut CommentManager,
+    stdout: &mut std::io::Stdout,
+) -> Result<()> {
+    if pending_comment_commands.is_empty() {
+        return Ok(());
+    }
+
+    let mut still_pending = VecDeque::new();
+
+    while let Some(command_id) = pending_comment_commands.pop_front() {
+        let suggestions = suggestion_receiver.suggestions_for_command(&command_id);
+        if suggestions.is_empty() {
+            still_pending.push_back(command_id);
+            continue;
+        }
+
+        for suggestion in suggestions {
+            comment_manager.add_from_suggestion(suggestion);
+        }
+
+        let shell_output = comment_manager.render_shell_comments_for_command(&command_id);
+        if !shell_output.is_empty() {
+            let comment_bytes = format!("\n{shell_output}\n");
+            stdout.write_all(comment_bytes.as_bytes())?;
+            stdout.flush()?;
+            debug!("Rendered assistant comment for {}", command_id);
+        }
+
+        suggestion_receiver.remove_suggestions_for_command(&command_id);
+        comment_manager.remove_for_command(&command_id);
+    }
+
+    *pending_comment_commands = still_pending;
+    Ok(())
+}
+
 /// Shell injection types for OSC 133 hook scripts.
 #[cfg(unix)]
 #[allow(dead_code)]
@@ -1089,47 +1398,45 @@ enum ShellInjection {
 /// Returns `None` if the shell is not supported or injection fails.
 #[cfg(unix)]
 fn setup_shell_injection(shell_path: &Path) -> Option<ShellInjection> {
-    let shell_name = shell_path
-        .file_name()
-        .and_then(|name| name.to_str())?;
+    let shell_name = shell_path.file_name().and_then(|name| name.to_str())?;
 
     match shell_name {
-        "bash" => {
-            match clai_wrap::shell_inject::BashInjector::new() {
-                Ok(injector) => {
-                    info!("Shell injection: bash OSC 133 hooks enabled");
-                    Some(ShellInjection::Bash(injector))
-                }
-                Err(e) => {
-                    warn!("Failed to create bash injector: {e}");
-                    None
-                }
+        "bash" => match clai_wrap::shell_inject::BashInjector::new() {
+            Ok(injector) => {
+                info!("Shell injection: bash OSC 133 hooks enabled");
+                Some(ShellInjection::Bash(injector))
             }
-        }
-        "zsh" => {
-            match clai_wrap::shell_inject::ZshInjector::new() {
-                Ok(injector) => {
-                    info!("Shell injection: zsh OSC 133 hooks enabled");
-                    Some(ShellInjection::Zsh(injector))
-                }
-                Err(e) => {
-                    warn!("Failed to create zsh injector: {e}");
-                    None
-                }
+            Err(e) => {
+                warn!("Failed to create bash injector: {e}");
+                None
             }
-        }
-        "fish" => {
-            match clai_wrap::shell_inject::FishInjector::new() {
-                Ok(injector) => {
-                    info!("Shell injection: fish OSC 133 hooks enabled");
-                    Some(ShellInjection::Fish(injector))
-                }
-                Err(e) => {
-                    warn!("Failed to create fish injector: {e}");
-                    None
-                }
+        },
+        "zsh" => match clai_wrap::shell_inject::ZshInjector::new() {
+            Ok(injector) => {
+                info!("Shell injection: zsh OSC 133 hooks enabled");
+                Some(ShellInjection::Zsh(injector))
             }
-        }
+            Err(e) => {
+                warn!("Failed to create zsh injector: {e}");
+                None
+            }
+        },
+        "fish" => match clai_wrap::shell_inject::FishInjector::for_shell_path(shell_path) {
+            Ok(injector) => {
+                info!("Shell injection: fish OSC 133 hooks enabled");
+                Some(ShellInjection::Fish(injector))
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to detect fish version from {}: {}; using fallback fish injection",
+                    shell_path.display(),
+                    e
+                );
+                Some(ShellInjection::Fish(
+                    clai_wrap::shell_inject::FishInjector::without_detection(),
+                ))
+            }
+        },
         _ => {
             debug!("Shell injection: no injector for shell {:?}", shell_name);
             None
@@ -1225,8 +1532,12 @@ mod tests {
             history.path().to_str().expect("utf8 history path"),
         ]);
 
-        let state = init_standalone_history(&cli, Path::new("/bin/bash"))
-            .expect("initialize standalone history");
+        let state = init_standalone_history(
+            &cli,
+            Path::new("/bin/bash"),
+            StandaloneReason::DaemonUnavailable,
+        )
+        .expect("initialize standalone history");
 
         assert!(
             state.has_history(),

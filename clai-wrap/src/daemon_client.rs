@@ -11,8 +11,9 @@
 //! # Socket Path Resolution
 //!
 //! The socket path is resolved in order:
-//! 1. `$XDG_RUNTIME_DIR/clai/daemon.sock`
-//! 2. `/tmp/clai-{uid}/daemon.sock`
+//! 1. `$CLAI_HOME/daemon.sock`
+//! 2. `$HOME/.clai/daemon.sock`
+//! 3. Legacy fallback (`$XDG_RUNTIME_DIR/clai/daemon.sock`, `/tmp/clai-{uid}/daemon.sock`)
 //!
 //! # Stale Socket Handling
 //!
@@ -69,7 +70,7 @@ pub enum DaemonClientError {
     IdMismatch { expected: u64, actual: u64 },
 
     /// Socket path could not be determined.
-    #[error("could not determine socket path: XDG_RUNTIME_DIR not set and /tmp fallback failed")]
+    #[error("could not determine socket path from CLAI_HOME/HOME/legacy fallbacks")]
     NoSocketPath,
 
     /// Unexpected response format.
@@ -88,29 +89,44 @@ pub struct DaemonClient {
     stream: UnixStream,
     reader: BufReader<UnixStream>,
     next_id: AtomicU64,
+    /// Partial notification line captured during non-blocking reads.
+    notification_partial: String,
 }
 
 impl DaemonClient {
     /// Resolves the default socket path.
     ///
     /// Returns the socket path based on:
-    /// 1. `$XDG_RUNTIME_DIR/clai/daemon.sock` if XDG_RUNTIME_DIR is set
-    /// 2. `/tmp/clai-{uid}/daemon.sock` as fallback
+    /// 1. `$CLAI_HOME/daemon.sock` if CLAI_HOME is set
+    /// 2. `$HOME/.clai/daemon.sock` if HOME is set
+    /// 3. Legacy runtime/temp fallback
     #[must_use]
     pub fn default_socket_path() -> Option<PathBuf> {
-        // Try XDG_RUNTIME_DIR first
+        // Preferred: CLAI_HOME override (matches daemon paths).
+        if let Ok(clai_home) = std::env::var("CLAI_HOME") {
+            let path = PathBuf::from(clai_home).join("daemon.sock");
+            return Some(path);
+        }
+
+        // Preferred default: ~/.clai/daemon.sock.
+        if let Ok(home) = std::env::var("HOME") {
+            let path = PathBuf::from(home).join(".clai").join("daemon.sock");
+            return Some(path);
+        }
+
+        // Legacy compatibility: XDG runtime socket.
         if let Ok(xdg_runtime) = std::env::var("XDG_RUNTIME_DIR") {
             let path = PathBuf::from(xdg_runtime).join("clai").join("daemon.sock");
             return Some(path);
         }
 
-        // Fallback to /tmp/clai-{uid}/daemon.sock
         #[cfg(unix)]
         {
+            // Legacy fallback to /tmp/clai-{uid}/daemon.sock
             // SAFETY: getuid() is always safe to call and has no failure modes
             let uid = unsafe { libc::getuid() };
             let path = PathBuf::from(format!("/tmp/clai-{uid}")).join("daemon.sock");
-            return Some(path);
+            Some(path)
         }
 
         #[cfg(not(unix))]
@@ -183,10 +199,11 @@ impl DaemonClient {
             stream,
             reader,
             next_id: AtomicU64::new(1),
+            notification_partial: String::new(),
         })
     }
 
-    /// Implements connection with timeout using non-blocking socket.
+    /// Implements connection with timeout.
     fn connect_with_timeout_impl(socket_path: &Path, timeout: Duration) -> Result<UnixStream> {
         use std::os::unix::net::UnixStream as StdUnixStream;
 
@@ -245,11 +262,11 @@ impl DaemonClient {
         self.next_id.fetch_add(1, Ordering::Relaxed)
     }
 
-    /// Returns the current Unix timestamp in seconds.
+    /// Returns the current Unix timestamp in milliseconds.
     fn current_timestamp() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_secs())
+            .map(|d| u64::try_from(d.as_millis()).unwrap_or(u64::MAX))
             .unwrap_or(0)
     }
 
@@ -377,15 +394,32 @@ impl DaemonClient {
         match self.reader.read_line(&mut line) {
             Ok(0) => {
                 // EOF - connection closed
+                self.notification_partial.clear();
                 Ok(None)
             }
             Ok(_) => {
+                if !self.notification_partial.is_empty() {
+                    let mut combined = std::mem::take(&mut self.notification_partial);
+                    combined.push_str(&line);
+                    line = combined;
+                }
+
+                // In non-blocking mode we may observe a partial line without the trailing newline.
+                // Hold it until the remaining bytes arrive.
+                if !line.ends_with('\n') {
+                    self.notification_partial.push_str(&line);
+                    return Ok(None);
+                }
+
                 // Parse as notification
                 let notification = Notification::parse(&line)?;
                 Ok(Some(notification))
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 // No data available
+                if !line.is_empty() {
+                    self.notification_partial.push_str(&line);
+                }
                 Ok(None)
             }
             Err(e) => Err(DaemonClientError::IoError(e)),
@@ -436,59 +470,45 @@ mod tests {
     // =========================================================================
 
     #[test]
-    fn test_default_socket_path_with_xdg() {
-        // Save original value
-        let original = std::env::var("XDG_RUNTIME_DIR").ok();
+    fn test_default_socket_path_with_clai_home() {
+        let original_clai_home = std::env::var("CLAI_HOME").ok();
+        let original_home = std::env::var("HOME").ok();
 
-        // Set XDG_RUNTIME_DIR
-        std::env::set_var("XDG_RUNTIME_DIR", "/run/user/1000");
+        std::env::set_var("CLAI_HOME", "/custom/clai");
+        std::env::set_var("HOME", "/home/tester");
 
         let path = DaemonClient::default_socket_path();
-        assert!(path.is_some());
-        assert_eq!(
-            path.unwrap(),
-            PathBuf::from("/run/user/1000/clai/daemon.sock")
-        );
+        assert_eq!(path, Some(PathBuf::from("/custom/clai/daemon.sock")));
 
-        // Restore original value
-        match original {
-            Some(val) => std::env::set_var("XDG_RUNTIME_DIR", val),
-            None => std::env::remove_var("XDG_RUNTIME_DIR"),
+        match original_clai_home {
+            Some(val) => std::env::set_var("CLAI_HOME", val),
+            None => std::env::remove_var("CLAI_HOME"),
+        }
+        match original_home {
+            Some(val) => std::env::set_var("HOME", val),
+            None => std::env::remove_var("HOME"),
         }
     }
 
     #[test]
-    fn test_default_socket_path_fallback() {
-        // Note: This test verifies the fallback path format.
-        // Due to test parallelism, we can't reliably unset XDG_RUNTIME_DIR,
-        // so we test the path construction logic directly instead.
+    fn test_default_socket_path_with_home_fallback() {
+        let original_clai_home = std::env::var("CLAI_HOME").ok();
+        let original_home = std::env::var("HOME").ok();
 
-        // Get the current UID
-        let uid = unsafe { libc::getuid() };
-        let expected_fallback = format!("/tmp/clai-{}/daemon.sock", uid);
-
-        // Save and remove XDG_RUNTIME_DIR
-        let original = std::env::var("XDG_RUNTIME_DIR").ok();
-        std::env::remove_var("XDG_RUNTIME_DIR");
+        std::env::remove_var("CLAI_HOME");
+        std::env::set_var("HOME", "/home/tester");
 
         let path = DaemonClient::default_socket_path();
-        assert!(path.is_some());
+        assert_eq!(path, Some(PathBuf::from("/home/tester/.clai/daemon.sock")));
 
-        let path_str = path.unwrap().to_string_lossy().to_string();
-
-        // Restore original value BEFORE assertions (to not affect other tests)
-        if let Some(val) = original {
-            std::env::set_var("XDG_RUNTIME_DIR", val);
+        match original_clai_home {
+            Some(val) => std::env::set_var("CLAI_HOME", val),
+            None => std::env::remove_var("CLAI_HOME"),
         }
-
-        // The path should either be the fallback (if no XDG_RUNTIME_DIR)
-        // or contain "clai" and "daemon.sock" (if XDG_RUNTIME_DIR was set by another test)
-        assert!(
-            path_str == expected_fallback || path_str.contains("/clai/daemon.sock"),
-            "path should be fallback '{}' or XDG-based, got: {}",
-            expected_fallback,
-            path_str
-        );
+        match original_home {
+            Some(val) => std::env::set_var("HOME", val),
+            None => std::env::remove_var("HOME"),
+        }
     }
 
     // =========================================================================
@@ -799,6 +819,44 @@ mod tests {
         handle.join().unwrap();
     }
 
+    #[test]
+    fn test_poll_notifications_with_fragmented_data() {
+        let (_temp_dir, socket_path) = setup_test_socket();
+
+        let listener = UnixListener::bind(&socket_path).unwrap();
+
+        let handle = thread::spawn(move || {
+            let (mut stream, _addr) = listener.accept().unwrap();
+
+            // Send one notification split across writes to simulate fragmented delivery.
+            stream.write_all(b"{\"jsonrpc\":\"2.0\"").unwrap();
+            stream.flush().unwrap();
+            thread::sleep(Duration::from_millis(20));
+            stream
+                .write_all(
+                    b",\"method\":\"suggestion.available\",\"params\":{\"command_id\":\"cmd-frag\",\"suggestion\":\"git status\"}}\n",
+                )
+                .unwrap();
+            stream.flush().unwrap();
+        });
+
+        let mut client = DaemonClient::connect(&socket_path).unwrap();
+
+        // First poll observes partial bytes, but should not error.
+        let first = client.poll_notifications().unwrap();
+        assert!(first.is_none());
+
+        // After remainder arrives, we should parse the full notification.
+        thread::sleep(Duration::from_millis(30));
+        let second = client.poll_notifications().unwrap();
+        let notification = second.expect("expected fragmented notification");
+        assert_eq!(notification.method, "suggestion.available");
+        assert_eq!(notification.params["command_id"], "cmd-frag");
+        assert_eq!(notification.params["suggestion"], "git status");
+
+        handle.join().unwrap();
+    }
+
     // =========================================================================
     // Full Integration Test
     // =========================================================================
@@ -820,6 +878,10 @@ mod tests {
             let request: serde_json::Value = serde_json::from_str(request_str.trim()).unwrap();
             let id = request["id"].as_u64().unwrap();
             assert_eq!(request["method"], "command.start");
+            assert!(
+                request["params"]["timestamp"].as_u64().unwrap() > 1_000_000_000_000,
+                "command.start timestamp should be unix milliseconds"
+            );
 
             let response =
                 format!("{{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":{{\"ok\":true}}}}\n");
@@ -844,6 +906,10 @@ mod tests {
             let request: serde_json::Value = serde_json::from_str(request_str.trim()).unwrap();
             let id = request["id"].as_u64().unwrap();
             assert_eq!(request["method"], "command.end");
+            assert!(
+                request["params"]["timestamp"].as_u64().unwrap() > 1_000_000_000_000,
+                "command.end timestamp should be unix milliseconds"
+            );
 
             let response =
                 format!("{{\"jsonrpc\":\"2.0\",\"id\":{id},\"result\":{{\"ok\":true}}}}\n");
