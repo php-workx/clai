@@ -49,8 +49,8 @@ func NewCommandSource(store storage.Store) *CommandSource {
 
 // QueryResult holds the commands from a query along with their source.
 type QueryResult struct {
-	Commands []storage.Command
 	Source   Source
+	Commands []storage.Command
 }
 
 // QuerySession retrieves commands from the current session.

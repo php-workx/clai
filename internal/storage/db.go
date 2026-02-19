@@ -22,10 +22,10 @@ const (
 // SQLiteStore implements the Store interface using SQLite.
 type SQLiteStore struct {
 	db        *sql.DB
+	closeErr  error         // stores the error from Close()
 	stopCh    chan struct{} // signals background goroutines to stop
 	stoppedCh chan struct{} // signals background goroutines have stopped
 	closeOnce sync.Once     // ensures Close() is idempotent
-	closeErr  error         // stores the error from Close()
 }
 
 // DefaultDBPath returns the default database path (~/.clai/state.db).
@@ -51,7 +51,7 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 
 	// Ensure the directory exists
 	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
@@ -145,13 +145,14 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 		SELECT version FROM schema_meta ORDER BY version DESC LIMIT 1
 	`)
 	if err := row.Scan(&currentVersion); err != nil {
-		if err == sql.ErrNoRows {
+		switch {
+		case err == sql.ErrNoRows:
 			// No version recorded yet, start from 0
 			currentVersion = 0
-		} else if isTableNotFoundError(err) {
+		case isTableNotFoundError(err):
 			// Table doesn't exist yet, start from 0
 			currentVersion = 0
-		} else {
+		default:
 			// Propagate unexpected errors
 			return fmt.Errorf("failed to read schema version: %w", err)
 		}
@@ -159,8 +160,8 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 
 	// Run migrations in order
 	migrations := []struct {
-		version int
 		sql     string
+		version int
 	}{
 		{
 			version: 1,

@@ -35,36 +35,21 @@ const (
 // Corrector provides typo correction for failed commands.
 type Corrector struct {
 	db                  *sql.DB
+	logger              *slog.Logger
+	stmtGetTopCommands  *sql.Stmt
 	similarityThreshold float64
 	topPercent          int
 	candidateLimit      int
 	maxSuggestions      int
-	logger              *slog.Logger
-
-	// Prepared statements
-	stmtGetTopCommands *sql.Stmt
 }
 
 // CorrectorConfig configures the typo corrector.
 type CorrectorConfig struct {
-	// SimilarityThreshold is the minimum similarity score (0-1).
-	// Default: 0.7
+	Logger              *slog.Logger
 	SimilarityThreshold float64
-
-	// TopPercent is the minimum frequency percentile for candidates.
-	// Default: 10 (top 10%)
-	TopPercent int
-
-	// CandidateLimit is the maximum candidates to consider.
-	// Default: 500
-	CandidateLimit int
-
-	// MaxSuggestions is the maximum corrections to return.
-	// Default: 3
-	MaxSuggestions int
-
-	// Logger for corrector operations.
-	Logger *slog.Logger
+	TopPercent          int
+	CandidateLimit      int
+	MaxSuggestions      int
 }
 
 // DefaultCorrectorConfig returns the default corrector configuration.
@@ -152,7 +137,7 @@ func ShouldCorrect(exitCode int) bool {
 
 // Correct attempts to correct a failed command.
 // Per spec Section 11.6.
-func (c *Corrector) Correct(ctx context.Context, failedCmd string, repoKey string) ([]Correction, error) {
+func (c *Corrector) Correct(ctx context.Context, failedCmd, repoKey string) ([]Correction, error) {
 	// Extract the first token (command name) for comparison
 	failedToken := extractFirstToken(failedCmd)
 	if failedToken == "" {

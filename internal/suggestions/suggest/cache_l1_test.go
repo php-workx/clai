@@ -170,7 +170,9 @@ func TestEstimateSuggestionsSize(t *testing.T) {
 	assert.Greater(t, size, int64(0))
 
 	// Larger suggestions should have larger size
-	bigger := append(suggestions, Suggestion{
+	bigger := make([]Suggestion, len(suggestions), len(suggestions)+1)
+	copy(bigger, suggestions)
+	bigger = append(bigger, Suggestion{
 		Command: "git commit -m 'a very long commit message here'",
 		Score:   0.5,
 		Reasons: []string{"freq", "transition", "task"},

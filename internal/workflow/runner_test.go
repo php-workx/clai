@@ -505,9 +505,9 @@ func TestRunner_StepCallback(t *testing.T) {
 	skipOnWindows(t)
 
 	type callbackEvent struct {
-		event  StepEvent
-		stepID string
 		result *StepResult
+		stepID string
+		event  StepEvent
 	}
 
 	var events []callbackEvent
@@ -516,9 +516,9 @@ func TestRunner_StepCallback(t *testing.T) {
 		WorkDir: t.TempDir(),
 		OnStep: func(event StepEvent, stepDef *StepDef, result *StepResult) error {
 			events = append(events, callbackEvent{
-				event:  event,
 				stepID: stepDef.ID,
 				result: result,
+				event:  event,
 			})
 			return nil
 		},

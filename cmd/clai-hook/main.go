@@ -50,7 +50,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		printUsage(stderr)
 		return 0
 	default:
-		fmt.Fprintf(stderr, "clai-hook: unknown command: %s\n", cmd)
+		fmt.Fprintf(stderr, "clai-hook: unknown command: %s\n", cmd) //nolint:gosec // G705: CLI stderr output, not web context
 		printUsage(stderr)
 		return 1
 	}

@@ -12,13 +12,13 @@ import (
 // Items are evicted via LRU when the count exceeds capacity.
 type L1Cache struct {
 	lru     *LRU[string, *l1Entry]
-	ttl     time.Duration
 	metrics *CacheMetrics
+	ttl     time.Duration
 }
 
 type l1Entry struct {
-	suggestions []Suggestion
 	createdAt   time.Time
+	suggestions []Suggestion
 }
 
 // DefaultL1Capacity is the default max number of L1 cache entries.

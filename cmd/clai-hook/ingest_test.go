@@ -105,7 +105,7 @@ func TestReadIngestEnv(t *testing.T) {
 		assert.Equal(t, "git status", ev.CmdRaw)
 		assert.Equal(t, "/home/user/project", ev.Cwd)
 		assert.Equal(t, 0, ev.ExitCode)
-		assert.Equal(t, int64(1730000000123), ev.Ts)
+		assert.Equal(t, int64(1730000000123), ev.TS)
 		assert.Equal(t, "zsh", string(ev.Shell))
 		assert.Equal(t, "abc123", ev.SessionID)
 		assert.Nil(t, ev.DurationMs)

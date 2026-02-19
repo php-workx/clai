@@ -107,7 +107,7 @@ func readIngestEnv(cfg *ingestConfig) (*event.CommandEvent, error) {
 
 	ev.Cwd = cwd
 	ev.ExitCode = exitCode
-	ev.Ts = ts
+	ev.TS = ts
 	ev.Shell = shell
 	ev.SessionID = sessionID
 

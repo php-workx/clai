@@ -8,12 +8,12 @@ import (
 // LRU is a generic least-recently-used cache with size tracking.
 // It is safe for concurrent use.
 type LRU[K comparable, V any] struct {
-	mu       sync.Mutex
-	capacity int
 	items    map[K]*list.Element
-	order    *list.List // front = most recent
-	size     int64      // total estimated size in bytes
+	order    *list.List
 	sizeFunc func(K, V) int64
+	capacity int
+	size     int64
+	mu       sync.Mutex
 }
 
 type lruEntry[K comparable, V any] struct {

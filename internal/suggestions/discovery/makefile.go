@@ -51,7 +51,7 @@ func (s *Service) discoverMakefile(ctx context.Context, repoRoot string, nowMs i
 	}
 
 	// Read Makefile
-	file, err := os.Open(makefilePath)
+	file, err := os.Open(makefilePath) //nolint:gosec // reads user-specified path
 	if err != nil {
 		return err
 	}

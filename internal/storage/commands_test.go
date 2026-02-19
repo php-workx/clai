@@ -29,7 +29,7 @@ func TestSQLiteStore_CreateCommand_Success(t *testing.T) {
 	cmd := &Command{
 		CommandID:     "test-cmd-1",
 		SessionID:     "cmd-session",
-		TsStartUnixMs: 1700000001000,
+		TSStartUnixMs: 1700000001000,
 		CWD:           "/home/user",
 		Command:       "git status",
 		IsSuccess:     boolPtr(true),
@@ -77,7 +77,7 @@ func TestSQLiteStore_CreateCommand_AutoNormalization(t *testing.T) {
 	cmd := &Command{
 		CommandID:     "norm-cmd-1",
 		SessionID:     "norm-session",
-		TsStartUnixMs: 1700000001000,
+		TSStartUnixMs: 1700000001000,
 		CWD:           "/home/user",
 		Command:       "  Git Status  ",
 		IsSuccess:     boolPtr(true),
@@ -102,7 +102,7 @@ func TestSQLiteStore_CreateCommand_InvalidSessionID(t *testing.T) {
 	cmd := &Command{
 		CommandID:     "orphan-cmd",
 		SessionID:     "nonexistent-session",
-		TsStartUnixMs: 1700000001000,
+		TSStartUnixMs: 1700000001000,
 		CWD:           "/tmp",
 		Command:       "ls",
 		IsSuccess:     boolPtr(true),
@@ -210,7 +210,7 @@ func TestSQLiteStore_UpdateCommandEnd_Success(t *testing.T) {
 	cmd := &Command{
 		CommandID:     "update-cmd",
 		SessionID:     "update-session",
-		TsStartUnixMs: 1700000001000,
+		TSStartUnixMs: 1700000001000,
 		CWD:           "/tmp",
 		Command:       "make build",
 		IsSuccess:     boolPtr(true),
@@ -236,8 +236,8 @@ func TestSQLiteStore_UpdateCommandEnd_Success(t *testing.T) {
 		t.Fatalf("Expected 1 command, got %d", len(cmds))
 	}
 
-	if cmds[0].TsEndUnixMs == nil || *cmds[0].TsEndUnixMs != 1700000002000 {
-		t.Errorf("TsEndUnixMs = %v, want 1700000002000", cmds[0].TsEndUnixMs)
+	if cmds[0].TSEndUnixMs == nil || *cmds[0].TSEndUnixMs != 1700000002000 {
+		t.Errorf("TSEndUnixMs = %v, want 1700000002000", cmds[0].TSEndUnixMs)
 	}
 	if cmds[0].DurationMs == nil || *cmds[0].DurationMs != 1000 {
 		t.Errorf("DurationMs = %v, want 1000", cmds[0].DurationMs)
@@ -274,7 +274,7 @@ func TestSQLiteStore_UpdateCommandEnd_FailedCommand(t *testing.T) {
 	cmd := &Command{
 		CommandID:     "fail-cmd",
 		SessionID:     "fail-session",
-		TsStartUnixMs: 1700000001000,
+		TSStartUnixMs: 1700000001000,
 		CWD:           "/tmp",
 		Command:       "false",
 		IsSuccess:     boolPtr(true), // Initial state
@@ -357,7 +357,7 @@ func TestSQLiteStore_QueryCommands_BySession(t *testing.T) {
 		cmd := &Command{
 			CommandID:     c.id,
 			SessionID:     c.sessionID,
-			TsStartUnixMs: 1700000001000,
+			TSStartUnixMs: 1700000001000,
 			CWD:           "/tmp",
 			Command:       c.cmd,
 			IsSuccess:     boolPtr(true),
@@ -414,7 +414,7 @@ func TestSQLiteStore_QueryCommands_ByCWD(t *testing.T) {
 		cmd := &Command{
 			CommandID:     c.id,
 			SessionID:     "cwd-session",
-			TsStartUnixMs: 1700000001000,
+			TSStartUnixMs: 1700000001000,
 			CWD:           c.cwd,
 			Command:       "ls",
 			IsSuccess:     boolPtr(true),
@@ -469,7 +469,7 @@ func TestSQLiteStore_QueryCommands_ByPrefix(t *testing.T) {
 		cmd := &Command{
 			CommandID:     generateTestCommandID(i),
 			SessionID:     "prefix-session",
-			TsStartUnixMs: int64(1700000001000 + i),
+			TSStartUnixMs: int64(1700000001000 + i),
 			CWD:           "/tmp",
 			Command:       c,
 			IsSuccess:     boolPtr(true),
@@ -517,7 +517,7 @@ func TestSQLiteStore_QueryCommands_WithOffset(t *testing.T) {
 		cmd := &Command{
 			CommandID:     generateTestCommandID(100 + i),
 			SessionID:     "offset-session",
-			TsStartUnixMs: int64(1700000001000 + i),
+			TSStartUnixMs: int64(1700000001000 + i),
 			CWD:           "/tmp",
 			Command:       "cmd-" + string(rune('a'+i)),
 			IsSuccess:     boolPtr(true),
@@ -561,9 +561,9 @@ func TestSQLiteStore_QueryCommands_WithOffset(t *testing.T) {
 	}
 
 	// Page 1 should be newer than page 2 (DESC order)
-	if page1[0].TsStartUnixMs < page2[0].TsStartUnixMs {
+	if page1[0].TSStartUnixMs < page2[0].TSStartUnixMs {
 		t.Errorf("Page 1 should be newer: page1[0].ts=%d, page2[0].ts=%d",
-			page1[0].TsStartUnixMs, page2[0].TsStartUnixMs)
+			page1[0].TSStartUnixMs, page2[0].TSStartUnixMs)
 	}
 
 	// Offset beyond data returns empty
@@ -623,7 +623,7 @@ func TestSQLiteStore_QueryCommands_Limit(t *testing.T) {
 		cmd := &Command{
 			CommandID:     generateTestCommandID(i + 100),
 			SessionID:     "limit-session",
-			TsStartUnixMs: int64(1700000001000 + i),
+			TSStartUnixMs: int64(1700000001000 + i),
 			CWD:           "/tmp",
 			Command:       "ls",
 			IsSuccess:     boolPtr(true),
@@ -673,7 +673,7 @@ func TestSQLiteStore_QueryCommands_OrderByRecent(t *testing.T) {
 		cmd := &Command{
 			CommandID:     generateTestCommandID(i + 200),
 			SessionID:     "order-session",
-			TsStartUnixMs: ts,
+			TSStartUnixMs: ts,
 			CWD:           "/tmp",
 			Command:       "cmd",
 			IsSuccess:     boolPtr(true),
@@ -698,8 +698,8 @@ func TestSQLiteStore_QueryCommands_OrderByRecent(t *testing.T) {
 	// Should be ordered: 1700000003000, 1700000002000, 1700000001000
 	expected := []int64{1700000003000, 1700000002000, 1700000001000}
 	for i, cmd := range cmds {
-		if cmd.TsStartUnixMs != expected[i] {
-			t.Errorf("cmds[%d].TsStartUnixMs = %d, want %d", i, cmd.TsStartUnixMs, expected[i])
+		if cmd.TSStartUnixMs != expected[i] {
+			t.Errorf("cmds[%d].TSStartUnixMs = %d, want %d", i, cmd.TSStartUnixMs, expected[i])
 		}
 	}
 }
@@ -806,7 +806,7 @@ func TestHashCommand(t *testing.T) {
 }
 
 func generateTestCommandID(n int) string {
-	return "test-cmd-" + string(rune('A'+n))
+	return "test-cmd-" + string(rune('A'+n)) //nolint:gosec // G115: test helper, n is small and bounded
 }
 
 func boolPtr(b bool) *bool {
@@ -850,7 +850,7 @@ func TestSQLiteStore_QueryCommands_SuccessOnly(t *testing.T) {
 		cmd := &Command{
 			CommandID:     c.id,
 			SessionID:     "success-session",
-			TsStartUnixMs: 1700000001000,
+			TSStartUnixMs: 1700000001000,
 			CWD:           "/tmp",
 			Command:       c.cmd,
 			IsSuccess:     boolPtr(c.isSuccess),
@@ -923,7 +923,7 @@ func TestSQLiteStore_QueryCommands_FailureOnly(t *testing.T) {
 		cmd := &Command{
 			CommandID:     c.id,
 			SessionID:     "failure-session",
-			TsStartUnixMs: 1700000001000,
+			TSStartUnixMs: 1700000001000,
 			CWD:           "/tmp",
 			Command:       c.cmd,
 			IsSuccess:     boolPtr(c.isSuccess),
@@ -995,7 +995,7 @@ func TestSQLiteStore_QueryCommands_Substring(t *testing.T) {
 		cmd := &Command{
 			CommandID:     generateTestCommandID(300 + i),
 			SessionID:     "substr-session",
-			TsStartUnixMs: int64(1700000001000 + i),
+			TSStartUnixMs: int64(1700000001000 + i),
 			CWD:           "/tmp",
 			Command:       c,
 			IsSuccess:     boolPtr(true),
@@ -1069,35 +1069,35 @@ func seedHistoryTestData(t *testing.T, store *SQLiteStore) {
 		{
 			CommandID:     "hist-cmd-1",
 			SessionID:     "hist-sess-1",
-			TsStartUnixMs: 1000,
+			TSStartUnixMs: 1000,
 			CWD:           "/tmp",
 			Command:       "git status",
 		},
 		{
 			CommandID:     "hist-cmd-2",
 			SessionID:     "hist-sess-1",
-			TsStartUnixMs: 2000,
+			TSStartUnixMs: 2000,
 			CWD:           "/tmp",
 			Command:       "git log",
 		},
 		{
 			CommandID:     "hist-cmd-3",
 			SessionID:     "hist-sess-1",
-			TsStartUnixMs: 3000,
+			TSStartUnixMs: 3000,
 			CWD:           "/tmp",
 			Command:       "git status",
 		},
 		{
 			CommandID:     "hist-cmd-4",
 			SessionID:     "hist-sess-2",
-			TsStartUnixMs: 4000,
+			TSStartUnixMs: 4000,
 			CWD:           "/home",
 			Command:       "ls -la",
 		},
 		{
 			CommandID:     "hist-cmd-5",
 			SessionID:     "hist-sess-2",
-			TsStartUnixMs: 5000,
+			TSStartUnixMs: 5000,
 			CWD:           "/home",
 			Command:       "echo hello world",
 		},
@@ -1321,14 +1321,14 @@ func TestSQLiteStore_QueryHistoryCommands_DoesNotCollapseNormalizedArgs(t *testi
 		{
 			CommandID:     "hist-path-cmd-1",
 			SessionID:     session.SessionID,
-			TsStartUnixMs: 1000,
+			TSStartUnixMs: 1000,
 			CWD:           "/tmp",
 			Command:       "cd /tmp",
 		},
 		{
 			CommandID:     "hist-path-cmd-2",
 			SessionID:     session.SessionID,
-			TsStartUnixMs: 2000,
+			TSStartUnixMs: 2000,
 			CWD:           "/tmp",
 			Command:       "cd /Users/example/project",
 		},
@@ -1398,7 +1398,7 @@ func TestSQLiteStore_QueryCommands_StatusWithOtherFilters(t *testing.T) {
 		cmd := &Command{
 			CommandID:     c.id,
 			SessionID:     "combo-session",
-			TsStartUnixMs: 1700000001000,
+			TSStartUnixMs: 1700000001000,
 			CWD:           c.cwd,
 			Command:       c.cmd,
 			IsSuccess:     boolPtr(c.isSuccess),

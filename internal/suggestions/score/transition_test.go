@@ -316,15 +316,15 @@ func TestTransitionStore_GetTopNextCommands(t *testing.T) {
 	defer ts.Close()
 
 	ctx := context.Background()
-	baseTs := int64(1000000)
+	baseTS := int64(1000000)
 
 	for i := 0; i < 3; i++ {
-		require.NoError(t, ts.RecordTransition(ctx, ScopeGlobal, "git status", "git add", baseTs+int64(i*100)))
+		require.NoError(t, ts.RecordTransition(ctx, ScopeGlobal, "git status", "git add", baseTS+int64(i*100)))
 	}
 	for i := 0; i < 2; i++ {
-		require.NoError(t, ts.RecordTransition(ctx, ScopeGlobal, "git status", "git commit", baseTs+int64(i*100)))
+		require.NoError(t, ts.RecordTransition(ctx, ScopeGlobal, "git status", "git commit", baseTS+int64(i*100)))
 	}
-	require.NoError(t, ts.RecordTransition(ctx, ScopeGlobal, "git status", "git diff", baseTs))
+	require.NoError(t, ts.RecordTransition(ctx, ScopeGlobal, "git status", "git diff", baseTS))
 
 	t.Run("returns top commands by count", func(t *testing.T) {
 		top, err := ts.GetTopNextCommands(ctx, ScopeGlobal, "git status", 3)

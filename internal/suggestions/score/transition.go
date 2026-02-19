@@ -134,7 +134,7 @@ func (ts *TransitionStore) RecordTransitionBoth(ctx context.Context, prevNorm, n
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback on error
 
 	// Update global scope
 	_, err = tx.ExecContext(ctx, `
@@ -173,7 +173,7 @@ func (ts *TransitionStore) RecordTransitionAll(ctx context.Context, prevNorm, ne
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback on error
 
 	// Update global scope
 	_, err = tx.ExecContext(ctx, `
@@ -220,9 +220,9 @@ func (ts *TransitionStore) RecordTransitionAll(ctx context.Context, prevNorm, ne
 
 // GetPreviousCommand retrieves the previous command for a session.
 // Per spec Section 9.2, this looks up the previous cmd_norm in the same session_id.
-func (ts *TransitionStore) GetPreviousCommand(ctx context.Context, sessionID string, beforeTs int64) (string, error) {
+func (ts *TransitionStore) GetPreviousCommand(ctx context.Context, sessionID string, beforeTS int64) (string, error) {
 	var prevNorm string
-	err := ts.getPrevStmt.QueryRowContext(ctx, sessionID, beforeTs).Scan(&prevNorm)
+	err := ts.getPrevStmt.QueryRowContext(ctx, sessionID, beforeTS).Scan(&prevNorm)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -235,9 +235,9 @@ func (ts *TransitionStore) GetPreviousCommand(ctx context.Context, sessionID str
 // GetPreviousCommandWithFallback retrieves the previous command, falling back to
 // repo-based lookup if no session match is found.
 // Per spec Section 9.2: "previous cmd_norm in same session_id (fallback: same repo within last N minutes)"
-func (ts *TransitionStore) GetPreviousCommandWithFallback(ctx context.Context, sessionID, repoKey string, beforeTs, fallbackWindowMs int64) (string, error) {
+func (ts *TransitionStore) GetPreviousCommandWithFallback(ctx context.Context, sessionID, repoKey string, beforeTS, fallbackWindowMs int64) (string, error) {
 	// First try session-based lookup
-	prev, err := ts.GetPreviousCommand(ctx, sessionID, beforeTs)
+	prev, err := ts.GetPreviousCommand(ctx, sessionID, beforeTS)
 	if err != nil {
 		return "", err
 	}
@@ -250,14 +250,14 @@ func (ts *TransitionStore) GetPreviousCommandWithFallback(ctx context.Context, s
 		return "", nil
 	}
 
-	minTs := beforeTs - fallbackWindowMs
+	minTS := beforeTS - fallbackWindowMs
 	var prevNorm string
 	err = ts.db.QueryRowContext(ctx, `
 		SELECT cmd_norm FROM command_event
 		WHERE repo_key = ? AND ts >= ? AND ts < ?
 		ORDER BY ts DESC
 		LIMIT 1
-	`, repoKey, minTs, beforeTs).Scan(&prevNorm)
+	`, repoKey, minTS, beforeTS).Scan(&prevNorm)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
@@ -272,7 +272,7 @@ type Transition struct {
 	PrevNorm string
 	NextNorm string
 	Count    int
-	LastTsMs int64
+	LastTSMs int64
 }
 
 // GetTopNextCommands retrieves the most frequent commands that follow a given command.
@@ -287,7 +287,7 @@ func (ts *TransitionStore) GetTopNextCommands(ctx context.Context, scope, prevNo
 	for rows.Next() {
 		var t Transition
 		t.PrevNorm = prevNorm
-		if err := rows.Scan(&t.NextNorm, &t.Count, &t.LastTsMs); err != nil {
+		if err := rows.Scan(&t.NextNorm, &t.Count, &t.LastTSMs); err != nil {
 			return nil, err
 		}
 		results = append(results, t)
@@ -303,8 +303,8 @@ func (ts *TransitionStore) GetTopNextCommands(ctx context.Context, scope, prevNo
 // GetTransitionCount retrieves the count for a specific transition.
 func (ts *TransitionStore) GetTransitionCount(ctx context.Context, scope, prevNorm, nextNorm string) (int, error) {
 	var count int
-	var lastTs int64
-	err := ts.getStmt.QueryRowContext(ctx, scope, prevNorm, nextNorm).Scan(&count, &lastTs)
+	var lastTS int64
+	err := ts.getStmt.QueryRowContext(ctx, scope, prevNorm, nextNorm).Scan(&count, &lastTS)
 	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}

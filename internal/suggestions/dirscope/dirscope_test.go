@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestComputeScopeKey(t *testing.T) {
+func TestComputeScopeKey(t *testing.T) { //nolint:funlen // table-driven test with many cases
 	t.Parallel()
 
 	tests := []struct {
@@ -132,8 +132,8 @@ func TestTruncatePath(t *testing.T) {
 	tests := []struct {
 		name     string
 		relPath  string
-		maxDepth int
 		expected string
+		maxDepth int
 	}{
 		{name: "empty", relPath: "", maxDepth: 3, expected: ""},
 		{name: "dot", relPath: ".", maxDepth: 3, expected: ""},

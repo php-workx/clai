@@ -7,7 +7,7 @@ BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 PICKER_LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-all test-interactive test-docker cover fmt lint vuln dev help proto bin/linux
+.PHONY: all build install install-dev clean test test-all test-interactive test-docker cover fmt lint vuln roam dev help proto bin/linux
 
 all: build
 
@@ -146,8 +146,16 @@ vuln:
 		echo "govulncheck not installed. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
 	fi
 
-## dev: Run all checks (fmt, lint, test, vuln)
-dev: fmt lint test vuln
+## roam: Run roam architectural checks (fitness + pr-risk)
+roam:
+	@if command -v roam >/dev/null 2>&1; then \
+		roam index && roam fitness && roam pr-risk main..HEAD; \
+	else \
+		echo "roam not installed, skipping roam checks..."; \
+	fi
+
+## dev: Run all checks (fmt, lint, test, vuln, roam)
+dev: fmt lint test vuln roam
 	@echo "All checks passed!"
 
 ## deps: Download dependencies

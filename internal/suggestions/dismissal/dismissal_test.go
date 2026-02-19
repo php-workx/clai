@@ -981,9 +981,9 @@ func TestFilterCandidates_ScopeAndContextIsolation(t *testing.T) {
 
 func TestConfigurableThreshold(t *testing.T) {
 	tests := []struct {
+		expectedState State
 		threshold     int
 		dismissals    int
-		expectedState State
 	}{
 		{threshold: 1, dismissals: 1, expectedState: StateLearned},
 		{threshold: 2, dismissals: 1, expectedState: StateTemporary},

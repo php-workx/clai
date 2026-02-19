@@ -22,7 +22,7 @@ import (
 
 // createBenchDB creates a temporary SQLite database for benchmarks.
 // It uses the V2 schema tables that the scorer and write path depend on.
-func createBenchDB(b *testing.B) *sql.DB {
+func createBenchDB(b *testing.B) *sql.DB { //nolint:funlen // benchmark DB setup with full V2 schema
 	b.Helper()
 
 	dir, err := os.MkdirTemp("", "clai-bench-*")
@@ -243,7 +243,7 @@ func createBenchDB(b *testing.B) *sql.DB {
 }
 
 // populateCommands populates the database with n commands via the scorer's frequency store.
-func populateCommands(b *testing.B, db *sql.DB, freqStore *score.FrequencyStore, transStore *score.TransitionStore, n int) {
+func populateCommands(b *testing.B, _ *sql.DB, freqStore *score.FrequencyStore, transStore *score.TransitionStore, n int) {
 	b.Helper()
 
 	ctx := context.Background()
@@ -307,7 +307,7 @@ func benchmarkSuggestWithN(b *testing.B, n int) {
 
 	populateCommands(b, db, freqStore, transStore, n)
 
-	scorer, err := NewScorer(ScorerDependencies{
+	scorer, err := NewScorer(&ScorerDependencies{
 		DB:              db,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
@@ -315,7 +315,7 @@ func benchmarkSuggestWithN(b *testing.B, n int) {
 	require.NoError(b, err)
 
 	ctx := context.Background()
-	suggestCtx := SuggestContext{
+	suggestCtx := &SuggestContext{
 		LastCmd: "git status",
 		NowMs:   time.Now().UnixMilli(),
 	}
@@ -372,12 +372,12 @@ func BenchmarkWritePath(b *testing.B) {
 			Cwd:       "/home/user/project",
 			CmdRaw:    cmd,
 			ExitCode:  0,
-			Ts:        time.Now().UnixMilli() + int64(i),
+			TS:        time.Now().UnixMilli() + int64(i),
 		}
 
 		wctx := ingest.PrepareWriteContext(ev, "repo:/bench", "main", "", 0, false, nil)
 
-		_, err := ingest.WritePath(ctx, db, wctx, ingest.WritePathConfig{})
+		_, err := ingest.WritePath(ctx, db, wctx, &ingest.WritePathConfig{})
 		if err != nil {
 			b.Fatalf("WritePath error: %v", err)
 		}

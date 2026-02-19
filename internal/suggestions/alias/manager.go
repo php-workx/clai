@@ -12,35 +12,24 @@ import (
 // Manager coordinates alias capture, storage, expansion, and rendering
 // for a single session. It is safe for concurrent use.
 type Manager struct {
-	store     *Store
-	sessionID string
-	shell     string
-	logger    *slog.Logger
-
-	mu         sync.RWMutex
+	store      *Store
+	logger     *slog.Logger
 	aliases    AliasMap
-	reverseMap []ReverseEntry
 	expander   *normalize.AliasExpander
+	sessionID  string
+	shell      string
+	reverseMap []ReverseEntry
 	maxDepth   int
+	mu         sync.RWMutex
 }
 
 // ManagerConfig holds configuration for the alias Manager.
 type ManagerConfig struct {
-	// SessionID is the current session identifier.
-	SessionID string
-
-	// Shell is the shell type (bash, zsh, fish).
-	Shell string
-
-	// DB is the database connection for persistence.
-	DB *sql.DB
-
-	// MaxExpansionDepth is the maximum alias expansion depth.
-	// If zero, uses normalize.DefaultMaxAliasDepth.
+	DB                *sql.DB
+	Logger            *slog.Logger
+	SessionID         string
+	Shell             string
 	MaxExpansionDepth int
-
-	// Logger is the structured logger. If nil, slog.Default() is used.
-	Logger *slog.Logger
 }
 
 // NewManager creates a new alias Manager for the given session.

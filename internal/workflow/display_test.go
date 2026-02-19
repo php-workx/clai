@@ -377,15 +377,15 @@ func TestDisplay_Plain_MatrixKey_Empty(t *testing.T) {
 
 func TestFormatDuration(t *testing.T) {
 	tests := []struct {
-		input    time.Duration
 		expected string
+		input    time.Duration
 	}{
-		{0, "0.00s"},
-		{time.Millisecond, "0.00s"},
-		{10 * time.Millisecond, "0.01s"},
-		{100 * time.Millisecond, "0.10s"},
-		{1230 * time.Millisecond, "1.23s"},
-		{time.Minute + 30*time.Second, "90.00s"},
+		{"0.00s", 0},
+		{"0.00s", time.Millisecond},
+		{"0.01s", 10 * time.Millisecond},
+		{"0.10s", 100 * time.Millisecond},
+		{"1.23s", 1230 * time.Millisecond},
+		{"90.00s", time.Minute + 30*time.Second},
 	}
 
 	for _, tc := range tests {
@@ -397,16 +397,16 @@ func TestFormatDuration(t *testing.T) {
 
 func TestFormatSummary(t *testing.T) {
 	tests := []struct {
-		passed, failed, skipped, cancelled int
 		expected                           string
+		passed, failed, skipped, cancelled int
 	}{
-		{0, 0, 0, 0, "0 passed"},
-		{3, 0, 0, 0, "3 passed"},
-		{1, 1, 0, 0, "1 passed, 1 failed"},
-		{1, 1, 1, 0, "1 passed, 1 failed, 1 skipped"},
-		{0, 1, 0, 0, "1 failed"},
-		{0, 0, 2, 0, "2 skipped"},
-		{0, 0, 0, 1, "1 cancelled"},
+		{"0 passed", 0, 0, 0, 0},
+		{"3 passed", 3, 0, 0, 0},
+		{"1 passed, 1 failed", 1, 1, 0, 0},
+		{"1 passed, 1 failed, 1 skipped", 1, 1, 1, 0},
+		{"1 failed", 0, 1, 0, 0},
+		{"2 skipped", 0, 0, 2, 0},
+		{"1 cancelled", 0, 0, 0, 1},
 	}
 
 	for _, tc := range tests {

@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -37,10 +38,10 @@ func shortTempDir(t *testing.T) string {
 type testServer struct {
 	listener  net.Listener
 	transport *transport.UnixTransport
-	events    []*event.CommandEvent
-	mu        sync.Mutex
-	wg        sync.WaitGroup
 	stopCh    chan struct{}
+	events    []*event.CommandEvent
+	wg        sync.WaitGroup
+	mu        sync.Mutex
 }
 
 func newTestServer(t *testing.T, socketPath string) *testServer {
@@ -156,7 +157,7 @@ func TestSender_Send_Success(t *testing.T) {
 	ev := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1730000000123,
+		TS:        1730000000123,
 		SessionID: "test-session",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user",
@@ -370,7 +371,7 @@ func TestSender_EnvironmentVariableParsing(t *testing.T) {
 				os.Setenv(EnvConnectTimeoutMs, tt.envValue)
 			}
 
-			socketPath := filepath.Join(tmpDir, "env"+string(rune('0'+i))+".sock")
+			socketPath := filepath.Join(tmpDir, fmt.Sprintf("env%d.sock", i))
 			tr := transport.NewUnixTransport(socketPath)
 			sender := NewSender(tr)
 
@@ -400,7 +401,7 @@ func TestSender_NDJSONFormat(t *testing.T) {
 	ev := &event.CommandEvent{
 		Version:    1,
 		Type:       event.EventTypeCommandEnd,
-		Ts:         1730000000123,
+		TS:         1730000000123,
 		SessionID:  "ndjson-test",
 		Shell:      event.ShellFish,
 		Cwd:        "/home/user/project",
@@ -423,7 +424,7 @@ func TestSender_NDJSONFormat(t *testing.T) {
 
 	assert.Equal(t, ev.Version, received.Version)
 	assert.Equal(t, ev.Type, received.Type)
-	assert.Equal(t, ev.Ts, received.Ts)
+	assert.Equal(t, ev.TS, received.TS)
 	assert.Equal(t, ev.SessionID, received.SessionID)
 	assert.Equal(t, ev.Shell, received.Shell)
 	assert.Equal(t, ev.Cwd, received.Cwd)
@@ -496,7 +497,7 @@ func TestSender_SpecialCharactersInCommand(t *testing.T) {
 	ev := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1730000000123,
+		TS:        1730000000123,
 		SessionID: "special-test",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user",
@@ -545,7 +546,7 @@ func TestSender_IncognitoNoRecord(t *testing.T) {
 	ev := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1730000000123,
+		TS:        1730000000123,
 		SessionID: "norecord-test",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user",
@@ -605,7 +606,7 @@ func TestSender_IncognitoEphemeral(t *testing.T) {
 	ev := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1730000000123,
+		TS:        1730000000123,
 		SessionID: "ephemeral-test",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user",

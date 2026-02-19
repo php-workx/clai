@@ -82,7 +82,7 @@ func (d *Display) RunStart(workflowName, runID string) {
 // StepStart prints step start indicator.
 // In TTY mode the line is printed without a newline so that StepEnd can
 // replace it in-place with the final status.
-func (d *Display) StepStart(stepName string, matrixKey string) {
+func (d *Display) StepStart(stepName, matrixKey string) {
 	d.clearActiveLine()
 	label := formatStepLabel(stepName, matrixKey)
 	if d.mode == DisplayTTY {
@@ -95,7 +95,7 @@ func (d *Display) StepStart(stepName string, matrixKey string) {
 
 // StepEnd prints step completion with status and duration.
 // In TTY mode, if a step-start line is active it is replaced in-place.
-func (d *Display) StepEnd(stepName string, matrixKey string, status string, duration time.Duration) {
+func (d *Display) StepEnd(stepName, matrixKey, status string, duration time.Duration) {
 	label := formatStepLabel(stepName, matrixKey)
 	durStr := formatDuration(duration)
 
@@ -171,7 +171,7 @@ func (d *Display) AnalysisStart(stepName string) {
 }
 
 // AnalysisEnd prints analysis result.
-func (d *Display) AnalysisEnd(stepName string, decision string) {
+func (d *Display) AnalysisEnd(stepName, decision string) {
 	if d.mode == DisplayTTY {
 		icon := iconForDecision(decision)
 		fmt.Fprintf(d.writer, "%s Analysis: %s -> %s\n", icon, stepName, decision)

@@ -146,7 +146,7 @@ func TestSQLiteStore_ConcurrentWrites_Safe(t *testing.T) {
 				cmd := &Command{
 					CommandID:     generateTestID(writerID, j),
 					SessionID:     "test-concurrent-session",
-					TsStartUnixMs: int64(1000 + writerID*100 + j),
+					TSStartUnixMs: int64(1000 + writerID*100 + j),
 					CWD:           "/tmp",
 					Command:       "echo test",
 					IsSuccess:     boolPtr(true),

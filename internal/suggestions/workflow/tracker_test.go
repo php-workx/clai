@@ -259,14 +259,14 @@ func TestWorkflowSummary(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		names    []string
 		expected string
+		names    []string
 	}{
-		{"empty", nil, ""},
-		{"single", []string{"git add"}, "git add"},
-		{"two", []string{"git add", "git commit"}, "git add -> git commit"},
-		{"three", []string{"git add", "git commit", "git push"}, "git add -> git commit -> git push"},
-		{"four", []string{"a", "b", "c", "d"}, "a -> b -> ... -> d"},
+		{"empty", "", nil},
+		{"single", "git add", []string{"git add"}},
+		{"two", "git add -> git commit", []string{"git add", "git commit"}},
+		{"three", "git add -> git commit -> git push", []string{"git add", "git commit", "git push"}},
+		{"four", "a -> b -> ... -> d", []string{"a", "b", "c", "d"}},
 	}
 
 	for _, tt := range tests {

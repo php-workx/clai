@@ -18,7 +18,7 @@ var validKeyRe = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 // Returns a map of key->value. Malformed lines are skipped with a warning log.
 // Missing file returns empty map (not an error -- step may not write outputs).
 func ParseOutputFile(path string) (map[string]string, error) {
-	f, err := os.Open(path)
+	f, err := os.Open(path) //nolint:gosec // G304: path is from internal temp file created by runner
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return map[string]string{}, nil
@@ -43,7 +43,7 @@ func ParseOutputFile(path string) (map[string]string, error) {
 		// Split on first '='.
 		idx := strings.IndexByte(trimmed, '=')
 		if idx < 0 {
-			slog.Warn("output: skipping malformed line (no '=')", "path", path, "line", lineNum)
+			slog.Warn("output: skipping malformed line (no '=')", "path", path, "line", lineNum) //nolint:gosec // G706: CLI log output, not web-facing
 			continue
 		}
 
@@ -51,7 +51,7 @@ func ParseOutputFile(path string) (map[string]string, error) {
 		value := trimmed[idx+1:]
 
 		if !validKeyRe.MatchString(key) {
-			slog.Warn("output: skipping invalid key", "path", path, "line", lineNum, "key", key)
+			slog.Warn("output: skipping invalid key", "path", path, "line", lineNum, "key", key) //nolint:gosec // G706: CLI log output, not web-facing
 			continue
 		}
 

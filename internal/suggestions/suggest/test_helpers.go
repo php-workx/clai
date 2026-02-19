@@ -4,7 +4,7 @@ package suggest
 // breakdown. This is intended for use in tests outside the suggest package
 // (e.g. the explain package) that need to construct suggestions with specific
 // per-feature score contributions.
-func SuggestionForTest(totalScore float64, b ScoreBreakdown) Suggestion {
+func SuggestionForTest(totalScore float64, b *ScoreBreakdown) Suggestion {
 	return Suggestion{
 		Command: "test-command",
 		Score:   totalScore,

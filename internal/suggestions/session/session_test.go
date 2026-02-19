@@ -202,8 +202,8 @@ func TestCleanupSessionFile(t *testing.T) {
 
 	// Verify it exists
 	path := SessionFilePath(pid)
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("session file should exist before cleanup: %v", err)
+	if _, statErr := os.Stat(path); statErr != nil {
+		t.Fatalf("session file should exist before cleanup: %v", statErr)
 	}
 
 	// Cleanup
@@ -307,14 +307,14 @@ func TestGenerateLocalSessionIDWithInputs(t *testing.T) {
 		tests := []struct {
 			name      string
 			hostname  string
+			random    []byte
 			pid       int
 			timestamp int64
-			random    []byte
 		}{
-			{"different hostname", "otherhost", basePid, baseTimestamp, baseRandom},
-			{"different pid", baseHostname, 99999, baseTimestamp, baseRandom},
-			{"different timestamp", baseHostname, basePid, baseTimestamp + 1, baseRandom},
-			{"different random", baseHostname, basePid, baseTimestamp, []byte("abcdef1234567890")},
+			{"different hostname", "otherhost", baseRandom, basePid, baseTimestamp},
+			{"different pid", baseHostname, baseRandom, 99999, baseTimestamp},
+			{"different timestamp", baseHostname, baseRandom, basePid, baseTimestamp + 1},
+			{"different random", baseHostname, []byte("abcdef1234567890"), basePid, baseTimestamp},
 		}
 
 		for _, tt := range tests {

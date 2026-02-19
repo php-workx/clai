@@ -103,18 +103,18 @@ func TestMiddleTruncate_ASCII(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		maxWidth int
 		want     string
+		maxWidth int
 	}{
-		{"fits exactly", "abcde", 5, "abcde"},
-		{"fits with room", "abc", 10, "abc"},
-		{"needs truncation", "abcdefghij", 7, "abc\u2026hij"},
-		{"max 3", "abcdef", 3, "a\u2026f"},
-		{"max 2", "abcdef", 2, "ab"},
-		{"max 1", "abcdef", 1, "a"},
-		{"max 0", "abcdef", 0, ""},
-		{"empty string", "", 5, ""},
-		{"single char", "x", 1, "x"},
+		{"fits exactly", "abcde", "abcde", 5},
+		{"fits with room", "abc", "abc", 10},
+		{"needs truncation", "abcdefghij", "abc\u2026hij", 7},
+		{"max 3", "abcdef", "a\u2026f", 3},
+		{"max 2", "abcdef", "ab", 2},
+		{"max 1", "abcdef", "a", 1},
+		{"max 0", "abcdef", "", 0},
+		{"empty string", "", "", 5},
+		{"single char", "x", "x", 1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -128,16 +128,16 @@ func TestMiddleTruncate_CJK(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		maxWidth int
 		want     string
+		maxWidth int
 	}{
 		// "\u4f60\u597d\u4e16\u754c" = 8 columns. maxWidth=7 => head=3cols, ellipsis=1, tail=3cols
 		// head: "\u4f60" (2 cols) + can't fit another CJK (2) in 3 cols => "\u4f60" takes 2;
 		// actually head budget = (7-1+1)/2 = 3 cols, "\u4f60" = 2 cols, next char is "\u597d" = 2 cols, 2+2=4 > 3, so head = "\u4f60"
 		// tail budget = (7-1)/2 = 3 cols. From the right: "\u754c" = 2 cols, "\u4e16" = 2 cols, 2+2=4 > 3, so tail = "\u754c"
-		{"CJK truncation", "\u4f60\u597d\u4e16\u754c", 7, "\u4f60\u2026\u754c"},
-		{"CJK fits", "\u4f60\u597d", 4, "\u4f60\u597d"},
-		{"CJK exactly", "\u4f60\u597d", 5, "\u4f60\u597d"},
+		{"CJK truncation", "\u4f60\u597d\u4e16\u754c", "\u4f60\u2026\u754c", 7},
+		{"CJK fits", "\u4f60\u597d", "\u4f60\u597d", 4},
+		{"CJK exactly", "\u4f60\u597d", "\u4f60\u597d", 5},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -151,10 +151,10 @@ func TestMiddleTruncate_Emoji(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		maxWidth int
 		want     string
+		maxWidth int
 	}{
-		{"emoji fits", "\U0001f600 hi", 10, "\U0001f600 hi"},
+		{"emoji fits", "\U0001f600 hi", "\U0001f600 hi", 10},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

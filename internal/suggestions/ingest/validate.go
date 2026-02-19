@@ -67,7 +67,7 @@ func ValidateEvent(ev *event.CommandEvent) error {
 		return ErrMissingType
 	}
 
-	if ev.Ts == 0 {
+	if ev.TS == 0 {
 		return ErrMissingTimestamp
 	}
 

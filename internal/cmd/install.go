@@ -47,7 +47,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 	}
 
 	paths := config.DefaultPaths()
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		return fmt.Errorf("failed to create directories: %w", err)
 	}
 
@@ -57,7 +57,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to get hook content: %w", err)
 	}
 
-	if err := os.WriteFile(hookFile, []byte(hookContent), 0o644); err != nil {
+	if err := os.WriteFile(hookFile, []byte(hookContent), 0o644); err != nil { //nolint:gosec // G306: hook file must be readable by shell
 		return fmt.Errorf("failed to write hook file: %w", err)
 	}
 	fmt.Printf("Wrote hook file: %s\n", hookFile)
@@ -163,7 +163,7 @@ func evalCommand(shell string) string {
 }
 
 func appendToRCFile(rcFile, sourceLine string) error {
-	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(rcFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644) //nolint:gosec // G304: rc file path from shell config
 	if err != nil {
 		return fmt.Errorf("failed to open %s: %w", rcFile, err)
 	}
@@ -190,7 +190,7 @@ func ensureTrailingNewline(f *os.File, rcFile string) error {
 		return nil
 	}
 
-	content, err := os.ReadFile(rcFile)
+	content, err := os.ReadFile(rcFile) //nolint:gosec // G304: rc file path from shell config
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", rcFile, err)
 	}
@@ -226,7 +226,7 @@ func getRCFiles(shell string) []string {
 	case "fish":
 		// Fish config is in ~/.config/fish/config.fish
 		configDir := filepath.Join(home, ".config", "fish")
-		if err := os.MkdirAll(configDir, 0o755); err != nil {
+		if err := os.MkdirAll(configDir, 0o755); err != nil { //nolint:gosec // G301: user config directory needs standard permissions
 			return nil
 		}
 		return []string{filepath.Join(configDir, "config.fish")}
@@ -249,8 +249,8 @@ func getHookContent(shell string) (string, error) {
 	}
 }
 
-func isInstalled(rcFile, hookFile, shell string) (bool, string, error) {
-	f, err := os.Open(rcFile)
+func isInstalled(rcFile, hookFile, shell string) (installed bool, reason string, err error) {
+	f, err := os.Open(rcFile) //nolint:gosec // G304: rc file path from shell config
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, "", nil

@@ -8,23 +8,23 @@ import (
 
 // Event represents a generic event in the ingestion queue.
 type Event struct {
-	Type      string
-	Payload   interface{}
 	Timestamp time.Time
+	Payload   interface{}
+	Type      string
 }
 
 // IngestionQueue is a bounded FIFO queue for ingestion events.
 // When the queue is full, it drops the oldest events (not newest).
 // It logs a warning when the queue exceeds 75% capacity.
 type IngestionQueue struct {
-	mu            sync.Mutex
+	logger        *slog.Logger
 	events        []Event
 	maxSize       int
-	logger        *slog.Logger
-	warnThreshold int // 75% of maxSize
-	warned        bool
+	warnThreshold int
 	totalDropped  int64
 	totalEnqueued int64
+	mu            sync.Mutex
+	warned        bool
 }
 
 // NewIngestionQueue creates a new IngestionQueue with the specified maximum size.

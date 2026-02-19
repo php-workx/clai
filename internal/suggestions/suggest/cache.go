@@ -21,10 +21,10 @@ const (
 // CacheEntry represents a cached set of suggestions for a session.
 // Per spec Section 11.2.1.
 type CacheEntry struct {
-	Suggestions []Suggestion
-	LastEventID int64
 	ComputedAt  time.Time
+	Suggestions []Suggestion
 	TTL         time.Duration
+	LastEventID int64
 }
 
 // IsExpired returns true if the cache entry has expired.
@@ -35,9 +35,9 @@ func (e *CacheEntry) IsExpired(now time.Time) bool {
 // Cache provides pre-computed suggestion caching per session.
 // Per spec Section 11.2: "zero-latency suggestions via pre-computation cache".
 type Cache struct {
-	mu      sync.RWMutex
-	entries map[string]*CacheEntry // keyed by session_id
+	entries map[string]*CacheEntry
 	ttl     time.Duration
+	mu      sync.RWMutex
 }
 
 // CacheConfig configures the suggestion cache.

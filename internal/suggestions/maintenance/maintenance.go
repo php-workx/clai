@@ -41,38 +41,14 @@ const (
 
 // Config configures the maintenance runner.
 type Config struct {
-	// Interval is the ticker interval between maintenance passes.
-	// If zero, DefaultInterval is used.
-	Interval time.Duration
-
-	// RetentionDays is the number of days to retain command_event rows.
-	// 0 disables time-based pruning; negative values use DefaultRetentionDays.
-	RetentionDays int
-
-	// PruneBatchSize is the number of rows deleted per batch.
-	// If <= 0, DefaultPruneBatchSize is used.
-	PruneBatchSize int
-
-	// PruneYieldDuration is the sleep between prune batches.
-	// If zero, DefaultPruneYieldDuration is used.
-	PruneYieldDuration time.Duration
-
-	// LowActivityThreshold is the event count below which low-activity
-	// operations (FTS optimize, VACUUM) are triggered.
-	// If <= 0, DefaultLowActivityThreshold is used.
+	Logger               *slog.Logger
+	DBPath               string
+	Interval             time.Duration
+	RetentionDays        int
+	PruneBatchSize       int
+	PruneYieldDuration   time.Duration
 	LowActivityThreshold int
-
-	// VacuumGrowthRatio triggers VACUUM when current DB size exceeds
-	// last-vacuum size by this ratio.
-	// If <= 0, DefaultVacuumGrowthRatio is used.
-	VacuumGrowthRatio float64
-
-	// DBPath is the path to the database file, used for size checks.
-	// If empty, VACUUM size checks are skipped.
-	DBPath string
-
-	// Logger is the structured logger. If nil, slog.Default() is used.
-	Logger *slog.Logger
+	VacuumGrowthRatio    float64
 }
 
 // applyDefaults fills in zero-valued fields with defaults.
@@ -102,24 +78,23 @@ func (c *Config) applyDefaults() {
 
 // Stats holds cumulative maintenance statistics.
 type Stats struct {
+	LastTickTime        time.Time
 	Ticks               int64
 	EventsPruned        int64
 	OrphansCleaned      int64
 	WALCheckpoints      int64
 	FTSOptimizations    int64
 	VacuumsPerformed    int64
-	LastTickTime        time.Time
 	LastVacuumSizeBytes int64
 }
 
 // Runner executes periodic maintenance tasks on the suggestions database.
 type Runner struct {
-	db     *sql.DB
 	cfg    Config
-	events atomic.Int64 // events since last tick
-
-	mu    sync.Mutex
-	stats Stats
+	db     *sql.DB
+	stats  Stats
+	events atomic.Int64
+	mu     sync.Mutex
 }
 
 // NewRunner creates a new maintenance runner.

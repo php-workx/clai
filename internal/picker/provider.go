@@ -1,3 +1,5 @@
+// Package picker provides an interactive TUI for browsing and selecting
+// shell history entries and command suggestions.
 package picker
 
 import "context"
@@ -27,17 +29,17 @@ type Provider interface {
 
 // Request describes what items the picker wants from a Provider.
 type Request struct {
-	RequestID uint64            // Monotonically increasing, for stale response detection
+	Options   map[string]string // Tab-specific options (session_id, global flag, etc.)
 	Query     string            // Search filter
 	TabID     string            // Active tab identifier
-	Options   map[string]string // Tab-specific options (session_id, global flag, etc.)
+	RequestID uint64            // Monotonically increasing, for stale response detection
 	Limit     int
 	Offset    int
 }
 
 // Response carries items back from a Provider.
 type Response struct {
-	RequestID uint64 // Must match Request.RequestID to be accepted
 	Items     []Item // Pickable items
+	RequestID uint64 // Must match Request.RequestID to be accepted
 	AtEnd     bool   // No more pages available
 }

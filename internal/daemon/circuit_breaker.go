@@ -21,40 +21,26 @@ const (
 // and starts sampling events (processing every Nth event) rather than
 // all of them. It auto-resets after the burst subsides.
 type CircuitBreaker struct {
-	mu sync.Mutex
-
-	// Configuration
-	burstThreshold int           // Events per window to trigger
-	window         time.Duration // Detection window
-	quietPeriod    time.Duration // Time to wait before reset
+	lastTrip       time.Time
 	logger         *slog.Logger
-
-	// State
-	state         CircuitBreakerState
-	eventTimes    []time.Time // Ring buffer of event timestamps in current window
-	lastTrip      time.Time   // When the circuit breaker was last tripped
-	totalAccepted int64
-	totalRejected int64
-	sampleCounter int // Counter for sampling in open state
-	sampleRate    int // Process every Nth event when open
+	eventTimes     []time.Time
+	burstThreshold int
+	window         time.Duration
+	quietPeriod    time.Duration
+	state          CircuitBreakerState
+	totalAccepted  int64
+	totalRejected  int64
+	sampleCounter  int
+	sampleRate     int
+	mu             sync.Mutex
 }
 
 // CircuitBreakerConfig holds configuration for the circuit breaker.
 type CircuitBreakerConfig struct {
-	// BurstThreshold is the number of events per window that triggers the breaker.
-	// Default: 200
+	Logger         *slog.Logger
 	BurstThreshold int
-
-	// Window is the time window for burst detection.
-	// Default: 1 second
-	Window time.Duration
-
-	// QuietPeriod is how long to wait after burst subsides before resetting.
-	// Default: 500ms
-	QuietPeriod time.Duration
-
-	// Logger for logging circuit breaker events.
-	Logger *slog.Logger
+	Window         time.Duration
+	QuietPeriod    time.Duration
 }
 
 // NewCircuitBreaker creates a new CircuitBreaker with the given configuration.

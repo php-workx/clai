@@ -1,3 +1,4 @@
+// Package cmd implements the CLI commands for clai.
 package cmd
 
 import (
@@ -43,14 +44,14 @@ func runAsk(cmd *cobra.Command, args []string) error {
 
 	// Build context
 	var contextBuilder strings.Builder
-	contextBuilder.WriteString(fmt.Sprintf("Working directory: %s\n", pwd))
-	contextBuilder.WriteString(fmt.Sprintf("Shell: %s\n", shell))
+	fmt.Fprintf(&contextBuilder, "Working directory: %s\n", pwd)
+	fmt.Fprintf(&contextBuilder, "Shell: %s\n", shell)
 
 	if recentCommands != "" {
-		contextBuilder.WriteString(fmt.Sprintf("Recent commands:\n%s\n", recentCommands))
+		fmt.Fprintf(&contextBuilder, "Recent commands:\n%s\n", recentCommands)
 	}
 
-	contextBuilder.WriteString(fmt.Sprintf("\nQuestion: %s", question))
+	fmt.Fprintf(&contextBuilder, "\nQuestion: %s", question)
 
 	// Set up context with Ctrl+C handling
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)

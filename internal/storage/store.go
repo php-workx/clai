@@ -34,7 +34,7 @@ type Store interface {
 
 	// Workflow methods
 	CreateWorkflowRun(ctx context.Context, run *WorkflowRun) error
-	UpdateWorkflowRun(ctx context.Context, runID string, status string, endedAt int64, durationMs int64) error
+	UpdateWorkflowRun(ctx context.Context, runID, status string, endedAt, durationMs int64) error
 	GetWorkflowRun(ctx context.Context, runID string) (*WorkflowRun, error)
 	QueryWorkflowRuns(ctx context.Context, q WorkflowRunQuery) ([]WorkflowRun, error)
 	CreateWorkflowStep(ctx context.Context, step *WorkflowStep) error
@@ -49,30 +49,22 @@ type Store interface {
 
 // Session represents a shell session.
 type Session struct {
-	SessionID       string
-	StartedAtUnixMs int64
 	EndedAtUnixMs   *int64
+	SessionID       string
 	Shell           string
 	OS              string
 	Hostname        string
 	Username        string
 	InitialCWD      string
+	StartedAtUnixMs int64
 }
 
 // Command represents a command executed in a session.
 type Command struct {
-	ID            int64
-	CommandID     string
-	SessionID     string
-	TsStartUnixMs int64
-	TsEndUnixMs   *int64
-	DurationMs    *int64
-	CWD           string
-	Command       string
-	CommandNorm   string
-	CommandHash   string
-	ExitCode      *int
-	IsSuccess     *bool // nil = unknown (treated as success), false = failure, true = success
+	TSEndUnixMs *int64
+	DurationMs  *int64
+	ExitCode    *int
+	IsSuccess   *bool // nil = unknown (treated as success), false = failure, true = success
 
 	// Git context (captured at command start)
 	GitBranch   *string
@@ -82,10 +74,19 @@ type Command struct {
 	// Sequence tracking
 	PrevCommandID *string
 
+	CommandID     string
+	SessionID     string
+	CWD           string
+	Command       string
+	CommandNorm   string
+	CommandHash   string
+	ID            int64
+	TSStartUnixMs int64
+
 	// Derived metadata (computed from command text)
-	IsSudo    bool
 	PipeCount int
 	WordCount int
+	IsSudo    bool
 }
 
 // CommandQuery defines parameters for querying commands.
@@ -137,11 +138,11 @@ type WorkflowStep struct {
 	MatrixKey   string // Composite key per D16
 	Status      string // "running", "passed", "failed", "skipped"
 	Command     string
-	ExitCode    int
-	DurationMs  int64
 	StdoutTail  string
 	StderrTail  string
 	OutputsJSON string
+	DurationMs  int64
+	ExitCode    int
 }
 
 // WorkflowStepUpdate contains fields for updating a workflow step.
@@ -151,11 +152,11 @@ type WorkflowStepUpdate struct {
 	MatrixKey   string
 	Status      string
 	Command     string
-	ExitCode    int
-	DurationMs  int64
 	StdoutTail  string
 	StderrTail  string
 	OutputsJSON string
+	DurationMs  int64
+	ExitCode    int
 }
 
 // WorkflowAnalysis represents an AI analysis of a workflow step.
@@ -174,7 +175,6 @@ type WorkflowAnalysis struct {
 
 // WorkflowAnalysisRecord is a stored analysis record with an auto-generated ID.
 type WorkflowAnalysisRecord struct {
-	ID          int64
 	RunID       string
 	StepID      string
 	MatrixKey   string
@@ -183,6 +183,7 @@ type WorkflowAnalysisRecord struct {
 	FlagsJSON   string
 	Prompt      string
 	RawResponse string
+	ID          int64
 	DurationMs  int64
 	AnalyzedAt  int64
 }

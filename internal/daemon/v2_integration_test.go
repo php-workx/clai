@@ -49,7 +49,7 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	defer v2db.Close()
 
 	paths := &config.Paths{BaseDir: tmpDir}
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -63,7 +63,7 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 		},
 	}
 
-	// Create server with V2 enabled in blend mode
+	// Create server with V2 enabled in v2 mode
 	server, err := NewServer(&ServerConfig{
 		Store:         store,
 		Ranker:        ranker,
@@ -71,7 +71,7 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 		Paths:         paths,
 		Logger:        logger,
 		IdleTimeout:   1 * time.Hour,
-		ScorerVersion: "blend",
+		ScorerVersion: "v2",
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
@@ -87,8 +87,8 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	if server.v2Scorer == nil {
 		t.Fatal("v2Scorer should be auto-initialized when V2DB is provided")
 	}
-	if server.scorerVersion != "blend" {
-		t.Fatalf("expected scorerVersion='blend', got %q", server.scorerVersion)
+	if server.scorerVersion != "v2" {
+		t.Fatalf("expected scorerVersion='v2', got %q", server.scorerVersion)
 	}
 
 	// Step 2: Start and verify the server (with gRPC)
@@ -104,13 +104,13 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	socketPath := paths.SocketFile()
 	for i := 0; i < 100; i++ {
 		time.Sleep(20 * time.Millisecond)
-		if _, err := os.Stat(socketPath); err == nil {
+		if _, statErr := os.Stat(socketPath); statErr == nil {
 			break
 		}
 		select {
-		case err := <-serverErr:
-			if err != nil {
-				t.Fatalf("server.Start failed: %v", err)
+		case srvErr := <-serverErr:
+			if srvErr != nil {
+				t.Fatalf("server.Start failed: %v", srvErr)
 			}
 		default:
 		}
@@ -178,7 +178,7 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 		t.Fatalf("CommandEnded (cmd-2) failed: %v (ok=%v)", err, cmdEndResp2.Ok)
 	}
 
-	// Step 5: Request suggestions (blend mode)
+	// Step 5: Request suggestions (v2 mode)
 	suggestResp, err := server.Suggest(ctx, &pb.SuggestRequest{
 		SessionId:  "lifecycle-session-1",
 		Cwd:        "/home/user/project",
@@ -190,7 +190,7 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	}
 	// V1 ranker always returns "git status" so we should have at least that
 	if len(suggestResp.Suggestions) == 0 {
-		t.Error("expected at least one suggestion in blend mode")
+		t.Error("expected at least one suggestion in v2 mode")
 	}
 
 	// Step 6: End session
@@ -206,9 +206,9 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	server.Shutdown()
 
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			t.Errorf("unexpected server error: %v", err)
+	case srvErr := <-serverErr:
+		if srvErr != nil {
+			t.Errorf("unexpected server error: %v", srvErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("server did not stop in time")
@@ -238,7 +238,7 @@ func TestV2Integration_GracefulDegradation_NilDB(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	paths := &config.Paths{BaseDir: tmpDir}
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -294,7 +294,7 @@ func TestV2Integration_GracefulDegradation_NilDB(t *testing.T) {
 	socketPath := paths.SocketFile()
 	for i := 0; i < 100; i++ {
 		time.Sleep(20 * time.Millisecond)
-		if _, err := os.Stat(socketPath); err == nil {
+		if _, statErr := os.Stat(socketPath); statErr == nil {
 			break
 		}
 	}
@@ -350,9 +350,9 @@ func TestV2Integration_GracefulDegradation_NilDB(t *testing.T) {
 	server.Shutdown()
 
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			t.Errorf("unexpected server error: %v", err)
+	case srvErr := <-serverErr:
+		if srvErr != nil {
+			t.Errorf("unexpected server error: %v", srvErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("server did not stop in time")
@@ -392,7 +392,7 @@ func TestV2Integration_GracefulDegradation_CorruptDB(t *testing.T) {
 		Ranker:        ranker,
 		V2DB:          v2db,
 		Logger:        logger,
-		ScorerVersion: "blend",
+		ScorerVersion: "v2",
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
@@ -402,7 +402,7 @@ func TestV2Integration_GracefulDegradation_CorruptDB(t *testing.T) {
 		t.Fatal("v2Scorer should be initialized")
 	}
 
-	// Suggest should work in blend mode (V2 will return empty since no data,
+	// Suggest should work in v2 mode (V2 will return empty since no data,
 	// but V1 provides results)
 	resp, err := server.Suggest(ctx, &pb.SuggestRequest{
 		SessionId:  "corrupt-session",
@@ -413,7 +413,7 @@ func TestV2Integration_GracefulDegradation_CorruptDB(t *testing.T) {
 		t.Fatalf("Suggest failed: %v", err)
 	}
 	if len(resp.Suggestions) == 0 {
-		t.Error("expected at least V1 suggestions in blend mode")
+		t.Error("expected at least V1 suggestions in v2 mode")
 	}
 }
 
@@ -441,7 +441,7 @@ func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
 	defer v2db.Close()
 
 	paths := &config.Paths{BaseDir: tmpDir}
-	if err := paths.EnsureDirectories(); err != nil {
+	if err = paths.EnsureDirectories(); err != nil {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
@@ -477,7 +477,7 @@ func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
 	socketPath := paths.SocketFile()
 	for i := 0; i < 100; i++ {
 		time.Sleep(20 * time.Millisecond)
-		if _, err := os.Stat(socketPath); err == nil {
+		if _, statErr := os.Stat(socketPath); statErr == nil {
 			break
 		}
 	}
@@ -525,9 +525,9 @@ func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
 	server.Shutdown()
 
 	select {
-	case err := <-serverErr:
-		if err != nil {
-			t.Errorf("unexpected server error: %v", err)
+	case srvErr := <-serverErr:
+		if srvErr != nil {
+			t.Errorf("unexpected server error: %v", srvErr)
 		}
 	case <-time.After(5 * time.Second):
 		t.Error("server did not stop in time")
@@ -569,7 +569,7 @@ func TestV2Integration_ScorerVersionSwitching(t *testing.T) {
 	}
 
 	// Test each scorer version
-	versions := []string{"v1", "v2", "blend"}
+	versions := []string{"v1", "v2"}
 	for _, version := range versions {
 		t.Run("version="+version, func(t *testing.T) {
 			server, err := NewServer(&ServerConfig{
@@ -602,13 +602,9 @@ func TestV2Integration_ScorerVersionSwitching(t *testing.T) {
 					t.Errorf("v1: expected 2 suggestions, got %d", len(resp.Suggestions))
 				}
 			case "v2":
-				// V2 with empty DB returns nil, falls through to V1
-				// This verifies the fallback path works
-				_ = resp
-			case "blend":
-				// Blend merges V2 (empty) + V1, so should return V1 results
+				// V2 merges V2 (empty DB) + V1, so should return V1 results
 				if len(resp.Suggestions) == 0 {
-					t.Error("blend: expected at least V1 suggestions")
+					t.Error("v2: expected at least V1 suggestions")
 				}
 			}
 		})

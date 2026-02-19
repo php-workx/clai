@@ -42,13 +42,11 @@ type activeWorkflow struct {
 // When a user executes a command matching step N of a known workflow,
 // the tracker activates it and provides next-step candidates.
 type Tracker struct {
-	mu       sync.Mutex
-	cfg      TrackerConfig
-	patterns []Pattern // Known workflow patterns (loaded from DB).
+	nowFn    func() int64
+	patterns []Pattern
 	active   []*activeWorkflow
-
-	// nowFn returns current time in ms; overridable for testing.
-	nowFn func() int64
+	cfg      TrackerConfig
+	mu       sync.Mutex
 }
 
 // NewTracker creates a new session tracker with the given patterns and config.
@@ -73,9 +71,9 @@ type Candidate struct {
 	PatternID    string `json:"pattern_id"`
 	TemplateID   string `json:"template_id"`
 	DisplayName  string `json:"display_name"`
+	WorkflowName string `json:"workflow_name"`
 	StepIndex    int    `json:"step_index"`
 	TotalSteps   int    `json:"total_steps"`
-	WorkflowName string `json:"workflow_name"` // Human-readable summary.
 }
 
 // OnCommand is called when the user executes a command. It updates active

@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
@@ -25,7 +26,7 @@ func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResul
 		suggestCtx.NowMs = time.Now().UnixMilli()
 	}
 
-	suggestions, err := s.v2Scorer.Suggest(ctx, suggestCtx)
+	suggestions, err := s.v2Scorer.Suggest(ctx, &suggestCtx)
 	if err != nil {
 		s.logger.Warn("V2 scorer failed", "error", err)
 		return nil
@@ -38,16 +39,25 @@ func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResul
 	return s.v2SuggestionsToProto(suggestions, suggestCtx.LastCmd, suggestCtx.NowMs)
 }
 
-// suggestBlend generates suggestions by merging V1 and V2 results.
-// V2 results are interleaved with V1, deduplicated by command text,
-// with V2 suggestions taking priority on conflicts.
-func (s *Server) suggestBlend(ctx context.Context, req *pb.SuggestRequest, maxResults int, v1Resp *pb.SuggestResponse) *pb.SuggestResponse {
-	v2Resp := s.suggestV2(ctx, req, maxResults)
-	if v2Resp == nil {
-		// V2 unavailable -- return V1 results only
-		return v1Resp
+// suggestV2Blend generates suggestions by running V1 and V2 concurrently
+// and merging the results. V2 results are interleaved with V1, deduplicated
+// by command text, with V2 suggestions taking priority on conflicts.
+// If V2 is unavailable, falls back to V1 only.
+func (s *Server) suggestV2Blend(ctx context.Context, req *pb.SuggestRequest, maxResults int) *pb.SuggestResponse {
+	if s.v2Scorer == nil {
+		return s.suggestV1(ctx, req, maxResults)
 	}
 
+	var v1Resp, v2Resp *pb.SuggestResponse
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() { defer wg.Done(); v1Resp = s.suggestV1(ctx, req, maxResults) }()
+	go func() { defer wg.Done(); v2Resp = s.suggestV2(ctx, req, maxResults) }()
+	wg.Wait()
+
+	if v2Resp == nil {
+		return v1Resp
+	}
 	return mergeResponses(v1Resp, v2Resp, maxResults)
 }
 
@@ -88,7 +98,7 @@ func appendUniqueSuggestion(
 	source []*pb.Suggestion,
 	idx int,
 	seen map[string]struct{},
-) ([]*pb.Suggestion, int) {
+) (result []*pb.Suggestion, nextIdx int) {
 	if idx >= len(source) {
 		return merged, idx
 	}
@@ -132,7 +142,7 @@ func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd
 
 	pbSuggestions := make([]*pb.Suggestion, len(suggestions))
 	for i := range suggestions {
-		pbSuggestions[i] = v2SuggestionToProto(suggestions[i], prevCmd, nowMs, explainCfg)
+		pbSuggestions[i] = v2SuggestionToProto(&suggestions[i], prevCmd, nowMs, explainCfg)
 	}
 	return &pb.SuggestResponse{
 		Suggestions: pbSuggestions,
@@ -141,7 +151,7 @@ func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd
 }
 
 func v2SuggestionToProto(
-	sug suggest2.Suggestion,
+	sug *suggest2.Suggestion,
 	prevCmd string,
 	nowMs int64,
 	explainCfg explain.Config,
@@ -159,8 +169,8 @@ func v2SuggestionToProto(
 	}
 }
 
-func v2SuggestionSource(sug suggest2.Suggestion) string {
-	breakdown := (&sug).ScoreBreakdown()
+func v2SuggestionSource(sug *suggest2.Suggestion) string {
+	breakdown := sug.ScoreBreakdown()
 
 	cwdScore := breakdown.DirTransition + breakdown.DirFrequency
 	repoScore := breakdown.RepoTransition + breakdown.RepoFrequency + breakdown.ProjectTask
@@ -197,7 +207,7 @@ func v2SuggestionRisk(command string) string {
 }
 
 func v2SuggestionReasons(
-	sug suggest2.Suggestion,
+	sug *suggest2.Suggestion,
 	why []explain.Reason,
 	nowMs int64,
 ) []*pb.SuggestionReason {
@@ -230,7 +240,7 @@ func v2SuggestionReasons(
 	return reasons
 }
 
-func v2SuggestionDescription(sug suggest2.Suggestion, why []explain.Reason, prevCmd string) string {
+func v2SuggestionDescription(sug *suggest2.Suggestion, why []explain.Reason, prevCmd string) string {
 	if len(why) > 0 {
 		return why[0].Description
 	}

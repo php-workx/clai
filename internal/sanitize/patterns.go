@@ -36,7 +36,7 @@ var secretPatterns = []Pattern{
 	},
 	{
 		Name:        "PEM Block",
-		Regex:       regexp.MustCompile(`-----BEGIN [A-Z ]+-----[\s\S]+?-----END [A-Z ]+-----`),
+		Regex:       regexp.MustCompile(`-{5}BEGIN [A-Z ]+-{5}[\s\S]+?-{5}END [A-Z ]+-{5}`),
 		Replacement: "[PEM_BLOCK_REDACTED]",
 	},
 	{

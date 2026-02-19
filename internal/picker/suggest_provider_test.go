@@ -13,10 +13,10 @@ import (
 
 type mockSuggestService struct {
 	pb.UnimplementedClaiServiceServer
+	failWith    error
+	lastReq     *pb.SuggestRequest
 	suggestions []*pb.Suggestion
 	delay       time.Duration
-	lastReq     *pb.SuggestRequest
-	failWith    error
 }
 
 func (m *mockSuggestService) Suggest(_ context.Context, req *pb.SuggestRequest) (*pb.SuggestResponse, error) {

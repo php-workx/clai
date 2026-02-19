@@ -831,8 +831,8 @@ func TestDispatchFzf_CoversBranches(t *testing.T) {
 }
 
 type fakeHistoryProvider struct {
-	resp []picker.Response
 	err  error
+	resp []picker.Response
 }
 
 func (f *fakeHistoryProvider) Fetch(_ context.Context, _ picker.Request) (picker.Response, error) {

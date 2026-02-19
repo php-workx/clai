@@ -120,10 +120,10 @@ func SpawnDaemonContext(ctx context.Context) error {
 	}
 
 	// Ensure run directory exists
-	if err := os.MkdirAll(RunDir(), 0o755); err != nil {
+	if err := os.MkdirAll(RunDir(), 0o750); err != nil {
 		return fmt.Errorf("failed to create run dir: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(LogPath()), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(LogPath()), 0o750); err != nil {
 		return fmt.Errorf("failed to create log dir: %w", err)
 	}
 
@@ -138,7 +138,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 	}
 
 	// Create log file
-	logFile, err := os.OpenFile(LogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	logFile, err := os.OpenFile(LogPath(), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
 		// Log file creation failed, use /dev/null
 		logFile, _ = os.Open(os.DevNull)
@@ -161,7 +161,7 @@ func SpawnDaemonContext(ctx context.Context) error {
 	}
 
 	// Write PID file (non-fatal if it fails)
-	_ = os.WriteFile(PidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o644)
+	_ = os.WriteFile(PidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o600)
 
 	// Detach from child - let it run independently
 	// We don't call cmd.Wait() so the process continues after shim exits
@@ -215,7 +215,7 @@ func findDaemonBinary() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to resolve CLAI_DAEMON_PATH: %w", err)
 		}
-		if _, err := os.Stat(absPath); err == nil {
+		if _, err := os.Stat(absPath); err == nil { //nolint:gosec // G703: daemon binary path from user env config
 			return absPath, nil
 		}
 	}
@@ -231,7 +231,7 @@ func findDaemonBinary() (string, error) {
 
 	// Check PATH
 	if path, err := exec.LookPath(DaemonBinaryName); err == nil {
-		absPath, absErr := filepath.Abs(path)
+		absPath, absErr := filepath.Abs(path) //nolint:gosec // G703: daemon binary path resolved from user's PATH
 		if absErr == nil {
 			return absPath, nil
 		}
@@ -377,7 +377,7 @@ func isLikelyStaleSocketDialError(err error) bool {
 
 func daemonLockHeldPID() (pid int, held bool, err error) {
 	lockPath := filepath.Join(RunDir(), "clai.lock")
-	f, err := os.OpenFile(lockPath, os.O_RDWR, 0)
+	f, err := os.OpenFile(lockPath, os.O_RDWR, 0) //nolint:gosec // G304: lock file path from trusted run dir
 	if err != nil {
 		if os.IsNotExist(err) {
 			return 0, false, nil
@@ -387,13 +387,16 @@ func daemonLockHeldPID() (pid int, held bool, err error) {
 	defer f.Close()
 
 	// If we can acquire the lock, it is not held.
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	fd := int(f.Fd()) //nolint:gosec // G115: file descriptor fits in int on all supported platforms
+	flockErr := syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
+	if flockErr == nil {
+		_ = syscall.Flock(fd, syscall.LOCK_UN)
 		return 0, false, nil
-	} else if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN) {
+	}
+	if errors.Is(flockErr, syscall.EWOULDBLOCK) || errors.Is(flockErr, syscall.EAGAIN) {
 		// Locked by daemon. Read PID from file for control.
-		if _, err := f.Seek(0, 0); err != nil {
-			return 0, true, err
+		if _, seekErr := f.Seek(0, 0); seekErr != nil {
+			return 0, true, seekErr
 		}
 		buf := make([]byte, 32)
 		n, rerr := f.Read(buf)
@@ -401,11 +404,10 @@ func daemonLockHeldPID() (pid int, held bool, err error) {
 			return 0, true, nil
 		}
 		pidStr := strings.TrimSpace(string(buf[:n]))
-		pid, _ := strconv.Atoi(pidStr)
+		pid, _ = strconv.Atoi(pidStr)
 		return pid, true, nil
-	} else {
-		return 0, false, err
 	}
+	return 0, false, flockErr
 }
 
 func terminatePID(pid int, timeout time.Duration) error {

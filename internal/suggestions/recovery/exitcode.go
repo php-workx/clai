@@ -25,8 +25,8 @@ const (
 
 // ExitCodeMapping maps an exit code to a FailureClass.
 type ExitCodeMapping struct {
-	Code  int
 	Class FailureClass
+	Code  int
 }
 
 // defaultMappings contains the standard exit code to failure class mappings.

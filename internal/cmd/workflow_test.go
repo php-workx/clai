@@ -212,9 +212,9 @@ func TestSetupRunContext_NoDaemon(t *testing.T) {
 
 func TestParseVarFlags(t *testing.T) {
 	tests := []struct {
+		expect map[string]string
 		name   string
 		input  []string
-		expect map[string]string
 	}{
 		{
 			name:   "empty",

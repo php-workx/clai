@@ -131,7 +131,7 @@ func TestClientWithMockServer(t *testing.T) {
 
 	// Create client connection directly using blocking dial
 	// For Unix sockets, we need to use "passthrough" scheme and connect directly
-	dialer := func(ctx context.Context, addr string) (net.Conn, error) {
+	dialer := func(ctx context.Context, _ string) (net.Conn, error) {
 		var d net.Dialer
 		return d.DialContext(ctx, "unix", sockPath)
 	}
@@ -283,7 +283,7 @@ func TestSuggestDefaultMaxResults(t *testing.T) {
 	os.Setenv("CLAI_SOCKET", sockPath)
 	defer os.Unsetenv("CLAI_SOCKET")
 
-	dialer := func(ctx context.Context, addr string) (net.Conn, error) {
+	dialer := func(ctx context.Context, _ string) (net.Conn, error) {
 		var d net.Dialer
 		return d.DialContext(ctx, "unix", sockPath)
 	}
@@ -321,7 +321,7 @@ func TestTextToCommandDefaultMaxSuggestions(t *testing.T) {
 	os.Setenv("CLAI_SOCKET", sockPath)
 	defer os.Unsetenv("CLAI_SOCKET")
 
-	dialer := func(ctx context.Context, addr string) (net.Conn, error) {
+	dialer := func(ctx context.Context, _ string) (net.Conn, error) {
 		var d net.Dialer
 		return d.DialContext(ctx, "unix", sockPath)
 	}

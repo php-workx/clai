@@ -15,8 +15,8 @@ const MaxImportEntries = 25000
 
 // ImportEntry represents a single history entry with optional timestamp.
 type ImportEntry struct {
-	Command   string
 	Timestamp time.Time // Zero value if timestamp not available
+	Command   string
 }
 
 // ImportBashHistory reads and parses a bash history file.
@@ -31,7 +31,7 @@ func ImportBashHistory(path string) ([]ImportEntry, error) {
 		return nil, nil
 	}
 
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec // G304: path is from user's HISTFILE or well-known default
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -89,7 +89,7 @@ func ImportZshHistory(path string) ([]ImportEntry, error) {
 		return nil, nil
 	}
 
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec // G304: path is from user's HISTFILE or well-known default
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -204,7 +204,7 @@ func ImportFishHistory(path string) ([]ImportEntry, error) {
 		return nil, nil
 	}
 
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec // G304: path is from user's HISTFILE or well-known default
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
@@ -231,9 +231,9 @@ func ImportFishHistory(path string) ([]ImportEntry, error) {
 }
 
 type fishHistoryParser struct {
-	entries          []ImportEntry
-	currentCmd       string
 	currentTimestamp time.Time
+	currentCmd       string
+	entries          []ImportEntry
 	inPaths          bool
 }
 

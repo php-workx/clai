@@ -50,8 +50,8 @@ func (s *SQLiteStore) CreateCommand(ctx context.Context, cmd *Command) error {
 	`,
 		cmd.CommandID,
 		cmd.SessionID,
-		cmd.TsStartUnixMs,
-		cmd.TsEndUnixMs,
+		cmd.TSStartUnixMs,
+		cmd.TSEndUnixMs,
 		cmd.DurationMs,
 		cmd.CWD,
 		cmd.Command,
@@ -148,8 +148,8 @@ func (s *SQLiteStore) UpdateCommandEnd(ctx context.Context, commandID string, ex
 }
 
 // QueryCommands queries commands based on the given criteria.
-func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Command, error) {
-	query, args := buildCommandQuerySQL(q)
+func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Command, error) { //nolint:gocritic // hugeParam: interface contract
+	query, args := buildCommandQuerySQL(&q)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -176,12 +176,12 @@ func (s *SQLiteStore) QueryCommands(ctx context.Context, q CommandQuery) ([]Comm
 // QueryHistoryCommands queries command history rows intended for interactive pickers.
 // When q.Deduplicate is true, it groups by raw command text and returns the most
 // recent timestamp for each unique command string.
-func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) ([]HistoryRow, error) {
+func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) ([]HistoryRow, error) { //nolint:gocritic // hugeParam: interface contract
 	// This API is specifically for "history picker" style queries: always
 	// deduplicate to avoid overwhelming the UI with repeated commands.
 	q.Deduplicate = true
 
-	query, args := buildHistoryQuerySQL(q)
+	query, args := buildHistoryQuerySQL(&q)
 
 	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -205,16 +205,16 @@ func (s *SQLiteStore) QueryHistoryCommands(ctx context.Context, q CommandQuery) 
 	return results, nil
 }
 
-func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
+func buildHistoryQuerySQL(q *CommandQuery) (query string, args []interface{}) {
 	// Deduplicate by exact command text. Do not group by command_norm: command_norm
 	// intentionally normalizes variable arguments (paths, URLs, numbers) and is too
 	// aggressive for history browsing.
-	query := `
+	query = `
 		SELECT command, MAX(ts_start_unix_ms) as latest_ts
 		FROM commands
 		WHERE 1=1
 	`
-	args := make([]interface{}, 0)
+	args = make([]interface{}, 0)
 	query, args = appendCommandQueryFilters(query, args, q)
 
 	query += " GROUP BY command ORDER BY latest_ts DESC"
@@ -223,8 +223,8 @@ func buildHistoryQuerySQL(q CommandQuery) (string, []interface{}) {
 	return query, args
 }
 
-func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
-	query := `
+func buildCommandQuerySQL(q *CommandQuery) (query string, args []interface{}) {
+	query = `
 		SELECT id, command_id, session_id, ts_start_unix_ms, ts_end_unix_ms,
 		       duration_ms, cwd, command, command_norm, command_hash,
 		       exit_code, is_success,
@@ -233,7 +233,7 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 		FROM commands
 		WHERE 1=1
 	`
-	args := make([]interface{}, 0)
+	args = make([]interface{}, 0)
 	query, args = appendCommandQueryFilters(query, args, q)
 
 	query += " ORDER BY ts_start_unix_ms DESC"
@@ -242,7 +242,7 @@ func buildCommandQuerySQL(q CommandQuery) (string, []interface{}) {
 	return query, args
 }
 
-func appendCommandQueryFilters(query string, args []interface{}, q CommandQuery) (string, []interface{}) {
+func appendCommandQueryFilters(query string, args []interface{}, q *CommandQuery) (_ string, _ []interface{}) {
 	if q.SessionID != nil {
 		query += " AND session_id = ?"
 		args = append(args, *q.SessionID)
@@ -272,7 +272,7 @@ func appendCommandQueryFilters(query string, args []interface{}, q CommandQuery)
 	return query, args
 }
 
-func appendCommandQueryLimitOffset(query string, args []interface{}, q CommandQuery) (string, []interface{}) {
+func appendCommandQueryLimitOffset(query string, args []interface{}, q *CommandQuery) (_ string, _ []interface{}) {
 	if q.Limit > 0 {
 		query += " LIMIT ?"
 		args = append(args, q.Limit)
@@ -295,7 +295,7 @@ func scanCommandRow(rows *sql.Rows) (Command, error) {
 	var isSudo, pipeCount, wordCount sql.NullInt32
 
 	err := rows.Scan(
-		&cmd.ID, &cmd.CommandID, &cmd.SessionID, &cmd.TsStartUnixMs,
+		&cmd.ID, &cmd.CommandID, &cmd.SessionID, &cmd.TSStartUnixMs,
 		&endTime, &duration, &cmd.CWD, &cmd.Command, &cmd.CommandNorm,
 		&cmd.CommandHash, &exitCode, &isSuccess,
 		&gitBranch, &gitRepoName, &gitRepoRoot, &prevCommandID,
@@ -306,7 +306,7 @@ func scanCommandRow(rows *sql.Rows) (Command, error) {
 	}
 
 	if endTime.Valid {
-		cmd.TsEndUnixMs = &endTime.Int64
+		cmd.TSEndUnixMs = &endTime.Int64
 	}
 	if duration.Valid {
 		cmd.DurationMs = &duration.Int64

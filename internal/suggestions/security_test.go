@@ -25,7 +25,7 @@ import (
 )
 
 // createSecurityTestDB creates a full V2 schema database for security tests.
-func createSecurityTestDB(t *testing.T) *sql.DB {
+func createSecurityTestDB(t *testing.T) *sql.DB { //nolint:funlen // security test DB setup with full V2 schema
 	t.Helper()
 
 	dir, err := os.MkdirTemp("", "clai-security-test-*")
@@ -230,13 +230,13 @@ func TestSecurity_SQLInjection_CommandText(t *testing.T) {
 				Cwd:       "/home/user",
 				CmdRaw:    injection,
 				ExitCode:  0,
-				Ts:        time.Now().UnixMilli(),
+				TS:        time.Now().UnixMilli(),
 			}
 
 			wctx := ingest.PrepareWriteContext(ev, "", "", "", 0, false, nil)
 
 			// Should succeed without error (parameterized queries protect against injection)
-			result, err := ingest.WritePath(ctx, db, wctx, ingest.WritePathConfig{})
+			result, err := ingest.WritePath(ctx, db, wctx, &ingest.WritePathConfig{})
 			require.NoError(t, err, "WritePath should handle injection safely: %q", injection)
 			assert.Greater(t, result.EventID, int64(0))
 		})
@@ -314,13 +314,13 @@ func TestSecurity_SQLInjection_SearchQuery(t *testing.T) {
 	}
 
 	for _, injection := range injections {
-		t.Run("search_injection", func(t *testing.T) {
+		t.Run("search_injection", func(_ *testing.T) {
 			// Should not panic or corrupt DB
-			results, err := svc.Search(ctx, injection, search.SearchOptions{})
+			results, searchErr := svc.Search(ctx, injection, search.SearchOptions{})
 			// We accept either no error (query runs but returns no matches)
 			// or an error (malformed query). Either way, the DB should be intact.
 			_ = results
-			_ = err
+			_ = searchErr
 		})
 	}
 
@@ -470,11 +470,11 @@ func TestSecurity_MalformedUTF8(t *testing.T) {
 				Cwd:       "/home/user",
 				CmdRaw:    sanitized,
 				ExitCode:  0,
-				Ts:        time.Now().UnixMilli(),
+				TS:        time.Now().UnixMilli(),
 			}
 
 			wctx := ingest.PrepareWriteContext(ev, "", "", "", 0, false, nil)
-			writeResult, err := ingest.WritePath(ctx, db, wctx, ingest.WritePathConfig{})
+			writeResult, err := ingest.WritePath(ctx, db, wctx, &ingest.WritePathConfig{})
 			require.NoError(t, err, "WritePath should handle sanitized malformed UTF-8")
 			assert.Greater(t, writeResult.EventID, int64(0))
 
@@ -614,11 +614,11 @@ func TestSecurity_SpecialSQLCharacters(t *testing.T) {
 				Cwd:       "/home/user",
 				CmdRaw:    cmd,
 				ExitCode:  0,
-				Ts:        time.Now().UnixMilli(),
+				TS:        time.Now().UnixMilli(),
 			}
 
 			wctx := ingest.PrepareWriteContext(ev, "", "", "", 0, false, nil)
-			result, err := ingest.WritePath(ctx, db, wctx, ingest.WritePathConfig{})
+			result, err := ingest.WritePath(ctx, db, wctx, &ingest.WritePathConfig{})
 			require.NoError(t, err, "WritePath should handle special SQL chars: %q", cmd)
 
 			// Verify the original command is stored correctly (round-trip)
@@ -666,11 +666,11 @@ func TestSecurity_ConcurrentIngestion(t *testing.T) {
 			Cwd:       "/home/user",
 			CmdRaw:    sanitized,
 			ExitCode:  0,
-			Ts:        time.Now().UnixMilli(),
+			TS:        time.Now().UnixMilli(),
 		}
 
 		wctx := ingest.PrepareWriteContext(ev, "", "", "", 0, false, nil)
-		_, err := ingest.WritePath(ctx, db, wctx, ingest.WritePathConfig{})
+		_, err := ingest.WritePath(ctx, db, wctx, &ingest.WritePathConfig{})
 		require.NoError(t, err, "WritePath should handle: %q", cmd)
 	}
 

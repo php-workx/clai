@@ -189,7 +189,7 @@ func TestImportHistory_NoTimestamps(t *testing.T) {
 
 	// All should have non-zero timestamps
 	for _, cmd := range cmds {
-		assert.NotZero(t, cmd.TsStartUnixMs)
+		assert.NotZero(t, cmd.TSStartUnixMs)
 	}
 }
 

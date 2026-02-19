@@ -41,8 +41,8 @@ func TestToggleIntegration_PersistentConfig(t *testing.T) {
 		t.Fatal("expected suggestions.enabled to be false")
 	}
 
-	if err := toggleIntegration(true, false); err != nil {
-		t.Fatalf("toggleIntegration enable error: %v", err)
+	if toggleErr := toggleIntegration(true, false); toggleErr != nil {
+		t.Fatalf("toggleIntegration enable error: %v", toggleErr)
 	}
 	cfg, err = config.Load()
 	if err != nil {

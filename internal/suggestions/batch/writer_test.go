@@ -24,12 +24,12 @@ func createTestDB(t *testing.T) *sql.DB {
 
 	dir, err := os.MkdirTemp("", "clai-batch-test-*")
 	require.NoError(t, err)
-	t.Cleanup(func() { os.RemoveAll(dir) })
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 
 	dbPath := filepath.Join(dir, "test.db")
 	db, err := sql.Open("sqlite", dbPath)
 	require.NoError(t, err)
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { _ = db.Close() })
 
 	// Create minimal schema for testing (matches V2 command_event columns)
 	_, err = db.Exec(`
@@ -104,7 +104,7 @@ func TestWriter_EnqueueAndFlush(t *testing.T) {
 		ev := &event.CommandEvent{
 			Version:   1,
 			Type:      event.EventTypeCommandEnd,
-			Ts:        time.Now().UnixMilli(),
+			TS:        time.Now().UnixMilli(),
 			SessionID: "test-session",
 			Shell:     event.ShellBash,
 			Cwd:       "/home/user",
@@ -153,7 +153,7 @@ func TestWriter_BatchSizeFlush(t *testing.T) {
 		ev := &event.CommandEvent{
 			Version:   1,
 			Type:      event.EventTypeCommandEnd,
-			Ts:        time.Now().UnixMilli(),
+			TS:        time.Now().UnixMilli(),
 			SessionID: "test-session",
 			Shell:     event.ShellBash,
 			Cwd:       "/home/user",
@@ -189,7 +189,7 @@ func TestWriter_EphemeralEventsNotPersisted(t *testing.T) {
 		ev := &event.CommandEvent{
 			Version:   1,
 			Type:      event.EventTypeCommandEnd,
-			Ts:        time.Now().UnixMilli(),
+			TS:        time.Now().UnixMilli(),
 			SessionID: "test-session",
 			Shell:     event.ShellBash,
 			Cwd:       "/home/user",
@@ -249,7 +249,7 @@ func TestWriter_QueueFull(t *testing.T) {
 		ev := &event.CommandEvent{
 			Version:   1,
 			Type:      event.EventTypeCommandEnd,
-			Ts:        time.Now().UnixMilli(),
+			TS:        time.Now().UnixMilli(),
 			SessionID: "test-session",
 			Shell:     event.ShellBash,
 			Cwd:       "/home/user",
@@ -280,7 +280,7 @@ func TestWriter_GracefulShutdown(t *testing.T) {
 		ev := &event.CommandEvent{
 			Version:   1,
 			Type:      event.EventTypeCommandEnd,
-			Ts:        time.Now().UnixMilli(),
+			TS:        time.Now().UnixMilli(),
 			SessionID: "test-session",
 			Shell:     event.ShellBash,
 			Cwd:       "/home/user",
@@ -329,7 +329,7 @@ func TestWriter_TimerFlush(t *testing.T) {
 	ev := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        time.Now().UnixMilli(),
+		TS:        time.Now().UnixMilli(),
 		SessionID: "test-session",
 		Shell:     event.ShellBash,
 		Cwd:       "/home/user",
@@ -377,7 +377,7 @@ func TestWriter_Stats(t *testing.T) {
 		ev := &event.CommandEvent{
 			Version:   1,
 			Type:      event.EventTypeCommandEnd,
-			Ts:        time.Now().UnixMilli(),
+			TS:        time.Now().UnixMilli(),
 			SessionID: "test-session",
 			Shell:     event.ShellBash,
 			Cwd:       "/home/user",
@@ -414,7 +414,7 @@ func createTestV2DB(t *testing.T) *sql.DB {
 		SkipLock: true,
 	})
 	require.NoError(t, err)
-	t.Cleanup(func() { d.Close() })
+	t.Cleanup(func() { _ = d.Close() })
 
 	// Ensure session exists for tests (command_event references session_id)
 	_, err = d.DB().ExecContext(context.Background(), `
@@ -442,7 +442,7 @@ func TestBatchWriter_CallsWritePath(t *testing.T) {
 	ev := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1700000000000,
+		TS:        1700000000000,
 		SessionID: "test-session",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user/project",
@@ -499,7 +499,7 @@ func TestBatchWriter_WritePath_ErrorSkipsEvent(t *testing.T) {
 	ev1 := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1700000000000,
+		TS:        1700000000000,
 		SessionID: "test-session",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user/project",
@@ -513,7 +513,7 @@ func TestBatchWriter_WritePath_ErrorSkipsEvent(t *testing.T) {
 	ev2 := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1700000001000,
+		TS:        1700000001000,
 		SessionID: "test-session",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user/project",
@@ -526,7 +526,7 @@ func TestBatchWriter_WritePath_ErrorSkipsEvent(t *testing.T) {
 	ev3 := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1700000002000,
+		TS:        1700000002000,
 		SessionID: "test-session",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user/project",
@@ -571,7 +571,7 @@ func TestBatchWriter_TransitionsAcrossBatches(t *testing.T) {
 	ev1 := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1700000000000,
+		TS:        1700000000000,
 		SessionID: "test-session",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user/project",
@@ -595,7 +595,7 @@ func TestBatchWriter_TransitionsAcrossBatches(t *testing.T) {
 	ev2 := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1700000001000,
+		TS:        1700000001000,
 		SessionID: "test-session",
 		Shell:     event.ShellZsh,
 		Cwd:       "/home/user/project",

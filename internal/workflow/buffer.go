@@ -7,8 +7,8 @@ import "sync"
 // Thread-safe with sync.Mutex.
 // Default capacity: 4096 bytes (4KB per FR-7).
 type LimitedBuffer struct {
-	mu       sync.Mutex
 	buf      []byte
+	mu       sync.Mutex
 	capacity int
 	// Ring buffer state: data lives in buf[0:size].
 	// When the buffer is full, we shift data to make room.

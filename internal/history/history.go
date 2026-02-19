@@ -172,7 +172,7 @@ func (p *historyParser) addCommand(cmd string) {
 // readZshHistory reads and parses zsh history file
 // Handles the extended history format: : timestamp:0;command
 func readZshHistory(path string) ([]string, error) {
-	file, err := os.Open(path)
+	file, err := os.Open(path) //nolint:gosec // G304: path is from user's HISTFILE or well-known default
 	if err != nil {
 		return nil, err
 	}

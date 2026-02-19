@@ -44,10 +44,10 @@ func NewDescribeService(db *sql.DB, cfg DescribeConfig) *DescribeService {
 type templateRow struct {
 	templateID string
 	cmdNorm    string
-	tagsJSON   sql.NullString
 	cmdRaw     string
 	repoKey    string
 	cwd        string
+	tagsJSON   sql.NullString
 	timestamp  int64
 	eventID    int64
 }
@@ -129,7 +129,7 @@ func (s *DescribeService) scanDescribeResults(
 		if err != nil {
 			return nil, err
 		}
-		result, ok := s.describeResultFromRow(row, queryTags, queryTagSet)
+		result, ok := s.describeResultFromRow(&row, queryTags, queryTagSet)
 		if ok {
 			results = append(results, result)
 		}
@@ -145,7 +145,7 @@ func scanTemplateRow(rows *sql.Rows) (templateRow, error) {
 }
 
 func (s *DescribeService) describeResultFromRow(
-	row templateRow,
+	row *templateRow,
 	queryTags []string,
 	queryTagSet map[string]bool,
 ) (SearchResult, bool) {
@@ -173,7 +173,7 @@ func (s *DescribeService) describeResultFromRow(
 	}, true
 }
 
-func (s *DescribeService) parseTemplateTags(row templateRow) ([]string, bool) {
+func (s *DescribeService) parseTemplateTags(row *templateRow) ([]string, bool) {
 	if !row.tagsJSON.Valid || row.tagsJSON.String == "" || row.tagsJSON.String == "null" {
 		return nil, false
 	}

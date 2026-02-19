@@ -51,8 +51,8 @@ type TextToCommandRequest struct {
 
 // TextToCommandResponse is the response from text-to-command conversion
 type TextToCommandResponse struct {
-	Suggestions  []Suggestion
 	ProviderName string
+	Suggestions  []Suggestion
 	LatencyMs    int64
 }
 
@@ -60,17 +60,17 @@ type TextToCommandResponse struct {
 type NextStepRequest struct {
 	SessionID    string
 	LastCommand  string
-	LastExitCode int
 	CWD          string
 	OS           string
 	Shell        string
 	RecentCmds   []CommandContext
+	LastExitCode int
 }
 
 // NextStepResponse is the response from next step prediction
 type NextStepResponse struct {
-	Suggestions  []Suggestion
 	ProviderName string
+	Suggestions  []Suggestion
 	LatencyMs    int64
 }
 
@@ -78,19 +78,19 @@ type NextStepResponse struct {
 type DiagnoseRequest struct {
 	SessionID  string
 	Command    string
-	ExitCode   int
 	CWD        string
 	OS         string
 	Shell      string
 	StdErr     string
 	RecentCmds []CommandContext
+	ExitCode   int
 }
 
 // DiagnoseResponse is the response from error diagnosis
 type DiagnoseResponse struct {
 	Explanation  string
-	Fixes        []Suggestion
 	ProviderName string
+	Fixes        []Suggestion
 	LatencyMs    int64
 }
 
@@ -99,6 +99,6 @@ type Suggestion struct {
 	Text        string  // The suggested command
 	Description string  // Optional description
 	Source      string  // SourceHistory or SourceAI
-	Score       float64 // Ranking score (0.0 to 1.0)
 	Risk        string  // "safe", "destructive"
+	Score       float64 // Ranking score (0.0 to 1.0)
 }

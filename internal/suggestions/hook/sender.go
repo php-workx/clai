@@ -109,7 +109,7 @@ func (s *Sender) Send(ev *event.CommandEvent) bool {
 	defer conn.Close()
 
 	// Set write deadline
-	if err := conn.SetWriteDeadline(time.Now().Add(s.writeTimeout)); err != nil {
+	if deadlineErr := conn.SetWriteDeadline(time.Now().Add(s.writeTimeout)); deadlineErr != nil {
 		return false
 	}
 

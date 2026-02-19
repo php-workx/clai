@@ -14,9 +14,9 @@ import (
 
 // ArtifactEvent represents a single event in the JSONL log.
 type ArtifactEvent struct {
+	Data      interface{} `json:"data"`      // event-specific payload
 	Type      string      `json:"type"`      // event type
 	Timestamp int64       `json:"timestamp"` // Unix milliseconds
-	Data      interface{} `json:"data"`      // event-specific payload
 }
 
 // Event types.
@@ -102,14 +102,14 @@ func NewRunArtifact(runID string) (*RunArtifact, error) {
 // NewRunArtifactWithDir creates a new artifact writer with a custom log directory.
 // Useful for testing.
 func NewRunArtifactWithDir(runID, logDir string) (*RunArtifact, error) {
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
+	if err := os.MkdirAll(logDir, 0o750); err != nil { //nolint:gosec // G301: log dir needs group access for workflow artifacts
 		return nil, fmt.Errorf("create log dir: %w", err)
 	}
 
 	safeName := sanitizePathComponent(runID)
 	path := filepath.Join(logDir, safeName+".jsonl")
 
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600) //nolint:gosec // G304: path is constructed from sanitized runID within logDir
 	if err != nil {
 		return nil, fmt.Errorf("open artifact file: %w", err)
 	}
@@ -153,7 +153,7 @@ func (a *RunArtifact) WriteStepLog(stepID, stdout, stderr string) {
 	}
 
 	stepsDir := filepath.Join(a.logDir, sanitizePathComponent(a.runID)+"-steps")
-	if err := os.MkdirAll(stepsDir, 0o755); err != nil {
+	if err := os.MkdirAll(stepsDir, 0o750); err != nil { //nolint:gosec // G301: steps dir needs group access for workflow artifacts
 		slog.Warn("artifact: create steps dir", "error", err)
 		return
 	}
@@ -165,14 +165,14 @@ func (a *RunArtifact) WriteStepLog(stepID, stdout, stderr string) {
 
 	if stdout != "" {
 		stdoutPath := filepath.Join(stepsDir, safeID+".stdout")
-		if err := os.WriteFile(stdoutPath, []byte(stdout), 0o644); err != nil {
+		if err := os.WriteFile(stdoutPath, []byte(stdout), 0o600); err != nil {
 			slog.Warn("artifact: write step stdout", "error", err, "step", stepID)
 		}
 	}
 
 	if stderr != "" {
 		stderrPath := filepath.Join(stepsDir, safeID+".stderr")
-		if err := os.WriteFile(stderrPath, []byte(stderr), 0o644); err != nil {
+		if err := os.WriteFile(stderrPath, []byte(stderr), 0o600); err != nil {
 			slog.Warn("artifact: write step stderr", "error", err, "step", stepID)
 		}
 	}

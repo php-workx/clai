@@ -116,7 +116,7 @@ func dockerFingerprint() (string, bool) {
 	if _, err := os.Stat("/.dockerenv"); err != nil {
 		return "", false
 	}
-	if data, err := os.ReadFile("/proc/self/cgroup"); err == nil {
+	if data, err := os.ReadFile("/proc/self/cgroup"); err == nil { //nolint:gosec // reads user-specified path
 		if id := extractContainerIDFromCgroup(string(data)); id != "" {
 			return "docker:" + id, true
 		}
@@ -207,7 +207,7 @@ func defaultSessionFilePath(pid int) string {
 func readSessionFile(pid int) (string, error) {
 	path := SessionFilePath(pid)
 
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // reads user-specified path
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", nil
