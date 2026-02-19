@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -13,6 +14,9 @@ import (
 
 	_ "modernc.org/sqlite" // Pure Go SQLite driver
 )
+
+// ErrDatabaseClosed is returned when an operation is attempted on a closed database.
+var ErrDatabaseClosed = errors.New("database is closed")
 
 const (
 	// walCheckpointInterval is how often we checkpoint the WAL file
@@ -314,7 +318,7 @@ func (d *DB) PrepareStatement(ctx context.Context, name, query string) (*sql.Stm
 	d.stmtMu.RLock()
 	if d.stmts == nil {
 		d.stmtMu.RUnlock()
-		return nil, fmt.Errorf("database is closed")
+		return nil, ErrDatabaseClosed
 	}
 	if stmt, ok := d.stmts[name]; ok {
 		d.stmtMu.RUnlock()
@@ -327,7 +331,7 @@ func (d *DB) PrepareStatement(ctx context.Context, name, query string) (*sql.Stm
 	defer d.stmtMu.Unlock()
 
 	if d.stmts == nil {
-		return nil, fmt.Errorf("database is closed")
+		return nil, ErrDatabaseClosed
 	}
 
 	// Double-check after acquiring write lock

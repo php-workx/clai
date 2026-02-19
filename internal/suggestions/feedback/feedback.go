@@ -114,7 +114,12 @@ func (s *Store) TrackSuggestion(sessionID, suggestedText, promptPrefix string, s
 	if shownAtMs == 0 {
 		shownAtMs = time.Now().UnixMilli()
 	}
-	s.recentSuggestions = append(s.recentSuggestions, RecentSuggestion{sessionID, suggestedText, promptPrefix, shownAtMs})
+	s.recentSuggestions = append(s.recentSuggestions, RecentSuggestion{
+		SessionID:     sessionID,
+		SuggestedText: suggestedText,
+		PromptPrefix:  promptPrefix,
+		ShownAtMs:     shownAtMs,
+	})
 	s.pruneRecentSuggestions(shownAtMs)
 }
 

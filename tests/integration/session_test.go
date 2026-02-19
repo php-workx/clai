@@ -406,23 +406,31 @@ func logCommandsToSession(t *testing.T, ctx context.Context, client pb.ClaiServi
 	t.Helper()
 	for _, cmd := range commands {
 		commandID := generateCommandID()
-		if _, err := client.CommandStarted(ctx, &pb.CommandStartRequest{
+		ack, err := client.CommandStarted(ctx, &pb.CommandStartRequest{
 			SessionId: sessionID,
 			CommandId: commandID,
 			Cwd:       cwd,
 			Command:   cmd,
 			TsUnixMs:  time.Now().UnixMilli(),
-		}); err != nil {
+		})
+		if err != nil {
 			t.Fatalf("CommandStarted(%s) failed: %v", cmd, err)
 		}
-		if _, err := client.CommandEnded(ctx, &pb.CommandEndRequest{
+		if !ack.Ok {
+			t.Fatalf("CommandStarted(%s) ack not ok: %s", cmd, ack.Error)
+		}
+		ack, err = client.CommandEnded(ctx, &pb.CommandEndRequest{
 			SessionId:  sessionID,
 			CommandId:  commandID,
 			ExitCode:   0,
 			DurationMs: 100,
 			TsUnixMs:   time.Now().UnixMilli(),
-		}); err != nil {
+		})
+		if err != nil {
 			t.Fatalf("CommandEnded(%s) failed: %v", cmd, err)
+		}
+		if !ack.Ok {
+			t.Fatalf("CommandEnded(%s) ack not ok: %s", cmd, ack.Error)
 		}
 	}
 }
