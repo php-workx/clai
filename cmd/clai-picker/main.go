@@ -573,7 +573,7 @@ func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 	if result == "" {
 		return exitCancelled
 	}
-	fmt.Fprintln(os.Stdout, result) //nolint:gosec // G705: CLI output to stdout, not web context
+	fmt.Fprintln(os.Stdout, result) //nolint:gosec // G705: CLI tool, not web context
 
 	return exitSuccess
 }

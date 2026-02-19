@@ -34,6 +34,9 @@ func NewTemplateStore(db *sql.DB) *TemplateStore {
 // On conflict, it updates last_seen_ms to the MAX of old and new values,
 // preserving the earliest first_seen_ms.
 func (s *TemplateStore) Upsert(ctx context.Context, t *Template) error {
+	if t == nil {
+		return fmt.Errorf("template is nil")
+	}
 	tagsJSON := "null"
 	if len(t.Tags) > 0 {
 		b, err := json.Marshal(t.Tags)

@@ -83,6 +83,9 @@ func NewStore(db *sql.DB, cfg Config, logger *slog.Logger) *Store {
 
 // RecordFeedback stores a feedback record.
 func (s *Store) RecordFeedback(ctx context.Context, rec *FeedbackRecord) (int64, error) {
+	if rec == nil {
+		return 0, fmt.Errorf("feedback record is nil")
+	}
 	if rec.SessionID == "" {
 		return 0, fmt.Errorf("session_id is required")
 	}

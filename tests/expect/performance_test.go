@@ -336,6 +336,9 @@ func TestPerformance_SourceScriptFast(t *testing.T) {
 
 // maxTimingDeviation computes the maximum absolute deviation from the mean.
 func maxTimingDeviation(durations []time.Duration) (avg, maxDev time.Duration) {
+	if len(durations) == 0 {
+		return 0, 0
+	}
 	var total time.Duration
 	for _, d := range durations {
 		total += d

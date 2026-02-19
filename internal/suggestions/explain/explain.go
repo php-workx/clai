@@ -50,6 +50,9 @@ type featureEntry struct {
 // The prevCmd parameter is used to fill in the "{prev_cmd}" placeholder
 // in transition-based reason descriptions. It may be empty.
 func Explain(s *suggest.Suggestion, cfg Config, prevCmd string) []Reason {
+	if s == nil {
+		return nil
+	}
 	if cfg.MaxReasons <= 0 {
 		cfg.MaxReasons = 3
 	}

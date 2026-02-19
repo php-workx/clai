@@ -402,23 +402,28 @@ func TestSession_MultipleSessions(t *testing.T) {
 }
 
 // logCommandsToSession logs a list of commands to the given session.
-func logCommandsToSession(ctx context.Context, client pb.ClaiServiceClient, sessionID, cwd string, commands []string) {
+func logCommandsToSession(t *testing.T, ctx context.Context, client pb.ClaiServiceClient, sessionID, cwd string, commands []string) {
+	t.Helper()
 	for _, cmd := range commands {
 		commandID := generateCommandID()
-		_, _ = client.CommandStarted(ctx, &pb.CommandStartRequest{
+		if _, err := client.CommandStarted(ctx, &pb.CommandStartRequest{
 			SessionId: sessionID,
 			CommandId: commandID,
 			Cwd:       cwd,
 			Command:   cmd,
 			TsUnixMs:  time.Now().UnixMilli(),
-		})
-		_, _ = client.CommandEnded(ctx, &pb.CommandEndRequest{
+		}); err != nil {
+			t.Fatalf("CommandStarted(%s) failed: %v", cmd, err)
+		}
+		if _, err := client.CommandEnded(ctx, &pb.CommandEndRequest{
 			SessionId:  sessionID,
 			CommandId:  commandID,
 			ExitCode:   0,
 			DurationMs: 100,
 			TsUnixMs:   time.Now().UnixMilli(),
-		})
+		}); err != nil {
+			t.Fatalf("CommandEnded(%s) failed: %v", cmd, err)
+		}
 	}
 }
 
@@ -512,14 +517,14 @@ func TestSession_HistoryIsolation(t *testing.T) {
 		"alice-unique-command-2",
 		"shared-prefix-alice",
 	}
-	logCommandsToSession(ctx, env.Client, sessionA, "/home/alice/project", sessionACommands)
+	logCommandsToSession(t, ctx, env.Client, sessionA, "/home/alice/project", sessionACommands)
 
 	sessionBCommands := []string{
 		"bob-unique-command-1",
 		"bob-unique-command-2",
 		"shared-prefix-bob",
 	}
-	logCommandsToSession(ctx, env.Client, sessionB, "/home/bob/project", sessionBCommands)
+	logCommandsToSession(t, ctx, env.Client, sessionB, "/home/bob/project", sessionBCommands)
 
 	// Query suggestions from session A with "alice" prefix
 	t.Run("SessionA_OnlySeesOwnCommands", func(t *testing.T) {

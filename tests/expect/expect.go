@@ -289,17 +289,15 @@ func (s *ShellSession) Close() error {
 	s.SendLine("exit")
 
 	// Close the console (this closes the pty)
-	if err := s.Console.Close(); err != nil {
-		return err
-	}
+	closeErr := s.Console.Close()
 
-	// Wait for the process to exit
+	// Always clean up the process, even if console close failed
 	if s.cmd != nil && s.cmd.Process != nil {
 		s.cmd.Process.Kill()
 		s.cmd.Wait()
 	}
 
-	return nil
+	return closeErr
 }
 
 // WaitForPrompt waits for a shell prompt to appear.

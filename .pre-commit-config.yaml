@@ -1,7 +1,7 @@
 # Pre-commit hooks: https://pre-commit.com
 # Install: make install-dev
 
-exclude: ^(\.agents/|\.roam/)
+exclude: ^(\.agents/|\.beads/|\.roam/)
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks

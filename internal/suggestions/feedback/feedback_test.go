@@ -321,9 +321,15 @@ func TestCountByAction(t *testing.T) {
 	store := NewStore(db, DefaultConfig(), nil)
 	ctx := context.Background()
 
-	store.RecordFeedback(ctx, &FeedbackRecord{SessionID: "sess-1", SuggestedText: "a", Action: ActionAccepted, TSMs: 1000})
-	store.RecordFeedback(ctx, &FeedbackRecord{SessionID: "sess-1", SuggestedText: "b", Action: ActionAccepted, TSMs: 1001})
-	store.RecordFeedback(ctx, &FeedbackRecord{SessionID: "sess-1", SuggestedText: "c", Action: ActionDismissed, TSMs: 1002})
+	if _, err := store.RecordFeedback(ctx, &FeedbackRecord{SessionID: "sess-1", SuggestedText: "a", Action: ActionAccepted, TSMs: 1000}); err != nil {
+		t.Fatalf("RecordFeedback: %v", err)
+	}
+	if _, err := store.RecordFeedback(ctx, &FeedbackRecord{SessionID: "sess-1", SuggestedText: "b", Action: ActionAccepted, TSMs: 1001}); err != nil {
+		t.Fatalf("RecordFeedback: %v", err)
+	}
+	if _, err := store.RecordFeedback(ctx, &FeedbackRecord{SessionID: "sess-1", SuggestedText: "c", Action: ActionDismissed, TSMs: 1002}); err != nil {
+		t.Fatalf("RecordFeedback: %v", err)
+	}
 
 	counts, err := store.CountByAction(ctx, "sess-1")
 	if err != nil {

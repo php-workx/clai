@@ -312,6 +312,10 @@ func (d *DB) walCheckpointLoop() {
 func (d *DB) PrepareStatement(ctx context.Context, name, query string) (*sql.Stmt, error) {
 	// Fast path: check if already prepared
 	d.stmtMu.RLock()
+	if d.stmts == nil {
+		d.stmtMu.RUnlock()
+		return nil, fmt.Errorf("database is closed")
+	}
 	if stmt, ok := d.stmts[name]; ok {
 		d.stmtMu.RUnlock()
 		return stmt, nil
@@ -321,6 +325,10 @@ func (d *DB) PrepareStatement(ctx context.Context, name, query string) (*sql.Stm
 	// Slow path: prepare and cache
 	d.stmtMu.Lock()
 	defer d.stmtMu.Unlock()
+
+	if d.stmts == nil {
+		return nil, fmt.Errorf("database is closed")
+	}
 
 	// Double-check after acquiring write lock
 	if stmt, ok := d.stmts[name]; ok {
