@@ -23,14 +23,8 @@ var (
 
 // PreNormConfig holds configuration for the pre-normalization pipeline.
 type PreNormConfig struct {
-	// MaxEventBytes is the maximum allowed event size in bytes.
-	// Events exceeding this are truncated. Default: DefaultMaxEventSize.
+	Aliases       map[string]string
 	MaxEventBytes int
-
-	// Aliases maps alias names to expansions for alias resolution.
-	Aliases map[string]string
-
-	// AliasMaxDepth is the max alias expansion depth. Default: DefaultMaxAliasDepth.
 	AliasMaxDepth int
 }
 

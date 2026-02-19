@@ -29,23 +29,23 @@ const recoveryRetryDelay = 30 * time.Millisecond
 
 // HistoryProvider implements Provider using the daemon's FetchHistory gRPC RPC.
 type HistoryProvider struct {
-	socketPath string
 	// ensureDaemon is injected for testing; defaults to ipc.EnsureDaemon.
 	ensureDaemon func() error
 
 	// state tracks per-(session,query) paging progress so the Session tab can
 	// seamlessly continue into global history once the session segment ends.
-	stateMu sync.Mutex
-	state   map[string]*sessionQueryState
+	state      map[string]*sessionQueryState
+	socketPath string
+	stateMu    sync.Mutex
 }
 
 type sessionQueryState struct {
-	// total is the total number of session items for this query once we've reached
-	// the end (atEnd=true). Until then, it is -1.
-	total int
 	// seen is the set of session commands observed so far for this (session,query),
 	// used to dedupe global fallback items.
 	seen map[string]struct{}
+	// total is the total number of session items for this query once we've reached
+	// the end (atEnd=true). Until then, it is -1.
+	total int
 }
 
 // Compile-time check that HistoryProvider implements Provider.
@@ -173,8 +173,8 @@ func (p *HistoryProvider) fetchSessionPageAndUpdateState(
 	req Request,
 	sessionID string,
 	state *sessionQueryState,
-) ([]Item, bool, int, map[string]struct{}, error) {
-	sessionPage, sessionAtEnd, err := p.fetchHistoryItems(ctx, client, sessionID, false, req.Query, req.Limit, req.Offset)
+) (sessionPage []Item, sessionAtEnd bool, total int, dedupe map[string]struct{}, err error) {
+	sessionPage, sessionAtEnd, err = p.fetchHistoryItems(ctx, client, sessionID, false, req.Query, req.Limit, req.Offset)
 	if err != nil {
 		return nil, false, 0, nil, err
 	}
@@ -187,7 +187,7 @@ func (p *HistoryProvider) fetchSessionPageAndUpdateState(
 	if sessionAtEnd {
 		state.total = req.Offset + len(sessionPage)
 	}
-	total := state.total
+	total = state.total
 	p.stateMu.Unlock()
 	return sessionPage, sessionAtEnd, total, p.sessionSeenSnapshot(state), nil
 }
@@ -295,8 +295,8 @@ func (p *HistoryProvider) fetchHistoryItems(
 		SessionId: sessionID,
 		Global:    global,
 		Query:     query,
-		Limit:     int32(limit),
-		Offset:    int32(offset),
+		Limit:     int32(limit),  //nolint:gosec // G115: limit is bounded by picker page size
+		Offset:    int32(offset), //nolint:gosec // G115: offset starts at 0, bounded by page size
 	}
 
 	grpcResp, err := client.FetchHistory(ctx, grpcReq)
@@ -436,12 +436,12 @@ func (p *HistoryProvider) fetchGlobalChunk(
 	dedupe map[string]struct{},
 	offset int,
 	maxChunk int,
-) ([]Item, bool, int, error) {
+) (items []Item, atEnd bool, nextOffset int, err error) {
 	chunkLimit := want + len(dedupe) + 50
 	if chunkLimit > maxChunk {
 		chunkLimit = maxChunk
 	}
-	items, atEnd, err := p.fetchHistoryItems(ctx, client, "", true, query, chunkLimit, offset)
+	items, atEnd, err = p.fetchHistoryItems(ctx, client, "", true, query, chunkLimit, offset)
 	if err != nil {
 		return nil, false, 0, err
 	}

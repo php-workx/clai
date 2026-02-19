@@ -299,12 +299,12 @@ func resolveScorerVersion(requested string, v2scorer *suggest2.Scorer, logger *s
 	version := requested
 	if version == "" {
 		if v2scorer != nil {
-			version = "blend"
+			version = "v2"
 		} else {
 			version = "v1"
 		}
 	}
-	if (version == "v2" || version == "blend") && v2scorer == nil {
+	if version == "v2" && v2scorer == nil {
 		logger.Warn("scorer_version requires V2 scorer but V2 is unavailable; falling back to v1",
 			"requested", version,
 		)

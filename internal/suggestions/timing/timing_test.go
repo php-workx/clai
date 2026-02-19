@@ -51,14 +51,14 @@ func TestNewMachine(t *testing.T) {
 
 func TestStateString(t *testing.T) {
 	tests := []struct {
-		state State
 		want  string
+		state State
 	}{
-		{IDLE, "IDLE"},
-		{TYPING, "TYPING"},
-		{FAST_TYPING, "FAST_TYPING"},
-		{PAUSED, "PAUSED"},
-		{State(99), "UNKNOWN"},
+		{"IDLE", IDLE},
+		{"TYPING", TYPING},
+		{"FAST_TYPING", FastTyping},
+		{"PAUSED", PAUSED},
+		{"UNKNOWN", State(99)},
 	}
 	for _, tt := range tests {
 		if got := tt.state.String(); got != tt.want {
@@ -86,10 +86,10 @@ func TestTypingToFastTyping(t *testing.T) {
 	// IDLE -> TYPING
 	m.OnKeystroke(1000)
 
-	// TYPING -> FAST_TYPING (delta 50ms < 100ms threshold)
+	// TYPING -> FastTyping (delta 50ms < 100ms threshold)
 	state, shouldRequest := m.OnKeystroke(1050)
-	if state != FAST_TYPING {
-		t.Errorf("state = %v, want FAST_TYPING", state)
+	if state != FastTyping {
+		t.Errorf("state = %v, want FastTyping", state)
 	}
 	if shouldRequest {
 		t.Error("shouldRequest = true, want false (suppress during fast typing)")
@@ -131,14 +131,14 @@ func TestTypingStaysTyping(t *testing.T) {
 func TestFastTypingStaysFast(t *testing.T) {
 	m := NewMachine(DefaultConfig())
 
-	// IDLE -> TYPING -> FAST_TYPING
+	// IDLE -> TYPING -> FastTyping
 	m.OnKeystroke(1000)
 	m.OnKeystroke(1050)
 
-	// FAST_TYPING -> FAST_TYPING (still fast, delta 40ms)
+	// FastTyping -> FastTyping (still fast, delta 40ms)
 	state, shouldRequest := m.OnKeystroke(1090)
-	if state != FAST_TYPING {
-		t.Errorf("state = %v, want FAST_TYPING", state)
+	if state != FastTyping {
+		t.Errorf("state = %v, want FastTyping", state)
 	}
 	if shouldRequest {
 		t.Error("shouldRequest = true, want false (still fast typing)")
@@ -148,11 +148,11 @@ func TestFastTypingStaysFast(t *testing.T) {
 func TestFastTypingToPaused(t *testing.T) {
 	m := NewMachine(DefaultConfig())
 
-	// IDLE -> TYPING -> FAST_TYPING
+	// IDLE -> TYPING -> FastTyping
 	m.OnKeystroke(1000)
 	m.OnKeystroke(1050)
 
-	// FAST_TYPING -> PAUSED (delta 400ms > 300ms)
+	// FastTyping -> PAUSED (delta 400ms > 300ms)
 	state, shouldRequest := m.OnKeystroke(1450)
 	if state != PAUSED {
 		t.Errorf("state = %v, want PAUSED", state)
@@ -180,7 +180,7 @@ func TestPausedToTyping(t *testing.T) {
 }
 
 func TestFullLifecycle(t *testing.T) {
-	// Test the full: IDLE -> TYPING -> FAST_TYPING -> PAUSED -> IDLE
+	// Test the full: IDLE -> TYPING -> FastTyping -> PAUSED -> IDLE
 	m := NewMachine(DefaultConfig())
 
 	// IDLE -> TYPING
@@ -189,19 +189,19 @@ func TestFullLifecycle(t *testing.T) {
 		t.Fatalf("step 1: state=%v req=%v, want TYPING/false", state, req)
 	}
 
-	// TYPING -> FAST_TYPING
+	// TYPING -> FastTyping
 	state, req = m.OnKeystroke(1050)
-	if state != FAST_TYPING || req {
-		t.Fatalf("step 2: state=%v req=%v, want FAST_TYPING/false", state, req)
+	if state != FastTyping || req {
+		t.Fatalf("step 2: state=%v req=%v, want FastTyping/false", state, req)
 	}
 
-	// FAST_TYPING continues
+	// FastTyping continues
 	state, req = m.OnKeystroke(1090)
-	if state != FAST_TYPING || req {
-		t.Fatalf("step 3: state=%v req=%v, want FAST_TYPING/false", state, req)
+	if state != FastTyping || req {
+		t.Fatalf("step 3: state=%v req=%v, want FastTyping/false", state, req)
 	}
 
-	// FAST_TYPING -> PAUSED
+	// FastTyping -> PAUSED
 	state, req = m.OnKeystroke(1500)
 	if state != PAUSED || !req {
 		t.Fatalf("step 4: state=%v req=%v, want PAUSED/true", state, req)
@@ -217,18 +217,18 @@ func TestFullLifecycle(t *testing.T) {
 func TestIdleTimeoutFromFastTyping(t *testing.T) {
 	m := NewMachine(DefaultConfig())
 
-	// Get to FAST_TYPING
+	// Get to FastTyping
 	m.OnKeystroke(1000)
 	m.OnKeystroke(1050)
 
-	if m.State() != FAST_TYPING {
-		t.Fatalf("setup: state = %v, want FAST_TYPING", m.State())
+	if m.State() != FastTyping {
+		t.Fatalf("setup: state = %v, want FastTyping", m.State())
 	}
 
 	// Not yet timed out (1500ms since last keystroke, need 2000ms)
 	state, req := m.OnIdle(2550)
-	if state != FAST_TYPING {
-		t.Errorf("before timeout: state = %v, want FAST_TYPING", state)
+	if state != FastTyping {
+		t.Errorf("before timeout: state = %v, want FastTyping", state)
 	}
 	if req {
 		t.Error("before timeout: shouldRequest = true, want false")
@@ -300,8 +300,8 @@ func TestReset(t *testing.T) {
 	// Get to some non-IDLE state
 	m.OnKeystroke(1000)
 	m.OnKeystroke(1050)
-	if m.State() != FAST_TYPING {
-		t.Fatalf("setup: state = %v, want FAST_TYPING", m.State())
+	if m.State() != FastTyping {
+		t.Fatalf("setup: state = %v, want FastTyping", m.State())
 	}
 
 	m.Reset()
@@ -330,10 +330,10 @@ func TestCustomConfig(t *testing.T) {
 	// IDLE -> TYPING
 	m.OnKeystroke(1000)
 
-	// With custom threshold of 50ms: delta 40ms should be FAST_TYPING
+	// With custom threshold of 50ms: delta 40ms should be FastTyping
 	state, _ := m.OnKeystroke(1040)
-	if state != FAST_TYPING {
-		t.Errorf("state = %v, want FAST_TYPING (custom 50ms threshold)", state)
+	if state != FastTyping {
+		t.Errorf("state = %v, want FastTyping (custom 50ms threshold)", state)
 	}
 
 	// With custom pause of 200ms: delta 250ms should be PAUSED
@@ -366,8 +366,8 @@ func TestFastTypingSuppression(t *testing.T) {
 		if shouldRequest {
 			t.Errorf("keystroke %d: shouldRequest = true, want false during fast typing", i)
 		}
-		if i > 0 && state != FAST_TYPING {
-			t.Errorf("keystroke %d: state = %v, want FAST_TYPING", i, state)
+		if i > 0 && state != FastTyping {
+			t.Errorf("keystroke %d: state = %v, want FastTyping", i, state)
 		}
 	}
 }
@@ -377,8 +377,8 @@ func TestPauseTriggersSuggestion(t *testing.T) {
 
 	// Type fast, then pause
 	m.OnKeystroke(1000)
-	m.OnKeystroke(1050) // FAST_TYPING
-	m.OnKeystroke(1100) // Still FAST_TYPING
+	m.OnKeystroke(1050) // FastTyping
+	m.OnKeystroke(1100) // Still FastTyping
 
 	// Pause for 400ms
 	state, shouldRequest := m.OnKeystroke(1500)
@@ -393,7 +393,7 @@ func TestPauseTriggersSuggestion(t *testing.T) {
 func TestHintFastTyping(t *testing.T) {
 	m := NewMachine(DefaultConfig())
 
-	// Get to FAST_TYPING
+	// Get to FastTyping
 	m.OnKeystroke(1000)
 	m.OnKeystroke(1050)
 
@@ -551,12 +551,12 @@ func TestBoundaryValues(t *testing.T) {
 		t.Error("delta=301ms: shouldRequest = false, want true")
 	}
 
-	// Just below fast threshold (delta == 99ms): FAST_TYPING
+	// Just below fast threshold (delta == 99ms): FastTyping
 	m.Reset()
 	m.OnKeystroke(1000)
 	state, _ = m.OnKeystroke(1099)
-	if state != FAST_TYPING {
-		t.Errorf("delta=99ms: state = %v, want FAST_TYPING", state)
+	if state != FastTyping {
+		t.Errorf("delta=99ms: state = %v, want FastTyping", state)
 	}
 }
 
@@ -593,8 +593,8 @@ func TestMultiplePauseCycles(t *testing.T) {
 	m.OnKeystroke(1600) // PAUSED -> TYPING
 
 	// Cycle 2: type fast, then pause
-	m.OnKeystroke(1650)              // TYPING -> FAST_TYPING
-	state, req = m.OnKeystroke(2050) // FAST_TYPING -> PAUSED
+	m.OnKeystroke(1650)              // TYPING -> FastTyping
+	state, req = m.OnKeystroke(2050) // FastTyping -> PAUSED
 	if state != PAUSED || !req {
 		t.Fatalf("cycle 2 pause: state=%v req=%v", state, req)
 	}

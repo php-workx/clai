@@ -78,20 +78,20 @@ const (
 // ShellSession wraps go-expect for interactive shell testing.
 type ShellSession struct {
 	Console *expect.Console
+	cmd     *exec.Cmd
 	Shell   string
 	Timeout time.Duration
-	cmd     *exec.Cmd
 }
 
 // SessionOption configures a ShellSession.
 type SessionOption func(*sessionConfig)
 
 type sessionConfig struct {
-	timeout    time.Duration
-	env        []string
-	showOutput bool
 	rcFile     string
-	claiInit   bool // Use eval "$(clai init <shell>)" instead of sourcing RC file
+	env        []string
+	timeout    time.Duration
+	showOutput bool
+	claiInit   bool
 }
 
 // WithTimeout sets the default timeout for expect operations.
@@ -289,17 +289,15 @@ func (s *ShellSession) Close() error {
 	s.SendLine("exit")
 
 	// Close the console (this closes the pty)
-	if err := s.Console.Close(); err != nil {
-		return err
-	}
+	closeErr := s.Console.Close()
 
-	// Wait for the process to exit
+	// Always clean up the process, even if console close failed
 	if s.cmd != nil && s.cmd.Process != nil {
 		s.cmd.Process.Kill()
 		s.cmd.Wait()
 	}
 
-	return nil
+	return closeErr
 }
 
 // WaitForPrompt waits for a shell prompt to appear.

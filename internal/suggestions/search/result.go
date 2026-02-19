@@ -16,15 +16,15 @@ const (
 
 // SearchResult represents a single search result from any search backend.
 type SearchResult struct {
-	ID          int64    // Command event ID
-	CmdRaw      string   // Raw command
-	CmdNorm     string   // Normalized command (may be empty for event-based results)
-	RepoKey     string   // Repository key (may be empty)
-	Cwd         string   // Working directory
-	Timestamp   int64    // Event timestamp (ms)
-	Score       float64  // BM25 or relevance score
-	Tags        []string // All tags for this command's template
-	MatchedTags []string // Tags that matched the query
-	Backend     Backend  // Which search backend produced this result
-	TemplateID  string   // Template ID (for deduplication in auto mode)
+	CmdRaw      string
+	CmdNorm     string
+	RepoKey     string
+	Cwd         string
+	Backend     Backend
+	TemplateID  string
+	Tags        []string
+	MatchedTags []string
+	ID          int64
+	Timestamp   int64
+	Score       float64
 }

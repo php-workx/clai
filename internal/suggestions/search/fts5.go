@@ -58,17 +58,17 @@ type Service struct {
 	db     *sql.DB
 	logger *slog.Logger
 
-	// FTS5 availability
-	fts5Available bool
-
-	// Fallback mode (LIKE-based search)
-	fallbackEnabled bool
-
 	// Prepared statements
 	searchStmt   *sql.Stmt
 	insertStmt   *sql.Stmt
 	deleteStmt   *sql.Stmt
 	fallbackStmt *sql.Stmt
+
+	// FTS5 availability
+	fts5Available bool
+
+	// Fallback mode (LIKE-based search)
+	fallbackEnabled bool
 }
 
 // Config configures the search service.
@@ -381,7 +381,7 @@ func (s *Service) IndexEventBatch(ctx context.Context, eventIDs []int64) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback on deferred path
 
 	stmt := tx.StmtContext(ctx, s.insertStmt)
 	for _, id := range eventIDs {

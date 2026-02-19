@@ -218,7 +218,7 @@ func TestSeed_TemplateDedup(t *testing.T) {
 	sqlDB := newTestDB(t)
 	ctx := context.Background()
 
-	entries := makeEntries(50, func(i int) string {
+	entries := makeEntries(50, func(_ int) string {
 		return "ls"
 	})
 
@@ -275,7 +275,7 @@ func TestSeed_IdempotentReplace(t *testing.T) {
 	sqlDB := newTestDB(t)
 	ctx := context.Background()
 
-	entries := makeEntries(5, func(i int) string {
+	entries := makeEntries(5, func(_ int) string {
 		return "git status"
 	})
 

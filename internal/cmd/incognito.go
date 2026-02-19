@@ -47,7 +47,7 @@ func init() {
 	rootCmd.AddCommand(incognitoCmd)
 }
 
-func runIncognito(cmd *cobra.Command, args []string) error {
+func runIncognito(_ *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		// Show status when no args
 		return showIncognitoStatus()

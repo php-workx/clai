@@ -18,10 +18,10 @@ import (
 // --- Mock provider ---
 
 type mockProvider struct {
-	items []Item
-	atEnd bool
 	err   error
-	delay time.Duration // Optional delay to simulate slow fetch
+	items []Item
+	delay time.Duration
+	atEnd bool
 }
 
 func (p *mockProvider) Fetch(ctx context.Context, req Request) (Response, error) {

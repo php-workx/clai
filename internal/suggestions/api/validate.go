@@ -54,8 +54,8 @@ func (e *ValidationError) Error() string {
 	return fmt.Sprintf("E_INVALID_ARGUMENT: %s: %s", e.Field, e.Message)
 }
 
-// ToApiError converts a ValidationError to the proto ApiError message.
-func (e *ValidationError) ToApiError() *pb.ApiError {
+// ToAPIError converts a ValidationError to the proto ApiError message.
+func (e *ValidationError) ToAPIError() *pb.ApiError {
 	return &pb.ApiError{
 		Code:      "E_INVALID_ARGUMENT",
 		Message:   fmt.Sprintf("%s: %s", e.Field, e.Message),
@@ -197,14 +197,15 @@ func ValidateSuggestRequest(req *pb.SuggestRequest) *ValidationResult {
 	}
 
 	// max_results (limit): optional, range [1, 50], default 10
-	if req.MaxResults == 0 {
+	switch {
+	case req.MaxResults == 0:
 		// Apply default - this is a clamp, not an error
 		req.MaxResults = int32(DefaultLimit)
 		result.addWarning("max_results", "not set; defaulting to 10")
-	} else if req.MaxResults < int32(MinLimit) {
+	case req.MaxResults < int32(MinLimit):
 		result.addWarning("max_results", fmt.Sprintf("below minimum %d, got %d; clamping to %d", MinLimit, req.MaxResults, MinLimit))
 		req.MaxResults = int32(MinLimit)
-	} else if req.MaxResults > int32(MaxLimit) {
+	case req.MaxResults > int32(MaxLimit):
 		result.addWarning("max_results", fmt.Sprintf("exceeds maximum %d, got %d; clamping to %d", MaxLimit, req.MaxResults, MaxLimit))
 		req.MaxResults = int32(MaxLimit)
 	}
@@ -213,9 +214,9 @@ func ValidateSuggestRequest(req *pb.SuggestRequest) *ValidationResult {
 	if req.CursorPos < 0 {
 		result.addWarning("cursor_pos", fmt.Sprintf("must be non-negative, got %d; clamping to 0", req.CursorPos))
 		req.CursorPos = 0
-	} else if req.Buffer != "" && int(req.CursorPos) > len(req.Buffer) {
+	} else if req.Buffer != "" && int(req.CursorPos) > len(req.Buffer) { //nolint:gosec // cursor pos bounded by buffer length
 		result.addWarning("cursor_pos", fmt.Sprintf("exceeds buffer length %d, got %d; clamping", len(req.Buffer), req.CursorPos))
-		req.CursorPos = int32(len(req.Buffer))
+		req.CursorPos = int32(len(req.Buffer)) //nolint:gosec // buffer length bounded by MaxCommandLen (10KB)
 	}
 
 	// repo_key: optional, max 512 chars

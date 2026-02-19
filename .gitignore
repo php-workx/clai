@@ -25,3 +25,4 @@ coverage.html
 
 # Auto Claude data directory
 .auto-claude/
+/tests/integration/.agents/

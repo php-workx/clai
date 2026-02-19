@@ -14,8 +14,8 @@ const DefaultRingCapacity = 16
 // RingBuffer is a fixed-capacity, thread-safe circular buffer.
 // When the buffer is full, the oldest item is silently dropped (overwritten).
 type RingBuffer[T any] struct {
-	mu    sync.Mutex
 	items []T
+	mu    sync.Mutex
 	head  int // index of oldest item
 	count int // number of items currently stored
 	cap   int // maximum capacity

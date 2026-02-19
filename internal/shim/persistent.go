@@ -94,13 +94,12 @@ func DefaultDialFunc(version string) DialFunc {
 
 // Runner manages the persistent NDJSON stdin loop with a single gRPC connection.
 type Runner struct {
-	dial    DialFunc
-	buf     *RingBuffer[*ShimEvent]
-	version string
-
-	mu         sync.Mutex
 	dispatcher Dispatcher
-	oneshot    bool // true if persistent connection has failed and we're in oneshot mode
+	dial       DialFunc
+	buf        *RingBuffer[*ShimEvent]
+	version    string
+	mu         sync.Mutex
+	oneshot    bool
 }
 
 // NewRunner creates a new persistent mode Runner.

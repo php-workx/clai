@@ -42,8 +42,8 @@ const (
 // WorkflowExitError is an error that carries a specific exit code.
 // cobra.RunE returns this so the caller can set the process exit code.
 type WorkflowExitError struct {
-	Code    int
 	Message string
+	Code    int
 }
 
 func (e *WorkflowExitError) Error() string {
@@ -85,18 +85,18 @@ func init() {
 // workflowRunContext holds all state for a workflow run, reducing the parameter
 // count across helper functions and lowering complexity of the main orchestrator.
 type workflowRunContext struct {
-	runID          string
-	workflowHash   string
-	normalizedPath string
-	workDir        string
 	ctx            context.Context
+	handler        workflow.InteractionHandler
 	def            *workflow.WorkflowDef
 	display        *workflow.Display
 	artifact       *workflow.RunArtifact
 	transport      *workflow.AnalysisTransport
-	handler        workflow.InteractionHandler
+	runID          string
+	workflowHash   string
+	normalizedPath string
+	workDir        string
 	noDaemon       bool
-	humanRejected  bool // set by step callback when analysis leads to rejection
+	humanRejected  bool
 }
 
 func runWorkflow(cmd *cobra.Command, args []string) error {
@@ -107,8 +107,8 @@ func runWorkflow(cmd *cobra.Command, args []string) error {
 	}
 
 	// Phase 1b: Check required external tools.
-	if err := checkRequires(def.Requires); err != nil {
-		return err
+	if reqErr := checkRequires(def.Requires); reqErr != nil {
+		return reqErr
 	}
 
 	// Phase 2: Setup run context.
@@ -214,12 +214,12 @@ func setupRunContext(cmd *cobra.Command, def *workflow.WorkflowDef, data []byte,
 
 // jobExecutionResult holds the outcome of executing a job.
 type jobExecutionResult struct {
-	allStepResults []*workflow.StepResult
 	overallStatus  string
+	allStepResults []*workflow.StepResult
+	totalDuration  time.Duration
 	humanRejected  bool
 	validationErr  bool
 	cancelled      bool
-	totalDuration  time.Duration
 }
 
 // executeJob runs all matrix combinations for the workflow's single v0 job.
@@ -516,7 +516,7 @@ func readWorkflowBytes(path string) ([]byte, error) {
 	if path == "-" {
 		data, err = io.ReadAll(os.Stdin)
 	} else {
-		data, err = os.ReadFile(path)
+		data, err = os.ReadFile(path) //nolint:gosec // G304: path is a CLI arg for workflow file
 	}
 	if err != nil {
 		return nil, fmt.Errorf("reading workflow file: %w", err)
@@ -748,7 +748,7 @@ func notifyDaemonStepUpdate(ctx context.Context, runID string, sr *workflow.Step
 		MatrixKey:   matrixKey,
 		Status:      sr.Status,
 		Command:     sr.Command,
-		ExitCode:    int32(sr.ExitCode),
+		ExitCode:    int32(sr.ExitCode), //nolint:gosec // G115: exit code is always 0-255
 		DurationMs:  sr.DurationMs,
 		StdoutTail:  sr.StdoutTail,
 		StderrTail:  sr.StderrTail,

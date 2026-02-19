@@ -1,3 +1,4 @@
+// Package workflow implements YAML-driven workflow execution with LLM analysis.
 package workflow
 
 import (
@@ -12,9 +13,9 @@ const DefaultMaxBytes = 100 * 1024
 
 // AnalysisResult holds the parsed LLM analysis.
 type AnalysisResult struct {
-	Decision  string            `json:"decision"` // "proceed", "halt", "needs_human", "error"
-	Reasoning string            `json:"reasoning"`
 	Flags     map[string]string `json:"flags,omitempty"`
+	Decision  string            `json:"decision"`
+	Reasoning string            `json:"reasoning"`
 }
 
 // Analyzer builds prompts, queries LLM, and parses responses.
@@ -36,11 +37,12 @@ func (a *Analyzer) BuildAnalysisContext(stdout, stderr string, maxBytes int) str
 	}
 
 	var combined string
-	if stderr == "" {
+	switch {
+	case stderr == "":
 		combined = stdout
-	} else if stdout == "" {
+	case stdout == "":
 		combined = stderr
-	} else {
+	default:
 		combined = stdout + "\n" + stderr
 	}
 

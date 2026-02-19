@@ -459,8 +459,8 @@ func TestReadHeldPID(t *testing.T) {
 		if err != nil {
 			t.Fatalf("StdoutPipe() error = %v", err)
 		}
-		if err := cmd.Start(); err != nil {
-			t.Fatalf("Start() error = %v", err)
+		if startErr := cmd.Start(); startErr != nil {
+			t.Fatalf("Start() error = %v", startErr)
 		}
 		t.Cleanup(func() {
 			_ = cmd.Process.Kill()

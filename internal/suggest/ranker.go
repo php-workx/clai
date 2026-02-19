@@ -25,18 +25,16 @@ type RankRequest struct {
 
 // Suggestion represents a ranked command suggestion.
 type Suggestion struct {
-	Text        string  // The suggested command
-	Description string  // Optional description
-	Source      string  // "session", "cwd", "global", "ai"
-	Score       float64 // Ranking score (0.0 to 1.0)
-	Risk        string  // "safe", "destructive", or empty
-
-	// Enrichment fields for explainability/UX.
+	Text           string
+	Description    string
+	Source         string
+	Risk           string
 	CmdNorm        string
+	Reasons        []Reason
+	Score          float64
 	LastSeenUnixMs int64
 	SuccessCount   int
 	FailureCount   int
-	Reasons        []Reason // weighted scoring reasons (type + contribution)
 }
 
 // Reason describes a single "why" component for a suggestion score.
@@ -70,8 +68,8 @@ const (
 
 // candidate represents an aggregated command candidate for ranking.
 type candidate struct {
-	cmd          storage.Command
 	source       Source
+	cmd          storage.Command
 	successCount int
 	failureCount int
 	latestTime   int64
@@ -123,9 +121,9 @@ func aggregateCandidates(results []*QueryResult) map[string]*candidate {
 			key := DeduplicateKey(cmd.CommandNorm)
 			existing, ok := candidates[key]
 			if !ok {
-				candidates[key] = newCandidate(*cmd, result.Source)
+				candidates[key] = newCandidate(cmd, result.Source)
 			} else {
-				updateCandidate(existing, *cmd, result.Source)
+				updateCandidate(existing, cmd, result.Source)
 			}
 		}
 	}
@@ -134,19 +132,19 @@ func aggregateCandidates(results []*QueryResult) map[string]*candidate {
 }
 
 // newCandidate creates a new candidate from a command.
-func newCandidate(cmd storage.Command, source Source) *candidate {
+func newCandidate(cmd *storage.Command, source Source) *candidate {
 	successCount, failureCount := countSuccessFailure(cmd)
 	return &candidate{
-		cmd:          cmd,
+		cmd:          *cmd,
 		source:       source,
 		successCount: successCount,
 		failureCount: failureCount,
-		latestTime:   cmd.TsStartUnixMs,
+		latestTime:   cmd.TSStartUnixMs,
 	}
 }
 
 // countSuccessFailure returns (successCount, failureCount) for a command.
-func countSuccessFailure(cmd storage.Command) (int, int) {
+func countSuccessFailure(cmd *storage.Command) (successCount, failureCount int) {
 	if cmd.IsSuccess == nil || *cmd.IsSuccess {
 		return 1, 0
 	}
@@ -154,16 +152,16 @@ func countSuccessFailure(cmd storage.Command) (int, int) {
 }
 
 // updateCandidate updates an existing candidate with a new command occurrence.
-func updateCandidate(existing *candidate, cmd storage.Command, source Source) {
+func updateCandidate(existing *candidate, cmd *storage.Command, source Source) {
 	if cmd.IsSuccess == nil || *cmd.IsSuccess {
 		existing.successCount++
 	} else {
 		existing.failureCount++
 	}
 
-	if cmd.TsStartUnixMs > existing.latestTime {
-		existing.latestTime = cmd.TsStartUnixMs
-		existing.cmd = cmd
+	if cmd.TSStartUnixMs > existing.latestTime {
+		existing.latestTime = cmd.TSStartUnixMs
+		existing.cmd = *cmd
 	}
 
 	if SourceWeight(source) > SourceWeight(existing.source) {

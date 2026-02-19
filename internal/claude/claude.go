@@ -1,3 +1,4 @@
+// Package claude provides integration with the Claude CLI for AI-powered queries.
 package claude
 
 import (

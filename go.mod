@@ -1,6 +1,6 @@
 module github.com/runger/clai
 
-go 1.24.13
+go 1.26
 
 require (
 	github.com/Netflix/go-expect v0.0.0-20220104043353-73e0943537d2

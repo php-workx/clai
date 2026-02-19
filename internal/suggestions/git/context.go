@@ -22,25 +22,12 @@ const DefaultCacheTTL = 2 * time.Second
 
 // Context represents the git context for a directory.
 type Context struct {
-	// RepoRoot is the canonical path to the git repository root.
-	RepoRoot string `json:"repo_root,omitempty"`
-
-	// RemoteURL is the URL of the origin remote (if any).
+	RepoRoot  string `json:"repo_root,omitempty"`
 	RemoteURL string `json:"remote_url,omitempty"`
-
-	// Branch is the current branch name.
-	Branch string `json:"branch,omitempty"`
-
-	// Dirty is true if the working tree has uncommitted changes.
-	Dirty bool `json:"dirty,omitempty"`
-
-	// RepoKey is the SHA256 hash identifying this repository.
-	// Computed as: SHA256(lower(remote_url) + "|" + canonical(repo_root))
-	// Or if no remote: SHA256("local|" + canonical(repo_root))
-	RepoKey string `json:"repo_key,omitempty"`
-
-	// IsRepo is true if the directory is inside a git repository.
-	IsRepo bool `json:"is_repo"`
+	Branch    string `json:"branch,omitempty"`
+	RepoKey   string `json:"repo_key,omitempty"`
+	Dirty     bool   `json:"dirty,omitempty"`
+	IsRepo    bool   `json:"is_repo"`
 }
 
 // cacheEntry stores a cached git context with expiration.
@@ -52,10 +39,10 @@ type cacheEntry struct {
 // ContextCache provides caching for git context lookups.
 // It's safe for concurrent use.
 type ContextCache struct {
-	mu      sync.RWMutex
-	cache   map[string]*cacheEntry // keyed by cwd
+	cache   map[string]*cacheEntry
+	nowFunc func() time.Time
 	ttl     time.Duration
-	nowFunc func() time.Time // for testing
+	mu      sync.RWMutex
 }
 
 // NewContextCache creates a new git context cache with the given TTL.
@@ -190,7 +177,7 @@ func gitRevParse(cwd string, args ...string) (string, error) {
 }
 
 // gitConfig runs `git config` to get a config value.
-func gitConfig(cwd string, key string) (string, error) {
+func gitConfig(cwd, key string) (string, error) {
 	return runGitCommand(cwd, "config", "--get", key)
 }
 

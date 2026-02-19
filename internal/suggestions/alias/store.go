@@ -23,12 +23,12 @@ func (s *Store) SaveAliases(ctx context.Context, sessionID string, aliases Alias
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback() //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck // best-effort rollback on error
 
 	// Delete existing aliases for this session
-	if _, err := tx.ExecContext(ctx,
-		`DELETE FROM session_alias WHERE session_id = ?`, sessionID); err != nil {
-		return fmt.Errorf("delete old aliases: %w", err)
+	if _, execErr := tx.ExecContext(ctx,
+		`DELETE FROM session_alias WHERE session_id = ?`, sessionID); execErr != nil {
+		return fmt.Errorf("delete old aliases: %w", execErr)
 	}
 
 	// Insert new aliases

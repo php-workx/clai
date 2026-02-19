@@ -482,7 +482,7 @@ func TestOpen_ReadOnly(t *testing.T) {
 	db.Close()
 
 	// Open in read-only mode
-	roDb, err := Open(context.Background(), Options{
+	roDB, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		ReadOnly: true,
 		UseV1:    true,
@@ -490,10 +490,10 @@ func TestOpen_ReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadOnly Open() error = %v", err)
 	}
-	defer roDb.Close()
+	defer roDB.Close()
 
 	// Should be able to read
-	version, err := roDb.Version(context.Background())
+	version, err := roDB.Version(context.Background())
 	if err != nil {
 		t.Errorf("Version() error = %v", err)
 	}
@@ -502,7 +502,7 @@ func TestOpen_ReadOnly(t *testing.T) {
 	}
 
 	// Write should fail
-	_, err = roDb.ExecContext(context.Background(), `
+	_, err = roDB.ExecContext(context.Background(), `
 		INSERT INTO session (id, created_at, shell) VALUES ('test', 1000, 'zsh')
 	`)
 	if err == nil {
@@ -1604,21 +1604,21 @@ func TestV2_SeparateFromV1(t *testing.T) {
 	defer v2DB.Close()
 
 	// Both should exist as separate files
-	if _, err := os.Stat(v1Path); os.IsNotExist(err) {
+	if _, statErr := os.Stat(v1Path); os.IsNotExist(statErr) {
 		t.Error("V1 database file does not exist")
 	}
-	if _, err := os.Stat(v2Path); os.IsNotExist(err) {
+	if _, statErr := os.Stat(v2Path); os.IsNotExist(statErr) {
 		t.Error("V2 database file does not exist")
 	}
 
 	// V1 should have V1 tables
-	if err := v1DB.Validate(context.Background()); err != nil {
-		t.Errorf("V1 Validate() error = %v", err)
+	if valErr := v1DB.Validate(context.Background()); valErr != nil {
+		t.Errorf("V1 Validate() error = %v", valErr)
 	}
 
 	// V2 should have V2 tables
-	if err := v2DB.ValidateV2(context.Background()); err != nil {
-		t.Errorf("V2 ValidateV2() error = %v", err)
+	if valErr := v2DB.ValidateV2(context.Background()); valErr != nil {
+		t.Errorf("V2 ValidateV2() error = %v", valErr)
 	}
 
 	// V1 should NOT have V2-only tables

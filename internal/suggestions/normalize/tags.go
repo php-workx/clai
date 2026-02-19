@@ -235,16 +235,16 @@ func addTags(tagSet map[string]bool, tags []string) {
 
 // extractCommandAndSub extracts the command name and optional subcommand
 // from a normalized segment string.
-func extractCommandAndSub(seg string) (string, string) {
+func extractCommandAndSub(seg string) (cmd, sub string) {
 	seg = multiSpacePattern.ReplaceAllString(strings.TrimSpace(seg), " ")
 	tokens := strings.Fields(seg)
 	if len(tokens) == 0 {
 		return "", ""
 	}
 
-	cmd := strings.ToLower(tokens[0])
+	cmd = strings.ToLower(tokens[0])
 
-	sub := ""
+	sub = ""
 	if len(tokens) > 1 && !strings.HasPrefix(tokens[1], "-") {
 		sub = strings.ToLower(tokens[1])
 	}

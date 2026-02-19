@@ -92,14 +92,14 @@ func parseCommandTokens(cmdRaw string) []string {
 }
 
 type normalizeState struct {
+	rule     CommandRule
 	n        *Normalizer
 	tokens   []string
-	rule     CommandRule
-	hasRule  bool
-	i        int
-	argIndex int
 	result   []string
 	slots    []SlotValue
+	i        int
+	argIndex int
+	hasRule  bool
 }
 
 func (n *Normalizer) newNormalizeState(tokens []string) *normalizeState {
@@ -205,9 +205,9 @@ func (s *normalizeState) addSlot(slotType, value string) {
 
 // SlotValue represents an extracted slot value from a command.
 type SlotValue struct {
-	Index int    // Position in the list of slots
-	Type  string // Slot type (e.g., "<path>", "<sha>")
-	Value string // Original value from the command
+	Type  string
+	Value string
+	Index int
 }
 
 // isSlotPlaceholder returns true if the token is already a normalized slot

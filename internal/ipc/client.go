@@ -152,7 +152,7 @@ func (c *Client) LogEnd(sessionID, commandID string, exitCode int, durationMs in
 		SessionId:  sessionID,
 		CommandId:  commandID,
 		TsUnixMs:   time.Now().UnixMilli(),
-		ExitCode:   int32(exitCode),
+		ExitCode:   int32(exitCode), //nolint:gosec // G115: exit codes are bounded 0-255
 		DurationMs: durationMs,
 	}
 
@@ -177,9 +177,9 @@ func (c *Client) Suggest(ctx context.Context, sessionID, cwd, buffer string, cur
 		SessionId:  sessionID,
 		Cwd:        cwd,
 		Buffer:     buffer,
-		CursorPos:  int32(cursorPos),
+		CursorPos:  int32(cursorPos), //nolint:gosec // G115: cursor pos is bounded by terminal width
 		IncludeAi:  includeAI,
-		MaxResults: int32(maxResults),
+		MaxResults: int32(maxResults), //nolint:gosec // G115: max results is a small positive integer
 	}
 
 	resp, err := c.client.Suggest(ctx, req)
@@ -273,9 +273,9 @@ func (c *Client) GetStatus() (*pb.StatusResponse, error) {
 
 // ImportHistoryResponse contains the result of an import operation.
 type ImportHistoryResponse struct {
+	Error         string
 	ImportedCount int
 	Skipped       bool
-	Error         string
 }
 
 // ImportHistory imports shell history into the daemon's database.

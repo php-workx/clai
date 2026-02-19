@@ -7,7 +7,7 @@
 // States:
 //   - IDLE: No typing activity. Suggestions can be requested immediately.
 //   - TYPING: User has started typing. Short debounce window.
-//   - FAST_TYPING: Rapid keystrokes detected (inter-keystroke < FastThresholdMs).
+//   - FastTyping: Rapid keystrokes detected (inter-keystroke < FastThresholdMs).
 //     Suggestions are suppressed.
 //   - PAUSED: User paused after typing (inter-keystroke > PauseThresholdMs).
 //     Suggestions should be requested.
@@ -23,8 +23,8 @@ const (
 	IDLE State = iota
 	// TYPING means the user has started typing. Short debounce window.
 	TYPING
-	// FAST_TYPING means rapid keystrokes detected. Suppress suggestions.
-	FAST_TYPING
+	// FastTyping means rapid keystrokes detected. Suppress suggestions.
+	FastTyping
 	// PAUSED means the user paused after typing. Request suggestion.
 	PAUSED
 )
@@ -36,7 +36,7 @@ func (s State) String() string {
 		return "IDLE"
 	case TYPING:
 		return "TYPING"
-	case FAST_TYPING:
+	case FastTyping:
 		return "FAST_TYPING"
 	case PAUSED:
 		return "PAUSED"
@@ -49,7 +49,7 @@ func (s State) String() string {
 type Config struct {
 	// FastThresholdMs is the maximum inter-keystroke interval in milliseconds
 	// to be classified as fast typing. Keystrokes arriving faster than this
-	// threshold transition the machine to FAST_TYPING.
+	// threshold transition the machine to FastTyping.
 	// Default: 100ms.
 	FastThresholdMs int64
 
@@ -60,7 +60,7 @@ type Config struct {
 	PauseThresholdMs int64
 
 	// IdleTimeoutMs is the inactivity duration in milliseconds after which the
-	// machine returns to IDLE from FAST_TYPING or PAUSED.
+	// machine returns to IDLE from FastTyping or PAUSED.
 	// Default: 2000ms.
 	IdleTimeoutMs int64
 }
@@ -129,10 +129,10 @@ func NewMachine(config Config) *Machine {
 //
 // Transition rules:
 //   - IDLE -> TYPING: first keystroke, no request (debounce)
-//   - TYPING -> FAST_TYPING: inter-keystroke < FastThresholdMs, suppress request
+//   - TYPING -> FastTyping: inter-keystroke < FastThresholdMs, suppress request
 //   - TYPING -> PAUSED: inter-keystroke > PauseThresholdMs, request
-//   - FAST_TYPING -> FAST_TYPING: still fast, suppress
-//   - FAST_TYPING -> PAUSED: paused after fast, request
+//   - FastTyping -> FastTyping: still fast, suppress
+//   - FastTyping -> PAUSED: paused after fast, request
 //   - PAUSED -> TYPING: resumed typing, no request (debounce)
 func (m *Machine) OnKeystroke(nowMs int64) (State, bool) {
 	m.mu.Lock()
@@ -141,7 +141,7 @@ func (m *Machine) OnKeystroke(nowMs int64) (State, bool) {
 	delta := nowMs - m.lastKeystrokeMs
 	m.lastKeystrokeMs = nowMs
 
-	if m.state != IDLE && m.state != TYPING && m.state != FAST_TYPING && m.state != PAUSED {
+	if m.state != IDLE && m.state != TYPING && m.state != FastTyping && m.state != PAUSED {
 		m.state = IDLE
 		return IDLE, false
 	}
@@ -152,20 +152,20 @@ func (m *Machine) OnKeystroke(nowMs int64) (State, bool) {
 		m.state = TYPING
 		return TYPING, false
 
-	case TYPING, FAST_TYPING:
+	case TYPING, FastTyping:
 		if delta > m.config.PauseThresholdMs {
 			return m.transitionToPaused()
 		}
 		if m.state == TYPING {
 			if delta < m.config.FastThresholdMs {
-				m.state = FAST_TYPING
-				return FAST_TYPING, false
+				m.state = FastTyping
+				return FastTyping, false
 			}
 			// Still in normal typing range — stay in TYPING, no request
 			return TYPING, false
 		}
 		// Still fast typing — suppress
-		return FAST_TYPING, false
+		return FastTyping, false
 	}
 
 	// Defensive fallback for unexpected state transitions.
@@ -215,7 +215,7 @@ func (m *Machine) Reset() {
 // suggestion request.
 //
 // Timing hints by state:
-//   - FAST_TYPING: 500ms wait (longer, to let fast typing settle)
+//   - FastTyping: 500ms wait (longer, to let fast typing settle)
 //   - PAUSED: 150ms wait (normal, responsive)
 //   - IDLE: 0ms (immediate)
 //   - TYPING: 200ms wait (moderate debounce)
@@ -224,7 +224,7 @@ func (m *Machine) Hint() TimingHint {
 	defer m.mu.Unlock()
 
 	switch m.state {
-	case FAST_TYPING:
+	case FastTyping:
 		return TimingHint{
 			UserSpeedClass:            "fast",
 			SuggestedPauseThresholdMs: 500,

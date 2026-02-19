@@ -80,7 +80,7 @@ func EnsureSecureDirectory(dirPath string) error {
 	// Fix permissions if too open
 	perm := info.Mode().Perm()
 	if perm != 0o700 {
-		if err := os.Chmod(dirPath, 0o700); err != nil {
+		if err := os.Chmod(dirPath, 0o700); err != nil { //nolint:gosec // G302: 0700 is appropriate for daemon runtime directory
 			return fmt.Errorf("failed to fix permissions on %s: %w", dirPath, err)
 		}
 	}

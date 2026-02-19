@@ -105,10 +105,10 @@ func makeLayerStats(hits, misses int64) LayerStats {
 // It tracks which context keys have a pending precompute so we don't
 // schedule duplicate work.
 type PrecomputeTracker struct {
-	mu        sync.Mutex
 	pending   map[string]struct{}
 	completed atomic.Int64
 	errors    atomic.Int64
+	mu        sync.Mutex
 }
 
 // NewPrecomputeTracker creates a new precompute tracker.

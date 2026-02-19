@@ -42,33 +42,24 @@ type Command struct {
 	// CmdRaw is the raw command string. If empty, CmdNorm is used.
 	CmdRaw string
 
-	// ExitCode is the exit status of the command.
-	ExitCode int
+	// CWD is the current working directory when the command was executed.
+	CWD string
 
 	// TimestampMs is the command timestamp in milliseconds.
 	TimestampMs int64
 
-	// CWD is the current working directory when the command was executed.
-	CWD string
+	// ExitCode is the exit status of the command.
+	ExitCode int
 }
 
 // ExpectedTopK defines the expected top-k suggestions after a specific command.
 type ExpectedTopK struct {
-	// AfterCommand is the index into the session's Commands slice.
+	TopK         []string
 	AfterCommand int
-
-	// TopK is the expected suggestion order (cmd_norm values).
-	TopK []string
 }
 
 // DiffResult captures the difference between expected and actual top-k at one step.
 type DiffResult struct {
-	// StepIndex is the index into ExpectedTopK that this diff corresponds to.
-	StepIndex int
-
-	// AfterCommand is the command index this expectation was checked after.
-	AfterCommand int
-
 	// Expected is the expected top-k list.
 	Expected []string
 
@@ -77,13 +68,16 @@ type DiffResult struct {
 
 	// Mismatches lists the specific differences found.
 	Mismatches []Mismatch
+
+	// StepIndex is the index into ExpectedTopK that this diff corresponds to.
+	StepIndex int
+
+	// AfterCommand is the command index this expectation was checked after.
+	AfterCommand int
 }
 
 // Mismatch describes a single difference between expected and actual top-k.
 type Mismatch struct {
-	// Position is the index in the top-k list where the mismatch occurs.
-	Position int
-
 	// Expected is what was expected at this position (empty for "extra" type).
 	Expected string
 
@@ -92,18 +86,13 @@ type Mismatch struct {
 
 	// Type classifies the mismatch: "missing", "extra", or "reordered".
 	Type string
+
+	// Position is the index in the top-k list where the mismatch occurs.
+	Position int
 }
 
 // RunnerConfig configures the replay runner.
 type RunnerConfig struct {
-	// BaseTimestampMs is the starting timestamp for the deterministic clock.
-	// Default: 1000.
-	BaseTimestampMs int64
-
-	// TimestampIncrementMs is the fixed increment per command for the deterministic clock.
-	// Default: 1000.
-	TimestampIncrementMs int64
-
 	// SessionID is the fixed session ID used during replay.
 	// Default: "replay-session".
 	SessionID string
@@ -115,6 +104,14 @@ type RunnerConfig struct {
 	// CWD is the default working directory used during replay.
 	// Default: "/replay/workdir".
 	CWD string
+
+	// BaseTimestampMs is the starting timestamp for the deterministic clock.
+	// Default: 1000.
+	BaseTimestampMs int64
+
+	// TimestampIncrementMs is the fixed increment per command for the deterministic clock.
+	// Default: 1000.
+	TimestampIncrementMs int64
 
 	// TopK is the number of suggestions to request.
 	// Default: suggest.DefaultTopK (3).
@@ -221,11 +218,11 @@ func (r *Runner) setupReplayRuntime(ctx context.Context, tmpDir string, session 
 	}
 	cleanup := func() { d.Close() }
 	sqlDB := d.DB()
-	if err := createScorerTables(ctx, sqlDB); err != nil {
+	if err = createScorerTables(ctx, sqlDB); err != nil {
 		cleanup()
 		return nil, nil, fmt.Errorf("create scorer tables: %w", err)
 	}
-	if err := insertReplaySession(ctx, sqlDB, r.cfg.SessionID, r.cfg.BaseTimestampMs); err != nil {
+	if err = insertReplaySession(ctx, sqlDB, r.cfg.SessionID, r.cfg.BaseTimestampMs); err != nil {
 		cleanup()
 		return nil, nil, err
 	}
@@ -240,11 +237,11 @@ func (r *Runner) setupReplayRuntime(ctx context.Context, tmpDir string, session 
 		cleanup()
 		return nil, nil, fmt.Errorf("create transition store: %w", err)
 	}
-	scorer, err := suggest.NewScorer(suggest.ScorerDependencies{
+	scorer, err := suggest.NewScorer(&suggest.ScorerDependencies{
 		DB:              sqlDB,
 		FreqStore:       freqStore,
 		TransitionStore: transStore,
-	}, suggest.ScorerConfig{
+	}, &suggest.ScorerConfig{
 		Weights:    suggest.DefaultWeights(),
 		Amplifiers: suggest.DefaultAmplifierConfig(),
 		TopK:       r.cfg.TopK,
@@ -298,7 +295,7 @@ func (r *Runner) replayCommandStep(
 	tsMs := r.resolveReplayTimestamp(cmdIdx, cmd)
 	cwd := r.resolveReplayCWD(cmd)
 	cmdRaw := resolveReplayCmdRaw(cmd)
-	preNorm, err := r.ingestReplayCommand(ctx, runtime, replayIngestInput{
+	preNorm, err := r.ingestReplayCommand(ctx, runtime, &replayIngestInput{
 		session:        session,
 		cmdIdx:         cmdIdx,
 		cmd:            cmd,
@@ -339,24 +336,24 @@ func resolveReplayCmdRaw(cmd Command) string {
 }
 
 type replayIngestInput struct {
-	session        Session
-	cmdIdx         int
-	cmd            Command
 	prevTemplateID string
-	tsMs           int64
 	cwd            string
 	cmdRaw         string
+	session        Session
+	cmd            Command
+	tsMs           int64
+	cmdIdx         int
 }
 
 func (r *Runner) ingestReplayCommand(
 	ctx context.Context,
 	runtime *replayRuntime,
-	input replayIngestInput,
+	input *replayIngestInput,
 ) (normalize.PreNormResult, error) {
 	ev := &event.CommandEvent{
 		Version:   event.EventVersion,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        input.tsMs,
+		TS:        input.tsMs,
 		SessionID: r.cfg.SessionID,
 		Shell:     event.ShellZsh,
 		Cwd:       input.cwd,
@@ -365,7 +362,7 @@ func (r *Runner) ingestReplayCommand(
 	}
 	prevExitCode, prevFailed := previousReplayStatus(input.session.Commands, input.cmdIdx)
 	wctx := ingest.PrepareWriteContext(ev, r.cfg.RepoKey, "", input.prevTemplateID, prevExitCode, prevFailed, nil)
-	if _, err := ingest.WritePath(ctx, runtime.sqlDB, wctx, ingest.WritePathConfig{}); err != nil {
+	if _, err := ingest.WritePath(ctx, runtime.sqlDB, wctx, &ingest.WritePathConfig{}); err != nil {
 		return normalize.PreNormResult{}, fmt.Errorf("write path for command %d (%q): %w", input.cmdIdx, input.cmd.CmdNorm, err)
 	}
 	preNorm := normalize.PreNormalize(input.cmdRaw, normalize.PreNormConfig{})
@@ -407,7 +404,7 @@ func (r *Runner) evaluateReplayExpectations(
 	if !hasExpectation {
 		return nil, nil
 	}
-	suggestions, err := runtime.scorer.Suggest(ctx, suggest.SuggestContext{
+	suggestions, err := runtime.scorer.Suggest(ctx, &suggest.SuggestContext{
 		SessionID: r.cfg.SessionID,
 		RepoKey:   r.cfg.RepoKey,
 		LastCmd:   lastCmd,

@@ -51,7 +51,7 @@ func initV2Scorer(db *sql.DB, logger *slog.Logger) *suggest2.Scorer {
 		deps.RecoveryEngine = re
 	}
 
-	scorer, err := suggest2.NewScorer(deps, suggest2.DefaultScorerConfig())
+	scorer, err := suggest2.NewScorer(&deps, suggest2.DefaultScorerConfig())
 	if err != nil {
 		logger.Warn("v2 scorer: failed to create scorer", "error", err)
 		return nil

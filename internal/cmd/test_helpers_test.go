@@ -8,12 +8,12 @@ import (
 )
 
 type historyGlobals struct {
-	limit   int
 	cwd     string
 	session string
-	global  bool
 	status  string
 	format  string
+	limit   int
+	global  bool
 }
 
 type suggestGlobals struct {

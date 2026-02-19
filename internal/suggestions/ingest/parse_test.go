@@ -50,7 +50,7 @@ func TestParseEvent_ValidMinimal(t *testing.T) {
 
 	assert.Equal(t, 1, ev.Version)
 	assert.Equal(t, "command_end", ev.Type)
-	assert.Equal(t, int64(1730000000123), ev.Ts)
+	assert.Equal(t, int64(1730000000123), ev.TS)
 	assert.Equal(t, "test-session-123", ev.SessionID)
 	assert.Equal(t, event.ShellZsh, ev.Shell)
 	assert.Equal(t, "/home/user/project", ev.Cwd)
@@ -100,13 +100,13 @@ func TestParseEvent_AllShells(t *testing.T) {
 
 func TestParseEvent_InvalidVersion(t *testing.T) {
 	tests := []struct {
-		name    string
 		version interface{}
+		name    string
 	}{
-		{"version 0", 0},
-		{"version 2", 2},
-		{"version -1", -1},
-		{"version 99", 99},
+		{0, "version 0"},
+		{2, "version 2"},
+		{-1, "version -1"},
+		{99, "version 99"},
 	}
 
 	for _, tt := range tests {
@@ -154,15 +154,15 @@ func TestParseEvent_InvalidShell(t *testing.T) {
 
 func TestParseEvent_MissingRequiredFields(t *testing.T) {
 	tests := []struct {
+		expectedErr error
 		name        string
 		fieldToOmit string
-		expectedErr error
 	}{
-		{"missing type", "type", ErrMissingType},
-		{"missing session_id", "session_id", ErrMissingSessionID},
-		{"missing shell", "shell", ErrMissingShell},
-		{"missing cwd", "cwd", ErrMissingCwd},
-		{"missing cmd_raw", "cmd_raw", ErrMissingCmdRaw},
+		{ErrMissingType, "missing type", "type"},
+		{ErrMissingSessionID, "missing session_id", "session_id"},
+		{ErrMissingShell, "missing shell", "shell"},
+		{ErrMissingCwd, "missing cwd", "cwd"},
+		{ErrMissingCmdRaw, "missing cmd_raw", "cmd_raw"},
 	}
 
 	for _, tt := range tests {
@@ -181,16 +181,16 @@ func TestParseEvent_MissingRequiredFields(t *testing.T) {
 
 func TestParseEvent_EmptyRequiredFields(t *testing.T) {
 	tests := []struct {
-		name        string
-		field       string
 		value       interface{}
 		expectedErr error
+		name        string
+		field       string
 	}{
-		{"empty type", "type", "", ErrMissingType},
-		{"empty session_id", "session_id", "", ErrMissingSessionID},
-		{"empty shell", "shell", "", ErrMissingShell},
-		{"empty cwd", "cwd", "", ErrMissingCwd},
-		{"empty cmd_raw", "cmd_raw", "", ErrMissingCmdRaw},
+		{"", ErrMissingType, "empty type", "type"},
+		{"", ErrMissingSessionID, "empty session_id", "session_id"},
+		{"", ErrMissingShell, "empty shell", "shell"},
+		{"", ErrMissingCwd, "empty cwd", "cwd"},
+		{"", ErrMissingCmdRaw, "empty cmd_raw", "cmd_raw"},
 	}
 
 	for _, tt := range tests {
@@ -401,7 +401,7 @@ func TestValidateEvent_ValidEvent(t *testing.T) {
 	ev := &event.CommandEvent{
 		Version:   1,
 		Type:      event.EventTypeCommandEnd,
-		Ts:        1730000000123,
+		TS:        1730000000123,
 		SessionID: "session-123",
 		Shell:     event.ShellBash,
 		Cwd:       "/home/user",
@@ -448,7 +448,7 @@ func FuzzParseEvent(f *testing.F) {
 			// Ensure required fields are present
 			assert.Equal(t, event.EventVersion, ev.Version)
 			assert.NotEmpty(t, ev.Type)
-			assert.NotZero(t, ev.Ts)
+			assert.NotZero(t, ev.TS)
 			assert.NotEmpty(t, ev.SessionID)
 			assert.NotEmpty(t, ev.Shell)
 			assert.NotEmpty(t, ev.Cwd)
@@ -475,7 +475,9 @@ func FuzzParseEventLine(f *testing.F) {
 
 // Benchmark tests
 func BenchmarkParseEvent(b *testing.B) {
-	data := []byte(`{"v":1,"type":"command_end","ts":1730000000123,"session_id":"bench-session","shell":"zsh","cwd":"/home/user/project","cmd_raw":"git status","exit_code":0,"duration_ms":150,"ephemeral":false}`)
+	data := []byte(`{"v":1,"type":"command_end","ts":1730000000123,` +
+		`"session_id":"bench-session","shell":"zsh","cwd":"/home/user/project",` +
+		`"cmd_raw":"git status","exit_code":0,"duration_ms":150,"ephemeral":false}`)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -488,7 +490,7 @@ func BenchmarkValidateEvent(b *testing.B) {
 	ev := &event.CommandEvent{
 		Version:    1,
 		Type:       event.EventTypeCommandEnd,
-		Ts:         1730000000123,
+		TS:         1730000000123,
 		SessionID:  "bench-session",
 		Shell:      event.ShellZsh,
 		Cwd:        "/home/user/project",

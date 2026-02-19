@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"log/slog"
@@ -14,6 +15,9 @@ import (
 	_ "modernc.org/sqlite" // Pure Go SQLite driver
 )
 
+// ErrDatabaseClosed is returned when an operation is attempted on a closed database.
+var ErrDatabaseClosed = errors.New("database is closed")
+
 const (
 	// walCheckpointInterval is how often we checkpoint the WAL file
 	// to prevent unbounded growth during long-running daemon sessions.
@@ -23,56 +27,27 @@ const (
 // DB is the main database wrapper for the suggestions engine.
 // It manages the SQLite connection, migrations, and lifecycle.
 type DB struct {
+	closeErr  error
 	db        *sql.DB
 	lock      *LockFile
-	dbPath    string
 	stopCh    chan struct{}
 	stoppedCh chan struct{}
+	stmts     map[string]*sql.Stmt
+	dbPath    string
+	stmtMu    sync.RWMutex
 	closeOnce sync.Once
-	closeErr  error
-
-	// Prepared statements (initialized lazily)
-	stmtMu sync.RWMutex
-	stmts  map[string]*sql.Stmt
 }
 
 // Options configures database initialization.
 type Options struct {
-	// Path is the path to the database file.
-	// If empty, defaults to ~/.clai/suggestions_v2.db (V2) or
-	// ~/.clai/suggestions.db (V1, when UseV1 is true).
-	Path string
-
-	// LockTimeout is how long to wait for the daemon lock.
-	// If zero, uses DefaultLockOptions().Timeout
-	LockTimeout time.Duration
-
-	// SkipLock skips acquiring the daemon lock.
-	// This should only be used for testing or read-only access.
-	SkipLock bool
-
-	// ReadOnly opens the database in read-only mode.
-	// No migrations will be run and no lock will be acquired.
-	ReadOnly bool
-
-	// UseV1 opens the V1 database (suggestions.db) instead of V2.
-	// This is for backward compatibility with existing V1 data.
-	UseV1 bool
-
-	// EnableRecovery enables automatic corruption recovery for V2 databases.
-	// When enabled, if corruption is detected during Open, the database files
-	// are rotated to .corrupt.<timestamp> and a fresh database is initialized.
-	// This is only supported for V2 databases (ignored when UseV1 is true).
-	EnableRecovery bool
-
-	// RunIntegrityCheck runs PRAGMA integrity_check after opening the database.
-	// This is only used when EnableRecovery is true; if the integrity check
-	// fails, corruption recovery is triggered.
+	Logger            *slog.Logger
+	Path              string
+	LockTimeout       time.Duration
+	SkipLock          bool
+	ReadOnly          bool
+	UseV1             bool
+	EnableRecovery    bool
 	RunIntegrityCheck bool
-
-	// Logger is the structured logger for recovery events.
-	// If nil, slog.Default() is used for recovery logging.
-	Logger *slog.Logger
 }
 
 // DefaultDBPath returns the default V2 database path (~/.clai/suggestions_v2.db).
@@ -106,8 +81,8 @@ func Open(ctx context.Context, opts Options) (*DB, error) {
 		return nil, err
 	}
 	dbDir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dbDir, 0o755); err != nil {
-		return nil, fmt.Errorf("failed to create database directory: %w", err)
+	if mkdirErr := os.MkdirAll(dbDir, 0o750); mkdirErr != nil {
+		return nil, fmt.Errorf("failed to create database directory: %w", mkdirErr)
 	}
 
 	lock, err := acquireOpenLock(dbDir, opts)
@@ -341,6 +316,10 @@ func (d *DB) walCheckpointLoop() {
 func (d *DB) PrepareStatement(ctx context.Context, name, query string) (*sql.Stmt, error) {
 	// Fast path: check if already prepared
 	d.stmtMu.RLock()
+	if d.stmts == nil {
+		d.stmtMu.RUnlock()
+		return nil, ErrDatabaseClosed
+	}
 	if stmt, ok := d.stmts[name]; ok {
 		d.stmtMu.RUnlock()
 		return stmt, nil
@@ -350,6 +329,10 @@ func (d *DB) PrepareStatement(ctx context.Context, name, query string) (*sql.Stm
 	// Slow path: prepare and cache
 	d.stmtMu.Lock()
 	defer d.stmtMu.Unlock()
+
+	if d.stmts == nil {
+		return nil, ErrDatabaseClosed
+	}
 
 	// Double-check after acquiring write lock
 	if stmt, ok := d.stmts[name]; ok {

@@ -52,8 +52,8 @@ func TestFindDaemonBinaryFromEnv(t *testing.T) {
 	tmpFile.Close()
 
 	// Make temp file executable
-	if err := os.Chmod(tmpFile.Name(), 0o755); err != nil {
-		t.Fatalf("Failed to chmod temp file: %v", err)
+	if chmodErr := os.Chmod(tmpFile.Name(), 0o755); chmodErr != nil {
+		t.Fatalf("Failed to chmod temp file: %v", chmodErr)
 	}
 
 	// Set environment variable
@@ -162,8 +162,8 @@ func TestSpawnAndWaitContextCanceledWhileWaiting(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	daemonPath := filepath.Join(tmpDir, "claid-test")
-	if err := os.WriteFile(daemonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
+	if writeErr := os.WriteFile(daemonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); writeErr != nil {
+		t.Fatalf("WriteFile() error = %v", writeErr)
 	}
 
 	oldSocket := os.Getenv("CLAI_SOCKET")
@@ -202,8 +202,8 @@ func TestSpawnAndWaitContextTimeout(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	daemonPath := filepath.Join(tmpDir, "claid-test")
-	if err := os.WriteFile(daemonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
+	if writeErr := os.WriteFile(daemonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); writeErr != nil {
+		t.Fatalf("WriteFile() error = %v", writeErr)
 	}
 
 	oldSocket := os.Getenv("CLAI_SOCKET")
@@ -262,7 +262,7 @@ func TestRemoveStaleSocketRetriesBeforeDelete(t *testing.T) {
 	}
 
 	removeCalls := 0
-	removeFileFn = func(path string) error {
+	removeFileFn = func(_ string) error {
 		removeCalls++
 		return nil
 	}
@@ -301,7 +301,7 @@ func TestRemoveStaleSocketDeleteError(t *testing.T) {
 	quickDialFn = func() (io.Closer, error) {
 		return nil, errors.New("connection refused")
 	}
-	removeFileFn = func(path string) error {
+	removeFileFn = func(_ string) error {
 		return fmt.Errorf("permission denied")
 	}
 
@@ -340,7 +340,7 @@ func TestRemoveStaleSocketDoesNotDeleteForUnknownDialError(t *testing.T) {
 	}
 
 	removeCalls := 0
-	removeFileFn = func(path string) error {
+	removeFileFn = func(_ string) error {
 		removeCalls++
 		return nil
 	}
@@ -393,8 +393,8 @@ func TestFindDaemonBinaryEnvPathIsAbsolute(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	daemonPath := filepath.Join(tmpDir, "claid")
-	if err := os.WriteFile(daemonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
+	if writeErr := os.WriteFile(daemonPath, []byte("#!/bin/sh\nexit 0\n"), 0o755); writeErr != nil {
+		t.Fatalf("WriteFile() error = %v", writeErr)
 	}
 
 	old := os.Getenv("CLAI_DAEMON_PATH")
@@ -418,8 +418,8 @@ func TestSpawnDaemonWritesPIDFile(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	daemonPath := filepath.Join(tmpDir, "claid-test")
-	if err := os.WriteFile(daemonPath, []byte("#!/bin/sh\nsleep 1\n"), 0o755); err != nil {
-		t.Fatalf("WriteFile() error = %v", err)
+	if writeErr := os.WriteFile(daemonPath, []byte("#!/bin/sh\nsleep 1\n"), 0o755); writeErr != nil {
+		t.Fatalf("WriteFile() error = %v", writeErr)
 	}
 
 	oldDaemonPath := os.Getenv("CLAI_DAEMON_PATH")
@@ -435,8 +435,8 @@ func TestSpawnDaemonWritesPIDFile(t *testing.T) {
 	_ = os.Setenv("XDG_RUNTIME_DIR", tmpDir)
 	_ = os.Setenv("HOME", tmpDir)
 
-	if err := SpawnDaemon(); err != nil {
-		t.Fatalf("SpawnDaemon() error = %v", err)
+	if spawnErr := SpawnDaemon(); spawnErr != nil {
+		t.Fatalf("SpawnDaemon() error = %v", spawnErr)
 	}
 
 	pidData, err := os.ReadFile(PidPath())
@@ -582,7 +582,7 @@ func TestRecoverMissingSocketDaemon(t *testing.T) {
 		quickDialFn = func() (io.Closer, error) { return nil, errors.New("dial failed") }
 
 		killedPID := 0
-		killPIDFn = func(pid int, timeout time.Duration) error {
+		killPIDFn = func(pid int, _ time.Duration) error {
 			killedPID = pid
 			return nil
 		}
@@ -614,7 +614,7 @@ func TestRecoverMissingSocketDaemon(t *testing.T) {
 		quickDialFn = func() (io.Closer, error) { return io.NopCloser(strings.NewReader("")), nil }
 
 		killCalls := 0
-		killPIDFn = func(pid int, timeout time.Duration) error {
+		killPIDFn = func(_ int, _ time.Duration) error {
 			killCalls++
 			return nil
 		}

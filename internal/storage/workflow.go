@@ -56,7 +56,7 @@ func (s *SQLiteStore) CreateWorkflowRun(ctx context.Context, run *WorkflowRun) e
 }
 
 // UpdateWorkflowRun updates a workflow run's status, end time, and duration.
-func (s *SQLiteStore) UpdateWorkflowRun(ctx context.Context, runID string, status string, endedAt int64, durationMs int64) error {
+func (s *SQLiteStore) UpdateWorkflowRun(ctx context.Context, runID, status string, endedAt, durationMs int64) error {
 	if runID == "" {
 		return errors.New(errRunIDRequired)
 	}

@@ -51,11 +51,11 @@ func TestRecordFeedback(t *testing.T) {
 	store := NewStore(db, DefaultConfig(), nil)
 	ctx := context.Background()
 
-	id, err := store.RecordFeedback(ctx, FeedbackRecord{
+	id, err := store.RecordFeedback(ctx, &FeedbackRecord{
 		SessionID:     "sess-1",
 		SuggestedText: "git status",
 		Action:        ActionAccepted,
-		TsMs:          1000,
+		TSMs:          1000,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -75,11 +75,11 @@ func TestRecordFeedback_AllActions(t *testing.T) {
 		ActionNever, ActionUnblock, ActionIgnored, ActionTimeout,
 	}
 	for _, action := range actions {
-		_, err := store.RecordFeedback(ctx, FeedbackRecord{
+		_, err := store.RecordFeedback(ctx, &FeedbackRecord{
 			SessionID:     "sess-1",
 			SuggestedText: "cmd-" + string(action),
 			Action:        action,
-			TsMs:          1000,
+			TSMs:          1000,
 		})
 		if err != nil {
 			t.Errorf("action %q: unexpected error: %v", action, err)
@@ -92,7 +92,7 @@ func TestRecordFeedback_MissingSessionID(t *testing.T) {
 	store := NewStore(db, DefaultConfig(), nil)
 	ctx := context.Background()
 
-	_, err := store.RecordFeedback(ctx, FeedbackRecord{
+	_, err := store.RecordFeedback(ctx, &FeedbackRecord{
 		SuggestedText: "git status",
 		Action:        ActionAccepted,
 	})
@@ -106,7 +106,7 @@ func TestRecordFeedback_MissingSuggestedText(t *testing.T) {
 	store := NewStore(db, DefaultConfig(), nil)
 	ctx := context.Background()
 
-	_, err := store.RecordFeedback(ctx, FeedbackRecord{
+	_, err := store.RecordFeedback(ctx, &FeedbackRecord{
 		SessionID: "sess-1",
 		Action:    ActionAccepted,
 	})
@@ -120,7 +120,7 @@ func TestRecordFeedback_InvalidAction(t *testing.T) {
 	store := NewStore(db, DefaultConfig(), nil)
 	ctx := context.Background()
 
-	_, err := store.RecordFeedback(ctx, FeedbackRecord{
+	_, err := store.RecordFeedback(ctx, &FeedbackRecord{
 		SessionID:     "sess-1",
 		SuggestedText: "git status",
 		Action:        "bogus",
@@ -296,11 +296,11 @@ func TestQueryFeedback(t *testing.T) {
 
 	// Insert some records
 	for i := 0; i < 3; i++ {
-		_, err := store.RecordFeedback(ctx, FeedbackRecord{
+		_, err := store.RecordFeedback(ctx, &FeedbackRecord{
 			SessionID:     "sess-1",
 			SuggestedText: "cmd",
 			Action:        ActionAccepted,
-			TsMs:          int64(1000 + i),
+			TSMs:          int64(1000 + i),
 		})
 		if err != nil {
 			t.Fatalf("insert %d: %v", i, err)
@@ -321,9 +321,15 @@ func TestCountByAction(t *testing.T) {
 	store := NewStore(db, DefaultConfig(), nil)
 	ctx := context.Background()
 
-	store.RecordFeedback(ctx, FeedbackRecord{SessionID: "sess-1", SuggestedText: "a", Action: ActionAccepted, TsMs: 1000})
-	store.RecordFeedback(ctx, FeedbackRecord{SessionID: "sess-1", SuggestedText: "b", Action: ActionAccepted, TsMs: 1001})
-	store.RecordFeedback(ctx, FeedbackRecord{SessionID: "sess-1", SuggestedText: "c", Action: ActionDismissed, TsMs: 1002})
+	if _, err := store.RecordFeedback(ctx, &FeedbackRecord{SessionID: "sess-1", SuggestedText: "a", Action: ActionAccepted, TSMs: 1000}); err != nil {
+		t.Fatalf("RecordFeedback: %v", err)
+	}
+	if _, err := store.RecordFeedback(ctx, &FeedbackRecord{SessionID: "sess-1", SuggestedText: "b", Action: ActionAccepted, TSMs: 1001}); err != nil {
+		t.Fatalf("RecordFeedback: %v", err)
+	}
+	if _, err := store.RecordFeedback(ctx, &FeedbackRecord{SessionID: "sess-1", SuggestedText: "c", Action: ActionDismissed, TSMs: 1002}); err != nil {
+		t.Fatalf("RecordFeedback: %v", err)
+	}
 
 	counts, err := store.CountByAction(ctx, "sess-1")
 	if err != nil {

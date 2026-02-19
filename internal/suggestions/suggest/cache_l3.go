@@ -12,8 +12,8 @@ import (
 // L3 is the slowest layer but survives process restarts.
 type L3Cache struct {
 	db      *sql.DB
-	ttl     time.Duration
 	metrics *CacheMetrics
+	ttl     time.Duration
 }
 
 // NewL3Cache creates a new L3 cache backed by SQLite.

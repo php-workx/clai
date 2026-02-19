@@ -76,11 +76,11 @@ const pickerErrorFmt = "clai-picker: %v\n"
 // pickerOpts holds the parsed command-line options for the history subcommand.
 type pickerOpts struct {
 	tabs    string
-	limit   int
 	query   string
 	session string
 	output  string
 	cwd     string
+	limit   int
 }
 
 func main() {
@@ -172,12 +172,11 @@ func run(args []string) int {
 	return dispatchRunCommand(cmd, cfg, opts)
 }
 
-func parseRunInputs(args []string) (subcommand, *pickerOpts, int, bool, error) {
+func parseRunInputs(args []string) (cmd subcommand, opts *pickerOpts, exitCode int, fallback bool, err error) {
 	if len(args) == 0 {
 		return cmdUnknown, nil, exitFallback, true, nil
 	}
 
-	var cmd subcommand
 	switch args[0] {
 	case "history":
 		cmd = cmdHistory
@@ -193,10 +192,7 @@ func parseRunInputs(args []string) (subcommand, *pickerOpts, int, bool, error) {
 		return cmdUnknown, nil, exitFallback, true, fmt.Errorf("unknown command %q", args[0])
 	}
 
-	var (
-		opts     *pickerOpts
-		parseErr error
-	)
+	var parseErr error
 	switch cmd {
 	case cmdHistory:
 		opts, parseErr = parseHistoryFlags(args[1:])
@@ -450,7 +446,7 @@ func socketPath(cfg *config.Config) string {
 	return config.DefaultPaths().SocketFile()
 }
 
-func runTUI(model picker.Model) (int, string) {
+func runTUI(model picker.Model) (int, string) { //nolint:gocritic // bubbletea tea.Model interface requires value receiver
 	// Open /dev/tty for TUI input/output since stdin/stdout are used for data.
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {

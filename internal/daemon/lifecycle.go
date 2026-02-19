@@ -41,7 +41,7 @@ func Run(ctx context.Context, cfg *ServerConfig) error {
 	// Acquire lock file to prevent double-start
 	lockPath := LockFilePath(paths.BaseDir)
 	lockFile := NewLockFile(lockPath)
-	if err := lockFile.Acquire(); err != nil {
+	if err = lockFile.Acquire(); err != nil {
 		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
 	defer lockFile.Release()
@@ -168,8 +168,8 @@ func IsRunningWithPaths(paths *config.Paths) bool {
 
 	// Check if process exists
 	if pid > 0 {
-		process, err := os.FindProcess(pid)
-		if err == nil {
+		process, findErr := os.FindProcess(pid)
+		if findErr == nil {
 			// On Unix, FindProcess always succeeds. Send signal 0 to check if alive.
 			if process.Signal(syscall.Signal(0)) == nil {
 				return true
@@ -194,7 +194,7 @@ func IsRunningWithPaths(paths *config.Paths) bool {
 
 // ReadPID reads the PID from the PID file.
 func ReadPID(pidPath string) (int, error) {
-	data, err := os.ReadFile(pidPath)
+	data, err := os.ReadFile(pidPath) //nolint:gosec // G304: PID file path is from trusted config
 	if err != nil {
 		return 0, err
 	}

@@ -90,9 +90,9 @@ func AssertTransactionalConsistency(t *testing.T, db *sql.DB) {
 }
 
 type txnFixture struct {
-	eventID    int64
 	templateID string
 	scope      string
+	eventID    int64
 	nowMs      int64
 }
 

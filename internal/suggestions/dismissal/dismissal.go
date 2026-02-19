@@ -66,8 +66,8 @@ func DefaultConfig() Config {
 // Store manages persistent dismissal pattern storage and state transitions.
 type Store struct {
 	db     *sql.DB
-	cfg    Config
 	logger *slog.Logger
+	cfg    Config
 }
 
 // NewStore creates a new dismissal store.
@@ -86,9 +86,9 @@ type PatternRecord struct {
 	Scope               string
 	ContextTemplateID   string
 	DismissedTemplateID string
+	SuppressionLevel    State
 	DismissalCount      int
 	LastDismissedMs     int64
-	SuppressionLevel    State
 }
 
 // RecordDismissal increments the dismissal count for the given pattern and

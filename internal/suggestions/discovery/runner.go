@@ -25,20 +25,11 @@ var (
 
 // RunnerConfig configures the command runner safety constraints.
 type RunnerConfig struct {
-	// Timeout for the command (default: 500ms).
-	Timeout time.Duration
-
-	// MaxOutputBytes limits stdout/stderr (default: 1MB).
+	Logger         *slog.Logger
+	WorkingDir     string
+	Timeout        time.Duration
 	MaxOutputBytes int64
-
-	// WorkingDir is the working directory for the command.
-	WorkingDir string
-
-	// AllowRoot allows running as root (default: false).
-	AllowRoot bool
-
-	// Logger for runner operations.
-	Logger *slog.Logger
+	AllowRoot      bool
 }
 
 // DefaultRunnerConfig returns the default runner configuration.
@@ -295,10 +286,10 @@ var _ io.Writer = (*limitedBuffer)(nil)
 // DiscoveryErrorTracker tracks recent discovery errors for debugging.
 // Per spec Section 10.2.1: "Debug endpoint /debug/discovery-errors shows recent failures"
 type DiscoveryErrorTracker struct {
-	mu       sync.RWMutex
 	errors   []DiscoveryError
 	maxSize  int
-	position int // Ring buffer position
+	position int
+	mu       sync.RWMutex
 }
 
 // DiscoveryError represents a discovery failure.

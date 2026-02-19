@@ -55,13 +55,15 @@ func TestAssertSessionIsolation_DetectsLeak(t *testing.T) {
 	}
 
 	// Insert legitimate transitions for each session
-	_, err := sqlDB.ExecContext(ctx,
-		"INSERT INTO transition_stat (scope, prev_template_id, next_template_id, weight, count, last_seen_ms) VALUES ('session:sess-x', 'tmpl_x1', 'tmpl_x2', 1.0, 1, ?)", now)
+	_, err := sqlDB.ExecContext(ctx, `
+		INSERT INTO transition_stat (scope, prev_template_id, next_template_id, weight, count, last_seen_ms)
+		VALUES ('session:sess-x', 'tmpl_x1', 'tmpl_x2', 1.0, 1, ?)`, now)
 	if err != nil {
 		t.Fatalf("failed to insert transition: %v", err)
 	}
-	_, err = sqlDB.ExecContext(ctx,
-		"INSERT INTO transition_stat (scope, prev_template_id, next_template_id, weight, count, last_seen_ms) VALUES ('session:sess-y', 'tmpl_y1', 'tmpl_y2', 1.0, 1, ?)", now)
+	_, err = sqlDB.ExecContext(ctx, `
+		INSERT INTO transition_stat (scope, prev_template_id, next_template_id, weight, count, last_seen_ms)
+		VALUES ('session:sess-y', 'tmpl_y1', 'tmpl_y2', 1.0, 1, ?)`, now)
 	if err != nil {
 		t.Fatalf("failed to insert transition: %v", err)
 	}
@@ -188,7 +190,8 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	defer os.RemoveAll(tmpHome)
 	os.Setenv("CLAI_HOME", tmpHome)
-	os.Exit(m.Run())
+	code := m.Run()
+	os.RemoveAll(tmpHome) //nolint:errcheck // best-effort cleanup
+	os.Exit(code)
 }

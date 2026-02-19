@@ -13,13 +13,13 @@ import (
 
 // mockDispatcher records dispatched events for testing.
 type mockDispatcher struct {
-	mu         sync.Mutex
+	closeErr   error
+	onDispatch func(ev *ShimEvent) error
 	events     []*ShimEvent
+	mu         sync.Mutex
 	failNext   bool
 	failPipe   bool
 	closed     bool
-	closeErr   error
-	onDispatch func(ev *ShimEvent) error
 }
 
 func (m *mockDispatcher) Dispatch(ev *ShimEvent) error {
@@ -56,8 +56,8 @@ func (m *mockDispatcher) getEvents() []*ShimEvent {
 
 // testDialer creates a DialFunc that returns mock dispatchers.
 type testDialer struct {
-	mu          sync.Mutex
 	dispatchers []*mockDispatcher
+	mu          sync.Mutex
 	failCount   int // number of initial dial failures
 	dialCount   int
 }

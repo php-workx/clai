@@ -20,8 +20,8 @@ var ErrLockTimeout = errors.New("lock acquisition timed out")
 // LockFile represents an advisory file lock used to prevent concurrent
 // daemon starts. The lock is held for the lifetime of the daemon.
 type LockFile struct {
-	path string
 	file *os.File
+	path string
 }
 
 // LockOptions configures lock acquisition behavior.
@@ -57,7 +57,7 @@ func AcquireLock(dbDir string, opts LockOptions) (*LockFile, error) {
 	lockPath := LockPath(dbDir)
 
 	// Ensure the directory exists
-	if err := os.MkdirAll(dbDir, 0o755); err != nil {
+	if err := os.MkdirAll(dbDir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create lock directory: %w", err)
 	}
 
@@ -97,13 +97,13 @@ func AcquireLock(dbDir string, opts LockOptions) (*LockFile, error) {
 // tryAcquireLock makes a single attempt to acquire the lock.
 func tryAcquireLock(lockPath string) (*LockFile, error) {
 	// Open or create the lock file
-	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o644)
+	file, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // lock path derived from known db directory
 	if err != nil {
 		return nil, fmt.Errorf("failed to open lock file: %w", err)
 	}
 
 	// Try to acquire an exclusive lock (non-blocking)
-	err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) //nolint:gosec // fd fits in int on supported platforms
 	if err != nil {
 		file.Close()
 		return nil, err
@@ -141,7 +141,7 @@ func (lf *LockFile) Release() error {
 	}
 
 	// Release the lock
-	if err := syscall.Flock(int(lf.file.Fd()), syscall.LOCK_UN); err != nil {
+	if err := syscall.Flock(int(lf.file.Fd()), syscall.LOCK_UN); err != nil { //nolint:gosec // fd fits in int on supported platforms
 		// Continue with cleanup even if unlock fails
 		_ = lf.file.Close()
 		lf.file = nil
@@ -172,21 +172,21 @@ func (lf *LockFile) Path() string {
 func IsLocked(dbDir string) bool {
 	lockPath := LockPath(dbDir)
 
-	file, err := os.OpenFile(lockPath, os.O_RDWR, 0o644)
+	file, err := os.OpenFile(lockPath, os.O_RDWR, 0o600) //nolint:gosec // lock path derived from known db directory
 	if err != nil {
 		return false
 	}
 	defer file.Close()
 
 	// Try to acquire lock non-blocking
-	err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	err = syscall.Flock(int(file.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) //nolint:gosec // fd fits in int on supported platforms
 	if err != nil {
 		// Could not acquire - someone else has it
 		return true
 	}
 
 	// We got the lock - release it immediately
-	_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN)
+	_ = syscall.Flock(int(file.Fd()), syscall.LOCK_UN) //nolint:gosec // fd fits in int on supported platforms
 	return false
 }
 
@@ -195,7 +195,7 @@ func IsLocked(dbDir string) bool {
 func GetLockHolderPID(dbDir string) int {
 	lockPath := LockPath(dbDir)
 
-	data, err := os.ReadFile(lockPath)
+	data, err := os.ReadFile(lockPath) //nolint:gosec // reads user-specified path
 	if err != nil {
 		return 0
 	}

@@ -15,8 +15,8 @@ import (
 // LockFile manages an exclusive lock file to prevent multiple daemon instances.
 // It uses flock(2) with LOCK_EX|LOCK_NB for non-blocking exclusive locking.
 type LockFile struct {
-	path string
 	file *os.File
+	path string
 }
 
 // NewLockFile creates a new LockFile at the specified path.
@@ -37,7 +37,7 @@ func LockFilePath(baseDir string) string {
 // This is used to recover when the PID file is stale/missing but a daemon is
 // still running and holding the lock.
 func ReadHeldPID(lockPath string) (pid int, held bool, err error) {
-	f, err := os.OpenFile(lockPath, os.O_RDWR, 0)
+	f, err := os.OpenFile(lockPath, os.O_RDWR, 0) //nolint:gosec // G304: lock file path is from trusted config
 	if err != nil {
 		if os.IsNotExist(err) {
 			return 0, false, nil
@@ -47,12 +47,12 @@ func ReadHeldPID(lockPath string) (pid int, held bool, err error) {
 	defer f.Close()
 
 	// If we can acquire the lock, it is not held.
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil {
-		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err == nil { //nolint:gosec // G115: fd fits in int
+		_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN) //nolint:gosec // G115: fd fits in int
 		return 0, false, nil
 	} else if errors.Is(err, syscall.EWOULDBLOCK) || errors.Is(err, syscall.EAGAIN) {
 		// Lock is held by another process. Read PID for diagnostics and control.
-		if _, err := f.Seek(0, 0); err != nil {
+		if _, seekErr := f.Seek(0, 0); seekErr != nil {
 			return 0, true, nil
 		}
 		buf := make([]byte, 32)
@@ -85,7 +85,7 @@ func (l *LockFile) Acquire() error {
 	}
 
 	// Try to acquire exclusive non-blocking lock
-	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) //nolint:gosec // G115: fd fits in int
 	if err != nil {
 		if !errors.Is(err, syscall.EWOULDBLOCK) && !errors.Is(err, syscall.EAGAIN) {
 			f.Close()
@@ -137,7 +137,7 @@ func (l *LockFile) retryAcquire() error {
 		return fmt.Errorf("failed to open lock file on retry: %w", err)
 	}
 
-	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB)
+	err = syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB) //nolint:gosec // G115: fd fits in int
 	if err != nil {
 		f.Close()
 		return fmt.Errorf("failed to acquire lock on retry: %w", err)
@@ -172,7 +172,7 @@ func (l *LockFile) Release() error {
 	}
 
 	// Unlock
-	if err := syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN); err != nil {
+	if err := syscall.Flock(int(l.file.Fd()), syscall.LOCK_UN); err != nil { //nolint:gosec // G115: fd fits in int
 		// Best effort - continue with cleanup
 		_ = err
 	}

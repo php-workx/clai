@@ -17,8 +17,8 @@ const (
 
 // riskPattern represents a pattern for detecting destructive commands
 type riskPattern struct {
-	Name    string
 	Pattern *regexp.Regexp
+	Name    string
 }
 
 // destructivePatterns contains patterns for detecting destructive commands

@@ -34,7 +34,7 @@ const (
 	maxSuggestSnapshotAge = 15 * time.Minute
 )
 
-func v1WhyNarrative(sug suggest.Suggestion, lastCmd string) string {
+func v1WhyNarrative(sug *suggest.Suggestion, lastCmd string) string {
 	// Prefer explaining something the user cannot infer from the numbers above.
 	// Avoid embedding numeric values here; those are rendered as structured hints.
 
@@ -228,10 +228,10 @@ func (s *Server) CommandStarted(ctx context.Context, req *pb.CommandStartRequest
 	cmd := &storage.Command{
 		CommandID:     req.CommandId,
 		SessionID:     req.SessionId,
-		TsStartUnixMs: tsStart.UnixMilli(),
+		TSStartUnixMs: tsStart.UnixMilli(),
 		CWD:           req.Cwd,
 		Command:       req.Command,
-		CommandNorm:   suggest.Normalize(req.Command),
+		CommandNorm:   suggest.NormalizeCommand(req.Command),
 		CommandHash:   suggest.Hash(req.Command),
 		IsSuccess:     boolPtr(true), // Assume success until CommandEnded
 	}
@@ -343,7 +343,7 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 
 // Suggest handles the Suggest RPC.
 // It returns command suggestions based on history and optionally AI.
-// The scorer version (v1/v2/blend) determines which scoring engine is used.
+// The scorer version (v1/v2) determines which scoring engine is used.
 func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.SuggestResponse, error) {
 	s.touchActivity()
 	start := time.Now()
@@ -381,7 +381,7 @@ func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResul
 	// Convert to protobuf
 	pbSuggestions := make([]*pb.Suggestion, len(suggestions))
 	for i := range suggestions {
-		pbSuggestions[i] = v1SuggestionToProto(suggestions[i], lastCommand, nowMs)
+		pbSuggestions[i] = v1SuggestionToProto(&suggestions[i], lastCommand, nowMs)
 	}
 
 	return &pb.SuggestResponse{
@@ -419,7 +419,7 @@ func (s *Server) rankV1Suggestions(
 	})
 }
 
-func v1SuggestionToProto(sug suggest.Suggestion, lastCommand string, nowMs int64) *pb.Suggestion {
+func v1SuggestionToProto(sug *suggest.Suggestion, lastCommand string, nowMs int64) *pb.Suggestion {
 	desc := strings.TrimSpace(sug.Description)
 	if desc == "" {
 		desc = v1WhyNarrative(sug, lastCommand)
@@ -447,7 +447,7 @@ func v1SuggestionRisk(text string) string {
 	return ""
 }
 
-func v1SuggestionReasons(sug suggest.Suggestion, nowMs int64) []*pb.SuggestionReason {
+func v1SuggestionReasons(sug *suggest.Suggestion, nowMs int64) []*pb.SuggestionReason {
 	reasons := make([]*pb.SuggestionReason, 0, len(sug.Reasons)+3)
 	reasons = append(reasons, v1BaseReasons(sug)...)
 	if sug.LastSeenUnixMs > 0 {
@@ -471,7 +471,7 @@ func v1SuggestionReasons(sug suggest.Suggestion, nowMs int64) []*pb.SuggestionRe
 	return reasons
 }
 
-func v1BaseReasons(sug suggest.Suggestion) []*pb.SuggestionReason {
+func v1BaseReasons(sug *suggest.Suggestion) []*pb.SuggestionReason {
 	reasons := make([]*pb.SuggestionReason, 0, len(sug.Reasons))
 	for _, r := range sug.Reasons {
 		typ := strings.TrimSpace(r.Type)
@@ -725,7 +725,7 @@ func (s *Server) handleRecordFeedback(ctx context.Context, req *pb.RecordFeedbac
 		LatencyMs:     req.LatencyMs,
 	}
 
-	_, err := s.feedbackStore.RecordFeedback(ctx, rec)
+	_, err := s.feedbackStore.RecordFeedback(ctx, &rec)
 	if err != nil {
 		s.logger.Warn("failed to record feedback",
 			"session_id", req.SessionId,
@@ -907,7 +907,7 @@ func (s *Server) GetStatus(ctx context.Context, req *pb.Ack) (*pb.StatusResponse
 
 	return &pb.StatusResponse{
 		Version:        Version,
-		ActiveSessions: int32(s.sessionManager.ActiveCount()),
+		ActiveSessions: int32(s.sessionManager.ActiveCount()), //nolint:gosec // G115: session count is bounded
 		UptimeSeconds:  int64(uptime),
 		CommandsLogged: s.getCommandsLogged(),
 	}, nil
@@ -1189,7 +1189,7 @@ func (s *Server) ImportHistory(ctx context.Context, req *pb.HistoryImportRequest
 	}
 
 	return &pb.HistoryImportResponse{
-		ImportedCount: int32(count),
+		ImportedCount: int32(count), //nolint:gosec // G115: import count is bounded
 	}, nil
 }
 

@@ -15,8 +15,8 @@ var ErrSchemaVersionTooNew = errors.New("database schema version is newer than s
 
 // Migration represents a single database migration.
 type Migration struct {
-	Version int
 	SQL     string
+	Version int
 }
 
 // V1Migrations returns the migration list for V1 database files (suggestions.db).
@@ -120,8 +120,8 @@ func applyMigration(ctx context.Context, db *sql.DB, m Migration) error {
 	defer tx.Rollback() //nolint:errcheck // Best effort rollback on error
 
 	// Execute the migration SQL
-	if _, err := tx.ExecContext(ctx, m.SQL); err != nil {
-		return fmt.Errorf("failed to execute migration SQL: %w", err)
+	if _, execErr := tx.ExecContext(ctx, m.SQL); execErr != nil {
+		return fmt.Errorf("failed to execute migration SQL: %w", execErr)
 	}
 
 	// Record the migration. Detect the column name since V1 uses

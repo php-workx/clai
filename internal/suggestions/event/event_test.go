@@ -37,7 +37,7 @@ func TestNewCommandEvent(t *testing.T) {
 
 	assert.Equal(t, EventVersion, ev.Version)
 	assert.Equal(t, EventTypeCommandEnd, ev.Type)
-	assert.Equal(t, int64(0), ev.Ts)
+	assert.Equal(t, int64(0), ev.TS)
 	assert.Equal(t, "", ev.SessionID)
 	assert.Equal(t, Shell(""), ev.Shell)
 	assert.Equal(t, "", ev.Cwd)
@@ -47,12 +47,12 @@ func TestNewCommandEvent(t *testing.T) {
 	assert.False(t, ev.Ephemeral)
 }
 
-func TestCommandEventJSONSerialization(t *testing.T) {
+func TestCommandEventJSONSerialization(t *testing.T) { //nolint:funlen // roundtrip serialization subtests
 	t.Run("minimal event", func(t *testing.T) {
 		ev := &CommandEvent{
 			Version:   1,
 			Type:      EventTypeCommandEnd,
-			Ts:        1730000000123,
+			TS:        1730000000123,
 			SessionID: "abc-123",
 			Shell:     ShellZsh,
 			Cwd:       "/home/user",
@@ -88,7 +88,7 @@ func TestCommandEventJSONSerialization(t *testing.T) {
 		ev := &CommandEvent{
 			Version:    1,
 			Type:       EventTypeCommandEnd,
-			Ts:         1730000000123,
+			TS:         1730000000123,
 			SessionID:  "session-456",
 			Shell:      ShellBash,
 			Cwd:        "/home/user/project",
@@ -123,7 +123,7 @@ func TestCommandEventJSONSerialization(t *testing.T) {
 		original := &CommandEvent{
 			Version:    1,
 			Type:       EventTypeCommandEnd,
-			Ts:         1730000000999,
+			TS:         1730000000999,
 			SessionID:  "roundtrip-test",
 			Shell:      ShellFish,
 			Cwd:        "/tmp/test",
@@ -142,7 +142,7 @@ func TestCommandEventJSONSerialization(t *testing.T) {
 
 		assert.Equal(t, original.Version, parsed.Version)
 		assert.Equal(t, original.Type, parsed.Type)
-		assert.Equal(t, original.Ts, parsed.Ts)
+		assert.Equal(t, original.TS, parsed.TS)
 		assert.Equal(t, original.SessionID, parsed.SessionID)
 		assert.Equal(t, original.Shell, parsed.Shell)
 		assert.Equal(t, original.Cwd, parsed.Cwd)

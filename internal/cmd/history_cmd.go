@@ -178,7 +178,7 @@ func outputHistory(commands []storage.Command) error {
 			entries = append(entries, historyOutput{
 				Text:     commands[i].Command,
 				Cwd:      commands[i].CWD,
-				TsUnixMs: commands[i].TsStartUnixMs,
+				TSUnixMs: commands[i].TSStartUnixMs,
 				ExitCode: commands[i].ExitCode,
 				Source:   source,
 			})
@@ -192,11 +192,11 @@ func outputHistory(commands []storage.Command) error {
 }
 
 type historyOutput struct {
+	ExitCode *int   `json:"exit_code"`
 	Text     string `json:"text"`
 	Cwd      string `json:"cwd"`
-	TsUnixMs int64  `json:"ts_unix_ms"`
-	ExitCode *int   `json:"exit_code"`
 	Source   string `json:"source"`
+	TSUnixMs int64  `json:"ts_unix_ms"`
 }
 
 func historySource(global bool, cwd, session string) string {

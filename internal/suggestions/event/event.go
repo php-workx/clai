@@ -65,11 +65,17 @@ type CommandEvent struct {
 
 	// DurationMs is the command duration in milliseconds (optional).
 	DurationMs *int64 `json:"duration_ms,omitempty"`
-
-	// Ephemeral indicates if this is an incognito/ephemeral event.
-	// Ephemeral events are used for in-memory session context only
-	// and are never persisted to disk.
-	Ephemeral bool `json:"ephemeral"`
+	Type       string `json:"type"`
+	SessionID  string `json:"session_id"`
+	Shell      Shell  `json:"shell"`
+	Cwd        string `json:"cwd"`
+	CmdRaw     string `json:"cmd_raw"`
+	RepoKey    string `json:"repo_key,omitempty"`
+	Branch     string `json:"branch,omitempty"`
+	Version    int    `json:"v"`
+	TS         int64  `json:"ts"`
+	ExitCode   int    `json:"exit_code"`
+	Ephemeral  bool   `json:"ephemeral"`
 }
 
 // EventType constants for the Type field.

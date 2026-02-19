@@ -94,15 +94,15 @@ func TestArtifact_EventTypes(t *testing.T) {
 	defer a.Close()
 
 	events := []struct {
-		eventType string
 		data      interface{}
+		eventType string
 	}{
-		{EventRunStart, RunStartData{RunID: "run-types", WorkflowName: "wf", WorkflowPath: "/tmp/wf.yaml"}},
-		{EventStepStart, StepStartData{RunID: "run-types", StepID: "s1", StepName: "Step 1", Command: "echo hi"}},
-		{EventStepEnd, StepEndData{RunID: "run-types", StepID: "s1", Status: "passed", ExitCode: 0, DurationMs: 100}},
-		{EventAnalysis, AnalysisData{RunID: "run-types", StepID: "s1", Decision: "approve", Reasoning: "looks good"}},
-		{EventHumanDecision, HumanDecisionData{RunID: "run-types", StepID: "s1", Action: "approve", Input: "yes"}},
-		{EventRunEnd, RunEndData{RunID: "run-types", Status: "passed", DurationMs: 5000}},
+		{RunStartData{RunID: "run-types", WorkflowName: "wf", WorkflowPath: "/tmp/wf.yaml"}, EventRunStart},
+		{StepStartData{RunID: "run-types", StepID: "s1", StepName: "Step 1", Command: "echo hi"}, EventStepStart},
+		{StepEndData{RunID: "run-types", StepID: "s1", Status: "passed", ExitCode: 0, DurationMs: 100}, EventStepEnd},
+		{AnalysisData{RunID: "run-types", StepID: "s1", Decision: "approve", Reasoning: "looks good"}, EventAnalysis},
+		{HumanDecisionData{RunID: "run-types", StepID: "s1", Action: "approve", Input: "yes"}, EventHumanDecision},
+		{RunEndData{RunID: "run-types", Status: "passed", DurationMs: 5000}, EventRunEnd},
 	}
 
 	for _, e := range events {

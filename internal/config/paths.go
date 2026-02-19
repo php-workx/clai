@@ -88,7 +88,7 @@ func (p *Paths) HooksDir() string {
 func (p *Paths) WorkflowLogDir(ctx context.Context) string {
 	_ = ctx // Reserved for future context-aware path resolution.
 	dir := filepath.Join(p.BaseDir, "workflow-logs")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // G301: workflow log directory needs standard permissions
 		// Best-effort creation; callers may still use the returned path.
 		_ = err
 	}

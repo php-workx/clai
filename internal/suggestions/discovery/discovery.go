@@ -44,17 +44,10 @@ type Task struct {
 
 // Options configures the discovery service.
 type Options struct {
-	// Timeout for discovery operations.
-	Timeout time.Duration
-
-	// MaxOutputBytes limits the output from discovery commands.
+	Logger         *slog.Logger
+	Timeout        time.Duration
 	MaxOutputBytes int64
-
-	// TTL is how long before re-discovery is triggered for a repo.
-	TTL time.Duration
-
-	// Logger for discovery operations.
-	Logger *slog.Logger
+	TTL            time.Duration
 }
 
 // DefaultOptions returns the default discovery options.
@@ -69,18 +62,14 @@ func DefaultOptions() Options {
 
 // Service manages task discovery for repositories.
 type Service struct {
-	db   *sql.DB
-	opts Options
-
-	// Prepared statements
+	db         *sql.DB
 	insertStmt *sql.Stmt
 	selectStmt *sql.Stmt
 	deleteStmt *sql.Stmt
-	lastTsStmt *sql.Stmt
-
-	// Discovery cache to avoid excessive re-scanning
-	cacheMu sync.RWMutex
-	cache   map[string]time.Time // repo_key -> last_discovery_time
+	lastTSStmt *sql.Stmt
+	cache      map[string]time.Time
+	opts       Options
+	cacheMu    sync.RWMutex
 }
 
 // NewService creates a new discovery service.
@@ -142,7 +131,7 @@ func (s *Service) prepareStatements() error {
 		return err
 	}
 
-	s.lastTsStmt, err = s.db.Prepare(`
+	s.lastTSStmt, err = s.db.Prepare(`
 		SELECT MAX(discovered_ts) FROM project_task WHERE repo_key = ?
 	`)
 	if err != nil {
@@ -166,8 +155,8 @@ func (s *Service) Close() error {
 	if s.deleteStmt != nil {
 		s.deleteStmt.Close()
 	}
-	if s.lastTsStmt != nil {
-		s.lastTsStmt.Close()
+	if s.lastTSStmt != nil {
+		s.lastTSStmt.Close()
 	}
 	return nil
 }
@@ -189,13 +178,13 @@ func (s *Service) Discover(ctx context.Context, repoRoot string) (bool, error) {
 	}
 
 	// Check database for last discovery timestamp
-	var lastTs sql.NullInt64
-	if err := s.lastTsStmt.QueryRow(repoRoot).Scan(&lastTs); err != nil {
+	var lastTS sql.NullInt64
+	if err := s.lastTSStmt.QueryRow(repoRoot).Scan(&lastTS); err != nil {
 		return false, err
 	}
 
-	if lastTs.Valid {
-		lastDiscoveryDB := time.UnixMilli(lastTs.Int64)
+	if lastTS.Valid {
+		lastDiscoveryDB := time.UnixMilli(lastTS.Int64)
 		if time.Since(lastDiscoveryDB) < s.opts.TTL {
 			// Update cache
 			s.cacheMu.Lock()

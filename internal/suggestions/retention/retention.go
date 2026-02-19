@@ -26,15 +26,9 @@ const (
 
 // Policy defines the retention policy for stored data.
 type Policy struct {
-	// RetentionDays is the number of days to retain command_event data.
-	// Defaults to DefaultRetentionDays (90 days).
+	Logger        *slog.Logger
 	RetentionDays int
-
-	// AutoVacuum enables automatic vacuum after large purges.
-	AutoVacuum bool
-
-	// Logger for logging purge operations.
-	Logger *slog.Logger
+	AutoVacuum    bool
 }
 
 // DefaultPolicy returns the default retention policy.

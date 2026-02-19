@@ -7,25 +7,15 @@ import (
 // SafetyGate checks recovery suggestions against a risk policy.
 // It prevents dangerous commands from being suggested as recoveries.
 type SafetyGate struct {
-	// destructivePatterns are command prefixes/patterns considered dangerous.
+	destructiveExact    map[string]bool
 	destructivePatterns []string
-
-	// destructiveExact are exact command strings considered dangerous.
-	destructiveExact map[string]bool
-
-	// allowSudo controls whether sudo-prefixed suggestions are permitted.
-	// When false, sudo commands are blocked unless the base command is safe.
-	allowSudo bool
+	allowSudo           bool
 }
 
 // SafetyConfig configures the safety gate.
 type SafetyConfig struct {
-	// AllowSudo permits sudo-prefixed recovery suggestions.
-	// Default: true (sudo is a common and expected recovery for permission errors).
-	AllowSudo bool
-
-	// AdditionalBlocked adds extra blocked patterns beyond the defaults.
 	AdditionalBlocked []string
+	AllowSudo         bool
 }
 
 // DefaultSafetyConfig returns the default safety configuration.

@@ -27,17 +27,17 @@ type ShimEvent struct {
 	// Command is the raw command string (command_start).
 	Command string `json:"command,omitempty"`
 
-	// ExitCode is the command exit code (command_end).
-	ExitCode int `json:"exit_code,omitempty"`
-
-	// DurationMs is the command duration in milliseconds (command_end).
-	DurationMs int64 `json:"duration_ms,omitempty"`
-
 	// Git context (command_start).
 	GitBranch     string `json:"git_branch,omitempty"`
 	GitRepoName   string `json:"git_repo_name,omitempty"`
 	GitRepoRoot   string `json:"git_repo_root,omitempty"`
 	PrevCommandID string `json:"prev_command_id,omitempty"`
+
+	// DurationMs is the command duration in milliseconds (command_end).
+	DurationMs int64 `json:"duration_ms,omitempty"`
+
+	// ExitCode is the command exit code (command_end).
+	ExitCode int `json:"exit_code,omitempty"`
 }
 
 // Event type constants.
