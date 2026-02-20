@@ -1,0 +1,62 @@
+=== RUN   TestNew_DefaultConfig
+=== PAUSE TestNew_DefaultConfig
+=== NAME  
+=== RUN   TestNew_JSONOutput
+=== PAUSE TestNew_JSONOutput
+=== NAME  
+=== RUN   TestNew_DebugLevel
+=== PAUSE TestNew_DebugLevel
+=== NAME  
+=== RUN   TestNew_InfoLevel_HidesDebug
+=== PAUSE TestNew_InfoLevel_HidesDebug
+=== NAME  
+=== RUN   TestLogStartup
+=== PAUSE TestLogStartup
+=== NAME  
+=== RUN   TestLogShutdown
+=== PAUSE TestLogShutdown
+=== NAME  
+=== RUN   TestLogConfigReload
+=== PAUSE TestLogConfigReload
+=== NAME  
+=== RUN   TestLogEventDropped
+=== PAUSE TestLogEventDropped
+=== NAME  
+=== RUN   TestLogDiscoveryTimeout
+=== PAUSE TestLogDiscoveryTimeout
+=== NAME  
+=== RUN   TestLogSQLiteError
+=== PAUSE TestLogSQLiteError
+=== NAME  
+=== RUN   TestLogFTS5Unavailable
+=== PAUSE TestLogFTS5Unavailable
+=== NAME  
+=== RUN   TestTimestampFormat
+=== PAUSE TestTimestampFormat
+=== NAME  
+=== CONT  TestNew_DefaultConfig
+=== CONT  TestLogShutdown
+--- PASS: TestNew_DefaultConfig (0.00s)
+=== CONT  TestLogStartup
+=== CONT  TestNew_InfoLevel_HidesDebug
+--- PASS: TestNew_InfoLevel_HidesDebug (0.00s)
+=== CONT  TestLogEventDropped
+=== CONT  TestLogConfigReload
+=== CONT  TestNew_JSONOutput
+=== CONT  TestNew_DebugLevel
+=== CONT  TestLogSQLiteError
+=== CONT  TestTimestampFormat
+=== CONT  TestLogFTS5Unavailable
+--- PASS: TestLogShutdown (0.00s)
+--- PASS: TestLogFTS5Unavailable (0.00s)
+=== CONT  TestLogDiscoveryTimeout
+--- PASS: TestLogDiscoveryTimeout (0.00s)
+--- PASS: TestLogStartup (0.00s)
+--- PASS: TestLogEventDropped (0.00s)
+--- PASS: TestLogConfigReload (0.00s)
+--- PASS: TestNew_JSONOutput (0.00s)
+--- PASS: TestNew_DebugLevel (0.00s)
+--- PASS: TestLogSQLiteError (0.00s)
+--- PASS: TestTimestampFormat (0.00s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/log	1.766s

@@ -1,0 +1,108 @@
+=== RUN   TestComputeContext_GitRepo
+=== PAUSE TestComputeContext_GitRepo
+=== NAME  
+=== RUN   TestComputeContext_NotGitRepo
+=== PAUSE TestComputeContext_NotGitRepo
+=== NAME  
+=== RUN   TestComputeContext_DirtyRepo
+=== PAUSE TestComputeContext_DirtyRepo
+=== NAME  
+=== RUN   TestComputeContext_WithRemote
+=== PAUSE TestComputeContext_WithRemote
+=== NAME  
+=== RUN   TestComputeRepoKey
+=== RUN   TestComputeRepoKey/with_remote
+--- PASS: TestComputeRepoKey/with_remote (0.00s)
+=== NAME  TestComputeRepoKey
+=== RUN   TestComputeRepoKey/without_remote
+--- PASS: TestComputeRepoKey/without_remote (0.00s)
+=== NAME  TestComputeRepoKey
+=== RUN   TestComputeRepoKey/ssh_remote
+--- PASS: TestComputeRepoKey/ssh_remote (0.00s)
+=== NAME  TestComputeRepoKey
+--- PASS: TestComputeRepoKey (0.00s)
+=== NAME  
+=== RUN   TestComputeRepoKey_CaseInsensitive
+--- PASS: TestComputeRepoKey_CaseInsensitive (0.00s)
+=== NAME  
+=== RUN   TestContextCache_Get
+=== PAUSE TestContextCache_Get
+=== NAME  
+=== RUN   TestContextCache_Expiration
+=== PAUSE TestContextCache_Expiration
+=== NAME  
+=== RUN   TestContextCache_ForceRefresh
+=== PAUSE TestContextCache_ForceRefresh
+=== NAME  
+=== RUN   TestContextCache_Invalidate
+=== PAUSE TestContextCache_Invalidate
+=== NAME  
+=== RUN   TestContextCache_InvalidateAll
+=== PAUSE TestContextCache_InvalidateAll
+=== NAME  
+=== RUN   TestContextCache_Cleanup
+=== PAUSE TestContextCache_Cleanup
+=== NAME  
+=== RUN   TestContextCache_ConcurrentAccess
+=== PAUSE TestContextCache_ConcurrentAccess
+=== NAME  
+=== RUN   TestIsGitCommand
+=== RUN   TestIsGitCommand/git_status
+--- PASS: TestIsGitCommand/git_status (0.00s)
+=== NAME  TestIsGitCommand
+=== RUN   TestIsGitCommand/git_commit_-m_'test'
+--- PASS: TestIsGitCommand/git_commit_-m_'test' (0.00s)
+=== NAME  TestIsGitCommand
+=== RUN   TestIsGitCommand/git_push_origin_main
+--- PASS: TestIsGitCommand/git_push_origin_main (0.00s)
+=== NAME  TestIsGitCommand
+=== RUN   TestIsGitCommand//usr/bin/git_log
+--- PASS: TestIsGitCommand//usr/bin/git_log (0.00s)
+=== NAME  TestIsGitCommand
+=== RUN   TestIsGitCommand/gh_pr_create
+--- PASS: TestIsGitCommand/gh_pr_create (0.00s)
+=== NAME  TestIsGitCommand
+=== RUN   TestIsGitCommand/gh_issue_list
+--- PASS: TestIsGitCommand/gh_issue_list (0.00s)
+=== NAME  TestIsGitCommand
+=== RUN   TestIsGitCommand/ls_-la
+--- PASS: TestIsGitCommand/ls_-la (0.00s)
+=== NAME  TestIsGitCommand
+=== RUN   TestIsGitCommand/npm_install
+--- PASS: TestIsGitCommand/npm_install (0.00s)
+=== NAME  TestIsGitCommand
+=== RUN   TestIsGitCommand/make_build
+--- PASS: TestIsGitCommand/make_build (0.00s)
+=== NAME  TestIsGitCommand
+=== RUN   TestIsGitCommand/#00
+--- PASS: TestIsGitCommand/#00 (0.00s)
+=== NAME  TestIsGitCommand
+--- PASS: TestIsGitCommand (0.00s)
+=== NAME  
+=== RUN   TestNewContextCache_DefaultTTL
+--- PASS: TestNewContextCache_DefaultTTL (0.00s)
+=== NAME  
+=== CONT  TestContextCache_Cleanup
+=== CONT  TestContextCache_Expiration
+=== CONT  TestContextCache_Get
+=== CONT  TestContextCache_InvalidateAll
+=== CONT  TestContextCache_ForceRefresh
+=== CONT  TestComputeContext_NotGitRepo
+=== CONT  TestContextCache_ConcurrentAccess
+=== CONT  TestComputeContext_DirtyRepo
+=== CONT  TestComputeContext_WithRemote
+=== CONT  TestContextCache_Invalidate
+--- PASS: TestComputeContext_NotGitRepo (0.03s)
+=== CONT  TestComputeContext_GitRepo
+--- PASS: TestContextCache_Invalidate (0.31s)
+--- PASS: TestComputeContext_DirtyRepo (0.36s)
+--- PASS: TestContextCache_Get (0.40s)
+--- PASS: TestComputeContext_GitRepo (0.41s)
+--- PASS: TestContextCache_ConcurrentAccess (0.51s)
+--- PASS: TestComputeContext_WithRemote (0.52s)
+--- PASS: TestContextCache_Expiration (0.53s)
+--- PASS: TestContextCache_ForceRefresh (0.60s)
+--- PASS: TestContextCache_Cleanup (0.68s)
+--- PASS: TestContextCache_InvalidateAll (0.69s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/git	3.548s

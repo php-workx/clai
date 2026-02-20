@@ -1,0 +1,127 @@
+=== RUN   TestMiner_DetectsContiguousSequences
+=== PAUSE TestMiner_DetectsContiguousSequences
+=== NAME  
+=== RUN   TestMiner_DetectsAcrossSessions
+=== PAUSE TestMiner_DetectsAcrossSessions
+=== NAME  
+=== RUN   TestMiner_RespectsMinOccurrences
+=== PAUSE TestMiner_RespectsMinOccurrences
+=== NAME  
+=== RUN   TestMiner_RespectsMinMaxSteps
+=== PAUSE TestMiner_RespectsMinMaxSteps
+=== NAME  
+=== RUN   TestMiner_PatternHashDeterministic
+=== PAUSE TestMiner_PatternHashDeterministic
+=== NAME  
+=== RUN   TestMiner_StorePatternUpdatesOccurrenceCount
+=== PAUSE TestMiner_StorePatternUpdatesOccurrenceCount
+=== NAME  
+=== RUN   TestMiner_SkipsSessionsWithTooFewCommands
+=== PAUSE TestMiner_SkipsSessionsWithTooFewCommands
+=== NAME  
+=== RUN   TestMiner_IgnoresEventsWithoutTemplateID
+=== PAUSE TestMiner_IgnoresEventsWithoutTemplateID
+=== NAME  
+=== RUN   TestMiner_StartStop
+=== PAUSE TestMiner_StartStop
+=== NAME  
+=== RUN   TestLoadPromotedPatterns_Empty
+=== PAUSE TestLoadPromotedPatterns_Empty
+=== NAME  
+=== RUN   TestTracker_ActivatesOnFirstStep
+=== PAUSE TestTracker_ActivatesOnFirstStep
+=== NAME  
+=== RUN   TestTracker_AdvancesOnCorrectStep
+=== PAUSE TestTracker_AdvancesOnCorrectStep
+=== NAME  
+=== RUN   TestTracker_CompletedWorkflowIsRemoved
+=== PAUSE TestTracker_CompletedWorkflowIsRemoved
+=== NAME  
+=== RUN   TestTracker_StaleAfterManyNonMatchingCommands
+=== PAUSE TestTracker_StaleAfterManyNonMatchingCommands
+=== NAME  
+=== RUN   TestTracker_TimesOutStaleWorkflow
+=== PAUSE TestTracker_TimesOutStaleWorkflow
+=== NAME  
+=== RUN   TestTracker_MaxCandidatesCapped
+=== PAUSE TestTracker_MaxCandidatesCapped
+=== NAME  
+=== RUN   TestTracker_DoesNotDuplicateActivation
+=== PAUSE TestTracker_DoesNotDuplicateActivation
+=== NAME  
+=== RUN   TestTracker_SetPatternsRefreshes
+=== PAUSE TestTracker_SetPatternsRefreshes
+=== NAME  
+=== RUN   TestTracker_MultipleWorkflowsInParallel
+=== PAUSE TestTracker_MultipleWorkflowsInParallel
+=== NAME  
+=== RUN   TestTracker_EmptyPatterns
+=== PAUSE TestTracker_EmptyPatterns
+=== NAME  
+=== RUN   TestTracker_EmptyTemplateID
+=== PAUSE TestTracker_EmptyTemplateID
+=== NAME  
+=== RUN   TestWorkflowSummary
+=== PAUSE TestWorkflowSummary
+=== NAME  
+=== CONT  TestMiner_DetectsContiguousSequences
+=== CONT  TestTracker_ActivatesOnFirstStep
+=== CONT  TestMiner_StorePatternUpdatesOccurrenceCount
+--- PASS: TestTracker_ActivatesOnFirstStep (0.00s)
+=== CONT  TestTracker_CompletedWorkflowIsRemoved
+=== CONT  TestMiner_StartStop
+=== CONT  TestLoadPromotedPatterns_Empty
+=== CONT  TestMiner_IgnoresEventsWithoutTemplateID
+=== CONT  TestMiner_SkipsSessionsWithTooFewCommands
+=== CONT  TestMiner_PatternHashDeterministic
+=== CONT  TestMiner_RespectsMinMaxSteps
+=== CONT  TestWorkflowSummary
+=== RUN   TestWorkflowSummary/empty
+=== CONT  TestTracker_SetPatternsRefreshes
+--- PASS: TestTracker_CompletedWorkflowIsRemoved (0.00s)
+=== CONT  TestTracker_EmptyTemplateID
+--- PASS: TestWorkflowSummary/empty (0.00s)
+--- PASS: TestTracker_EmptyTemplateID (0.00s)
+=== CONT  TestTracker_MultipleWorkflowsInParallel
+--- PASS: TestMiner_PatternHashDeterministic (0.00s)
+=== CONT  TestTracker_EmptyPatterns
+--- PASS: TestTracker_EmptyPatterns (0.00s)
+=== CONT  TestMiner_RespectsMinOccurrences
+=== CONT  TestMiner_DetectsAcrossSessions
+--- PASS: TestTracker_SetPatternsRefreshes (0.00s)
+--- PASS: TestTracker_MultipleWorkflowsInParallel (0.00s)
+=== NAME  TestWorkflowSummary
+=== RUN   TestWorkflowSummary/single
+--- PASS: TestWorkflowSummary/single (0.00s)
+=== NAME  TestWorkflowSummary
+=== RUN   TestWorkflowSummary/two
+--- PASS: TestWorkflowSummary/two (0.00s)
+=== NAME  TestWorkflowSummary
+=== RUN   TestWorkflowSummary/three
+--- PASS: TestWorkflowSummary/three (0.00s)
+=== NAME  TestWorkflowSummary
+=== RUN   TestWorkflowSummary/four
+--- PASS: TestWorkflowSummary/four (0.00s)
+=== NAME  TestWorkflowSummary
+--- PASS: TestWorkflowSummary (0.00s)
+=== CONT  TestTracker_MaxCandidatesCapped
+--- PASS: TestTracker_MaxCandidatesCapped (0.00s)
+=== CONT  TestTracker_StaleAfterManyNonMatchingCommands
+--- PASS: TestTracker_StaleAfterManyNonMatchingCommands (0.00s)
+=== CONT  TestTracker_DoesNotDuplicateActivation
+--- PASS: TestTracker_DoesNotDuplicateActivation (0.00s)
+=== CONT  TestTracker_TimesOutStaleWorkflow
+=== CONT  TestTracker_AdvancesOnCorrectStep
+--- PASS: TestTracker_TimesOutStaleWorkflow (0.00s)
+--- PASS: TestTracker_AdvancesOnCorrectStep (0.00s)
+--- PASS: TestLoadPromotedPatterns_Empty (0.11s)
+--- PASS: TestMiner_StartStop (0.12s)
+--- PASS: TestMiner_SkipsSessionsWithTooFewCommands (0.12s)
+--- PASS: TestMiner_RespectsMinOccurrences (0.13s)
+--- PASS: TestMiner_IgnoresEventsWithoutTemplateID (0.14s)
+--- PASS: TestMiner_DetectsAcrossSessions (0.14s)
+--- PASS: TestMiner_DetectsContiguousSequences (0.17s)
+--- PASS: TestMiner_RespectsMinMaxSteps (0.19s)
+--- PASS: TestMiner_StorePatternUpdatesOccurrenceCount (1.05s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/workflow	2.572s

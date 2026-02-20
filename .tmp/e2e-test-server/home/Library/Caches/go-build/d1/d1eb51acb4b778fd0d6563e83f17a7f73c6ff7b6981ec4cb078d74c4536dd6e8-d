@@ -1,0 +1,51 @@
+=== RUN   TestSetup_NilConfig
+=== PAUSE TestSetup_NilConfig
+=== NAME  
+=== RUN   TestSetup_CancelsContextOnShutdown
+2026/02/20 09:31:31 INFO shutdown signal received signal=terminated
+--- PASS: TestSetup_CancelsContextOnShutdown (0.00s)
+=== NAME  
+=== RUN   TestSetup_CallsShutdownFn
+2026/02/20 09:31:31 INFO shutdown signal received signal=terminated
+--- PASS: TestSetup_CallsShutdownFn (0.00s)
+=== NAME  
+=== RUN   TestSetup_ShutdownFnError
+2026/02/20 09:31:31 INFO shutdown signal received signal=terminated
+2026/02/20 09:31:31 WARN shutdown function error error="shutdown error"
+--- PASS: TestSetup_ShutdownFnError (0.00s)
+=== NAME  
+=== RUN   TestSetup_ReloadConfig
+2026/02/20 09:31:31 INFO reload signal received
+2026/02/20 09:31:31 INFO configuration reloaded
+2026/02/20 09:31:31 INFO reload signal received
+2026/02/20 09:31:31 INFO configuration reloaded
+--- PASS: TestSetup_ReloadConfig (0.21s)
+=== NAME  
+=== RUN   TestSetup_ReloadFnError
+2026/02/20 09:31:31 INFO reload signal received
+2026/02/20 09:31:31 ERROR failed to reload configuration error="reload error"
+--- PASS: TestSetup_ReloadFnError (0.10s)
+=== NAME  
+=== RUN   TestSetup_NoReloadFn
+2026/02/20 09:31:31 INFO reload signal received
+--- PASS: TestSetup_NoReloadFn (0.10s)
+=== NAME  
+=== RUN   TestHandler_Stop
+=== PAUSE TestHandler_Stop
+=== NAME  
+=== RUN   TestSetup_ExternalContextCancellation
+=== PAUSE TestSetup_ExternalContextCancellation
+=== NAME  
+=== RUN   TestShutdownTimeout
+=== PAUSE TestShutdownTimeout
+=== NAME  
+=== CONT  TestSetup_NilConfig
+=== CONT  TestShutdownTimeout
+--- PASS: TestShutdownTimeout (0.00s)
+=== CONT  TestSetup_ExternalContextCancellation
+=== CONT  TestHandler_Stop
+--- PASS: TestSetup_NilConfig (0.00s)
+--- PASS: TestSetup_ExternalContextCancellation (0.00s)
+--- PASS: TestHandler_Stop (0.00s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/signal	2.997s

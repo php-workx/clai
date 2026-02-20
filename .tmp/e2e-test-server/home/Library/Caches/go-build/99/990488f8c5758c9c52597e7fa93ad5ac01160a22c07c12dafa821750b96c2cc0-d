@@ -1,0 +1,182 @@
+=== RUN   TestReplay_Deterministic
+=== PAUSE TestReplay_Deterministic
+=== NAME  
+=== RUN   TestReplay_DeterministicWithExpectations
+=== PAUSE TestReplay_DeterministicWithExpectations
+=== NAME  
+=== RUN   TestReplay_CorpusRuns
+=== PAUSE TestReplay_CorpusRuns
+=== NAME  
+=== RUN   TestReplay_EmptySession
+=== PAUSE TestReplay_EmptySession
+=== NAME  
+=== RUN   TestReplay_SingleCommand
+=== PAUSE TestReplay_SingleCommand
+=== NAME  
+=== RUN   TestReplay_MatchingExpectations
+=== PAUSE TestReplay_MatchingExpectations
+=== NAME  
+=== RUN   TestReplay_DiffDetection
+=== PAUSE TestReplay_DiffDetection
+=== NAME  
+=== RUN   TestReplay_FixedClockProducesConsistentTimestamps
+=== PAUSE TestReplay_FixedClockProducesConsistentTimestamps
+=== NAME  
+=== RUN   TestReplay_ExplicitTimestampsOverrideClock
+=== PAUSE TestReplay_ExplicitTimestampsOverrideClock
+=== NAME  
+=== RUN   TestReplayAll
+=== PAUSE TestReplayAll
+=== NAME  
+=== RUN   TestReplayAll_EmptyList
+=== PAUSE TestReplayAll_EmptyList
+=== NAME  
+=== RUN   TestComputeMismatches_Identical
+=== PAUSE TestComputeMismatches_Identical
+=== NAME  
+=== RUN   TestComputeMismatches_Empty
+=== PAUSE TestComputeMismatches_Empty
+=== NAME  
+=== RUN   TestComputeMismatches_Missing
+=== PAUSE TestComputeMismatches_Missing
+=== NAME  
+=== RUN   TestComputeMismatches_Extra
+=== PAUSE TestComputeMismatches_Extra
+=== NAME  
+=== RUN   TestComputeMismatches_Reordered
+=== PAUSE TestComputeMismatches_Reordered
+=== NAME  
+=== RUN   TestComputeMismatches_CompletelyDifferent
+=== PAUSE TestComputeMismatches_CompletelyDifferent
+=== NAME  
+=== RUN   TestFormatDiffs_NoDiffs
+=== PAUSE TestFormatDiffs_NoDiffs
+=== NAME  
+=== RUN   TestFormatDiffs_WithDiffs
+=== PAUSE TestFormatDiffs_WithDiffs
+=== NAME  
+=== RUN   TestFormatDiffs_AllMismatchTypes
+=== PAUSE TestFormatDiffs_AllMismatchTypes
+=== NAME  
+=== RUN   TestFormatAllDiffs
+=== PAUSE TestFormatAllDiffs
+=== NAME  
+=== RUN   TestFormatTopK_Empty
+=== PAUSE TestFormatTopK_Empty
+=== NAME  
+=== RUN   TestFormatTopK_Values
+=== PAUSE TestFormatTopK_Values
+=== NAME  
+=== RUN   TestDefaultRunnerConfig
+=== PAUSE TestDefaultRunnerConfig
+=== NAME  
+=== RUN   TestNewRunner_DefaultsApplied
+=== PAUSE TestNewRunner_DefaultsApplied
+=== NAME  
+=== RUN   TestNewRunner_CustomConfig
+=== PAUSE TestNewRunner_CustomConfig
+=== NAME  
+=== RUN   TestReplay_BuildCycleProducesDeterministicOutput
+=== PAUSE TestReplay_BuildCycleProducesDeterministicOutput
+=== NAME  
+=== RUN   TestReplay_NpmWorkflowProducesDeterministicOutput
+=== PAUSE TestReplay_NpmWorkflowProducesDeterministicOutput
+=== NAME  
+=== RUN   TestReplay_FullCorpusDeterministic
+=== PAUSE TestReplay_FullCorpusDeterministic
+=== NAME  
+=== RUN   TestReplay_CommandWithFailure
+=== PAUSE TestReplay_CommandWithFailure
+=== NAME  
+=== RUN   TestReplay_CWDVariation
+=== PAUSE TestReplay_CWDVariation
+=== NAME  
+=== CONT  TestReplay_DeterministicWithExpectations
+=== CONT  TestReplay_FixedClockProducesConsistentTimestamps
+=== CONT  TestReplay_EmptySession
+=== CONT  TestReplay_ExplicitTimestampsOverrideClock
+=== CONT  TestReplay_DiffDetection
+=== CONT  TestReplay_MatchingExpectations
+=== CONT  TestComputeMismatches_Identical
+--- PASS: TestComputeMismatches_Identical (0.00s)
+=== CONT  TestComputeMismatches_Extra
+--- PASS: TestComputeMismatches_Extra (0.00s)
+=== CONT  TestComputeMismatches_Missing
+=== CONT  TestComputeMismatches_Empty
+--- PASS: TestComputeMismatches_Missing (0.00s)
+=== CONT  TestReplay_SingleCommand
+--- PASS: TestComputeMismatches_Empty (0.00s)
+=== CONT  TestReplay_CorpusRuns
+=== RUN   TestReplay_CorpusRuns/git-workflow
+=== PAUSE TestReplay_CorpusRuns/git-workflow
+=== NAME  TestReplay_CorpusRuns
+=== RUN   TestReplay_CorpusRuns/build-cycle
+=== PAUSE TestReplay_CorpusRuns/build-cycle
+=== NAME  TestReplay_CorpusRuns
+=== RUN   TestReplay_CorpusRuns/npm-workflow
+=== CONT  TestReplayAll_EmptyList
+=== CONT  TestFormatDiffs_WithDiffs
+=== PAUSE TestReplay_CorpusRuns/npm-workflow
+=== NAME  TestReplay_CorpusRuns
+=== RUN   TestReplay_CorpusRuns/directory-nav
+=== CONT  TestNewRunner_DefaultsApplied
+--- PASS: TestReplay_EmptySession (0.00s)
+=== PAUSE TestReplay_CorpusRuns/directory-nav
+=== NAME  TestReplay_CorpusRuns
+=== CONT  TestReplay_CWDVariation
+--- PASS: TestNewRunner_DefaultsApplied (0.00s)
+=== RUN   TestReplay_CorpusRuns/mixed-tools
+--- PASS: TestFormatDiffs_WithDiffs (0.00s)
+=== CONT  TestReplay_FullCorpusDeterministic
+=== PAUSE TestReplay_CorpusRuns/mixed-tools
+=== NAME  TestReplay_CorpusRuns
+=== CONT  TestReplay_CommandWithFailure
+=== CONT  TestReplay_NpmWorkflowProducesDeterministicOutput
+--- PASS: TestReplayAll_EmptyList (0.00s)
+=== CONT  TestReplay_BuildCycleProducesDeterministicOutput
+--- PASS: TestReplay_SingleCommand (0.46s)
+--- PASS: TestReplay_ExplicitTimestampsOverrideClock (0.50s)
+=== CONT  TestNewRunner_CustomConfig
+--- PASS: TestNewRunner_CustomConfig (0.00s)
+=== CONT  TestComputeMismatches_Reordered
+--- PASS: TestComputeMismatches_Reordered (0.00s)
+=== CONT  TestFormatTopK_Empty
+=== CONT  TestDefaultRunnerConfig
+--- PASS: TestFormatTopK_Empty (0.00s)
+=== CONT  TestFormatTopK_Values
+--- PASS: TestDefaultRunnerConfig (0.00s)
+--- PASS: TestFormatTopK_Values (0.00s)
+=== CONT  TestFormatAllDiffs
+--- PASS: TestFormatAllDiffs (0.00s)
+=== CONT  TestReplay_Deterministic
+--- PASS: TestReplay_DiffDetection (0.50s)
+=== CONT  TestFormatDiffs_NoDiffs
+=== CONT  TestFormatDiffs_AllMismatchTypes
+=== CONT  TestComputeMismatches_CompletelyDifferent
+--- PASS: TestFormatDiffs_NoDiffs (0.00s)
+--- PASS: TestFormatDiffs_AllMismatchTypes (0.00s)
+--- PASS: TestComputeMismatches_CompletelyDifferent (0.00s)
+=== CONT  TestReplayAll
+=== CONT  TestReplay_CorpusRuns/npm-workflow
+--- PASS: TestReplay_CWDVariation (0.51s)
+--- PASS: TestReplay_CommandWithFailure (0.54s)
+=== CONT  TestReplay_CorpusRuns/mixed-tools
+--- PASS: TestReplay_DeterministicWithExpectations (1.12s)
+=== CONT  TestReplay_CorpusRuns/directory-nav
+--- PASS: TestReplay_FixedClockProducesConsistentTimestamps (1.13s)
+=== CONT  TestReplay_CorpusRuns/git-workflow
+--- PASS: TestReplay_CorpusRuns/npm-workflow (0.67s)
+=== CONT  TestReplay_CorpusRuns/build-cycle
+--- PASS: TestReplay_MatchingExpectations (1.19s)
+--- PASS: TestReplay_CorpusRuns/mixed-tools (0.72s)
+--- PASS: TestReplay_NpmWorkflowProducesDeterministicOutput (1.28s)
+--- PASS: TestReplayAll (0.97s)
+--- PASS: TestReplay_CorpusRuns/directory-nav (0.49s)
+--- PASS: TestReplay_CorpusRuns/git-workflow (0.49s)
+--- PASS: TestReplay_Deterministic (1.13s)
+--- PASS: TestReplay_BuildCycleProducesDeterministicOutput (1.17s)
+--- PASS: TestReplay_CorpusRuns/build-cycle (0.46s)
+--- PASS: TestReplay_CorpusRuns (0.00s)
+--- PASS: TestReplay_FullCorpusDeterministic (2.67s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/replay	4.629s

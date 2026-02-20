@@ -1,0 +1,62 @@
+=== RUN   TestDefaultPolicy
+=== PAUSE TestDefaultPolicy
+=== NAME  
+=== RUN   TestNewPurger_ClampsRetentionDays
+=== PAUSE TestNewPurger_ClampsRetentionDays
+=== NAME  
+=== RUN   TestPurger_Purge
+=== PAUSE TestPurger_Purge
+=== NAME  
+=== RUN   TestPurger_Purge_NoOldData
+=== PAUSE TestPurger_Purge_NoOldData
+=== NAME  
+=== RUN   TestPurger_Purge_EmptyDatabase
+=== PAUSE TestPurger_Purge_EmptyDatabase
+=== NAME  
+=== RUN   TestPurger_EstimatePurgeCount
+=== PAUSE TestPurger_EstimatePurgeCount
+=== NAME  
+=== RUN   TestPurger_ShortRetention
+=== PAUSE TestPurger_ShortRetention
+=== NAME  
+=== RUN   TestPurger_RebuildAggregates
+=== PAUSE TestPurger_RebuildAggregates
+=== NAME  
+=== RUN   TestConstants
+=== PAUSE TestConstants
+=== NAME  
+=== CONT  TestPurger_Purge_NoOldData
+=== CONT  TestPurger_Purge_EmptyDatabase
+=== CONT  TestDefaultPolicy
+=== CONT  TestPurger_RebuildAggregates
+=== CONT  TestConstants
+=== CONT  TestPurger_ShortRetention
+=== CONT  TestPurger_Purge
+=== CONT  TestPurger_EstimatePurgeCount
+=== CONT  TestNewPurger_ClampsRetentionDays
+--- PASS: TestDefaultPolicy (0.00s)
+--- PASS: TestConstants (0.00s)
+=== RUN   TestNewPurger_ClampsRetentionDays/below_minimum
+--- PASS: TestNewPurger_ClampsRetentionDays/below_minimum (0.00s)
+=== NAME  TestNewPurger_ClampsRetentionDays
+=== RUN   TestNewPurger_ClampsRetentionDays/above_maximum
+--- PASS: TestNewPurger_ClampsRetentionDays/above_maximum (0.00s)
+=== NAME  TestNewPurger_ClampsRetentionDays
+=== RUN   TestNewPurger_ClampsRetentionDays/within_range
+--- PASS: TestNewPurger_ClampsRetentionDays/within_range (0.00s)
+=== NAME  TestNewPurger_ClampsRetentionDays
+2026/02/20 09:31:30 INFO rebuilding aggregates from retained history
+2026/02/20 09:31:30 WARN rebuild aggregates not yet implemented
+--- PASS: TestNewPurger_ClampsRetentionDays (0.02s)
+2026/02/20 09:31:30 INFO purge completed deleted_events=0 vacuumed=false duration=916µs
+--- PASS: TestPurger_RebuildAggregates (0.02s)
+2026/02/20 09:31:30 INFO purge completed deleted_events=0 vacuumed=false duration=236.208µs
+--- PASS: TestPurger_Purge_EmptyDatabase (0.02s)
+--- PASS: TestPurger_Purge_NoOldData (0.02s)
+2026/02/20 09:31:30 INFO purge completed deleted_events=1 vacuumed=false duration=1.134375ms
+--- PASS: TestPurger_Purge (0.02s)
+2026/02/20 09:31:30 INFO purge completed deleted_events=1 vacuumed=false duration=1.430292ms
+--- PASS: TestPurger_EstimatePurgeCount (0.03s)
+--- PASS: TestPurger_ShortRetention (0.03s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/retention	1.956s

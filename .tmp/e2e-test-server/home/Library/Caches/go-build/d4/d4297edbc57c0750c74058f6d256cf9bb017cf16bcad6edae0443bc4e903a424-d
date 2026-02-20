@@ -1,0 +1,7 @@
+# test log
+open /nonexistent/path/tasks.yaml
+getenv GOTMPDIR
+getenv TMPDIR
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestLoadPlaybook_FromFile1140804853/001/tasks.yaml
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestLoadPlaybook_FromFile1140804853/001/tasks.yaml
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T

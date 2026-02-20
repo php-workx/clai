@@ -1,0 +1,284 @@
+=== RUN   TestAutoService_Search_MergesFTSAndDescribe
+=== PAUSE TestAutoService_Search_MergesFTSAndDescribe
+=== NAME  
+=== RUN   TestAutoService_Search_EmptyQuery
+=== PAUSE TestAutoService_Search_EmptyQuery
+=== NAME  
+=== RUN   TestAutoService_Search_NoResults
+=== PAUSE TestAutoService_Search_NoResults
+=== NAME  
+=== RUN   TestAutoService_Search_DescribeOnlyWhenFTSNil
+=== PAUSE TestAutoService_Search_DescribeOnlyWhenFTSNil
+=== NAME  
+=== RUN   TestAutoService_Search_Limit
+=== PAUSE TestAutoService_Search_Limit
+=== NAME  
+=== RUN   TestAutoService_Search_Offset
+=== PAUSE TestAutoService_Search_Offset
+=== NAME  
+=== RUN   TestAutoConfig_Defaults
+=== PAUSE TestAutoConfig_Defaults
+=== NAME  
+=== RUN   TestAutoService_WeightNormalization
+=== PAUSE TestAutoService_WeightNormalization
+=== NAME  
+=== RUN   TestAutoService_DefaultWeights
+=== PAUSE TestAutoService_DefaultWeights
+=== NAME  
+=== RUN   TestDedupKey
+=== PAUSE TestDedupKey
+=== NAME  
+=== RUN   TestMaxScore
+=== PAUSE TestMaxScore
+=== NAME  
+=== RUN   TestMergeResults_Deduplication
+=== PAUSE TestMergeResults_Deduplication
+=== NAME  
+=== RUN   TestMergeResults_EnrichesFTSWithTags
+=== PAUSE TestMergeResults_EnrichesFTSWithTags
+=== NAME  
+=== RUN   TestBackendConstants
+=== PAUSE TestBackendConstants
+=== NAME  
+=== RUN   TestDescribeService_Search_MatchesByTags
+=== PAUSE TestDescribeService_Search_MatchesByTags
+=== NAME  
+=== RUN   TestDescribeService_Search_ContainerQuery
+=== PAUSE TestDescribeService_Search_ContainerQuery
+=== NAME  
+=== RUN   TestDescribeService_Search_EmptyQuery
+=== PAUSE TestDescribeService_Search_EmptyQuery
+=== NAME  
+=== RUN   TestDescribeService_Search_NoTagMatch
+=== PAUSE TestDescribeService_Search_NoTagMatch
+=== NAME  
+=== RUN   TestDescribeService_Search_RepoFilter
+=== PAUSE TestDescribeService_Search_RepoFilter
+=== NAME  
+=== RUN   TestDescribeService_Search_ScoreByOverlap
+=== PAUSE TestDescribeService_Search_ScoreByOverlap
+=== NAME  
+=== RUN   TestDescribeService_Search_CustomTagMapper
+=== PAUSE TestDescribeService_Search_CustomTagMapper
+=== NAME  
+=== RUN   TestDescribeService_Search_NetworkHTTP
+=== PAUSE TestDescribeService_Search_NetworkHTTP
+=== NAME  
+=== RUN   TestDescribeService_Search_Offset
+=== PAUSE TestDescribeService_Search_Offset
+=== NAME  
+=== RUN   TestComputeMatchedTags
+=== PAUSE TestComputeMatchedTags
+=== NAME  
+=== RUN   TestDefaultDescriptionToTags
+=== PAUSE TestDefaultDescriptionToTags
+=== NAME  
+=== RUN   TestService_NewService
+=== PAUSE TestService_NewService
+=== NAME  
+=== RUN   TestService_Search_FTS5
+=== PAUSE TestService_Search_FTS5
+=== NAME  
+=== RUN   TestService_Search_QuotedPhrase
+=== PAUSE TestService_Search_QuotedPhrase
+=== NAME  
+=== RUN   TestService_Search_RepoFilter
+=== PAUSE TestService_Search_RepoFilter
+=== NAME  
+=== RUN   TestService_Search_CwdFilter
+=== PAUSE TestService_Search_CwdFilter
+=== NAME  
+=== RUN   TestService_Search_EphemeralNotIndexed
+=== PAUSE TestService_Search_EphemeralNotIndexed
+=== NAME  
+=== RUN   TestService_Search_Limit
+=== PAUSE TestService_Search_Limit
+=== NAME  
+=== RUN   TestService_Search_Offset
+=== PAUSE TestService_Search_Offset
+=== NAME  
+=== RUN   TestService_Search_EmptyQuery
+=== PAUSE TestService_Search_EmptyQuery
+=== NAME  
+=== RUN   TestService_IndexEventBatch
+=== PAUSE TestService_IndexEventBatch
+=== NAME  
+=== RUN   TestService_RebuildIndex
+=== PAUSE TestService_RebuildIndex
+=== NAME  
+=== RUN   TestService_FallbackSearch
+=== PAUSE TestService_FallbackSearch
+=== NAME  
+=== RUN   TestEscapeFTS5Query
+=== PAUSE TestEscapeFTS5Query
+=== NAME  
+=== RUN   TestEscapeLikePattern
+=== PAUSE TestEscapeLikePattern
+=== NAME  
+=== RUN   TestDefaultConfig
+=== PAUSE TestDefaultConfig
+=== NAME  
+=== RUN   TestConstants
+=== PAUSE TestConstants
+=== NAME  
+=== CONT  TestAutoService_Search_EmptyQuery
+=== CONT  TestEscapeLikePattern
+=== CONT  TestDescribeService_Search_NetworkHTTP
+=== CONT  TestDescribeService_Search_CustomTagMapper
+=== CONT  TestService_Search_Limit
+=== CONT  TestService_Search_CwdFilter
+=== CONT  TestService_Search_RepoFilter
+=== CONT  TestService_Search_FTS5
+=== CONT  TestDescribeService_Search_Offset
+--- PASS: TestAutoService_Search_EmptyQuery (0.00s)
+=== CONT  TestDescribeService_Search_ScoreByOverlap
+=== CONT  TestDescribeService_Search_RepoFilter
+=== RUN   TestEscapeLikePattern/simple
+--- PASS: TestEscapeLikePattern/simple (0.00s)
+=== NAME  TestEscapeLikePattern
+=== RUN   TestEscapeLikePattern/with%percent
+--- PASS: TestEscapeLikePattern/with%percent (0.00s)
+=== NAME  TestEscapeLikePattern
+=== RUN   TestEscapeLikePattern/under_score
+--- PASS: TestEscapeLikePattern/under_score (0.00s)
+=== NAME  TestEscapeLikePattern
+=== RUN   TestEscapeLikePattern/mixed%_chars
+--- PASS: TestEscapeLikePattern/mixed%_chars (0.00s)
+=== NAME  TestEscapeLikePattern
+--- PASS: TestEscapeLikePattern (0.00s)
+=== CONT  TestService_Search_QuotedPhrase
+=== CONT  TestDescribeService_Search_EmptyQuery
+--- PASS: TestDescribeService_Search_NetworkHTTP (0.04s)
+--- PASS: TestDescribeService_Search_CustomTagMapper (0.05s)
+=== CONT  TestDescribeService_Search_NoTagMatch
+--- PASS: TestDescribeService_Search_ScoreByOverlap (0.05s)
+=== CONT  TestDescribeService_Search_MatchesByTags
+=== CONT  TestService_FallbackSearch
+--- PASS: TestDescribeService_Search_RepoFilter (0.06s)
+--- PASS: TestDescribeService_Search_EmptyQuery (0.03s)
+=== CONT  TestBackendConstants
+--- PASS: TestBackendConstants (0.00s)
+=== CONT  TestMergeResults_Deduplication
+--- PASS: TestMergeResults_Deduplication (0.00s)
+=== CONT  TestDescribeService_Search_ContainerQuery
+--- PASS: TestDescribeService_Search_Offset (0.07s)
+=== CONT  TestMaxScore
+=== RUN   TestMaxScore/empty
+--- PASS: TestMaxScore/empty (0.00s)
+=== NAME  TestMaxScore
+=== RUN   TestMaxScore/single
+--- PASS: TestMaxScore/single (0.00s)
+=== NAME  TestMaxScore
+=== RUN   TestMaxScore/multiple_negative
+--- PASS: TestMaxScore/multiple_negative (0.00s)
+=== NAME  TestMaxScore
+=== RUN   TestMaxScore/all_positive
+--- PASS: TestMaxScore/all_positive (0.00s)
+=== NAME  TestMaxScore
+--- PASS: TestMaxScore (0.00s)
+=== CONT  TestService_RebuildIndex
+--- PASS: TestDescribeService_Search_NoTagMatch (0.04s)
+=== CONT  TestDedupKey
+=== RUN   TestDedupKey/with_template_ID
+--- PASS: TestDedupKey/with_template_ID (0.00s)
+=== NAME  TestDedupKey
+=== RUN   TestDedupKey/without_template_ID
+--- PASS: TestDedupKey/without_template_ID (0.00s)
+=== NAME  TestDedupKey
+=== RUN   TestDedupKey/empty_template_ID
+--- PASS: TestDedupKey/empty_template_ID (0.00s)
+=== NAME  TestDedupKey
+--- PASS: TestDedupKey (0.00s)
+=== CONT  TestComputeMatchedTags
+=== RUN   TestComputeMatchedTags/full_overlap
+--- PASS: TestComputeMatchedTags/full_overlap (0.00s)
+=== NAME  TestComputeMatchedTags
+=== RUN   TestComputeMatchedTags/partial_overlap
+--- PASS: TestComputeMatchedTags/partial_overlap (0.00s)
+=== NAME  TestComputeMatchedTags
+=== RUN   TestComputeMatchedTags/no_overlap
+--- PASS: TestComputeMatchedTags/no_overlap (0.00s)
+=== NAME  TestComputeMatchedTags
+=== RUN   TestComputeMatchedTags/empty_tags
+--- PASS: TestComputeMatchedTags/empty_tags (0.00s)
+=== NAME  TestComputeMatchedTags
+--- PASS: TestComputeMatchedTags (0.00s)
+=== CONT  TestEscapeFTS5Query
+=== RUN   TestEscapeFTS5Query/simple
+--- PASS: TestEscapeFTS5Query/simple (0.00s)
+=== NAME  TestEscapeFTS5Query
+=== RUN   TestEscapeFTS5Query/"exact_phrase"
+--- PASS: TestEscapeFTS5Query/"exact_phrase" (0.00s)
+=== NAME  TestEscapeFTS5Query
+=== RUN   TestEscapeFTS5Query/with_"quotes"
+--- PASS: TestEscapeFTS5Query/with_"quotes" (0.00s)
+=== NAME  TestEscapeFTS5Query
+=== RUN   TestEscapeFTS5Query/docker_run
+--- PASS: TestEscapeFTS5Query/docker_run (0.00s)
+=== NAME  TestEscapeFTS5Query
+=== RUN   TestEscapeFTS5Query/git_commit_-m
+--- PASS: TestEscapeFTS5Query/git_commit_-m (0.00s)
+=== NAME  TestEscapeFTS5Query
+--- PASS: TestEscapeFTS5Query (0.00s)
+=== CONT  TestAutoService_Search_Limit
+--- PASS: TestDescribeService_Search_MatchesByTags (0.04s)
+=== CONT  TestDefaultDescriptionToTags
+=== RUN   TestDefaultDescriptionToTags/empty
+--- PASS: TestDefaultDescriptionToTags/empty (0.00s)
+=== NAME  TestDefaultDescriptionToTags
+=== RUN   TestDefaultDescriptionToTags/unknown_words
+--- PASS: TestDefaultDescriptionToTags/unknown_words (0.00s)
+=== NAME  TestDefaultDescriptionToTags
+=== RUN   TestDefaultDescriptionToTags/direct_tag_match
+--- PASS: TestDefaultDescriptionToTags/direct_tag_match (0.00s)
+=== NAME  TestDefaultDescriptionToTags
+=== RUN   TestDefaultDescriptionToTags/synonym_mapping
+--- PASS: TestDefaultDescriptionToTags/synonym_mapping (0.00s)
+=== NAME  TestDefaultDescriptionToTags
+=== RUN   TestDefaultDescriptionToTags/with_punctuation
+--- PASS: TestDefaultDescriptionToTags/with_punctuation (0.00s)
+=== NAME  TestDefaultDescriptionToTags
+--- PASS: TestDefaultDescriptionToTags (0.00s)
+=== CONT  TestAutoService_WeightNormalization
+--- PASS: TestAutoService_WeightNormalization (0.00s)
+=== CONT  TestAutoService_DefaultWeights
+--- PASS: TestAutoService_DefaultWeights (0.00s)
+=== CONT  TestAutoService_Search_NoResults
+--- PASS: TestDescribeService_Search_ContainerQuery (0.04s)
+=== CONT  TestService_Search_EmptyQuery
+--- PASS: TestService_Search_CwdFilter (0.12s)
+=== CONT  TestService_Search_Offset
+--- PASS: TestService_Search_QuotedPhrase (0.12s)
+=== CONT  TestConstants
+--- PASS: TestConstants (0.00s)
+=== CONT  TestMergeResults_EnrichesFTSWithTags
+--- PASS: TestMergeResults_EnrichesFTSWithTags (0.00s)
+=== CONT  TestAutoConfig_Defaults
+--- PASS: TestAutoConfig_Defaults (0.00s)
+=== CONT  TestAutoService_Search_Offset
+--- PASS: TestAutoService_Search_NoResults (0.03s)
+=== CONT  TestService_NewService
+--- PASS: TestService_Search_FTS5 (0.13s)
+=== CONT  TestAutoService_Search_DescribeOnlyWhenFTSNil
+=== CONT  TestService_Search_EphemeralNotIndexed
+--- PASS: TestService_Search_RepoFilter (0.14s)
+--- PASS: TestService_FallbackSearch (0.09s)
+=== CONT  TestDefaultConfig
+--- PASS: TestDefaultConfig (0.00s)
+=== CONT  TestAutoService_Search_MergesFTSAndDescribe
+2026/02/20 09:31:31 INFO rebuilding FTS5 index
+--- PASS: TestAutoService_Search_DescribeOnlyWhenFTSNil (0.04s)
+=== CONT  TestService_IndexEventBatch
+--- PASS: TestAutoService_Search_Offset (0.07s)
+--- PASS: TestService_Search_EmptyQuery (0.09s)
+--- PASS: TestAutoService_Search_MergesFTSAndDescribe (0.05s)
+2026/02/20 09:31:31 INFO FTS5 index rebuilt duration=35.338666ms
+--- PASS: TestService_NewService (0.09s)
+--- PASS: TestService_RebuildIndex (0.14s)
+--- PASS: TestAutoService_Search_Limit (0.13s)
+--- PASS: TestService_Search_EphemeralNotIndexed (0.09s)
+--- PASS: TestService_Search_Offset (0.12s)
+--- PASS: TestService_IndexEventBatch (0.08s)
+--- PASS: TestService_Search_Limit (0.25s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/search	2.671s

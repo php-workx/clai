@@ -1,0 +1,4 @@
+# test log
+open testdata/fuzz/FuzzNormalize
+open testdata/fuzz/FuzzExtractTemplate
+open testdata/fuzz/FuzzSplitPipeline

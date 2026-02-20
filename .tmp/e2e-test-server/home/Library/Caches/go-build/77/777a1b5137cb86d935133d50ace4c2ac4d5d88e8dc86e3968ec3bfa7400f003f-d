@@ -1,0 +1,815 @@
+=== RUN   TestParseEvent_ValidMinimal
+--- PASS: TestParseEvent_ValidMinimal (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_ValidFull
+--- PASS: TestParseEvent_ValidFull (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_AllShells
+=== RUN   TestParseEvent_AllShells/bash
+--- PASS: TestParseEvent_AllShells/bash (0.00s)
+=== NAME  TestParseEvent_AllShells
+=== RUN   TestParseEvent_AllShells/zsh
+--- PASS: TestParseEvent_AllShells/zsh (0.00s)
+=== NAME  TestParseEvent_AllShells
+=== RUN   TestParseEvent_AllShells/fish
+--- PASS: TestParseEvent_AllShells/fish (0.00s)
+=== NAME  TestParseEvent_AllShells
+--- PASS: TestParseEvent_AllShells (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_InvalidVersion
+=== RUN   TestParseEvent_InvalidVersion/version_0
+--- PASS: TestParseEvent_InvalidVersion/version_0 (0.00s)
+=== NAME  TestParseEvent_InvalidVersion
+=== RUN   TestParseEvent_InvalidVersion/version_2
+--- PASS: TestParseEvent_InvalidVersion/version_2 (0.00s)
+=== NAME  TestParseEvent_InvalidVersion
+=== RUN   TestParseEvent_InvalidVersion/version_-1
+--- PASS: TestParseEvent_InvalidVersion/version_-1 (0.00s)
+=== NAME  TestParseEvent_InvalidVersion
+=== RUN   TestParseEvent_InvalidVersion/version_99
+--- PASS: TestParseEvent_InvalidVersion/version_99 (0.00s)
+=== NAME  TestParseEvent_InvalidVersion
+--- PASS: TestParseEvent_InvalidVersion (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_InvalidShell
+=== RUN   TestParseEvent_InvalidShell/uppercase_bash
+--- PASS: TestParseEvent_InvalidShell/uppercase_bash (0.00s)
+=== NAME  TestParseEvent_InvalidShell
+=== RUN   TestParseEvent_InvalidShell/uppercase_zsh
+--- PASS: TestParseEvent_InvalidShell/uppercase_zsh (0.00s)
+=== NAME  TestParseEvent_InvalidShell
+=== RUN   TestParseEvent_InvalidShell/uppercase_fish
+--- PASS: TestParseEvent_InvalidShell/uppercase_fish (0.00s)
+=== NAME  TestParseEvent_InvalidShell
+=== RUN   TestParseEvent_InvalidShell/powershell
+--- PASS: TestParseEvent_InvalidShell/powershell (0.00s)
+=== NAME  TestParseEvent_InvalidShell
+=== RUN   TestParseEvent_InvalidShell/sh
+--- PASS: TestParseEvent_InvalidShell/sh (0.00s)
+=== NAME  TestParseEvent_InvalidShell
+=== RUN   TestParseEvent_InvalidShell/ksh
+--- PASS: TestParseEvent_InvalidShell/ksh (0.00s)
+=== NAME  TestParseEvent_InvalidShell
+=== RUN   TestParseEvent_InvalidShell/tcsh
+--- PASS: TestParseEvent_InvalidShell/tcsh (0.00s)
+=== NAME  TestParseEvent_InvalidShell
+=== RUN   TestParseEvent_InvalidShell/unknown
+--- PASS: TestParseEvent_InvalidShell/unknown (0.00s)
+=== NAME  TestParseEvent_InvalidShell
+--- PASS: TestParseEvent_InvalidShell (0.01s)
+=== NAME  
+=== RUN   TestParseEvent_MissingRequiredFields
+=== RUN   TestParseEvent_MissingRequiredFields/missing_type
+--- PASS: TestParseEvent_MissingRequiredFields/missing_type (0.00s)
+=== NAME  TestParseEvent_MissingRequiredFields
+=== RUN   TestParseEvent_MissingRequiredFields/missing_session_id
+--- PASS: TestParseEvent_MissingRequiredFields/missing_session_id (0.00s)
+=== NAME  TestParseEvent_MissingRequiredFields
+=== RUN   TestParseEvent_MissingRequiredFields/missing_shell
+--- PASS: TestParseEvent_MissingRequiredFields/missing_shell (0.00s)
+=== NAME  TestParseEvent_MissingRequiredFields
+=== RUN   TestParseEvent_MissingRequiredFields/missing_cwd
+--- PASS: TestParseEvent_MissingRequiredFields/missing_cwd (0.00s)
+=== NAME  TestParseEvent_MissingRequiredFields
+=== RUN   TestParseEvent_MissingRequiredFields/missing_cmd_raw
+--- PASS: TestParseEvent_MissingRequiredFields/missing_cmd_raw (0.00s)
+=== NAME  TestParseEvent_MissingRequiredFields
+--- PASS: TestParseEvent_MissingRequiredFields (0.01s)
+=== NAME  
+=== RUN   TestParseEvent_EmptyRequiredFields
+=== RUN   TestParseEvent_EmptyRequiredFields/empty_type
+--- PASS: TestParseEvent_EmptyRequiredFields/empty_type (0.00s)
+=== NAME  TestParseEvent_EmptyRequiredFields
+=== RUN   TestParseEvent_EmptyRequiredFields/empty_session_id
+--- PASS: TestParseEvent_EmptyRequiredFields/empty_session_id (0.00s)
+=== NAME  TestParseEvent_EmptyRequiredFields
+=== RUN   TestParseEvent_EmptyRequiredFields/empty_shell
+--- PASS: TestParseEvent_EmptyRequiredFields/empty_shell (0.00s)
+=== NAME  TestParseEvent_EmptyRequiredFields
+=== RUN   TestParseEvent_EmptyRequiredFields/empty_cwd
+--- PASS: TestParseEvent_EmptyRequiredFields/empty_cwd (0.00s)
+=== NAME  TestParseEvent_EmptyRequiredFields
+=== RUN   TestParseEvent_EmptyRequiredFields/empty_cmd_raw
+--- PASS: TestParseEvent_EmptyRequiredFields/empty_cmd_raw (0.00s)
+=== NAME  TestParseEvent_EmptyRequiredFields
+--- PASS: TestParseEvent_EmptyRequiredFields (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_MissingTimestamp
+--- PASS: TestParseEvent_MissingTimestamp (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_ZeroTimestamp
+--- PASS: TestParseEvent_ZeroTimestamp (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_OptionalFields
+=== RUN   TestParseEvent_OptionalFields/duration_ms_omitted
+--- PASS: TestParseEvent_OptionalFields/duration_ms_omitted (0.00s)
+=== NAME  TestParseEvent_OptionalFields
+=== RUN   TestParseEvent_OptionalFields/duration_ms_zero
+--- PASS: TestParseEvent_OptionalFields/duration_ms_zero (0.00s)
+=== NAME  TestParseEvent_OptionalFields
+=== RUN   TestParseEvent_OptionalFields/ephemeral_omitted_defaults_to_false
+--- PASS: TestParseEvent_OptionalFields/ephemeral_omitted_defaults_to_false (0.00s)
+=== NAME  TestParseEvent_OptionalFields
+=== RUN   TestParseEvent_OptionalFields/ephemeral_true
+--- PASS: TestParseEvent_OptionalFields/ephemeral_true (0.00s)
+=== NAME  TestParseEvent_OptionalFields
+--- PASS: TestParseEvent_OptionalFields (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_ExitCodeVariations
+=== RUN   TestParseEvent_ExitCodeVariations/exit_code_0
+--- PASS: TestParseEvent_ExitCodeVariations/exit_code_0 (0.00s)
+=== NAME  TestParseEvent_ExitCodeVariations
+=== RUN   TestParseEvent_ExitCodeVariations/exit_code_1
+--- PASS: TestParseEvent_ExitCodeVariations/exit_code_1 (0.00s)
+=== NAME  TestParseEvent_ExitCodeVariations
+=== RUN   TestParseEvent_ExitCodeVariations/exit_code_127
+--- PASS: TestParseEvent_ExitCodeVariations/exit_code_127 (0.00s)
+=== NAME  TestParseEvent_ExitCodeVariations
+=== RUN   TestParseEvent_ExitCodeVariations/exit_code_255
+--- PASS: TestParseEvent_ExitCodeVariations/exit_code_255 (0.00s)
+=== NAME  TestParseEvent_ExitCodeVariations
+=== RUN   TestParseEvent_ExitCodeVariations/exit_code_-1
+--- PASS: TestParseEvent_ExitCodeVariations/exit_code_-1 (0.00s)
+=== NAME  TestParseEvent_ExitCodeVariations
+--- PASS: TestParseEvent_ExitCodeVariations (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_InvalidJSON
+=== RUN   TestParseEvent_InvalidJSON/empty_input
+--- PASS: TestParseEvent_InvalidJSON/empty_input (0.00s)
+=== NAME  TestParseEvent_InvalidJSON
+=== RUN   TestParseEvent_InvalidJSON/nil_input
+--- PASS: TestParseEvent_InvalidJSON/nil_input (0.00s)
+=== NAME  TestParseEvent_InvalidJSON
+=== RUN   TestParseEvent_InvalidJSON/invalid_json
+--- PASS: TestParseEvent_InvalidJSON/invalid_json (0.00s)
+=== NAME  TestParseEvent_InvalidJSON
+=== RUN   TestParseEvent_InvalidJSON/incomplete_json
+--- PASS: TestParseEvent_InvalidJSON/incomplete_json (0.00s)
+=== NAME  TestParseEvent_InvalidJSON
+=== RUN   TestParseEvent_InvalidJSON/just_a_number
+--- PASS: TestParseEvent_InvalidJSON/just_a_number (0.00s)
+=== NAME  TestParseEvent_InvalidJSON
+=== RUN   TestParseEvent_InvalidJSON/just_a_string
+--- PASS: TestParseEvent_InvalidJSON/just_a_string (0.00s)
+=== NAME  TestParseEvent_InvalidJSON
+=== RUN   TestParseEvent_InvalidJSON/array_instead_of_object
+--- PASS: TestParseEvent_InvalidJSON/array_instead_of_object (0.00s)
+=== NAME  TestParseEvent_InvalidJSON
+--- PASS: TestParseEvent_InvalidJSON (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_SpecialCharacters
+=== RUN   TestParseEvent_SpecialCharacters/command_with_quotes
+--- PASS: TestParseEvent_SpecialCharacters/command_with_quotes (0.00s)
+=== NAME  TestParseEvent_SpecialCharacters
+=== RUN   TestParseEvent_SpecialCharacters/command_with_newlines
+--- PASS: TestParseEvent_SpecialCharacters/command_with_newlines (0.00s)
+=== NAME  TestParseEvent_SpecialCharacters
+=== RUN   TestParseEvent_SpecialCharacters/command_with_unicode
+--- PASS: TestParseEvent_SpecialCharacters/command_with_unicode (0.00s)
+=== NAME  TestParseEvent_SpecialCharacters
+=== RUN   TestParseEvent_SpecialCharacters/cwd_with_spaces
+--- PASS: TestParseEvent_SpecialCharacters/cwd_with_spaces (0.00s)
+=== NAME  TestParseEvent_SpecialCharacters
+--- PASS: TestParseEvent_SpecialCharacters (0.00s)
+=== NAME  
+=== RUN   TestParseEventLine
+=== RUN   TestParseEventLine/with_trailing_newline
+--- PASS: TestParseEventLine/with_trailing_newline (0.00s)
+=== NAME  TestParseEventLine
+=== RUN   TestParseEventLine/with_crlf
+--- PASS: TestParseEventLine/with_crlf (0.00s)
+=== NAME  TestParseEventLine
+=== RUN   TestParseEventLine/without_newline
+--- PASS: TestParseEventLine/without_newline (0.00s)
+=== NAME  TestParseEventLine
+--- PASS: TestParseEventLine (0.00s)
+=== NAME  
+=== RUN   TestValidateEvent_NilEvent
+--- PASS: TestValidateEvent_NilEvent (0.00s)
+=== NAME  
+=== RUN   TestValidateEvent_ValidEvent
+--- PASS: TestValidateEvent_ValidEvent (0.00s)
+=== NAME  
+=== RUN   TestParseEvent_LargeCommand
+--- PASS: TestParseEvent_LargeCommand (0.00s)
+=== NAME  
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough
+=== PAUSE TestToLossyUTF8_ValidUTF8Passthrough
+=== NAME  
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced
+=== PAUSE TestToLossyUTF8_InvalidSequencesReplaced
+=== NAME  
+=== RUN   TestToLossyUTF8_MixedValidInvalid
+=== PAUSE TestToLossyUTF8_MixedValidInvalid
+=== NAME  
+=== RUN   TestToLossyUTF8_NULByteHandling
+=== PAUSE TestToLossyUTF8_NULByteHandling
+=== NAME  
+=== RUN   TestToLossyUTF8_EmptyInput
+=== PAUSE TestToLossyUTF8_EmptyInput
+=== NAME  
+=== RUN   TestToLossyUTF8_OutputIsValidUTF8
+=== PAUSE TestToLossyUTF8_OutputIsValidUTF8
+=== NAME  
+=== RUN   TestToLossyUTF8_LargeInput
+=== PAUSE TestToLossyUTF8_LargeInput
+=== NAME  
+=== RUN   TestContainsNUL
+=== PAUSE TestContainsNUL
+=== NAME  
+=== RUN   TestWritePath_NilContext
+=== PAUSE TestWritePath_NilContext
+=== NAME  
+=== RUN   TestWritePath_NilDB
+=== PAUSE TestWritePath_NilDB
+=== NAME  
+=== RUN   TestWritePath_BasicEvent
+=== PAUSE TestWritePath_BasicEvent
+=== NAME  
+=== RUN   TestWritePath_CommandEventInserted
+=== PAUSE TestWritePath_CommandEventInserted
+=== NAME  
+=== RUN   TestWritePath_CommandTemplateUpserted
+=== PAUSE TestWritePath_CommandTemplateUpserted
+=== NAME  
+=== RUN   TestWritePath_CommandTemplateUpsertPreservesFirstSeen
+=== PAUSE TestWritePath_CommandTemplateUpsertPreservesFirstSeen
+=== NAME  
+=== RUN   TestWritePath_CommandStatUpdated
+=== PAUSE TestWritePath_CommandStatUpdated
+=== NAME  
+=== RUN   TestWritePath_CommandStatFailure
+=== PAUSE TestWritePath_CommandStatFailure
+=== NAME  
+=== RUN   TestWritePath_CommandStatRepoScope
+=== PAUSE TestWritePath_CommandStatRepoScope
+=== NAME  
+=== RUN   TestWritePath_CommandStatDecay
+=== PAUSE TestWritePath_CommandStatDecay
+=== NAME  
+=== RUN   TestWritePath_TransitionStatNoHistory
+=== PAUSE TestWritePath_TransitionStatNoHistory
+=== NAME  
+=== RUN   TestWritePath_TransitionStatRecorded
+=== PAUSE TestWritePath_TransitionStatRecorded
+=== NAME  
+=== RUN   TestWritePath_TransitionStatRepoScope
+=== PAUSE TestWritePath_TransitionStatRepoScope
+=== NAME  
+=== RUN   TestWritePath_SlotStatsUpdated
+=== PAUSE TestWritePath_SlotStatsUpdated
+=== NAME  
+=== RUN   TestWritePath_SlotStatsNoSlots
+=== PAUSE TestWritePath_SlotStatsNoSlots
+=== NAME  
+=== RUN   TestWritePath_SlotCorrelationsUpdated
+=== PAUSE TestWritePath_SlotCorrelationsUpdated
+=== NAME  
+=== RUN   TestWritePath_SlotCorrelationsSkippedWhenFewSlots
+=== PAUSE TestWritePath_SlotCorrelationsSkippedWhenFewSlots
+=== NAME  
+=== RUN   TestWritePath_ProjectTypeStatUpdated
+=== PAUSE TestWritePath_ProjectTypeStatUpdated
+=== NAME  
+=== RUN   TestWritePath_ProjectTypeTransitionUpdated
+=== PAUSE TestWritePath_ProjectTypeTransitionUpdated
+=== NAME  
+=== RUN   TestWritePath_NoProjectTypesSkipsStep
+=== PAUSE TestWritePath_NoProjectTypesSkipsStep
+=== NAME  
+=== RUN   TestWritePath_DirectoryScopedAggregates
+=== PAUSE TestWritePath_DirectoryScopedAggregates
+=== NAME  
+=== RUN   TestWritePath_DirectoryScopedTransition
+=== PAUSE TestWritePath_DirectoryScopedTransition
+=== NAME  
+=== RUN   TestWritePath_PipelineSimpleCommand
+=== PAUSE TestWritePath_PipelineSimpleCommand
+=== NAME  
+=== RUN   TestWritePath_PipelineCompoundCommand
+=== PAUSE TestWritePath_PipelineCompoundCommand
+=== NAME  
+=== RUN   TestWritePath_PipelineThreeSegments
+=== PAUSE TestWritePath_PipelineThreeSegments
+=== NAME  
+=== RUN   TestWritePath_PipelineAndOperator
+=== PAUSE TestWritePath_PipelineAndOperator
+=== NAME  
+=== RUN   TestWritePath_FailureRecoveryNotRecordedWithoutPrevFailure
+=== PAUSE TestWritePath_FailureRecoveryNotRecordedWithoutPrevFailure
+=== NAME  
+=== RUN   TestWritePath_FailureRecoveryRecorded
+=== PAUSE TestWritePath_FailureRecoveryRecorded
+=== NAME  
+=== RUN   TestWritePath_FailureRecoverySuccessRateAveraged
+=== PAUSE TestWritePath_FailureRecoverySuccessRateAveraged
+=== NAME  
+=== RUN   TestWritePath_CacheInvalidated
+=== PAUSE TestWritePath_CacheInvalidated
+=== NAME  
+=== RUN   TestWritePath_CacheNotInvalidatedOnNilCache
+=== PAUSE TestWritePath_CacheNotInvalidatedOnNilCache
+=== NAME  
+=== RUN   TestWritePath_AtomicRollbackOnFailure
+=== PAUSE TestWritePath_AtomicRollbackOnFailure
+=== NAME  
+=== RUN   TestPrepareWriteContext_Basic
+=== PAUSE TestPrepareWriteContext_Basic
+=== NAME  
+=== RUN   TestPrepareWriteContext_WithAliases
+=== PAUSE TestPrepareWriteContext_WithAliases
+=== NAME  
+=== RUN   TestPrepareWriteContext_WithPrevFailure
+=== PAUSE TestPrepareWriteContext_WithPrevFailure
+=== NAME  
+=== RUN   TestComputeDirScope
+=== PAUSE TestComputeDirScope
+=== NAME  
+=== RUN   TestBuildSlotKey
+=== PAUSE TestBuildSlotKey
+=== NAME  
+=== RUN   TestClassifyExitCode
+=== PAUSE TestClassifyExitCode
+=== NAME  
+=== RUN   TestBuildOperatorChain
+=== PAUSE TestBuildOperatorChain
+=== NAME  
+=== RUN   TestWritePath_MultipleEvents
+=== PAUSE TestWritePath_MultipleEvents
+=== NAME  
+=== RUN   TestWritePath_SameCommandMultipleTimes
+=== PAUSE TestWritePath_SameCommandMultipleTimes
+=== NAME  
+=== RUN   TestWritePath_EphemeralEvent
+=== PAUSE TestWritePath_EphemeralEvent
+=== NAME  
+=== RUN   TestWritePath_LongCommand
+=== PAUSE TestWritePath_LongCommand
+=== NAME  
+=== RUN   TestWritePath_CommandWithUnicode
+=== PAUSE TestWritePath_CommandWithUnicode
+=== NAME  
+=== RUN   TestWritePath_CommandWithDuration
+=== PAUSE TestWritePath_CommandWithDuration
+=== NAME  
+=== RUN   TestWritePath_AllStepsTogether
+=== PAUSE TestWritePath_AllStepsTogether
+=== NAME  
+=== RUN   TestWritePath_PipelineGoTestGrepFAIL
+=== PAUSE TestWritePath_PipelineGoTestGrepFAIL
+=== NAME  
+=== RUN   TestWritePath_PipelineMaxSegmentsEnforced
+=== PAUSE TestWritePath_PipelineMaxSegmentsEnforced
+=== NAME  
+=== RUN   TestWritePath_PipelineDefaultMaxSegments
+=== PAUSE TestWritePath_PipelineDefaultMaxSegments
+=== NAME  
+=== RUN   TestWritePath_PipelineRepoScoped
+=== PAUSE TestWritePath_PipelineRepoScoped
+=== NAME  
+=== RUN   TestWritePath_PipelineSemicolonOperator
+=== PAUSE TestWritePath_PipelineSemicolonOperator
+=== NAME  
+=== RUN   TestWritePath_PipelineOrOperator
+=== PAUSE TestWritePath_PipelineOrOperator
+=== NAME  
+=== RUN   TestWritePath_PipelinePatternCountIncremented
+=== PAUSE TestWritePath_PipelinePatternCountIncremented
+=== NAME  
+=== RUN   TestWritePath_PipelineTransitionWeightIncremented
+=== PAUSE TestWritePath_PipelineTransitionWeightIncremented
+=== NAME  
+=== RUN   TestWritePath_PipelineMixedOperators
+=== PAUSE TestWritePath_PipelineMixedOperators
+=== NAME  
+=== CONT  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/empty_string
+=== CONT  TestWritePath_PipelineMixedOperators
+=== CONT  TestWritePath_LongCommand
+=== CONT  TestWritePath_CacheNotInvalidatedOnNilCache
+=== CONT  TestWritePath_DirectoryScopedTransition
+=== CONT  TestWritePath_PipelineTransitionWeightIncremented
+=== CONT  TestWritePath_DirectoryScopedAggregates
+=== CONT  TestWritePath_PipelineOrOperator
+=== CONT  TestWritePath_FailureRecoveryNotRecordedWithoutPrevFailure
+=== CONT  TestWritePath_PipelineCompoundCommand
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/empty_string (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/ascii_only
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/ascii_only (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/ascii_with_punctuation
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/ascii_with_punctuation (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/ascii_with_numbers
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/ascii_with_numbers (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/multi-byte_latin
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/multi-byte_latin (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/german
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/german (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/french
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/french (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/cyrillic
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/cyrillic (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/chinese
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/chinese (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/japanese_hiragana
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/japanese_hiragana (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/japanese_kanji
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/japanese_kanji (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/korean
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/korean (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/arabic
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/arabic (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/hebrew
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/hebrew (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/thai
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/thai (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/emoji_simple
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/emoji_simple (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/emoji_complex
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/emoji_complex (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/emoji_flag
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/emoji_flag (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/mixed_ascii_and_emoji
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/mixed_ascii_and_emoji (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/mixed_scripts
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/mixed_scripts (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/newlines_and_tabs
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/newlines_and_tabs (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/shell_command_with_unicode
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/shell_command_with_unicode (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/path_with_spaces
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/path_with_spaces (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/special_chars
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/special_chars (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/escape_sequences
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/escape_sequences (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/zero-width_joiner
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/zero-width_joiner (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/BOM
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/BOM (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/mathematical_symbols
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/mathematical_symbols (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/currency_symbols
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/currency_symbols (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/arrows
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/arrows (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+=== RUN   TestToLossyUTF8_ValidUTF8Passthrough/box_drawing
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough/box_drawing (0.00s)
+=== NAME  TestToLossyUTF8_ValidUTF8Passthrough
+--- PASS: TestToLossyUTF8_ValidUTF8Passthrough (0.04s)
+=== CONT  TestWritePath_CacheInvalidated
+--- PASS: TestWritePath_FailureRecoveryNotRecordedWithoutPrevFailure (0.53s)
+=== CONT  TestWritePath_PipelineThreeSegments
+--- PASS: TestWritePath_PipelineMixedOperators (0.76s)
+=== CONT  TestWritePath_PipelineAndOperator
+--- PASS: TestWritePath_PipelineCompoundCommand (0.73s)
+=== CONT  TestWritePath_CommandWithDuration
+--- PASS: TestWritePath_PipelineOrOperator (0.81s)
+=== CONT  TestWritePath_PipelineSemicolonOperator
+--- PASS: TestWritePath_CacheNotInvalidatedOnNilCache (0.81s)
+=== CONT  TestWritePath_PipelineRepoScoped
+--- PASS: TestWritePath_LongCommand (0.90s)
+=== CONT  TestWritePath_PipelinePatternCountIncremented
+--- PASS: TestWritePath_DirectoryScopedAggregates (0.94s)
+=== CONT  TestWritePath_PipelineMaxSegmentsEnforced
+--- PASS: TestWritePath_PipelineTransitionWeightIncremented (0.97s)
+=== CONT  TestWritePath_PipelineGoTestGrepFAIL
+--- PASS: TestWritePath_PipelineThreeSegments (0.43s)
+=== CONT  TestWritePath_PipelineDefaultMaxSegments
+--- PASS: TestWritePath_CacheInvalidated (1.10s)
+=== CONT  TestWritePath_CommandStatUpdated
+--- PASS: TestWritePath_DirectoryScopedTransition (1.16s)
+=== CONT  TestWritePath_NoProjectTypesSkipsStep
+--- PASS: TestWritePath_PipelineAndOperator (0.52s)
+=== CONT  TestWritePath_SameCommandMultipleTimes
+--- PASS: TestWritePath_CommandWithDuration (0.58s)
+=== CONT  TestWritePath_CommandWithUnicode
+--- PASS: TestWritePath_PipelineMaxSegmentsEnforced (0.42s)
+=== CONT  TestWritePath_AllStepsTogether
+--- PASS: TestWritePath_PipelineRepoScoped (0.63s)
+=== CONT  TestWritePath_EphemeralEvent
+--- PASS: TestWritePath_PipelineSemicolonOperator (0.67s)
+=== CONT  TestWritePath_FailureRecoverySuccessRateAveraged
+--- PASS: TestWritePath_PipelineDefaultMaxSegments (0.52s)
+=== CONT  TestWritePath_AtomicRollbackOnFailure
+--- PASS: TestWritePath_NoProjectTypesSkipsStep (0.42s)
+=== CONT  TestContainsNUL
+=== RUN   TestContainsNUL/#00
+--- PASS: TestContainsNUL/#00 (0.00s)
+=== NAME  TestContainsNUL
+=== RUN   TestContainsNUL/#01
+--- PASS: TestContainsNUL/#01 (0.00s)
+=== NAME  TestContainsNUL
+=== RUN   TestContainsNUL/hello
+--- PASS: TestContainsNUL/hello (0.00s)
+=== NAME  TestContainsNUL
+=== RUN   TestContainsNUL/\x00
+--- PASS: TestContainsNUL/\x00 (0.00s)
+=== NAME  TestContainsNUL
+=== RUN   TestContainsNUL/a\x00b
+--- PASS: TestContainsNUL/a\x00b (0.00s)
+=== NAME  TestContainsNUL
+=== RUN   TestContainsNUL/\x00a
+--- PASS: TestContainsNUL/\x00a (0.00s)
+=== NAME  TestContainsNUL
+=== RUN   TestContainsNUL/a\x00
+--- PASS: TestContainsNUL/a\x00 (0.00s)
+=== NAME  TestContainsNUL
+=== RUN   TestContainsNUL/\x01\x02\x03
+--- PASS: TestContainsNUL/\x01\x02\x03 (0.00s)
+=== NAME  TestContainsNUL
+--- PASS: TestContainsNUL (0.00s)
+=== CONT  TestWritePath_CommandEventInserted
+--- PASS: TestWritePath_PipelineGoTestGrepFAIL (0.62s)
+=== CONT  TestWritePath_CommandTemplateUpserted
+--- PASS: TestWritePath_CommandStatUpdated (0.52s)
+=== CONT  TestWritePath_NilDB
+--- PASS: TestWritePath_NilDB (0.00s)
+=== CONT  TestWritePath_BasicEvent
+--- PASS: TestWritePath_PipelinePatternCountIncremented (0.74s)
+=== CONT  TestWritePath_NilContext
+--- PASS: TestWritePath_SameCommandMultipleTimes (0.46s)
+=== CONT  TestToLossyUTF8_LargeInput
+=== CONT  TestToLossyUTF8_OutputIsValidUTF8
+--- PASS: TestToLossyUTF8_LargeInput (0.01s)
+--- PASS: TestToLossyUTF8_OutputIsValidUTF8 (0.00s)
+=== CONT  TestWritePath_FailureRecoveryRecorded
+--- PASS: TestWritePath_EphemeralEvent (0.34s)
+=== CONT  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/single_invalid_byte_0x80
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/single_invalid_byte_0x80 (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/single_invalid_byte_0xFF
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/single_invalid_byte_0xFF (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/invalid_byte_0xFE
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/invalid_byte_0xFE (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/truncated_2-byte_sequence
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/truncated_2-byte_sequence (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/truncated_3-byte_sequence_missing_1
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/truncated_3-byte_sequence_missing_1 (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/truncated_3-byte_sequence_missing_2
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/truncated_3-byte_sequence_missing_2 (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/truncated_4-byte_sequence_missing_1
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/truncated_4-byte_sequence_missing_1 (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/truncated_4-byte_sequence_missing_2
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/truncated_4-byte_sequence_missing_2 (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/truncated_4-byte_sequence_missing_3
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/truncated_4-byte_sequence_missing_3 (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/invalid_continuation_byte
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/invalid_continuation_byte (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/overlong_encoding_for_ASCII
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/overlong_encoding_for_ASCII (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/overlong_encoding_3-byte_for_2-byte_char
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/overlong_encoding_3-byte_for_2-byte_char (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/invalid_start_byte_followed_by_valid
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/invalid_start_byte_followed_by_valid (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/valid_followed_by_invalid
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/valid_followed_by_invalid (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/multiple_consecutive_invalid_bytes
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/multiple_consecutive_invalid_bytes (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/surrogate_pair_(invalid_in_UTF-8)
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/surrogate_pair_(invalid_in_UTF-8) (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+=== RUN   TestToLossyUTF8_InvalidSequencesReplaced/code_point_above_U+10FFFF
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced/code_point_above_U+10FFFF (0.00s)
+=== NAME  TestToLossyUTF8_InvalidSequencesReplaced
+--- PASS: TestToLossyUTF8_InvalidSequencesReplaced (0.00s)
+=== CONT  TestToLossyUTF8_EmptyInput
+--- PASS: TestToLossyUTF8_EmptyInput (0.00s)
+=== CONT  TestToLossyUTF8_MixedValidInvalid
+=== RUN   TestToLossyUTF8_MixedValidInvalid/invalid_between_valid_ASCII
+--- PASS: TestToLossyUTF8_MixedValidInvalid/invalid_between_valid_ASCII (0.00s)
+=== NAME  TestToLossyUTF8_MixedValidInvalid
+=== RUN   TestToLossyUTF8_MixedValidInvalid/invalid_between_valid_multi-byte
+--- PASS: TestToLossyUTF8_MixedValidInvalid/invalid_between_valid_multi-byte (0.00s)
+=== NAME  TestToLossyUTF8_MixedValidInvalid
+=== RUN   TestToLossyUTF8_MixedValidInvalid/invalid_at_start,_valid_emoji_at_end
+--- PASS: TestToLossyUTF8_MixedValidInvalid/invalid_at_start,_valid_emoji_at_end (0.00s)
+=== NAME  TestToLossyUTF8_MixedValidInvalid
+=== RUN   TestToLossyUTF8_MixedValidInvalid/valid_emoji_at_start,_invalid_at_end
+--- PASS: TestToLossyUTF8_MixedValidInvalid/valid_emoji_at_start,_invalid_at_end (0.00s)
+=== NAME  TestToLossyUTF8_MixedValidInvalid
+=== RUN   TestToLossyUTF8_MixedValidInvalid/alternating_valid_and_invalid
+--- PASS: TestToLossyUTF8_MixedValidInvalid/alternating_valid_and_invalid (0.00s)
+=== NAME  TestToLossyUTF8_MixedValidInvalid
+=== RUN   TestToLossyUTF8_MixedValidInvalid/valid_UTF-8_command_with_trailing_invalid
+--- PASS: TestToLossyUTF8_MixedValidInvalid/valid_UTF-8_command_with_trailing_invalid (0.00s)
+=== NAME  TestToLossyUTF8_MixedValidInvalid
+=== RUN   TestToLossyUTF8_MixedValidInvalid/valid_path_with_embedded_invalid_byte
+--- PASS: TestToLossyUTF8_MixedValidInvalid/valid_path_with_embedded_invalid_byte (0.00s)
+=== NAME  TestToLossyUTF8_MixedValidInvalid
+--- PASS: TestToLossyUTF8_MixedValidInvalid (0.00s)
+=== CONT  TestToLossyUTF8_NULByteHandling
+=== RUN   TestToLossyUTF8_NULByteHandling/single_NUL_byte
+--- PASS: TestToLossyUTF8_NULByteHandling/single_NUL_byte (0.00s)
+=== NAME  TestToLossyUTF8_NULByteHandling
+=== RUN   TestToLossyUTF8_NULByteHandling/NUL_at_start
+--- PASS: TestToLossyUTF8_NULByteHandling/NUL_at_start (0.00s)
+=== NAME  TestToLossyUTF8_NULByteHandling
+=== RUN   TestToLossyUTF8_NULByteHandling/NUL_at_end
+--- PASS: TestToLossyUTF8_NULByteHandling/NUL_at_end (0.00s)
+=== NAME  TestToLossyUTF8_NULByteHandling
+=== RUN   TestToLossyUTF8_NULByteHandling/NUL_in_middle
+--- PASS: TestToLossyUTF8_NULByteHandling/NUL_in_middle (0.00s)
+=== NAME  TestToLossyUTF8_NULByteHandling
+=== RUN   TestToLossyUTF8_NULByteHandling/multiple_NUL_bytes
+--- PASS: TestToLossyUTF8_NULByteHandling/multiple_NUL_bytes (0.00s)
+=== NAME  TestToLossyUTF8_NULByteHandling
+=== RUN   TestToLossyUTF8_NULByteHandling/NUL_between_multi-byte_chars
+--- PASS: TestToLossyUTF8_NULByteHandling/NUL_between_multi-byte_chars (0.00s)
+=== NAME  TestToLossyUTF8_NULByteHandling
+=== RUN   TestToLossyUTF8_NULByteHandling/NUL_after_emoji
+--- PASS: TestToLossyUTF8_NULByteHandling/NUL_after_emoji (0.00s)
+=== NAME  TestToLossyUTF8_NULByteHandling
+=== RUN   TestToLossyUTF8_NULByteHandling/NUL_and_invalid_byte_together
+--- PASS: TestToLossyUTF8_NULByteHandling/NUL_and_invalid_byte_together (0.00s)
+=== NAME  TestToLossyUTF8_NULByteHandling
+=== RUN   TestToLossyUTF8_NULByteHandling/command_with_embedded_NUL
+--- PASS: TestToLossyUTF8_NULByteHandling/command_with_embedded_NUL (0.00s)
+=== NAME  TestToLossyUTF8_NULByteHandling
+--- PASS: TestToLossyUTF8_NULByteHandling (0.00s)
+=== CONT  TestWritePath_TransitionStatRepoScope
+--- PASS: TestWritePath_CommandWithUnicode (0.45s)
+=== CONT  TestWritePath_PipelineSimpleCommand
+--- PASS: TestWritePath_AllStepsTogether (0.43s)
+=== CONT  TestWritePath_ProjectTypeStatUpdated
+=== CONT  TestWritePath_SlotCorrelationsSkippedWhenFewSlots
+=== CONT  TestWritePath_ProjectTypeTransitionUpdated
+--- PASS: TestWritePath_FailureRecoverySuccessRateAveraged (0.39s)
+--- PASS: TestWritePath_AtomicRollbackOnFailure (0.35s)
+--- PASS: TestWritePath_CommandEventInserted (0.34s)
+=== CONT  TestWritePath_SlotCorrelationsUpdated
+--- PASS: TestWritePath_NilContext (0.27s)
+=== CONT  TestWritePath_SlotStatsUpdated
+--- PASS: TestWritePath_BasicEvent (0.28s)
+=== CONT  TestWritePath_MultipleEvents
+--- PASS: TestWritePath_CommandTemplateUpserted (0.34s)
+=== CONT  TestPrepareWriteContext_WithPrevFailure
+=== CONT  TestBuildOperatorChain
+=== CONT  TestClassifyExitCode
+--- PASS: TestPrepareWriteContext_WithPrevFailure (0.00s)
+--- PASS: TestClassifyExitCode (0.00s)
+--- PASS: TestBuildOperatorChain (0.00s)
+=== CONT  TestBuildSlotKey
+--- PASS: TestBuildSlotKey (0.00s)
+=== CONT  TestComputeDirScope
+--- PASS: TestComputeDirScope (0.00s)
+=== CONT  TestPrepareWriteContext_WithAliases
+--- PASS: TestPrepareWriteContext_WithAliases (0.00s)
+=== CONT  TestPrepareWriteContext_Basic
+=== CONT  TestWritePath_TransitionStatNoHistory
+--- PASS: TestPrepareWriteContext_Basic (0.00s)
+--- PASS: TestWritePath_TransitionStatRepoScope (0.23s)
+=== CONT  TestWritePath_SlotStatsNoSlots
+--- PASS: TestWritePath_FailureRecoveryRecorded (0.27s)
+=== CONT  TestWritePath_TransitionStatRecorded
+--- PASS: TestWritePath_PipelineSimpleCommand (0.24s)
+=== CONT  TestWritePath_CommandStatDecay
+--- PASS: TestWritePath_ProjectTypeStatUpdated (0.25s)
+=== CONT  TestWritePath_CommandStatRepoScope
+--- PASS: TestWritePath_SlotCorrelationsSkippedWhenFewSlots (0.21s)
+=== CONT  TestWritePath_CommandStatFailure
+--- PASS: TestWritePath_ProjectTypeTransitionUpdated (0.24s)
+=== CONT  TestWritePath_CommandTemplateUpsertPreservesFirstSeen
+--- PASS: TestWritePath_SlotCorrelationsUpdated (0.24s)
+--- PASS: TestWritePath_SlotStatsUpdated (0.26s)
+--- PASS: TestWritePath_TransitionStatNoHistory (0.26s)
+--- PASS: TestWritePath_MultipleEvents (0.29s)
+--- PASS: TestWritePath_CommandStatRepoScope (0.21s)
+--- PASS: TestWritePath_TransitionStatRecorded (0.24s)
+--- PASS: TestWritePath_SlotStatsNoSlots (0.25s)
+--- PASS: TestWritePath_CommandStatDecay (0.24s)
+--- PASS: TestWritePath_CommandStatFailure (0.19s)
+--- PASS: TestWritePath_CommandTemplateUpsertPreservesFirstSeen (0.17s)
+=== RUN   FuzzParseEvent
+=== RUN   FuzzParseEvent/seed#0
+--- PASS: FuzzParseEvent/seed#0 (0.00s)
+=== NAME  FuzzParseEvent
+=== RUN   FuzzParseEvent/seed#1
+--- PASS: FuzzParseEvent/seed#1 (0.00s)
+=== NAME  FuzzParseEvent
+=== RUN   FuzzParseEvent/seed#2
+--- PASS: FuzzParseEvent/seed#2 (0.00s)
+=== NAME  FuzzParseEvent
+=== RUN   FuzzParseEvent/seed#3
+--- PASS: FuzzParseEvent/seed#3 (0.00s)
+=== NAME  FuzzParseEvent
+=== RUN   FuzzParseEvent/seed#4
+--- PASS: FuzzParseEvent/seed#4 (0.00s)
+=== NAME  FuzzParseEvent
+=== RUN   FuzzParseEvent/seed#5
+--- PASS: FuzzParseEvent/seed#5 (0.00s)
+=== NAME  FuzzParseEvent
+=== RUN   FuzzParseEvent/seed#6
+--- PASS: FuzzParseEvent/seed#6 (0.00s)
+=== NAME  FuzzParseEvent
+--- PASS: FuzzParseEvent (0.00s)
+=== NAME  
+=== RUN   FuzzParseEventLine
+=== RUN   FuzzParseEventLine/seed#0
+--- PASS: FuzzParseEventLine/seed#0 (0.00s)
+=== NAME  FuzzParseEventLine
+=== RUN   FuzzParseEventLine/seed#1
+--- PASS: FuzzParseEventLine/seed#1 (0.00s)
+=== NAME  FuzzParseEventLine
+=== RUN   FuzzParseEventLine/seed#2
+--- PASS: FuzzParseEventLine/seed#2 (0.00s)
+=== NAME  FuzzParseEventLine
+=== RUN   FuzzParseEventLine/seed#3
+--- PASS: FuzzParseEventLine/seed#3 (0.00s)
+=== NAME  FuzzParseEventLine
+=== RUN   FuzzParseEventLine/seed#4
+--- PASS: FuzzParseEventLine/seed#4 (0.00s)
+=== NAME  FuzzParseEventLine
+--- PASS: FuzzParseEventLine (0.00s)
+=== NAME  
+=== RUN   FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#0
+--- PASS: FuzzToLossyUTF8/seed#0 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#1
+--- PASS: FuzzToLossyUTF8/seed#1 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#2
+--- PASS: FuzzToLossyUTF8/seed#2 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#3
+--- PASS: FuzzToLossyUTF8/seed#3 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#4
+--- PASS: FuzzToLossyUTF8/seed#4 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#5
+--- PASS: FuzzToLossyUTF8/seed#5 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#6
+--- PASS: FuzzToLossyUTF8/seed#6 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#7
+--- PASS: FuzzToLossyUTF8/seed#7 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#8
+--- PASS: FuzzToLossyUTF8/seed#8 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#9
+--- PASS: FuzzToLossyUTF8/seed#9 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#10
+--- PASS: FuzzToLossyUTF8/seed#10 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#11
+--- PASS: FuzzToLossyUTF8/seed#11 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#12
+--- PASS: FuzzToLossyUTF8/seed#12 (0.00s)
+=== NAME  FuzzToLossyUTF8
+=== RUN   FuzzToLossyUTF8/seed#13
+--- PASS: FuzzToLossyUTF8/seed#13 (0.00s)
+=== NAME  FuzzToLossyUTF8
+--- PASS: FuzzToLossyUTF8 (0.00s)
+=== NAME  
+PASS
+ok  	github.com/runger/clai/internal/suggestions/ingest	5.438s

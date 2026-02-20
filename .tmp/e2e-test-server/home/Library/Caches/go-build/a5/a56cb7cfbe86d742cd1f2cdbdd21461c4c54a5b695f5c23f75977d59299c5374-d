@@ -1,0 +1,142 @@
+=== RUN   TestParsePlaybook_BasicTasks
+=== PAUSE TestParsePlaybook_BasicTasks
+=== NAME  
+=== RUN   TestParsePlaybook_ExtendedFields
+=== PAUSE TestParsePlaybook_ExtendedFields
+=== NAME  
+=== RUN   TestParsePlaybook_CircularDependency
+=== PAUSE TestParsePlaybook_CircularDependency
+=== NAME  
+=== RUN   TestParsePlaybook_CircularDependencyThreeNodes
+=== PAUSE TestParsePlaybook_CircularDependencyThreeNodes
+=== NAME  
+=== RUN   TestNextTasks_AfterSuccessfulCommand
+=== PAUSE TestNextTasks_AfterSuccessfulCommand
+=== NAME  
+=== RUN   TestNextTasks_AfterFailedCommand
+=== PAUSE TestNextTasks_AfterFailedCommand
+=== NAME  
+=== RUN   TestNextTasks_MatchByCommand
+=== PAUSE TestNextTasks_MatchByCommand
+=== NAME  
+=== RUN   TestNextTasks_NoMatch
+=== PAUSE TestNextTasks_NoMatch
+=== NAME  
+=== RUN   TestParsePlaybook_EmptyPlaybook
+=== PAUSE TestParsePlaybook_EmptyPlaybook
+=== NAME  
+=== RUN   TestParsePlaybook_InvalidYAML
+=== PAUSE TestParsePlaybook_InvalidYAML
+=== NAME  
+=== RUN   TestParsePlaybook_MissingName
+=== PAUSE TestParsePlaybook_MissingName
+=== NAME  
+=== RUN   TestParsePlaybook_MissingCommand
+=== PAUSE TestParsePlaybook_MissingCommand
+=== NAME  
+=== RUN   TestParsePlaybook_MissingAfterTarget
+=== PAUSE TestParsePlaybook_MissingAfterTarget
+=== NAME  
+=== RUN   TestParsePlaybook_MissingAfterFailureTarget
+=== PAUSE TestParsePlaybook_MissingAfterFailureTarget
+=== NAME  
+=== RUN   TestParsePlaybook_DuplicateTaskName
+=== PAUSE TestParsePlaybook_DuplicateTaskName
+=== NAME  
+=== RUN   TestParsePlaybook_InvalidPriority
+=== PAUSE TestParsePlaybook_InvalidPriority
+=== NAME  
+=== RUN   TestParsePlaybook_DisabledTask
+=== PAUSE TestParsePlaybook_DisabledTask
+=== NAME  
+=== RUN   TestParsePlaybook_PrioritySorting
+=== PAUSE TestParsePlaybook_PrioritySorting
+=== NAME  
+=== RUN   TestPlaybook_WorkflowAssociations
+=== PAUSE TestPlaybook_WorkflowAssociations
+=== NAME  
+=== RUN   TestPlaybook_TaskNames
+=== PAUSE TestPlaybook_TaskNames
+=== NAME  
+=== RUN   TestLoadPlaybook_FromFile
+=== PAUSE TestLoadPlaybook_FromFile
+=== NAME  
+=== RUN   TestLoadPlaybook_FileNotFound
+=== PAUSE TestLoadPlaybook_FileNotFound
+=== NAME  
+=== RUN   TestTask_IsEnabled_Default
+=== PAUSE TestTask_IsEnabled_Default
+=== NAME  
+=== RUN   TestTask_PriorityWeight_Unknown
+=== PAUSE TestTask_PriorityWeight_Unknown
+=== NAME  
+=== RUN   TestPlaybook_GetTask_NotFound
+=== PAUSE TestPlaybook_GetTask_NotFound
+=== NAME  
+=== RUN   TestParsePlaybook_DAGValidation_NoCycle
+=== PAUSE TestParsePlaybook_DAGValidation_NoCycle
+=== NAME  
+=== RUN   TestNextTasks_DisabledTasksExcluded
+=== PAUSE TestNextTasks_DisabledTasksExcluded
+=== NAME  
+=== RUN   TestParsePlaybook_CaseSensitivePriority
+=== PAUSE TestParsePlaybook_CaseSensitivePriority
+=== NAME  
+=== CONT  TestParsePlaybook_ExtendedFields
+=== CONT  TestParsePlaybook_MissingAfterFailureTarget
+=== CONT  TestNextTasks_MatchByCommand
+=== CONT  TestParsePlaybook_InvalidPriority
+=== CONT  TestParsePlaybook_MissingCommand
+--- PASS: TestParsePlaybook_MissingAfterFailureTarget (0.00s)
+=== CONT  TestParsePlaybook_CaseSensitivePriority
+--- PASS: TestParsePlaybook_MissingCommand (0.00s)
+=== CONT  TestPlaybook_GetTask_NotFound
+--- PASS: TestParsePlaybook_InvalidPriority (0.00s)
+--- PASS: TestNextTasks_MatchByCommand (0.00s)
+=== CONT  TestNextTasks_DisabledTasksExcluded
+=== CONT  TestParsePlaybook_MissingAfterTarget
+--- PASS: TestPlaybook_GetTask_NotFound (0.00s)
+=== CONT  TestParsePlaybook_DAGValidation_NoCycle
+--- PASS: TestParsePlaybook_CaseSensitivePriority (0.00s)
+=== CONT  TestLoadPlaybook_FileNotFound
+--- PASS: TestParsePlaybook_ExtendedFields (0.00s)
+=== CONT  TestTask_IsEnabled_Default
+--- PASS: TestTask_IsEnabled_Default (0.00s)
+=== CONT  TestPlaybook_WorkflowAssociations
+--- PASS: TestLoadPlaybook_FileNotFound (0.00s)
+=== CONT  TestParsePlaybook_InvalidYAML
+=== CONT  TestTask_PriorityWeight_Unknown
+--- PASS: TestTask_PriorityWeight_Unknown (0.00s)
+=== CONT  TestNextTasks_NoMatch
+--- PASS: TestParsePlaybook_InvalidYAML (0.00s)
+=== CONT  TestNextTasks_AfterSuccessfulCommand
+=== CONT  TestParsePlaybook_MissingName
+--- PASS: TestNextTasks_DisabledTasksExcluded (0.00s)
+=== CONT  TestParsePlaybook_DisabledTask
+--- PASS: TestParsePlaybook_DAGValidation_NoCycle (0.00s)
+=== CONT  TestParsePlaybook_PrioritySorting
+--- PASS: TestParsePlaybook_MissingName (0.00s)
+--- PASS: TestNextTasks_NoMatch (0.00s)
+=== CONT  TestParsePlaybook_CircularDependency
+=== CONT  TestLoadPlaybook_FromFile
+--- PASS: TestPlaybook_WorkflowAssociations (0.00s)
+=== CONT  TestParsePlaybook_DuplicateTaskName
+--- PASS: TestParsePlaybook_DisabledTask (0.00s)
+=== CONT  TestParsePlaybook_CircularDependencyThreeNodes
+--- PASS: TestParsePlaybook_MissingAfterTarget (0.00s)
+--- PASS: TestParsePlaybook_PrioritySorting (0.00s)
+=== CONT  TestParsePlaybook_BasicTasks
+=== CONT  TestNextTasks_AfterFailedCommand
+=== CONT  TestParsePlaybook_EmptyPlaybook
+--- PASS: TestParsePlaybook_DuplicateTaskName (0.00s)
+=== CONT  TestPlaybook_TaskNames
+--- PASS: TestParsePlaybook_BasicTasks (0.00s)
+--- PASS: TestParsePlaybook_CircularDependency (0.00s)
+--- PASS: TestNextTasks_AfterSuccessfulCommand (0.00s)
+--- PASS: TestParsePlaybook_CircularDependencyThreeNodes (0.00s)
+--- PASS: TestParsePlaybook_EmptyPlaybook (0.00s)
+--- PASS: TestNextTasks_AfterFailedCommand (0.00s)
+--- PASS: TestPlaybook_TaskNames (0.00s)
+--- PASS: TestLoadPlaybook_FromFile (0.00s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/playbook	1.807s

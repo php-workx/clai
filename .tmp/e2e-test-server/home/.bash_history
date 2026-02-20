@@ -1,14 +1,3 @@
-echo apricot
-git status
-command one
-command two
-command three
-echo 'selected command'
-selected
-echo unique_session_test_command_12345
-echo session_specific_command
-echo this_is_a_very_long_command_that_should_be_truncated_in_the_middle_with_an_ellipsis_indicator_to_show_both_start_and_end
-echo UNIQUE_START_marker_this_is_a_very_long_command_with_lots_of_text_in_the_middle_UNIQUE_END_marker
 UNIQUE_START
 echo CLIPBOARD_START_this_is_a_very_long_command_for_clipboard_test_CLIPBOARD_END
 source ~/.clai/shell/bash.sh
@@ -498,3 +487,14 @@ cd /tmp/reason-test && clai suggest --format=json
 git status
 make build
 clai suggest --format=json
+echo suggest_text_seed_one
+echo suggest_text_seed_two
+clai suggest echo --limit=3
+echo suggest_json_seed_one
+echo suggest_json_seed_two
+clai suggest echo --format=json --limit=3
+git status
+git log --oneline
+npm test
+make build
+clai suggest git --format=fzf --limit=5

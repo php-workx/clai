@@ -1,0 +1,359 @@
+=== RUN   TestBash_SourceWithoutError
+=== PAUSE TestBash_SourceWithoutError
+=== NAME  
+=== RUN   TestBash_TabCompletionIntegration
+=== PAUSE TestBash_TabCompletionIntegration
+=== NAME  
+=== RUN   TestBash_AcceptCommandWorks
+=== PAUSE TestBash_AcceptCommandWorks
+=== NAME  
+=== RUN   TestBash_ClearSuggestionWorks
+=== PAUSE TestBash_ClearSuggestionWorks
+=== NAME  
+=== RUN   TestBash_NaturalLanguagePrefix
+=== PAUSE TestBash_NaturalLanguagePrefix
+=== NAME  
+=== RUN   TestBash_RunWrapperExists
+=== PAUSE TestBash_RunWrapperExists
+=== NAME  
+=== RUN   TestBash_AIFixFunctionExists
+=== PAUSE TestBash_AIFixFunctionExists
+=== NAME  
+=== RUN   TestBash_AIFunctionExists
+=== PAUSE TestBash_AIFunctionExists
+=== NAME  
+=== RUN   TestBash_VoiceFunctionExists
+=== PAUSE TestBash_VoiceFunctionExists
+=== NAME  
+=== RUN   TestBash_PromptCommandSet
+=== PAUSE TestBash_PromptCommandSet
+=== NAME  
+=== RUN   TestBash_DoctorShowsCorrectShell
+=== PAUSE TestBash_DoctorShowsCorrectShell
+=== NAME  
+=== RUN   TestBash_InstallDetectsShell
+=== PAUSE TestBash_InstallDetectsShell
+=== NAME  
+=== RUN   TestBash_StatusShowsCorrectShell
+=== PAUSE TestBash_StatusShowsCorrectShell
+=== NAME  
+=== RUN   TestBash_HistoryFallbackWhenDisabled
+=== PAUSE TestBash_HistoryFallbackWhenDisabled
+=== NAME  
+=== RUN   TestFish_SourceWithoutError
+=== PAUSE TestFish_SourceWithoutError
+=== NAME  
+=== RUN   TestFish_RightPromptFunction
+=== PAUSE TestFish_RightPromptFunction
+=== NAME  
+=== RUN   TestFish_AltEnterBinding
+=== PAUSE TestFish_AltEnterBinding
+=== NAME  
+=== RUN   TestFish_VoiceModeFunction
+=== PAUSE TestFish_VoiceModeFunction
+=== NAME  
+=== RUN   TestFish_RunWrapperExists
+=== PAUSE TestFish_RunWrapperExists
+=== NAME  
+=== RUN   TestFish_AIFixFunctionExists
+=== PAUSE TestFish_AIFixFunctionExists
+=== NAME  
+=== RUN   TestFish_AIFunctionExists
+=== PAUSE TestFish_AIFunctionExists
+=== NAME  
+=== RUN   TestFish_VoiceFunctionExists
+=== PAUSE TestFish_VoiceFunctionExists
+=== NAME  
+=== RUN   TestFish_CacheDirCreated
+=== PAUSE TestFish_CacheDirCreated
+=== NAME  
+=== RUN   TestFish_EnterBindingForVoice
+=== PAUSE TestFish_EnterBindingForVoice
+=== NAME  
+=== RUN   TestFish_EscapeBindingClears
+=== PAUSE TestFish_EscapeBindingClears
+=== NAME  
+=== RUN   TestFish_HistoryFunctionExists
+=== PAUSE TestFish_HistoryFunctionExists
+=== NAME  
+=== RUN   TestFish_SessionIDExists
+=== PAUSE TestFish_SessionIDExists
+=== NAME  
+=== RUN   TestFish_DoctorShowsCorrectShell
+=== PAUSE TestFish_DoctorShowsCorrectShell
+=== NAME  
+=== RUN   TestFish_InstallDetectsShell
+=== PAUSE TestFish_InstallDetectsShell
+=== NAME  
+=== RUN   TestFish_StatusShowsCorrectShell
+=== PAUSE TestFish_StatusShowsCorrectShell
+=== NAME  
+=== RUN   TestBash_HookMissingGracefulHandling
+=== PAUSE TestBash_HookMissingGracefulHandling
+=== NAME  
+=== RUN   TestBash_WorksWithoutDaemon
+=== PAUSE TestBash_WorksWithoutDaemon
+=== NAME  
+=== RUN   TestZsh_SessionCleanupOnExit
+=== PAUSE TestZsh_SessionCleanupOnExit
+=== NAME  
+=== RUN   TestBash_GitContextRefreshOnCD
+=== PAUSE TestBash_GitContextRefreshOnCD
+=== NAME  
+=== RUN   TestBash_NonInteractiveBashC_DoesNotRunHooks
+=== PAUSE TestBash_NonInteractiveBashC_DoesNotRunHooks
+=== NAME  
+=== RUN   TestBash_NonInteractiveScript_DoesNotRunHooks
+=== PAUSE TestBash_NonInteractiveScript_DoesNotRunHooks
+=== NAME  
+=== RUN   TestPerformance_ZshIntegrationOverhead
+=== PAUSE TestPerformance_ZshIntegrationOverhead
+=== NAME  
+=== RUN   TestPerformance_BashIntegrationOverhead
+=== PAUSE TestPerformance_BashIntegrationOverhead
+=== NAME  
+=== RUN   TestPerformance_FishIntegrationOverhead
+=== PAUSE TestPerformance_FishIntegrationOverhead
+=== NAME  
+=== RUN   TestPerformance_InitCommandFast
+=== PAUSE TestPerformance_InitCommandFast
+=== NAME  
+=== RUN   TestPerformance_SourceScriptFast
+=== PAUSE TestPerformance_SourceScriptFast
+=== NAME  
+=== RUN   TestPerformance_NoBlockingIPCOnStartup
+=== PAUSE TestPerformance_NoBlockingIPCOnStartup
+=== NAME  
+=== RUN   TestZsh_SourceWithoutError
+=== PAUSE TestZsh_SourceWithoutError
+=== NAME  
+=== RUN   TestZsh_EvalWithHistoryAlias
+=== PAUSE TestZsh_EvalWithHistoryAlias
+=== NAME  
+=== RUN   TestZsh_SuggestionAppearsInRightPrompt
+=== PAUSE TestZsh_SuggestionAppearsInRightPrompt
+=== NAME  
+=== RUN   TestZsh_LongSuggestionTruncated
+=== PAUSE TestZsh_LongSuggestionTruncated
+=== NAME  
+=== RUN   TestZsh_RightArrowAcceptsSuggestion
+=== PAUSE TestZsh_RightArrowAcceptsSuggestion
+=== NAME  
+=== RUN   TestZsh_GhostTextPersistsAfterSpace
+=== PAUSE TestZsh_GhostTextPersistsAfterSpace
+=== NAME  
+=== RUN   TestZsh_EscapeNotBound
+=== PAUSE TestZsh_EscapeNotBound
+=== NAME  
+=== RUN   TestZsh_WorksWithExistingRPS1
+=== PAUSE TestZsh_WorksWithExistingRPS1
+=== NAME  
+=== RUN   TestZsh_NaturalLanguagePrefix
+=== PAUSE TestZsh_NaturalLanguagePrefix
+=== NAME  
+=== RUN   TestZsh_CtrlSpaceShowsMenu
+=== PAUSE TestZsh_CtrlSpaceShowsMenu
+=== NAME  
+=== RUN   TestZsh_DoctorShowsCorrectShell
+=== PAUSE TestZsh_DoctorShowsCorrectShell
+=== NAME  
+=== RUN   TestZsh_StatusShowsCorrectShell
+=== PAUSE TestZsh_StatusShowsCorrectShell
+=== NAME  
+=== RUN   TestZsh_InstallDetectsShell
+=== PAUSE TestZsh_InstallDetectsShell
+=== NAME  
+=== RUN   TestZsh_ZLEResetPromptWithWidgetGuard
+=== PAUSE TestZsh_ZLEResetPromptWithWidgetGuard
+=== NAME  
+=== RUN   TestZsh_HistoryFallbackWhenDisabled
+=== PAUSE TestZsh_HistoryFallbackWhenDisabled
+=== NAME  
+=== CONT  TestBash_NaturalLanguagePrefix
+=== CONT  TestFish_InstallDetectsShell
+=== CONT  TestZsh_SourceWithoutError
+=== CONT  TestPerformance_NoBlockingIPCOnStartup
+=== CONT  TestPerformance_SourceScriptFast
+=== RUN   TestPerformance_NoBlockingIPCOnStartup/zsh
+=== RUN   TestPerformance_SourceScriptFast/zsh
+=== CONT  TestZsh_EvalWithHistoryAlias
+=== CONT  TestPerformance_FishIntegrationOverhead
+=== CONT  TestPerformance_BashIntegrationOverhead
+=== CONT  TestPerformance_InitCommandFast
+=== CONT  TestPerformance_ZshIntegrationOverhead
+=== RUN   TestPerformance_InitCommandFast/zsh
+    performance_test.go:227: clai init zsh average time: 13.285991ms (over 5 runs)
+--- PASS: TestPerformance_InitCommandFast/zsh (0.07s)
+=== NAME  TestPerformance_InitCommandFast
+=== RUN   TestPerformance_InitCommandFast/bash
+=== NAME  TestPerformance_ZshIntegrationOverhead
+    performance_test.go:93: zsh baseline startup: 111.444459ms
+=== NAME  TestPerformance_InitCommandFast/bash
+    performance_test.go:227: clai init bash average time: 13.738408ms (over 5 runs)
+--- PASS: TestPerformance_InitCommandFast/bash (0.07s)
+=== NAME  TestPerformance_InitCommandFast
+=== RUN   TestPerformance_InitCommandFast/fish
+=== NAME  TestPerformance_BashIntegrationOverhead
+    performance_test.go:119: bash baseline startup: 138.743875ms
+=== CONT  TestBash_NonInteractiveBashC_DoesNotRunHooks
+--- PASS: TestZsh_EvalWithHistoryAlias (0.16s)
+--- PASS: TestBash_NonInteractiveBashC_DoesNotRunHooks (0.01s)
+=== CONT  TestBash_GitContextRefreshOnCD
+--- PASS: TestZsh_SourceWithoutError (0.19s)
+=== CONT  TestBash_NonInteractiveScript_DoesNotRunHooks
+--- PASS: TestBash_NonInteractiveScript_DoesNotRunHooks (0.01s)
+=== CONT  TestBash_WorksWithoutDaemon
+=== NAME  TestPerformance_InitCommandFast/fish
+    performance_test.go:227: clai init fish average time: 14.733149ms (over 5 runs)
+--- PASS: TestPerformance_InitCommandFast/fish (0.07s)
+=== NAME  TestPerformance_InitCommandFast
+=== CONT  TestBash_HookMissingGracefulHandling
+--- PASS: TestPerformance_InitCommandFast (0.21s)
+=== NAME  TestPerformance_SourceScriptFast/zsh
+    performance_test.go:288: zsh source time: 13.770166ms
+--- PASS: TestPerformance_SourceScriptFast/zsh (0.33s)
+=== NAME  TestPerformance_SourceScriptFast
+=== RUN   TestPerformance_SourceScriptFast/bash
+=== NAME  TestPerformance_FishIntegrationOverhead
+    performance_test.go:172: fish clai source time: 914.417µs
+--- PASS: TestPerformance_FishIntegrationOverhead (0.33s)
+=== CONT  TestZsh_SessionCleanupOnExit
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/zsh
+    performance_test.go:415: zsh iteration 0: 332.489584ms
+=== NAME  TestPerformance_ZshIntegrationOverhead
+    performance_test.go:97: zsh with clai startup: 307.647917ms
+    performance_test.go:101: zsh clai overhead: 196.203458ms
+--- PASS: TestPerformance_ZshIntegrationOverhead (0.42s)
+=== CONT  TestBash_AIFunctionExists
+=== NAME  TestPerformance_BashIntegrationOverhead
+    performance_test.go:123: bash with clai startup: 308.966292ms
+    performance_test.go:127: bash clai overhead: 170.222417ms
+--- PASS: TestPerformance_BashIntegrationOverhead (0.45s)
+=== CONT  TestBash_HistoryFallbackWhenDisabled
+=== CONT  TestFish_SourceWithoutError
+--- PASS: TestBash_WorksWithoutDaemon (0.41s)
+--- PASS: TestBash_NaturalLanguagePrefix (0.61s)
+=== CONT  TestBash_StatusShowsCorrectShell
+--- PASS: TestFish_InstallDetectsShell (0.61s)
+=== CONT  TestBash_DoctorShowsCorrectShell
+--- PASS: TestBash_HookMissingGracefulHandling (0.41s)
+=== CONT  TestBash_PromptCommandSet
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/zsh
+    performance_test.go:415: zsh iteration 1: 305.792125ms
+=== NAME  TestPerformance_SourceScriptFast/bash
+    performance_test.go:288: bash source time: 9.7175ms
+--- PASS: TestPerformance_SourceScriptFast/bash (0.32s)
+=== NAME  TestPerformance_SourceScriptFast
+=== RUN   TestPerformance_SourceScriptFast/fish
+--- PASS: TestBash_HistoryFallbackWhenDisabled (0.36s)
+=== CONT  TestBash_VoiceFunctionExists
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/zsh
+    performance_test.go:415: zsh iteration 2: 306.069417ms
+    performance_test.go:417: zsh average: 314.783708ms, max deviation: 17.705876ms
+--- PASS: TestPerformance_NoBlockingIPCOnStartup/zsh (0.95s)
+=== NAME  TestPerformance_NoBlockingIPCOnStartup
+=== RUN   TestPerformance_NoBlockingIPCOnStartup/bash
+=== NAME  TestPerformance_SourceScriptFast/fish
+    performance_test.go:330: fish source time: 992.125µs
+--- PASS: TestPerformance_SourceScriptFast/fish (0.31s)
+=== NAME  TestPerformance_SourceScriptFast
+--- PASS: TestPerformance_SourceScriptFast (0.95s)
+=== CONT  TestBash_ClearSuggestionWorks
+=== CONT  TestBash_AIFixFunctionExists
+--- PASS: TestBash_AIFunctionExists (0.62s)
+--- PASS: TestFish_SourceWithoutError (0.61s)
+=== CONT  TestBash_InstallDetectsShell
+--- PASS: TestBash_PromptCommandSet (0.61s)
+=== CONT  TestBash_RunWrapperExists
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/bash
+    performance_test.go:415: bash iteration 0: 307.825875ms
+--- PASS: TestBash_VoiceFunctionExists (0.62s)
+=== CONT  TestBash_TabCompletionIntegration
+--- PASS: TestBash_DoctorShowsCorrectShell (0.94s)
+=== CONT  TestBash_AcceptCommandWorks
+=== CONT  TestZsh_WorksWithExistingRPS1
+--- PASS: TestBash_StatusShowsCorrectShell (0.94s)
+=== CONT  TestZsh_ZLEResetPromptWithWidgetGuard
+--- PASS: TestBash_GitContextRefreshOnCD (1.39s)
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/bash
+    performance_test.go:415: bash iteration 1: 306.63225ms
+--- PASS: TestBash_ClearSuggestionWorks (0.62s)
+=== CONT  TestZsh_InstallDetectsShell
+--- PASS: TestBash_AIFixFunctionExists (0.62s)
+=== CONT  TestZsh_StatusShowsCorrectShell
+--- PASS: TestZsh_ZLEResetPromptWithWidgetGuard (0.12s)
+=== CONT  TestZsh_DoctorShowsCorrectShell
+=== CONT  TestZsh_CtrlSpaceShowsMenu
+--- PASS: TestBash_InstallDetectsShell (0.61s)
+--- PASS: TestBash_RunWrapperExists (0.62s)
+=== CONT  TestZsh_HistoryFallbackWhenDisabled
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/bash
+    performance_test.go:415: bash iteration 2: 307.157041ms
+    performance_test.go:417: bash average: 307.205055ms, max deviation: 620.82µs
+--- PASS: TestPerformance_NoBlockingIPCOnStartup/bash (0.92s)
+=== NAME  TestPerformance_NoBlockingIPCOnStartup
+=== RUN   TestPerformance_NoBlockingIPCOnStartup/fish
+--- PASS: TestZsh_WorksWithExistingRPS1 (0.60s)
+=== CONT  TestFish_VoiceFunctionExists
+--- PASS: TestBash_AcceptCommandWorks (0.62s)
+=== CONT  TestFish_DoctorShowsCorrectShell
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/fish
+    performance_test.go:447: fish iteration 0: 2.144125ms
+--- PASS: TestZsh_InstallDetectsShell (0.61s)
+=== CONT  TestFish_SessionIDExists
+--- PASS: TestZsh_HistoryFallbackWhenDisabled (0.35s)
+=== CONT  TestFish_HistoryFunctionExists
+--- PASS: TestZsh_StatusShowsCorrectShell (0.61s)
+=== CONT  TestFish_EscapeBindingClears
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/fish
+    performance_test.go:447: fish iteration 1: 636.375µs
+--- PASS: TestFish_VoiceFunctionExists (0.61s)
+=== CONT  TestFish_EnterBindingForVoice
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/fish
+    performance_test.go:447: fish iteration 2: 720.292µs
+--- PASS: TestFish_SessionIDExists (0.61s)
+=== CONT  TestFish_CacheDirCreated
+=== NAME  TestPerformance_NoBlockingIPCOnStartup/fish
+    performance_test.go:450: fish average: 1.16693ms, max deviation: 977.195µs
+--- PASS: TestPerformance_NoBlockingIPCOnStartup/fish (0.92s)
+=== NAME  TestPerformance_NoBlockingIPCOnStartup
+--- PASS: TestPerformance_NoBlockingIPCOnStartup (2.79s)
+=== CONT  TestZsh_RightArrowAcceptsSuggestion
+--- PASS: TestFish_HistoryFunctionExists (0.61s)
+=== CONT  TestZsh_NaturalLanguagePrefix
+=== CONT  TestZsh_EscapeNotBound
+--- PASS: TestZsh_CtrlSpaceShowsMenu (1.01s)
+--- PASS: TestFish_EscapeBindingClears (0.61s)
+=== CONT  TestZsh_SuggestionAppearsInRightPrompt
+--- PASS: TestFish_DoctorShowsCorrectShell (0.91s)
+=== CONT  TestZsh_GhostTextPersistsAfterSpace
+--- PASS: TestZsh_NaturalLanguagePrefix (0.49s)
+=== CONT  TestFish_AIFixFunctionExists
+--- PASS: TestFish_EnterBindingForVoice (0.61s)
+=== CONT  TestFish_AIFunctionExists
+--- PASS: TestFish_CacheDirCreated (0.61s)
+=== CONT  TestFish_StatusShowsCorrectShell
+--- PASS: TestZsh_RightArrowAcceptsSuggestion (0.61s)
+=== CONT  TestFish_AltEnterBinding
+=== CONT  TestFish_VoiceModeFunction
+--- PASS: TestZsh_GhostTextPersistsAfterSpace (0.47s)
+--- PASS: TestZsh_EscapeNotBound (0.81s)
+=== CONT  TestBash_SourceWithoutError
+--- PASS: TestZsh_SuggestionAppearsInRightPrompt (0.81s)
+=== CONT  TestFish_RightPromptFunction
+--- PASS: TestFish_AIFixFunctionExists (0.61s)
+=== CONT  TestFish_RunWrapperExists
+--- PASS: TestFish_AIFunctionExists (0.61s)
+=== CONT  TestZsh_LongSuggestionTruncated
+--- PASS: TestFish_AltEnterBinding (0.61s)
+--- PASS: TestBash_TabCompletionIntegration (2.62s)
+--- PASS: TestFish_VoiceModeFunction (0.61s)
+--- PASS: TestBash_SourceWithoutError (0.62s)
+--- PASS: TestZsh_LongSuggestionTruncated (0.31s)
+--- PASS: TestFish_RightPromptFunction (0.61s)
+--- PASS: TestFish_StatusShowsCorrectShell (0.91s)
+--- PASS: TestFish_RunWrapperExists (0.61s)
+--- PASS: TestZsh_DoctorShowsCorrectShell (3.62s)
+--- PASS: TestZsh_SessionCleanupOnExit (10.21s)
+PASS
+ok  	github.com/runger/clai/tests/expect	12.408s

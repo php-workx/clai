@@ -1,0 +1,623 @@
+=== RUN   TestAliasExpand_NilExpander
+--- PASS: TestAliasExpand_NilExpander (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_NoMatch
+--- PASS: TestAliasExpand_NoMatch (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_Simple
+--- PASS: TestAliasExpand_Simple (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_WithArgs
+--- PASS: TestAliasExpand_WithArgs (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_Chained
+--- PASS: TestAliasExpand_Chained (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_MultiDepth
+--- PASS: TestAliasExpand_MultiDepth (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_CycleDetection
+--- PASS: TestAliasExpand_CycleDetection (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_SelfReferencing
+--- PASS: TestAliasExpand_SelfReferencing (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_EmptyCommand
+--- PASS: TestAliasExpand_EmptyCommand (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_WhitespaceCommand
+--- PASS: TestAliasExpand_WhitespaceCommand (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_BoundedDepth
+--- PASS: TestAliasExpand_BoundedDepth (0.00s)
+=== NAME  
+=== RUN   TestAliasExpand_CustomMaxDepth
+--- PASS: TestAliasExpand_CustomMaxDepth (0.00s)
+=== NAME  
+=== RUN   TestSplitFirstToken
+--- PASS: TestSplitFirstToken (0.00s)
+=== NAME  
+=== RUN   TestEnforceEventSize_WithinLimit
+--- PASS: TestEnforceEventSize_WithinLimit (0.00s)
+=== NAME  
+=== RUN   TestEnforceEventSize_ExceedsLimit
+--- PASS: TestEnforceEventSize_ExceedsLimit (0.00s)
+=== NAME  
+=== RUN   TestEnforceEventSize_ExactLimit
+--- PASS: TestEnforceEventSize_ExactLimit (0.00s)
+=== NAME  
+=== RUN   TestEnforceEventSize_DefaultLimit
+--- PASS: TestEnforceEventSize_DefaultLimit (0.00s)
+=== NAME  
+=== RUN   TestEnforceEventSize_PreservesContent
+--- PASS: TestEnforceEventSize_PreservesContent (0.00s)
+=== NAME  
+=== RUN   TestEnforceEventSize_EmptyString
+--- PASS: TestEnforceEventSize_EmptyString (0.00s)
+=== NAME  
+=== RUN   TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/simple_command_no_args
+--- PASS: TestNormalizer_Normalize/simple_command_no_args (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/command_with_flags_only
+--- PASS: TestNormalizer_Normalize/command_with_flags_only (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/cd_with_path
+--- PASS: TestNormalizer_Normalize/cd_with_path (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/cd_with_relative_path
+--- PASS: TestNormalizer_Normalize/cd_with_relative_path (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/cd_with_tilde_path
+--- PASS: TestNormalizer_Normalize/cd_with_tilde_path (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/cat_multiple_paths
+--- PASS: TestNormalizer_Normalize/cat_multiple_paths (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/git_status_(no_args)
+--- PASS: TestNormalizer_Normalize/git_status_(no_args) (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/git_commit_with_message
+--- PASS: TestNormalizer_Normalize/git_commit_with_message (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/git_checkout_branch
+--- PASS: TestNormalizer_Normalize/git_checkout_branch (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/git_add_paths
+--- PASS: TestNormalizer_Normalize/git_add_paths (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/git_push_remote_branch
+--- PASS: TestNormalizer_Normalize/git_push_remote_branch (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/git_show_SHA
+--- PASS: TestNormalizer_Normalize/git_show_SHA (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/git_clone_URL
+--- PASS: TestNormalizer_Normalize/git_clone_URL (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/git_clone_with_destination
+--- PASS: TestNormalizer_Normalize/git_clone_with_destination (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/npm_install
+--- PASS: TestNormalizer_Normalize/npm_install (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/npm_install_package
+--- PASS: TestNormalizer_Normalize/npm_install_package (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/npm_run_script
+--- PASS: TestNormalizer_Normalize/npm_run_script (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/go_test_path
+--- PASS: TestNormalizer_Normalize/go_test_path (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/go_build
+--- PASS: TestNormalizer_Normalize/go_build (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/pytest_with_path
+--- PASS: TestNormalizer_Normalize/pytest_with_path (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/kubectl_get_pods_with_namespace
+--- PASS: TestNormalizer_Normalize/kubectl_get_pods_with_namespace (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/docker_build
+--- PASS: TestNormalizer_Normalize/docker_build (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/docker_run
+--- PASS: TestNormalizer_Normalize/docker_run (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/curl_URL
+--- PASS: TestNormalizer_Normalize/curl_URL (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/chmod_with_mode
+--- PASS: TestNormalizer_Normalize/chmod_with_mode (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/make_targets
+--- PASS: TestNormalizer_Normalize/make_targets (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/empty_command
+--- PASS: TestNormalizer_Normalize/empty_command (0.00s)
+=== NAME  TestNormalizer_Normalize
+=== RUN   TestNormalizer_Normalize/whitespace_only
+--- PASS: TestNormalizer_Normalize/whitespace_only (0.00s)
+=== NAME  TestNormalizer_Normalize
+--- PASS: TestNormalizer_Normalize (0.00s)
+=== NAME  
+=== RUN   TestNormalizer_SlotValues
+--- PASS: TestNormalizer_SlotValues (0.00s)
+=== NAME  
+=== RUN   TestDetectSlotType
+=== RUN   TestDetectSlotType//etc/passwd
+--- PASS: TestDetectSlotType//etc/passwd (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/./src
+--- PASS: TestDetectSlotType/./src (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/../parent
+--- PASS: TestDetectSlotType/../parent (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/~/Documents
+--- PASS: TestDetectSlotType/~/Documents (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/src/main.go
+--- PASS: TestDetectSlotType/src/main.go (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/abc1234
+--- PASS: TestDetectSlotType/abc1234 (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/abc1234567890abcdef1234567890abcdef1234
+--- PASS: TestDetectSlotType/abc1234567890abcdef1234567890abcdef1234 (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/https://example.com
+--- PASS: TestDetectSlotType/https://example.com (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/http://localhost:8080
+--- PASS: TestDetectSlotType/http://localhost:8080 (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/git@github.com:user/repo.git
+--- PASS: TestDetectSlotType/git@github.com:user/repo.git (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/123
+--- PASS: TestDetectSlotType/123 (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/0
+--- PASS: TestDetectSlotType/0 (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/999999
+--- PASS: TestDetectSlotType/999999 (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/lodash
+--- PASS: TestDetectSlotType/lodash (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/main
+--- PASS: TestDetectSlotType/main (0.00s)
+=== NAME  TestDetectSlotType
+=== RUN   TestDetectSlotType/test
+--- PASS: TestDetectSlotType/test (0.00s)
+=== NAME  TestDetectSlotType
+--- PASS: TestDetectSlotType (0.00s)
+=== NAME  
+=== RUN   TestNormalizeSimple
+--- PASS: TestNormalizeSimple (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_Empty
+--- PASS: TestSplitPipeline_Empty (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_SimpleCommand
+--- PASS: TestSplitPipeline_SimpleCommand (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_Pipe
+--- PASS: TestSplitPipeline_Pipe (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_And
+--- PASS: TestSplitPipeline_And (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_Or
+--- PASS: TestSplitPipeline_Or (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_Semicolon
+--- PASS: TestSplitPipeline_Semicolon (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_MultiplePipes
+--- PASS: TestSplitPipeline_MultiplePipes (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_MixedOperators
+--- PASS: TestSplitPipeline_MixedOperators (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_QuotedStringsPreserved
+--- PASS: TestSplitPipeline_QuotedStringsPreserved (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_SingleQuotedStringsPreserved
+--- PASS: TestSplitPipeline_SingleQuotedStringsPreserved (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_EscapedPipe
+--- PASS: TestSplitPipeline_EscapedPipe (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_WhitespaceTrimming
+--- PASS: TestSplitPipeline_WhitespaceTrimming (0.00s)
+=== NAME  
+=== RUN   TestSplitPipeline_NestedQuotes
+--- PASS: TestSplitPipeline_NestedQuotes (0.00s)
+=== NAME  
+=== RUN   TestReassemblePipeline_Empty
+--- PASS: TestReassemblePipeline_Empty (0.00s)
+=== NAME  
+=== RUN   TestReassemblePipeline_Single
+--- PASS: TestReassemblePipeline_Single (0.00s)
+=== NAME  
+=== RUN   TestReassemblePipeline_Multiple
+--- PASS: TestReassemblePipeline_Multiple (0.00s)
+=== NAME  
+=== RUN   TestPipeline_RoundTrip
+--- PASS: TestPipeline_RoundTrip (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_BasicCommands
+=== RUN   TestPreNormalize_BasicCommands/simple_ls
+--- PASS: TestPreNormalize_BasicCommands/simple_ls (0.00s)
+=== NAME  TestPreNormalize_BasicCommands
+=== RUN   TestPreNormalize_BasicCommands/git_commit
+--- PASS: TestPreNormalize_BasicCommands/git_commit (0.00s)
+=== NAME  TestPreNormalize_BasicCommands
+=== RUN   TestPreNormalize_BasicCommands/echo
+--- PASS: TestPreNormalize_BasicCommands/echo (0.00s)
+=== NAME  TestPreNormalize_BasicCommands
+=== RUN   TestPreNormalize_BasicCommands/whitespace_collapse
+--- PASS: TestPreNormalize_BasicCommands/whitespace_collapse (0.00s)
+=== NAME  TestPreNormalize_BasicCommands
+--- PASS: TestPreNormalize_BasicCommands (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_PathReplacement
+=== RUN   TestPreNormalize_PathReplacement/absolute_path
+--- PASS: TestPreNormalize_PathReplacement/absolute_path (0.00s)
+=== NAME  TestPreNormalize_PathReplacement
+=== RUN   TestPreNormalize_PathReplacement/home_path
+--- PASS: TestPreNormalize_PathReplacement/home_path (0.00s)
+=== NAME  TestPreNormalize_PathReplacement
+=== RUN   TestPreNormalize_PathReplacement/relative_dot_path
+--- PASS: TestPreNormalize_PathReplacement/relative_dot_path (0.00s)
+=== NAME  TestPreNormalize_PathReplacement
+=== RUN   TestPreNormalize_PathReplacement/relative_parent
+--- PASS: TestPreNormalize_PathReplacement/relative_parent (0.00s)
+=== NAME  TestPreNormalize_PathReplacement
+=== RUN   TestPreNormalize_PathReplacement/multiple_paths
+--- PASS: TestPreNormalize_PathReplacement/multiple_paths (0.00s)
+=== NAME  TestPreNormalize_PathReplacement
+=== RUN   TestPreNormalize_PathReplacement/path_with_slash
+--- PASS: TestPreNormalize_PathReplacement/path_with_slash (0.00s)
+=== NAME  TestPreNormalize_PathReplacement
+--- PASS: TestPreNormalize_PathReplacement (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_UUIDReplacement
+--- PASS: TestPreNormalize_UUIDReplacement (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_URLReplacement
+--- PASS: TestPreNormalize_URLReplacement (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_NumericReplacement
+=== RUN   TestPreNormalize_NumericReplacement/chmod_with_path
+--- PASS: TestPreNormalize_NumericReplacement/chmod_with_path (0.00s)
+=== NAME  TestPreNormalize_NumericReplacement
+=== RUN   TestPreNormalize_NumericReplacement/tail_with_path
+--- PASS: TestPreNormalize_NumericReplacement/tail_with_path (0.00s)
+=== NAME  TestPreNormalize_NumericReplacement
+=== RUN   TestPreNormalize_NumericReplacement/bare_number_only
+--- PASS: TestPreNormalize_NumericReplacement/bare_number_only (0.00s)
+=== NAME  TestPreNormalize_NumericReplacement
+=== RUN   TestPreNormalize_NumericReplacement/bare_filename_no_replace
+--- PASS: TestPreNormalize_NumericReplacement/bare_filename_no_replace (0.00s)
+=== NAME  TestPreNormalize_NumericReplacement
+--- PASS: TestPreNormalize_NumericReplacement (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_PipelineCommands
+--- PASS: TestPreNormalize_PipelineCommands (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_WithAliases
+--- PASS: TestPreNormalize_WithAliases (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_TemplateIDStability
+--- PASS: TestPreNormalize_TemplateIDStability (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_TemplateIDFormat
+--- PASS: TestPreNormalize_TemplateIDFormat (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_EventSizeLimit
+--- PASS: TestPreNormalize_EventSizeLimit (0.00s)
+=== NAME  
+=== RUN   TestPreNormalize_CaseInsensitiveCommandOnly
+--- PASS: TestPreNormalize_CaseInsensitiveCommandOnly (0.00s)
+=== NAME  
+=== RUN   TestComputeTemplateID
+--- PASS: TestComputeTemplateID (0.00s)
+=== NAME  
+=== RUN   TestNormalizeSegment
+=== RUN   TestNormalizeSegment/empty
+--- PASS: TestNormalizeSegment/empty (0.00s)
+=== NAME  TestNormalizeSegment
+=== RUN   TestNormalizeSegment/simple
+--- PASS: TestNormalizeSegment/simple (0.00s)
+=== NAME  TestNormalizeSegment
+=== RUN   TestNormalizeSegment/whitespace
+--- PASS: TestNormalizeSegment/whitespace (0.00s)
+=== NAME  TestNormalizeSegment
+=== RUN   TestNormalizeSegment/uppercase_cmd
+--- PASS: TestNormalizeSegment/uppercase_cmd (0.00s)
+=== NAME  TestNormalizeSegment
+=== RUN   TestNormalizeSegment/path
+--- PASS: TestNormalizeSegment/path (0.00s)
+=== NAME  TestNormalizeSegment
+=== RUN   TestNormalizeSegment/uuid
+--- PASS: TestNormalizeSegment/uuid (0.00s)
+=== NAME  TestNormalizeSegment
+=== RUN   TestNormalizeSegment/url
+--- PASS: TestNormalizeSegment/url (0.00s)
+=== NAME  TestNormalizeSegment
+=== RUN   TestNormalizeSegment/number
+--- PASS: TestNormalizeSegment/number (0.00s)
+=== NAME  TestNormalizeSegment
+=== RUN   TestNormalizeSegment/flag_preserved
+--- PASS: TestNormalizeSegment/flag_preserved (0.00s)
+=== NAME  TestNormalizeSegment
+--- PASS: TestNormalizeSegment (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Git
+--- PASS: TestExtractTags_Git (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_GoTest
+--- PASS: TestExtractTags_GoTest (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_GoBuild
+--- PASS: TestExtractTags_GoBuild (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_GoVet
+--- PASS: TestExtractTags_GoVet (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Docker
+--- PASS: TestExtractTags_Docker (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Npm
+--- PASS: TestExtractTags_Npm (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Make
+--- PASS: TestExtractTags_Make (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Kubectl
+--- PASS: TestExtractTags_Kubectl (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Curl
+--- PASS: TestExtractTags_Curl (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Vim
+--- PASS: TestExtractTags_Vim (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Unknown
+--- PASS: TestExtractTags_Unknown (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Empty
+--- PASS: TestExtractTags_Empty (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_PipelineMerges
+--- PASS: TestExtractTags_PipelineMerges (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Pytest
+--- PASS: TestExtractTags_Pytest (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Terraform
+--- PASS: TestExtractTags_Terraform (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Aws
+--- PASS: TestExtractTags_Aws (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Cargo
+--- PASS: TestExtractTags_Cargo (0.00s)
+=== NAME  
+=== RUN   TestExtractTags_Brew
+--- PASS: TestExtractTags_Brew (0.00s)
+=== NAME  
+=== RUN   TestExtractCommandAndSub
+--- PASS: TestExtractCommandAndSub (0.00s)
+=== NAME  
+=== RUN   TestTemplateStore_Upsert
+--- PASS: TestTemplateStore_Upsert (0.01s)
+=== NAME  
+=== RUN   TestTemplateStore_UpsertUpdatesLastSeen
+--- PASS: TestTemplateStore_UpsertUpdatesLastSeen (0.00s)
+=== NAME  
+=== RUN   TestTemplateStore_UpsertDoesNotDecrementLastSeen
+--- PASS: TestTemplateStore_UpsertDoesNotDecrementLastSeen (0.00s)
+=== NAME  
+=== RUN   TestTemplateStore_GetNonExistent
+--- PASS: TestTemplateStore_GetNonExistent (0.00s)
+=== NAME  
+=== RUN   TestTemplateStore_UpsertNilTags
+--- PASS: TestTemplateStore_UpsertNilTags (0.01s)
+=== NAME  
+=== RUN   TestCountSlots
+=== RUN   TestCountSlots/no_slots
+--- PASS: TestCountSlots/no_slots (0.00s)
+=== NAME  TestCountSlots
+=== RUN   TestCountSlots/one_new_placeholder
+--- PASS: TestCountSlots/one_new_placeholder (0.00s)
+=== NAME  TestCountSlots
+=== RUN   TestCountSlots/one_legacy_slot
+--- PASS: TestCountSlots/one_legacy_slot (0.00s)
+=== NAME  TestCountSlots
+=== RUN   TestCountSlots/mixed
+--- PASS: TestCountSlots/mixed (0.00s)
+=== NAME  TestCountSlots
+=== RUN   TestCountSlots/multiple_same
+--- PASS: TestCountSlots/multiple_same (0.00s)
+=== NAME  TestCountSlots
+=== RUN   TestCountSlots/all_new_types
+--- PASS: TestCountSlots/all_new_types (0.00s)
+=== NAME  TestCountSlots
+=== RUN   TestCountSlots/all_legacy_types
+--- PASS: TestCountSlots/all_legacy_types (0.00s)
+=== NAME  TestCountSlots
+--- PASS: TestCountSlots (0.00s)
+=== NAME  
+=== RUN   FuzzNormalize
+=== RUN   FuzzNormalize/seed#0
+--- PASS: FuzzNormalize/seed#0 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#1
+--- PASS: FuzzNormalize/seed#1 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#2
+--- PASS: FuzzNormalize/seed#2 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#3
+--- PASS: FuzzNormalize/seed#3 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#4
+--- PASS: FuzzNormalize/seed#4 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#5
+--- PASS: FuzzNormalize/seed#5 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#6
+--- PASS: FuzzNormalize/seed#6 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#7
+--- PASS: FuzzNormalize/seed#7 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#8
+--- PASS: FuzzNormalize/seed#8 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#9
+--- PASS: FuzzNormalize/seed#9 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#10
+--- PASS: FuzzNormalize/seed#10 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#11
+--- PASS: FuzzNormalize/seed#11 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#12
+--- PASS: FuzzNormalize/seed#12 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#13
+--- PASS: FuzzNormalize/seed#13 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#14
+--- PASS: FuzzNormalize/seed#14 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#15
+--- PASS: FuzzNormalize/seed#15 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#16
+--- PASS: FuzzNormalize/seed#16 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#17
+--- PASS: FuzzNormalize/seed#17 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#18
+--- PASS: FuzzNormalize/seed#18 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#19
+--- PASS: FuzzNormalize/seed#19 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#20
+--- PASS: FuzzNormalize/seed#20 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#21
+--- PASS: FuzzNormalize/seed#21 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#22
+--- PASS: FuzzNormalize/seed#22 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#23
+--- PASS: FuzzNormalize/seed#23 (0.00s)
+=== NAME  FuzzNormalize
+=== RUN   FuzzNormalize/seed#24
+--- PASS: FuzzNormalize/seed#24 (0.00s)
+=== NAME  FuzzNormalize
+--- PASS: FuzzNormalize (0.00s)
+=== NAME  
+=== RUN   FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#0
+--- PASS: FuzzExtractTemplate/seed#0 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#1
+--- PASS: FuzzExtractTemplate/seed#1 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#2
+--- PASS: FuzzExtractTemplate/seed#2 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#3
+--- PASS: FuzzExtractTemplate/seed#3 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#4
+--- PASS: FuzzExtractTemplate/seed#4 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#5
+--- PASS: FuzzExtractTemplate/seed#5 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#6
+--- PASS: FuzzExtractTemplate/seed#6 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#7
+--- PASS: FuzzExtractTemplate/seed#7 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#8
+--- PASS: FuzzExtractTemplate/seed#8 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#9
+--- PASS: FuzzExtractTemplate/seed#9 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#10
+--- PASS: FuzzExtractTemplate/seed#10 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#11
+--- PASS: FuzzExtractTemplate/seed#11 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#12
+--- PASS: FuzzExtractTemplate/seed#12 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#13
+--- PASS: FuzzExtractTemplate/seed#13 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#14
+--- PASS: FuzzExtractTemplate/seed#14 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#15
+--- PASS: FuzzExtractTemplate/seed#15 (0.00s)
+=== NAME  FuzzExtractTemplate
+=== RUN   FuzzExtractTemplate/seed#16
+--- PASS: FuzzExtractTemplate/seed#16 (0.00s)
+=== NAME  FuzzExtractTemplate
+--- PASS: FuzzExtractTemplate (0.00s)
+=== NAME  
+=== RUN   FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#0
+--- PASS: FuzzSplitPipeline/seed#0 (0.00s)
+=== NAME  FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#1
+--- PASS: FuzzSplitPipeline/seed#1 (0.00s)
+=== NAME  FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#2
+--- PASS: FuzzSplitPipeline/seed#2 (0.00s)
+=== NAME  FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#3
+--- PASS: FuzzSplitPipeline/seed#3 (0.00s)
+=== NAME  FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#4
+--- PASS: FuzzSplitPipeline/seed#4 (0.00s)
+=== NAME  FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#5
+--- PASS: FuzzSplitPipeline/seed#5 (0.00s)
+=== NAME  FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#6
+--- PASS: FuzzSplitPipeline/seed#6 (0.00s)
+=== NAME  FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#7
+--- PASS: FuzzSplitPipeline/seed#7 (0.00s)
+=== NAME  FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#8
+--- PASS: FuzzSplitPipeline/seed#8 (0.00s)
+=== NAME  FuzzSplitPipeline
+=== RUN   FuzzSplitPipeline/seed#9
+--- PASS: FuzzSplitPipeline/seed#9 (0.00s)
+=== NAME  FuzzSplitPipeline
+--- PASS: FuzzSplitPipeline (0.00s)
+=== NAME  
+PASS
+ok  	github.com/runger/clai/internal/suggestions/normalize	1.604s
