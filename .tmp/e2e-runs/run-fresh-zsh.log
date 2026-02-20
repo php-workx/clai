@@ -24,3 +24,69 @@ log: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/gott
 [zsh] 10/54 clai suggest with prefix filters results
   -> FAIL: expected screen not to contain: npm | expected screen not to contain: make
 [zsh] 11/54 Suggestion shows transition reason
+  -> FAIL: expected screen to contain: transition
+[zsh] 12/54 Suggestion shows freq_repo reason
+  -> FAIL: expected screen to match: (freq_repo|freq_global)
+[zsh] 13/54 Suggestion includes confidence score
+  -> FAIL: expected screen to contain: confidence
+[zsh] 14/54 Suggestion context includes last_cmd_norm
+  -> PASS
+[zsh] 15/54 Ghost text suggestion appears
+  -> FAIL: expected screen to contain: git status
+[zsh] 16/54 Right arrow accepts full suggestion
+  -> PASS
+[zsh] 17/54 Escape clears suggestion
+  -> PASS
+[zsh] 18/54 Typing clears ghost text
+  -> PASS
+[zsh] 19/54 Alt+Right accepts next token
+  -> FAIL: expected screen to contain: kubectl get
+[zsh] 20/54 Typo correction suggests on exit 127
+  -> SKIP: Typo correction backend not yet implemented
+[zsh] 21/54 Typo correction respects similarity threshold
+  -> SKIP: Typo correction backend not yet implemented
+[zsh] 22/54 Typo correction prioritizes high-frequency commands
+  -> SKIP: Typo correction backend not yet implemented
+[zsh] 23/54 Slot filling learns argument values
+  -> SKIP: Slot filling backend not yet implemented
+[zsh] 24/54 Slot filling respects frequency
+  -> SKIP: Slot filling backend not yet implemented
+[zsh] 25/54 Slot scope repo overrides global
+  -> SKIP: Slot filling backend not yet implemented
+[zsh] 26/54 Suggestions served from cache
+  -> SKIP: Cache introspection not yet exposed in CLI
+[zsh] 27/54 Cache TTL expires stale entries
+  -> SKIP: Cache introspection not yet exposed in CLI
+[zsh] 28/54 Cache invalidated on new command
+  -> SKIP: Cache introspection not yet exposed in CLI
+[zsh] 29/54 Cache shows in debug endpoint
+  -> SKIP: Cache introspection not yet exposed in CLI
+[zsh] 30/54 Alt+H opens suggestion picker (zsh)
+  -> PASS
+[zsh] 31/54 clai search basic query
+  -> PASS
+[zsh] 32/54 clai search with repo filter
+  -> PASS
+[zsh] 33/54 clai search with limit
+  -> PASS
+[zsh] 34/54 clai search with JSON output
+  -> PASS
+[zsh] 35/54 clai search empty results
+  -> PASS
+[zsh] 36/54 clai search with special characters
+  -> PASS
+[zsh] 37/54 Discovery finds package.json scripts
+  -> PASS
+[zsh] 38/54 Discovery finds Makefile targets
+  -> PASS
+[zsh] 39/54 Discovery shows project_task reason
+  -> FAIL: expected screen to contain: project_task
+[zsh] 40/54 Discovery finds Cargo.toml commands
+  -> SKIP: Cargo discovery not yet implemented
+[zsh] 41/54 Discovery finds pyproject.toml scripts
+  -> SKIP: pyproject.toml discovery not yet implemented
+[zsh] 42/54 Debug scores endpoint returns data
+  -> PASS
+[zsh] 43/54 Debug scores with limit parameter
+  -> PASS
+[zsh] 44/54 Debug transitions endpoint returns data
