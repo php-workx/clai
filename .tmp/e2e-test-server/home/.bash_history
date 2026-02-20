@@ -1,29 +1,3 @@
-cd '/tmp/test dir with spaces'
-echo 'command in spaced dir'
-ls -la
-mkdir -p "/tmp/path'with\"quotes"
-cd "/tmp/path'with\"quotes"
-echo 'special path command'
-clai incognito on
-clai incognito on
-echo 'SECRET_INCOGNITO_COMMAND_12345'
-clai incognito off
-clai history --global | grep SECRET_INCOGNITO
-clai incognito on
-clai incognito off
-export CLAI_NO_RECORD=1
-echo 'NO_RECORD_TEST_CMD'
-unset CLAI_NO_RECORD
-clai history --session=$CLAI_SESSION_ID
-true
-clai history --session=$CLAI_SESSION_ID --json | tail -1
-false
-clai history --session=$CLAI_SESSION_ID --json | tail -1
-cd /tmp && echo 'ingestion_cwd_test'
-clai history --cwd=/tmp --global
-echo "hello | world" > /dev/null && echo 'done'
-clai history --session=$CLAI_SESSION_ID
-echo '日本語 émoji 🎉'
 clai history --session=$CLAI_SESSION_ID
 clai daemon status
 clai daemon start
@@ -498,3 +472,29 @@ git log --oneline
 npm test
 make build
 clai suggest git
+git add .
+git commit -m 'test' >/dev/null 2>&1 || true
+git add .
+git commit -m 'test2' >/dev/null 2>&1 || true
+git add .
+clai suggest git --format=json --limit=5
+echo freq_reason_seed
+echo freq_reason_seed
+echo freq_reason_seed
+echo freq_reason_other
+clai suggest echo --format=json --limit=5
+echo confidence_seed_alpha
+echo confidence_seed_beta
+clai suggest echo --format=json --limit=3
+git status
+git log --oneline
+clai suggest git --format=fzf --limit=3
+kubectl get pods -n production
+clai suggest kubectl --format=fzf --limit=3
+mkdir -p /tmp/reason-test
+cd /tmp/reason-test
+echo '{"scripts":{"lint":"eslint"}}' > package.json
+cd /tmp/reason-test && clai suggest npm --format=json --limit=5
+git status
+git log --oneline -1
+clai suggest git --format=json --limit=5

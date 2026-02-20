@@ -1,38 +1,35 @@
-2026/02/20 09:36:44 GoTTY is starting with command: bash --noprofile --rcfile /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/shell/bashrc -i
-2026/02/20 09:36:44 Permitting clients to write input to the PTY.
-2026/02/20 09:36:44 HTTP server is listening at: http://127.0.0.1:8080/
-2026/02/20 09:36:46 127.0.0.1:60097 200 GET /
-2026/02/20 09:36:46 127.0.0.1:60100 200 GET /auth_token.js
-2026/02/20 09:36:46 127.0.0.1:60101 200 GET /config.js
-2026/02/20 09:36:46 127.0.0.1:60097 200 GET /css/index.css
-2026/02/20 09:36:46 127.0.0.1:60099 200 GET /css/xterm_customize.css
-2026/02/20 09:36:46 127.0.0.1:60098 200 GET /css/xterm.css
-2026/02/20 09:36:46 127.0.0.1:60102 200 GET /js/gotty.js
-2026/02/20 09:36:46 New client connected: 127.0.0.1:60103, connections: 1/0
-2026/02/20 09:36:47 Connection closed by client: 127.0.0.1:60103, connections: 0/0
-2026/02/20 09:36:47 127.0.0.1:60104 200 GET /
-2026/02/20 09:36:47 127.0.0.1:60104 200 GET /css/index.css
-2026/02/20 09:36:47 127.0.0.1:60106 200 GET /css/xterm_customize.css
-2026/02/20 09:36:47 127.0.0.1:60104 200 GET /config.js
-2026/02/20 09:36:47 127.0.0.1:60107 200 GET /auth_token.js
-2026/02/20 09:36:47 127.0.0.1:60105 200 GET /css/xterm.css
-2026/02/20 09:36:47 127.0.0.1:60108 200 GET /js/gotty.js
-2026/02/20 09:36:47 New client connected: 127.0.0.1:60110, connections: 1/0
-2026/02/20 09:36:49 Connection closed by client: 127.0.0.1:60110, connections: 0/0
-2026/02/20 09:36:49 127.0.0.1:60113 200 GET /
-2026/02/20 09:36:49 127.0.0.1:60113 200 GET /css/index.css
-2026/02/20 09:36:49 127.0.0.1:60115 200 GET /css/xterm_customize.css
-2026/02/20 09:36:49 127.0.0.1:60116 200 GET /config.js
-2026/02/20 09:36:49 127.0.0.1:60113 200 GET /auth_token.js
-2026/02/20 09:36:49 127.0.0.1:60114 200 GET /css/xterm.css
-2026/02/20 09:36:49 127.0.0.1:60117 200 GET /js/gotty.js
-2026/02/20 09:36:49 New client connected: 127.0.0.1:60119, connections: 1/0
-2026/02/20 09:36:54 Connection closed by client: 127.0.0.1:60119, connections: 0/0
-2026/02/20 09:36:54 127.0.0.1:60126 200 GET /
-2026/02/20 09:36:54 127.0.0.1:60126 200 GET /css/index.css
-2026/02/20 09:36:54 127.0.0.1:60129 200 GET /config.js
-2026/02/20 09:36:54 127.0.0.1:60126 200 GET /auth_token.js
-2026/02/20 09:36:54 127.0.0.1:60128 200 GET /css/xterm_customize.css
-2026/02/20 09:36:54 127.0.0.1:60127 200 GET /css/xterm.css
-2026/02/20 09:36:55 127.0.0.1:60130 200 GET /js/gotty.js
-2026/02/20 09:36:55 New client connected: 127.0.0.1:60132, connections: 1/0
+2026/02/20 09:37:09 GoTTY is starting with command: env ZDOTDIR=/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/shell/zdotdir zsh -i
+2026/02/20 09:37:09 Permitting clients to write input to the PTY.
+2026/02/20 09:37:09 HTTP server is listening at: http://127.0.0.1:8080/
+2026/02/20 09:37:10 127.0.0.1:60193 200 GET /
+2026/02/20 09:37:10 127.0.0.1:60197 200 GET /config.js
+2026/02/20 09:37:10 127.0.0.1:60196 200 GET /auth_token.js
+2026/02/20 09:37:10 127.0.0.1:60193 200 GET /css/index.css
+2026/02/20 09:37:10 127.0.0.1:60195 200 GET /css/xterm_customize.css
+2026/02/20 09:37:10 127.0.0.1:60194 200 GET /css/xterm.css
+2026/02/20 09:37:10 127.0.0.1:60198 200 GET /js/gotty.js
+2026/02/20 09:37:10 New client connected: 127.0.0.1:60199, connections: 1/0
+2026/02/20 09:37:12 127.0.0.1:60200 200 GET /
+2026/02/20 09:37:12 127.0.0.1:60200 200 GET /css/index.css
+2026/02/20 09:37:12 127.0.0.1:60204 200 GET /config.js
+2026/02/20 09:37:12 127.0.0.1:60203 200 GET /auth_token.js
+2026/02/20 09:37:12 127.0.0.1:60202 200 GET /css/xterm_customize.css
+2026/02/20 09:37:12 127.0.0.1:60201 200 GET /css/xterm.css
+2026/02/20 09:37:12 127.0.0.1:60200 200 GET /js/gotty.js
+2026/02/20 09:37:12 New client connected: 127.0.0.1:60208, connections: 2/0
+2026/02/20 09:37:14 127.0.0.1:60211 200 GET /
+2026/02/20 09:37:14 127.0.0.1:60211 200 GET /css/index.css
+2026/02/20 09:37:14 127.0.0.1:60214 200 GET /auth_token.js
+2026/02/20 09:37:14 127.0.0.1:60213 200 GET /css/xterm_customize.css
+2026/02/20 09:37:14 127.0.0.1:60215 200 GET /config.js
+2026/02/20 09:37:14 127.0.0.1:60212 200 GET /css/xterm.css
+2026/02/20 09:37:14 127.0.0.1:60216 200 GET /js/gotty.js
+2026/02/20 09:37:15 New client connected: 127.0.0.1:60217, connections: 3/0
+2026/02/20 09:37:19 127.0.0.1:60222 200 GET /
+2026/02/20 09:37:19 127.0.0.1:60222 200 GET /css/index.css
+2026/02/20 09:37:19 127.0.0.1:60225 200 GET /config.js
+2026/02/20 09:37:19 127.0.0.1:60222 200 GET /auth_token.js
+2026/02/20 09:37:19 127.0.0.1:60224 200 GET /css/xterm_customize.css
+2026/02/20 09:37:19 127.0.0.1:60223 200 GET /css/xterm.css
+2026/02/20 09:37:19 127.0.0.1:60226 200 GET /js/gotty.js
+2026/02/20 09:37:19 New client connected: 127.0.0.1:60228, connections: 4/0
