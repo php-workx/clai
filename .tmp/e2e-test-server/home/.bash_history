@@ -192,3 +192,91 @@ git status
 git log --oneline
 npm test
 make build
+git add .
+git commit -m 'test'
+make build
+git status
+clai suggest --format=json
+git status
+clai suggest --format=json
+git status
+git log --oneline
+docker ps -a
+npm install
+git status
+kubectl get pods -n production
+git status
+git log --oneline -1
+gti status
+clai suggest
+xyzabc123nonexistent
+clai suggest
+echo common_cmd
+echo common_cmd
+echo common_cmd
+echo rare_cmd
+commo_cmd
+clai suggest
+kubectl get pods -n production
+kubectl get pods -n production
+kubectl get pods -n staging
+clai suggest kubectl
+docker run -it alpine
+docker run -it alpine
+docker run -it alpine
+docker run -it ubuntu
+clai suggest 'docker run'
+cd /tmp && docker run -it ubuntu && cd -
+docker run -it alpine
+docker run -it alpine
+clai suggest --format=json 'docker run'
+echo cache_warmup_cmd
+clai suggest --format=json
+echo cache_test_cmd
+clai suggest --format=json
+clai suggest --format=json
+echo warmup
+clai suggest --format=json
+echo new_command
+clai suggest --format=json
+curl -s http://localhost:8765/debug/cache 2>/dev/null || clai debug cache
+echo test1
+git status
+echo 'searchable_unique_term_abc123'
+git status
+clai search 'searchable_unique'
+echo 'repo_specific_search_term'
+clai search --repo 'repo_specific'
+echo search_limit_1
+echo search_limit_2
+echo search_limit_3
+echo search_limit_4
+echo search_limit_5
+clai search --limit 2 'search_limit'
+echo json_search_test
+clai search --json 'json_search'
+clai search 'xyznonexistent98765'
+echo 'test-with-dashes_and_underscores'
+clai search 'test-with-dashes'
+mkdir -p /tmp/node-test-project
+cd /tmp/node-test-project
+echo '{"scripts":{"test":"jest","build":"tsc"}}' > package.json
+cd /tmp/node-test-project && clai suggest
+mkdir -p /tmp/make-test-project
+cd /tmp/make-test-project
+printf 'build:\n\techo build\ntest:\n\techo test\n' > Makefile
+cd /tmp/make-test-project && clai suggest
+mkdir -p /tmp/reason-test
+cd /tmp/reason-test
+echo '{"scripts":{"lint":"eslint"}}' > package.json
+cd /tmp/reason-test && clai suggest --format=json
+mkdir -p /tmp/rust-test-project
+cd /tmp/rust-test-project
+echo '[package]\nname = "test"\nversion = "0.1.0"' > Cargo.toml
+cd /tmp/rust-test-project && clai suggest
+mkdir -p /tmp/python-test-project
+cd /tmp/python-test-project
+echo '[project.scripts]\ntest = "pytest"' > pyproject.toml
+cd /tmp/python-test-project && clai suggest
+curl -s http://localhost:8765/debug/scores 2>/dev/null || clai debug scores
+curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5
