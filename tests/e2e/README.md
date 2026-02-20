@@ -21,7 +21,15 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
    make test-e2e E2E_GREP="suggest|search"
    ```
 
-4. **Customize plans/output:**
+4. **Choose standard reporter format (Playwright):**
+   ```bash
+   make test-e2e E2E_REPORTER=line
+   make test-e2e E2E_REPORTER=dot
+   make test-e2e E2E_REPORTER=list
+   make test-e2e E2E_REPORTER=junit
+   ```
+
+5. **Customize plans/output:**
    ```bash
    make test-e2e \
      E2E_PLANS="tests/e2e/suggestions-tests.yaml" \
@@ -29,12 +37,12 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
      E2E_URL="http://127.0.0.1:8080"
    ```
 
-5. **Ask Claude to run tests (alternative):**
+6. **Ask Claude to run tests (alternative):**
    ```
    Run e2e tests from tests/e2e/example-test-plan.yaml against http://localhost:8080
    ```
 
-6. **Review results** - pass/fail summary and per-test JSON are written to `.tmp/e2e-runs/`
+7. **Review results** - pass/fail summary and per-test JSON are written to `.tmp/e2e-runs/`
    - `.tmp/e2e-runs/results-<shell>.json`
    - `.tmp/e2e-runs/results-all.json`
    - `.tmp/e2e-runs/summary.md`
@@ -43,6 +51,7 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
 ## Dependency Management
 
 The suite runner installs Node dependencies from `tests/e2e/package.json` on demand.
+It uses Playwright's standard test runner and reporters.
 To preinstall manually:
 
 ```bash

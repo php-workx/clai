@@ -10,7 +10,9 @@ E2E_GREP="${E2E_GREP:-}"
 INSTALL_DEPS="${E2E_INSTALL_DEPS:-1}"
 
 NODE_MODULES_DIR="$ROOT_DIR/tests/e2e/node_modules"
-RUNNER_JS="$ROOT_DIR/tests/e2e/run-e2e.js"
+PW_CONFIG="$ROOT_DIR/tests/e2e/playwright.config.cjs"
+PW_SPEC="$ROOT_DIR/tests/e2e/yaml.spec.cjs"
+E2E_REPORTER="${E2E_REPORTER:-line}"
 
 require_cmd() {
 	local c="$1"
@@ -28,7 +30,7 @@ ensure_deps() {
 		return
 	fi
 
-	if [[ ! -d "$NODE_MODULES_DIR/playwright" || ! -d "$NODE_MODULES_DIR/js-yaml" ]]; then
+	if [[ ! -d "$NODE_MODULES_DIR/@playwright/test" || ! -d "$NODE_MODULES_DIR/js-yaml" ]]; then
 		echo "Installing e2e runner dependencies into tests/e2e/node_modules..."
 		if [[ -f "$ROOT_DIR/tests/e2e/package-lock.json" ]]; then
 			npm --prefix "$ROOT_DIR/tests/e2e" ci --no-fund --no-audit
@@ -41,6 +43,8 @@ ensure_deps() {
 run_shell_suite() {
 	local shell_name="$1"
 	local log_path="$OUT_DIR/run-$shell_name.log"
+	local result_json="$OUT_DIR/results-$shell_name.json"
+	local artifacts_dir="$OUT_DIR/artifacts-$shell_name"
 	local rc=0
 
 	: >"$log_path"
@@ -48,32 +52,64 @@ run_shell_suite() {
 
 	make -C "$ROOT_DIR" test-server TEST_SHELL="$shell_name" >>"$log_path" 2>&1
 
-	local -a args
-	args=(--shell "$shell_name" --url "$E2E_URL" --plans "$E2E_PLANS" --out "$OUT_DIR")
+	local reporter="$E2E_REPORTER"
+	if [[ ",$reporter," != *",json,"* ]]; then
+		reporter="$reporter,json"
+	fi
+
+	local -a cmd
+	cmd=(
+		npx --prefix "$ROOT_DIR/tests/e2e"
+		playwright test "$PW_SPEC"
+		--config "$PW_CONFIG"
+		--workers=1
+		--reporter "$reporter"
+		--output "$artifacts_dir"
+	)
 	if [[ -n "$E2E_GREP" ]]; then
-		args+=(--grep "$E2E_GREP")
+		cmd+=(--grep "$E2E_GREP")
 	fi
 
 	set +e
-	NODE_PATH="$NODE_MODULES_DIR" node "$RUNNER_JS" "${args[@]}" 2>&1 | tee -a "$log_path"
+	env \
+		E2E_SHELL="$shell_name" \
+		E2E_URL="$E2E_URL" \
+		E2E_PLANS="$E2E_PLANS" \
+		PLAYWRIGHT_JSON_OUTPUT_FILE="$result_json" \
+		"${cmd[@]}" 2>&1 | tee -a "$log_path"
 	rc=${PIPESTATUS[0]}
 	set -e
 
 	make -C "$ROOT_DIR" test-server-stop >>"$log_path" 2>&1 || true
 
-	local result_json="$OUT_DIR/results-$shell_name.json"
 	if [[ -f "$result_json" ]]; then
 		node -e '
 const fs = require("fs");
 const p = process.argv[1];
 const d = JSON.parse(fs.readFileSync(p, "utf8"));
-const s = d.summary || {};
-console.log(`SUMMARY ${p}: total=${s.total||0} pass=${s.passed||0} fail=${s.failed||0} skip=${s.skipped||0}`);
-if (Array.isArray(s.failures) && s.failures.length > 0) {
-  console.log(`FAILURES ${p}:`);
-  for (const f of s.failures) {
-    console.log(` - ${f.name}: ${f.reason || "failed"}`);
+const s = d.stats || {};
+const passed = s.expected || 0;
+const skipped = s.skipped || 0;
+const failed = (s.unexpected || 0) + (s.flaky || 0);
+const total = passed + skipped + failed;
+console.log(`SUMMARY ${p}: total=${total} pass=${passed} fail=${failed} skip=${skipped}`);
+function collectFailures(suites, out) {
+  for (const suite of suites || []) {
+    for (const spec of suite.specs || []) {
+      for (const t of spec.tests || []) {
+        if (t.status === "unexpected" || t.status === "flaky") {
+          out.push(`${spec.title}: ${t.status}`);
+        }
+      }
+    }
+    collectFailures(suite.suites, out);
   }
+}
+const failures = [];
+collectFailures(d.suites, failures);
+if (failures.length > 0) {
+  console.log(`FAILURES ${p}:`);
+  for (const f of failures) console.log(` - ${f}`);
 }
 ' "$result_json" | tee -a "$log_path"
 	else
@@ -105,7 +141,13 @@ for (const sh of shells) {
     continue;
   }
   const parsed = JSON.parse(fs.readFileSync(p, "utf8"));
-  const s = parsed.summary || {};
+  const stats = parsed.stats || {};
+  const s = {
+    total: (stats.expected || 0) + (stats.skipped || 0) + (stats.unexpected || 0) + (stats.flaky || 0),
+    passed: stats.expected || 0,
+    failed: (stats.unexpected || 0) + (stats.flaky || 0),
+    skipped: stats.skipped || 0,
+  };
   aggregate.shells[sh] = s;
   aggregate.totals.total += s.total || 0;
   aggregate.totals.passed += s.passed || 0;
@@ -133,17 +175,6 @@ for (const sh of shells) {
 }
 lines.push(`| TOTAL | ${aggregate.totals.total} | ${aggregate.totals.passed} | ${aggregate.totals.failed} | ${aggregate.totals.skipped} |`);
 lines.push("");
-for (const sh of shells) {
-  const s = aggregate.shells[sh];
-  if (!s || !Array.isArray(s.failures) || s.failures.length === 0) continue;
-  lines.push(`## ${sh} failures`);
-  lines.push("");
-  for (const f of s.failures) {
-    lines.push(`- ${f.name}: ${f.reason || "failed"}`);
-  }
-  lines.push("");
-}
-
 const mdOut = path.join(outDir, "summary.md");
 fs.writeFileSync(mdOut, lines.join("\n"));
 console.log("=== E2E Aggregate Summary ===");

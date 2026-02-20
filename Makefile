@@ -18,6 +18,7 @@ E2E_PLANS?=tests/e2e/example-test-plan.yaml,tests/e2e/suggestions-tests.yaml
 E2E_GREP?=
 E2E_OUT?=.tmp/e2e-runs
 E2E_URL?=http://127.0.0.1:8080
+E2E_REPORTER?=line
 
 all: build
 
@@ -156,6 +157,7 @@ test-e2e:
 	E2E_GREP="$(E2E_GREP)" \
 	E2E_OUT="$(E2E_OUT)" \
 	E2E_URL="$(E2E_URL)" \
+	E2E_REPORTER="$(E2E_REPORTER)" \
 	./scripts/run-e2e-suite.sh
 
 ## test-e2e-shell: Run gotty+Playwright e2e suite for one shell (set E2E_SHELL=bash|zsh|fish)
@@ -165,6 +167,7 @@ test-e2e-shell:
 	E2E_GREP="$(E2E_GREP)" \
 	E2E_OUT="$(E2E_OUT)" \
 	E2E_URL="$(E2E_URL)" \
+	E2E_REPORTER="$(E2E_REPORTER)" \
 	./scripts/run-e2e-suite.sh
 
 ## fmt: Format code

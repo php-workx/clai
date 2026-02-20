@@ -6,9 +6,11 @@
   "license": "UNLICENSED",
   "scripts": {
     "run": "node run-e2e.js",
+    "test:pw": "playwright test --config=playwright.config.cjs",
     "install:browsers": "playwright install chromium"
   },
   "dependencies": {
+    "@playwright/test": "^1.58.2",
     "js-yaml": "^4.1.0",
     "playwright": "^1.52.0"
   }
