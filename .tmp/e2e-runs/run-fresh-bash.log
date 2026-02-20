@@ -132,3 +132,5 @@ Call log:
 [bash] 52/97 clai suggest with limit
   -> PASS
 [bash] 53/97 clai suggest with prefix filters results
+  -> FAIL: expected screen not to contain: npm | expected screen not to contain: make
+[bash] 54/97 Suggestion shows transition reason
