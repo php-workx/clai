@@ -20,3 +20,5 @@ shell: fish
 url: http://127.0.0.1:8080
 pid: 9124
 log: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/gotty.log
+exit_code=1
+

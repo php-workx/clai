@@ -59,3 +59,76 @@ url: http://127.0.0.1:8080
 [bash] 29/97 PTY wrapper Ctrl+C handling
   -> PASS
 [bash] 30/97 Voice mode converts natural language
+  -> PASS
+[bash] 31/97 Empty command line doesn't crash
+  -> PASS
+[bash] 32/97 Very long command doesn't overflow
+  -> PASS
+[bash] 33/97 Special characters handled correctly
+  -> PASS
+[bash] 34/97 CWD scope works with paths containing spaces
+  -> FAIL: expected screen to contain: command in spaced dir
+[bash] 35/97 History args handle special path characters
+  -> PASS
+[bash] 36/97 Incognito mode can be enabled
+  -> PASS
+[bash] 37/97 Commands in incognito mode not persisted
+  -> PASS
+[bash] 38/97 Incognito mode can be disabled
+  -> FAIL: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/
+Call log:
+[2m  - navigating to "http://127.0.0.1:8080/", waiting until "domcontentloaded"[22m
+
+[bash] 39/97 CLAI_NO_RECORD prevents all ingestion
+  -> FAIL: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/
+Call log:
+[2m  - navigating to "http://127.0.0.1:8080/", waiting until "domcontentloaded"[22m
+
+[bash] 40/97 Command ingestion captures exit code success
+  -> FAIL: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/
+Call log:
+[2m  - navigating to "http://127.0.0.1:8080/", waiting until "domcontentloaded"[22m
+
+[bash] 41/97 Command ingestion captures exit code failure
+  -> FAIL: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/
+Call log:
+[2m  - navigating to "http://127.0.0.1:8080/", waiting until "domcontentloaded"[22m
+
+[bash] 42/97 Command ingestion captures CWD
+  -> FAIL: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/
+Call log:
+[2m  - navigating to "http://127.0.0.1:8080/", waiting until "domcontentloaded"[22m
+
+[bash] 43/97 Command with special characters ingested
+  -> FAIL: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/
+Call log:
+[2m  - navigating to "http://127.0.0.1:8080/", waiting until "domcontentloaded"[22m
+
+[bash] 44/97 Command with unicode characters ingested
+  -> FAIL: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/
+Call log:
+[2m  - navigating to "http://127.0.0.1:8080/", waiting until "domcontentloaded"[22m
+
+[bash] 45/97 clai daemon status shows state
+  -> FAIL: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/
+Call log:
+[2m  - navigating to "http://127.0.0.1:8080/", waiting until "domcontentloaded"[22m
+
+[bash] 46/97 clai daemon start works
+  -> FAIL: page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/
+Call log:
+[2m  - navigating to "http://127.0.0.1:8080/", waiting until "domcontentloaded"[22m
+
+[bash] 47/97 clai daemon stop graceful shutdown
+  -> PASS
+[bash] 48/97 clai daemon restart sequence
+  -> PASS
+[bash] 49/97 clai suggest text format
+  -> FAIL: expected screen to match: \d+\.
+[bash] 50/97 clai suggest JSON format
+  -> PASS
+[bash] 51/97 clai suggest fzf format
+  -> PASS
+[bash] 52/97 clai suggest with limit
+  -> PASS
+[bash] 53/97 clai suggest with prefix filters results

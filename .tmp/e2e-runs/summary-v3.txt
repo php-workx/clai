@@ -2,3 +2,6 @@
 .tmp/e2e-runs/results-bash.json: pass=0 fail=0 skip=0
 
 === zsh ===
+.tmp/e2e-runs/results-zsh.json: pass=0 fail=0 skip=0
+
+=== fish ===
