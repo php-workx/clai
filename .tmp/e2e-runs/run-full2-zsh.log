@@ -90,3 +90,27 @@ log: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/gott
 [zsh] 43/54 Debug scores with limit parameter
   -> PASS
 [zsh] 44/54 Debug transitions endpoint returns data
+  -> PASS
+[zsh] 45/54 Debug tasks endpoint returns discovered tasks
+  -> PASS
+[zsh] 46/54 Debug discovery-errors endpoint
+  -> PASS
+[zsh] 47/54 Debug endpoints return valid JSON
+  -> PASS
+[zsh] 48/54 Incognito mode toggle
+  -> PASS
+[zsh] 49/54 Incognito commands appear in session suggestions
+  -> PASS
+[zsh] 50/54 Incognito commands not in global suggestions
+  -> PASS
+[zsh] 51/54 CLAI_EPHEMERAL affects suggestions
+  -> PASS
+[zsh] 52/54 Suggest API returns expected JSON structure
+  -> PASS
+[zsh] 53/54 Suggest API includes cache status
+  -> SKIP: Cache status field not yet exposed
+[zsh] 54/54 Suggest API includes timing info
+  -> SKIP: Timing info not yet exposed
+SUMMARY shell=zsh total=39 passed=37 failed=2 skipped=15 duration_ms=87002
+RESULTS_JSON /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/results-zsh.json
+test server stopped (pid=58168)
