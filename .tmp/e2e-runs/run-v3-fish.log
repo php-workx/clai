@@ -84,3 +84,5 @@ log: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/gott
 [fish] 40/51 Debug scores with limit parameter
   -> PASS
 [fish] 41/51 Debug transitions endpoint returns data
+  -> PASS
+[fish] 42/51 Debug tasks endpoint returns discovered tasks

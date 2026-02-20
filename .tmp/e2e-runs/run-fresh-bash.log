@@ -198,3 +198,5 @@ Call log:
 [bash] 85/97 Debug scores endpoint returns data
   -> PASS
 [bash] 86/97 Debug scores with limit parameter
+  -> PASS
+[bash] 87/97 Debug transitions endpoint returns data
