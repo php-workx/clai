@@ -1,637 +1,281 @@
-2026/02/20 09:40:11 GoTTY is starting with command: bash --noprofile --rcfile /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/shell/bashrc -i
-2026/02/20 09:40:11 Permitting clients to write input to the PTY.
-2026/02/20 09:40:11 HTTP server is listening at: http://127.0.0.1:8080/
-2026/02/20 09:40:12 127.0.0.1:60697 200 GET /
-2026/02/20 09:40:12 127.0.0.1:60701 200 GET /config.js
-2026/02/20 09:40:12 127.0.0.1:60700 200 GET /auth_token.js
-2026/02/20 09:40:12 127.0.0.1:60697 200 GET /css/index.css
-2026/02/20 09:40:12 127.0.0.1:60699 200 GET /css/xterm_customize.css
-2026/02/20 09:40:12 127.0.0.1:60698 200 GET /css/xterm.css
-2026/02/20 09:40:12 127.0.0.1:60702 200 GET /js/gotty.js
-2026/02/20 09:40:12 New client connected: 127.0.0.1:60703, connections: 1/0
-2026/02/20 09:40:14 Connection closed by client: 127.0.0.1:60703, connections: 0/0
-2026/02/20 09:40:14 127.0.0.1:60706 200 GET /
-2026/02/20 09:40:14 127.0.0.1:60706 200 GET /css/index.css
-2026/02/20 09:40:14 127.0.0.1:60708 200 GET /css/xterm_customize.css
-2026/02/20 09:40:14 127.0.0.1:60709 200 GET /auth_token.js
-2026/02/20 09:40:14 127.0.0.1:60706 200 GET /config.js
-2026/02/20 09:40:14 127.0.0.1:60707 200 GET /css/xterm.css
-2026/02/20 09:40:14 127.0.0.1:60710 200 GET /js/gotty.js
-2026/02/20 09:40:14 New client connected: 127.0.0.1:60712, connections: 1/0
-2026/02/20 09:40:16 Connection closed by client: 127.0.0.1:60712, connections: 0/0
-2026/02/20 09:40:16 127.0.0.1:60714 200 GET /
-2026/02/20 09:40:16 127.0.0.1:60714 200 GET /css/index.css
-2026/02/20 09:40:16 127.0.0.1:60716 200 GET /css/xterm_customize.css
-2026/02/20 09:40:16 127.0.0.1:60717 200 GET /config.js
-2026/02/20 09:40:16 127.0.0.1:60714 200 GET /auth_token.js
-2026/02/20 09:40:16 127.0.0.1:60715 200 GET /css/xterm.css
-2026/02/20 09:40:16 127.0.0.1:60718 200 GET /js/gotty.js
-2026/02/20 09:40:16 New client connected: 127.0.0.1:60720, connections: 1/0
-2026/02/20 09:40:17 Connection closed by client: 127.0.0.1:60720, connections: 0/0
-2026/02/20 09:40:17 127.0.0.1:60724 200 GET /
-2026/02/20 09:40:17 127.0.0.1:60724 200 GET /css/index.css
-2026/02/20 09:40:17 127.0.0.1:60727 200 GET /auth_token.js
-2026/02/20 09:40:17 127.0.0.1:60726 200 GET /css/xterm_customize.css
-2026/02/20 09:40:17 127.0.0.1:60728 200 GET /config.js
-2026/02/20 09:40:17 127.0.0.1:60725 200 GET /css/xterm.css
-2026/02/20 09:40:17 127.0.0.1:60724 200 GET /js/gotty.js
-2026/02/20 09:40:17 New client connected: 127.0.0.1:60730, connections: 1/0
-2026/02/20 09:40:18 Connection closed by client: 127.0.0.1:60730, connections: 0/0
-2026/02/20 09:40:18 127.0.0.1:60731 200 GET /
-2026/02/20 09:40:18 127.0.0.1:60731 200 GET /css/index.css
-2026/02/20 09:40:18 127.0.0.1:60734 200 GET /auth_token.js
-2026/02/20 09:40:18 127.0.0.1:60735 200 GET /config.js
-2026/02/20 09:40:18 127.0.0.1:60733 200 GET /css/xterm_customize.css
-2026/02/20 09:40:18 127.0.0.1:60732 200 GET /css/xterm.css
-2026/02/20 09:40:18 127.0.0.1:60731 200 GET /js/gotty.js
-2026/02/20 09:40:18 New client connected: 127.0.0.1:60737, connections: 1/0
-2026/02/20 09:40:19 Connection closed by client: 127.0.0.1:60737, connections: 0/0
-2026/02/20 09:40:19 127.0.0.1:60740 200 GET /
-2026/02/20 09:40:19 127.0.0.1:60740 200 GET /css/index.css
-2026/02/20 09:40:19 127.0.0.1:60740 200 GET /config.js
-2026/02/20 09:40:19 127.0.0.1:60743 200 GET /auth_token.js
-2026/02/20 09:40:19 127.0.0.1:60742 200 GET /css/xterm_customize.css
-2026/02/20 09:40:19 127.0.0.1:60741 200 GET /css/xterm.css
-2026/02/20 09:40:19 127.0.0.1:60744 200 GET /js/gotty.js
-2026/02/20 09:40:20 New client connected: 127.0.0.1:60746, connections: 1/0
-2026/02/20 09:40:20 Connection closed by client: 127.0.0.1:60746, connections: 0/0
-2026/02/20 09:40:20 127.0.0.1:60747 200 GET /
-2026/02/20 09:40:20 127.0.0.1:60747 200 GET /css/index.css
-2026/02/20 09:40:20 127.0.0.1:60747 200 GET /auth_token.js
-2026/02/20 09:40:20 127.0.0.1:60749 200 GET /css/xterm_customize.css
-2026/02/20 09:40:20 127.0.0.1:60750 200 GET /config.js
-2026/02/20 09:40:20 127.0.0.1:60748 200 GET /css/xterm.css
-2026/02/20 09:40:20 127.0.0.1:60751 200 GET /js/gotty.js
-2026/02/20 09:40:21 New client connected: 127.0.0.1:60753, connections: 1/0
-2026/02/20 09:40:21 Connection closed by client: 127.0.0.1:60753, connections: 0/0
-2026/02/20 09:40:22 127.0.0.1:60754 200 GET /
-2026/02/20 09:40:22 127.0.0.1:60754 200 GET /css/index.css
-2026/02/20 09:40:22 127.0.0.1:60757 200 GET /auth_token.js
-2026/02/20 09:40:22 127.0.0.1:60754 200 GET /config.js
-2026/02/20 09:40:22 127.0.0.1:60756 200 GET /css/xterm_customize.css
-2026/02/20 09:40:22 127.0.0.1:60755 200 GET /css/xterm.css
-2026/02/20 09:40:22 127.0.0.1:60758 200 GET /js/gotty.js
-2026/02/20 09:40:22 New client connected: 127.0.0.1:60760, connections: 1/0
-2026/02/20 09:40:23 Connection closed by client: 127.0.0.1:60760, connections: 0/0
-2026/02/20 09:40:23 127.0.0.1:60763 200 GET /
-2026/02/20 09:40:23 127.0.0.1:60763 200 GET /css/index.css
-2026/02/20 09:40:23 127.0.0.1:60765 200 GET /css/xterm_customize.css
-2026/02/20 09:40:23 127.0.0.1:60766 200 GET /auth_token.js
-2026/02/20 09:40:23 127.0.0.1:60763 200 GET /config.js
-2026/02/20 09:40:23 127.0.0.1:60764 200 GET /css/xterm.css
-2026/02/20 09:40:23 127.0.0.1:60767 200 GET /js/gotty.js
-2026/02/20 09:40:23 New client connected: 127.0.0.1:60769, connections: 1/0
-2026/02/20 09:40:25 Connection closed by client: 127.0.0.1:60769, connections: 0/0
-2026/02/20 09:40:25 127.0.0.1:60770 200 GET /
-2026/02/20 09:40:25 127.0.0.1:60770 200 GET /css/index.css
-2026/02/20 09:40:25 127.0.0.1:60772 200 GET /css/xterm_customize.css
-2026/02/20 09:40:25 127.0.0.1:60773 200 GET /config.js
-2026/02/20 09:40:25 127.0.0.1:60770 200 GET /auth_token.js
-2026/02/20 09:40:25 127.0.0.1:60771 200 GET /css/xterm.css
-2026/02/20 09:40:25 127.0.0.1:60774 200 GET /js/gotty.js
-2026/02/20 09:40:25 New client connected: 127.0.0.1:60776, connections: 1/0
-2026/02/20 09:40:27 Connection closed by client: 127.0.0.1:60776, connections: 0/0
-2026/02/20 09:40:27 127.0.0.1:60779 200 GET /
-2026/02/20 09:40:27 127.0.0.1:60779 200 GET /css/index.css
-2026/02/20 09:40:27 127.0.0.1:60781 200 GET /css/xterm_customize.css
-2026/02/20 09:40:27 127.0.0.1:60782 200 GET /auth_token.js
-2026/02/20 09:40:27 127.0.0.1:60779 200 GET /config.js
-2026/02/20 09:40:27 127.0.0.1:60780 200 GET /css/xterm.css
-2026/02/20 09:40:27 127.0.0.1:60783 200 GET /js/gotty.js
-2026/02/20 09:40:27 New client connected: 127.0.0.1:60785, connections: 1/0
-2026/02/20 09:40:29 Connection closed by client: 127.0.0.1:60785, connections: 0/0
-2026/02/20 09:40:30 127.0.0.1:60788 200 GET /
-2026/02/20 09:40:30 127.0.0.1:60788 200 GET /css/index.css
-2026/02/20 09:40:30 127.0.0.1:60790 200 GET /css/xterm_customize.css
-2026/02/20 09:40:30 127.0.0.1:60788 200 GET /auth_token.js
-2026/02/20 09:40:30 127.0.0.1:60791 200 GET /config.js
-2026/02/20 09:40:30 127.0.0.1:60789 200 GET /css/xterm.css
-2026/02/20 09:40:30 127.0.0.1:60792 200 GET /js/gotty.js
-2026/02/20 09:40:30 New client connected: 127.0.0.1:60794, connections: 1/0
-2026/02/20 09:40:31 Connection closed by client: 127.0.0.1:60794, connections: 0/0
-2026/02/20 09:40:31 127.0.0.1:60797 200 GET /
-2026/02/20 09:40:31 127.0.0.1:60797 200 GET /css/index.css
-2026/02/20 09:40:31 127.0.0.1:60797 200 GET /auth_token.js
-2026/02/20 09:40:31 127.0.0.1:60800 200 GET /config.js
-2026/02/20 09:40:31 127.0.0.1:60799 200 GET /css/xterm_customize.css
-2026/02/20 09:40:31 127.0.0.1:60798 200 GET /css/xterm.css
-2026/02/20 09:40:31 127.0.0.1:60801 200 GET /js/gotty.js
-2026/02/20 09:40:31 New client connected: 127.0.0.1:60803, connections: 1/0
-2026/02/20 09:40:32 Connection closed by client: 127.0.0.1:60803, connections: 0/0
-2026/02/20 09:40:32 127.0.0.1:60804 200 GET /
-2026/02/20 09:40:32 127.0.0.1:60804 200 GET /css/index.css
-2026/02/20 09:40:32 127.0.0.1:60806 200 GET /css/xterm_customize.css
-2026/02/20 09:40:32 127.0.0.1:60807 200 GET /config.js
-2026/02/20 09:40:32 127.0.0.1:60804 200 GET /auth_token.js
-2026/02/20 09:40:32 127.0.0.1:60805 200 GET /css/xterm.css
-2026/02/20 09:40:32 127.0.0.1:60808 200 GET /js/gotty.js
-2026/02/20 09:40:33 New client connected: 127.0.0.1:60810, connections: 1/0
-2026/02/20 09:40:34 Connection closed by client: 127.0.0.1:60810, connections: 0/0
-2026/02/20 09:40:34 127.0.0.1:60811 200 GET /
-2026/02/20 09:40:34 127.0.0.1:60811 200 GET /css/index.css
-2026/02/20 09:40:34 127.0.0.1:60814 200 GET /auth_token.js
-2026/02/20 09:40:34 127.0.0.1:60811 200 GET /config.js
-2026/02/20 09:40:34 127.0.0.1:60813 200 GET /css/xterm_customize.css
-2026/02/20 09:40:34 127.0.0.1:60812 200 GET /css/xterm.css
-2026/02/20 09:40:34 127.0.0.1:60815 200 GET /js/gotty.js
-2026/02/20 09:40:34 New client connected: 127.0.0.1:60817, connections: 1/0
-2026/02/20 09:40:35 Connection closed by client: 127.0.0.1:60817, connections: 0/0
-2026/02/20 09:40:35 127.0.0.1:60818 200 GET /
-2026/02/20 09:40:35 127.0.0.1:60818 200 GET /css/index.css
-2026/02/20 09:40:35 127.0.0.1:60820 200 GET /css/xterm_customize.css
-2026/02/20 09:40:35 127.0.0.1:60821 200 GET /config.js
-2026/02/20 09:40:35 127.0.0.1:60818 200 GET /auth_token.js
-2026/02/20 09:40:35 127.0.0.1:60819 200 GET /css/xterm.css
-2026/02/20 09:40:35 127.0.0.1:60822 200 GET /js/gotty.js
-2026/02/20 09:40:35 New client connected: 127.0.0.1:60826, connections: 1/0
-2026/02/20 09:40:37 Connection closed by client: 127.0.0.1:60826, connections: 0/0
-2026/02/20 09:40:37 127.0.0.1:60827 200 GET /
-2026/02/20 09:40:37 127.0.0.1:60827 200 GET /css/index.css
-2026/02/20 09:40:37 127.0.0.1:60829 200 GET /css/xterm_customize.css
-2026/02/20 09:40:37 127.0.0.1:60830 200 GET /config.js
-2026/02/20 09:40:37 127.0.0.1:60827 200 GET /auth_token.js
-2026/02/20 09:40:37 127.0.0.1:60828 200 GET /css/xterm.css
-2026/02/20 09:40:37 127.0.0.1:60831 200 GET /js/gotty.js
-2026/02/20 09:40:37 New client connected: 127.0.0.1:60833, connections: 1/0
-2026/02/20 09:40:38 Connection closed by client: 127.0.0.1:60833, connections: 0/0
-2026/02/20 09:40:38 127.0.0.1:60834 200 GET /
-2026/02/20 09:40:38 127.0.0.1:60834 200 GET /css/index.css
-2026/02/20 09:40:38 127.0.0.1:60836 200 GET /css/xterm_customize.css
-2026/02/20 09:40:38 127.0.0.1:60834 200 GET /config.js
-2026/02/20 09:40:38 127.0.0.1:60837 200 GET /auth_token.js
-2026/02/20 09:40:38 127.0.0.1:60835 200 GET /css/xterm.css
-2026/02/20 09:40:38 127.0.0.1:60838 200 GET /js/gotty.js
-2026/02/20 09:40:38 New client connected: 127.0.0.1:60842, connections: 1/0
-2026/02/20 09:40:40 Connection closed by client: 127.0.0.1:60842, connections: 0/0
-2026/02/20 09:40:40 127.0.0.1:60844 200 GET /
-2026/02/20 09:40:40 127.0.0.1:60844 200 GET /css/index.css
-2026/02/20 09:40:40 127.0.0.1:60846 200 GET /css/xterm_customize.css
-2026/02/20 09:40:40 127.0.0.1:60847 200 GET /config.js
-2026/02/20 09:40:40 127.0.0.1:60844 200 GET /auth_token.js
-2026/02/20 09:40:40 127.0.0.1:60845 200 GET /css/xterm.css
-2026/02/20 09:40:40 127.0.0.1:60848 200 GET /js/gotty.js
-2026/02/20 09:40:40 New client connected: 127.0.0.1:60850, connections: 1/0
-2026/02/20 09:40:43 Connection closed by client: 127.0.0.1:60850, connections: 0/0
-2026/02/20 09:40:43 127.0.0.1:60854 200 GET /
-2026/02/20 09:40:43 127.0.0.1:60854 200 GET /css/index.css
-2026/02/20 09:40:43 127.0.0.1:60856 200 GET /css/xterm_customize.css
-2026/02/20 09:40:43 127.0.0.1:60857 200 GET /config.js
-2026/02/20 09:40:43 127.0.0.1:60854 200 GET /auth_token.js
-2026/02/20 09:40:43 127.0.0.1:60855 200 GET /css/xterm.css
-2026/02/20 09:40:43 127.0.0.1:60858 200 GET /js/gotty.js
-2026/02/20 09:40:43 New client connected: 127.0.0.1:60860, connections: 1/0
-2026/02/20 09:40:45 Connection closed by client: 127.0.0.1:60860, connections: 0/0
-2026/02/20 09:40:45 127.0.0.1:60861 200 GET /
-2026/02/20 09:40:45 127.0.0.1:60861 200 GET /css/index.css
-2026/02/20 09:40:45 127.0.0.1:60863 200 GET /css/xterm_customize.css
-2026/02/20 09:40:45 127.0.0.1:60861 200 GET /config.js
-2026/02/20 09:40:45 127.0.0.1:60864 200 GET /auth_token.js
-2026/02/20 09:40:45 127.0.0.1:60862 200 GET /css/xterm.css
-2026/02/20 09:40:45 127.0.0.1:60865 200 GET /js/gotty.js
-2026/02/20 09:40:45 New client connected: 127.0.0.1:60867, connections: 1/0
-2026/02/20 09:40:46 Connection closed by client: 127.0.0.1:60867, connections: 0/0
-2026/02/20 09:40:46 127.0.0.1:60868 200 GET /
-2026/02/20 09:40:46 127.0.0.1:60868 200 GET /css/index.css
-2026/02/20 09:40:46 127.0.0.1:60871 200 GET /auth_token.js
-2026/02/20 09:40:46 127.0.0.1:60870 200 GET /css/xterm_customize.css
-2026/02/20 09:40:46 127.0.0.1:60868 200 GET /config.js
-2026/02/20 09:40:46 127.0.0.1:60869 200 GET /css/xterm.css
-2026/02/20 09:40:46 127.0.0.1:60872 200 GET /js/gotty.js
-2026/02/20 09:40:46 New client connected: 127.0.0.1:60874, connections: 1/0
-2026/02/20 09:40:47 Connection closed by client: 127.0.0.1:60874, connections: 0/0
-2026/02/20 09:40:47 127.0.0.1:60877 200 GET /
-2026/02/20 09:40:47 127.0.0.1:60877 200 GET /css/index.css
-2026/02/20 09:40:47 127.0.0.1:60880 200 GET /auth_token.js
-2026/02/20 09:40:47 127.0.0.1:60877 200 GET /config.js
-2026/02/20 09:40:47 127.0.0.1:60879 200 GET /css/xterm_customize.css
-2026/02/20 09:40:47 127.0.0.1:60878 200 GET /css/xterm.css
-2026/02/20 09:40:47 127.0.0.1:60881 200 GET /js/gotty.js
-2026/02/20 09:40:47 New client connected: 127.0.0.1:60883, connections: 1/0
-2026/02/20 09:40:48 Connection closed by client: 127.0.0.1:60883, connections: 0/0
-2026/02/20 09:40:48 127.0.0.1:60884 200 GET /
-2026/02/20 09:40:48 127.0.0.1:60884 200 GET /css/index.css
-2026/02/20 09:40:48 127.0.0.1:60887 200 GET /config.js
-2026/02/20 09:40:48 127.0.0.1:60884 200 GET /auth_token.js
-2026/02/20 09:40:48 127.0.0.1:60886 200 GET /css/xterm_customize.css
-2026/02/20 09:40:48 127.0.0.1:60885 200 GET /css/xterm.css
-2026/02/20 09:40:49 127.0.0.1:60888 200 GET /js/gotty.js
-2026/02/20 09:40:49 New client connected: 127.0.0.1:60890, connections: 1/0
-2026/02/20 09:40:50 Connection closed by client: 127.0.0.1:60890, connections: 0/0
-2026/02/20 09:40:50 127.0.0.1:60892 200 GET /
-2026/02/20 09:40:50 127.0.0.1:60892 200 GET /css/index.css
-2026/02/20 09:40:50 127.0.0.1:60894 200 GET /css/xterm_customize.css
-2026/02/20 09:40:50 127.0.0.1:60892 200 GET /auth_token.js
-2026/02/20 09:40:50 127.0.0.1:60895 200 GET /config.js
-2026/02/20 09:40:50 127.0.0.1:60893 200 GET /css/xterm.css
-2026/02/20 09:40:50 127.0.0.1:60896 200 GET /js/gotty.js
-2026/02/20 09:40:50 New client connected: 127.0.0.1:60898, connections: 1/0
-2026/02/20 09:40:51 Connection closed by client: 127.0.0.1:60898, connections: 0/0
-2026/02/20 09:40:51 127.0.0.1:60902 200 GET /
-2026/02/20 09:40:51 127.0.0.1:60902 200 GET /css/index.css
-2026/02/20 09:40:51 127.0.0.1:60904 200 GET /css/xterm_customize.css
-2026/02/20 09:40:51 127.0.0.1:60905 200 GET /auth_token.js
-2026/02/20 09:40:51 127.0.0.1:60902 200 GET /config.js
-2026/02/20 09:40:51 127.0.0.1:60903 200 GET /css/xterm.css
-2026/02/20 09:40:51 127.0.0.1:60906 200 GET /js/gotty.js
-2026/02/20 09:40:51 New client connected: 127.0.0.1:60908, connections: 1/0
-2026/02/20 09:40:54 Connection closed by client: 127.0.0.1:60908, connections: 0/0
-2026/02/20 09:40:54 127.0.0.1:60912 200 GET /
-2026/02/20 09:40:54 127.0.0.1:60912 200 GET /css/index.css
-2026/02/20 09:40:54 127.0.0.1:60912 200 GET /config.js
-2026/02/20 09:40:54 127.0.0.1:60915 200 GET /auth_token.js
-2026/02/20 09:40:54 127.0.0.1:60914 200 GET /css/xterm_customize.css
-2026/02/20 09:40:54 127.0.0.1:60913 200 GET /css/xterm.css
-2026/02/20 09:40:54 127.0.0.1:60916 200 GET /js/gotty.js
-2026/02/20 09:40:54 New client connected: 127.0.0.1:60918, connections: 1/0
-2026/02/20 09:40:55 Connection closed by client: 127.0.0.1:60918, connections: 0/0
-2026/02/20 09:40:55 127.0.0.1:60919 200 GET /
-2026/02/20 09:40:55 127.0.0.1:60919 200 GET /css/index.css
-2026/02/20 09:40:55 127.0.0.1:60921 200 GET /css/xterm_customize.css
-2026/02/20 09:40:55 127.0.0.1:60919 200 GET /auth_token.js
-2026/02/20 09:40:55 127.0.0.1:60920 200 GET /css/xterm.css
-2026/02/20 09:40:55 127.0.0.1:60922 200 GET /config.js
-2026/02/20 09:40:55 127.0.0.1:60923 200 GET /js/gotty.js
-2026/02/20 09:40:55 New client connected: 127.0.0.1:60925, connections: 1/0
-2026/02/20 09:40:57 Connection closed by client: 127.0.0.1:60925, connections: 0/0
-2026/02/20 09:40:57 127.0.0.1:60926 200 GET /
-2026/02/20 09:40:57 127.0.0.1:60926 200 GET /css/index.css
-2026/02/20 09:40:57 127.0.0.1:60926 200 GET /auth_token.js
-2026/02/20 09:40:57 127.0.0.1:60928 200 GET /css/xterm_customize.css
-2026/02/20 09:40:57 127.0.0.1:60929 200 GET /config.js
-2026/02/20 09:40:57 127.0.0.1:60927 200 GET /css/xterm.css
-2026/02/20 09:40:57 127.0.0.1:60930 200 GET /js/gotty.js
-2026/02/20 09:40:57 New client connected: 127.0.0.1:60932, connections: 1/0
-2026/02/20 09:40:58 Connection closed by client: 127.0.0.1:60932, connections: 0/0
-2026/02/20 09:40:58 127.0.0.1:60936 200 GET /
-2026/02/20 09:40:58 127.0.0.1:60936 200 GET /css/index.css
-2026/02/20 09:40:58 127.0.0.1:60938 200 GET /css/xterm_customize.css
-2026/02/20 09:40:58 127.0.0.1:60936 200 GET /config.js
-2026/02/20 09:40:58 127.0.0.1:60939 200 GET /auth_token.js
-2026/02/20 09:40:58 127.0.0.1:60937 200 GET /css/xterm.css
-2026/02/20 09:40:58 127.0.0.1:60940 200 GET /js/gotty.js
-2026/02/20 09:40:58 New client connected: 127.0.0.1:60942, connections: 1/0
-2026/02/20 09:41:00 Connection closed by client: 127.0.0.1:60942, connections: 0/0
-2026/02/20 09:41:00 127.0.0.1:60943 200 GET /
-2026/02/20 09:41:00 127.0.0.1:60943 200 GET /css/index.css
-2026/02/20 09:41:00 127.0.0.1:60946 200 GET /config.js
-2026/02/20 09:41:00 127.0.0.1:60943 200 GET /auth_token.js
-2026/02/20 09:41:00 127.0.0.1:60945 200 GET /css/xterm_customize.css
-2026/02/20 09:41:00 127.0.0.1:60944 200 GET /css/xterm.css
-2026/02/20 09:41:00 127.0.0.1:60947 200 GET /js/gotty.js
-2026/02/20 09:41:00 New client connected: 127.0.0.1:60949, connections: 1/0
-2026/02/20 09:41:02 Connection closed by client: 127.0.0.1:60949, connections: 0/0
-2026/02/20 09:41:02 127.0.0.1:60952 200 GET /
-2026/02/20 09:41:02 127.0.0.1:60952 200 GET /css/index.css
-2026/02/20 09:41:02 127.0.0.1:60952 200 GET /auth_token.js
-2026/02/20 09:41:02 127.0.0.1:60955 200 GET /config.js
-2026/02/20 09:41:02 127.0.0.1:60954 200 GET /css/xterm_customize.css
-2026/02/20 09:41:02 127.0.0.1:60953 200 GET /css/xterm.css
-2026/02/20 09:41:02 127.0.0.1:60956 200 GET /js/gotty.js
-2026/02/20 09:41:02 New client connected: 127.0.0.1:60958, connections: 1/0
-2026/02/20 09:41:03 Connection closed by client: 127.0.0.1:60958, connections: 0/0
-2026/02/20 09:41:03 127.0.0.1:60959 200 GET /
-2026/02/20 09:41:03 127.0.0.1:60959 200 GET /css/index.css
-2026/02/20 09:41:03 127.0.0.1:60961 200 GET /css/xterm_customize.css
-2026/02/20 09:41:03 127.0.0.1:60962 200 GET /auth_token.js
-2026/02/20 09:41:03 127.0.0.1:60960 200 GET /css/xterm.css
-2026/02/20 09:41:03 127.0.0.1:60959 200 GET /config.js
-2026/02/20 09:41:03 127.0.0.1:60963 200 GET /js/gotty.js
-2026/02/20 09:41:03 New client connected: 127.0.0.1:60965, connections: 1/0
-2026/02/20 09:41:07 Connection closed by client: 127.0.0.1:60965, connections: 0/0
-2026/02/20 09:41:07 127.0.0.1:60968 200 GET /
-2026/02/20 09:41:07 127.0.0.1:60968 200 GET /css/index.css
-2026/02/20 09:41:07 127.0.0.1:60971 200 GET /config.js
-2026/02/20 09:41:07 127.0.0.1:60970 200 GET /css/xterm_customize.css
-2026/02/20 09:41:07 127.0.0.1:60968 200 GET /auth_token.js
-2026/02/20 09:41:07 127.0.0.1:60969 200 GET /css/xterm.css
-2026/02/20 09:41:07 127.0.0.1:60972 200 GET /js/gotty.js
-2026/02/20 09:41:07 New client connected: 127.0.0.1:60974, connections: 1/0
-2026/02/20 09:41:08 Connection closed by client: 127.0.0.1:60974, connections: 0/0
-2026/02/20 09:41:08 127.0.0.1:60978 200 GET /
-2026/02/20 09:41:08 127.0.0.1:60978 200 GET /css/index.css
-2026/02/20 09:41:08 127.0.0.1:60980 200 GET /css/xterm_customize.css
-2026/02/20 09:41:08 127.0.0.1:60981 200 GET /auth_token.js
-2026/02/20 09:41:08 127.0.0.1:60978 200 GET /config.js
-2026/02/20 09:41:08 127.0.0.1:60979 200 GET /css/xterm.css
-2026/02/20 09:41:08 127.0.0.1:60982 200 GET /js/gotty.js
-2026/02/20 09:41:08 New client connected: 127.0.0.1:60984, connections: 1/0
-2026/02/20 09:41:11 Connection closed by client: 127.0.0.1:60984, connections: 0/0
-2026/02/20 09:41:11 127.0.0.1:60989 200 GET /
-2026/02/20 09:41:11 127.0.0.1:60989 200 GET /css/index.css
-2026/02/20 09:41:11 127.0.0.1:60991 200 GET /css/xterm_customize.css
-2026/02/20 09:41:11 127.0.0.1:60989 200 GET /config.js
-2026/02/20 09:41:11 127.0.0.1:60992 200 GET /auth_token.js
-2026/02/20 09:41:11 127.0.0.1:60990 200 GET /css/xterm.css
-2026/02/20 09:41:11 127.0.0.1:60993 200 GET /js/gotty.js
-2026/02/20 09:41:11 New client connected: 127.0.0.1:60995, connections: 1/0
-2026/02/20 09:41:14 Connection closed by client: 127.0.0.1:60995, connections: 0/0
-2026/02/20 09:41:14 127.0.0.1:60998 200 GET /
-2026/02/20 09:41:14 127.0.0.1:60998 200 GET /css/index.css
-2026/02/20 09:41:14 127.0.0.1:61000 200 GET /css/xterm_customize.css
-2026/02/20 09:41:14 127.0.0.1:60998 200 GET /auth_token.js
-2026/02/20 09:41:14 127.0.0.1:60999 200 GET /css/xterm.css
-2026/02/20 09:41:14 127.0.0.1:61001 200 GET /config.js
-2026/02/20 09:41:14 127.0.0.1:61002 200 GET /js/gotty.js
-2026/02/20 09:41:14 New client connected: 127.0.0.1:61004, connections: 1/0
-2026/02/20 09:41:16 Connection closed by client: 127.0.0.1:61004, connections: 0/0
-2026/02/20 09:41:16 127.0.0.1:61005 200 GET /
-2026/02/20 09:41:16 127.0.0.1:61005 200 GET /css/index.css
-2026/02/20 09:41:16 127.0.0.1:61005 200 GET /auth_token.js
-2026/02/20 09:41:16 127.0.0.1:61008 200 GET /config.js
-2026/02/20 09:41:16 127.0.0.1:61007 200 GET /css/xterm_customize.css
-2026/02/20 09:41:16 127.0.0.1:61006 200 GET /css/xterm.css
-2026/02/20 09:41:16 127.0.0.1:61009 200 GET /js/gotty.js
-2026/02/20 09:41:16 New client connected: 127.0.0.1:61011, connections: 1/0
-2026/02/20 09:41:18 Connection closed by client: 127.0.0.1:61011, connections: 0/0
-2026/02/20 09:41:18 127.0.0.1:61015 200 GET /
-2026/02/20 09:41:18 127.0.0.1:61015 200 GET /css/index.css
-2026/02/20 09:41:18 127.0.0.1:61018 200 GET /config.js
-2026/02/20 09:41:18 127.0.0.1:61017 200 GET /css/xterm_customize.css
-2026/02/20 09:41:18 127.0.0.1:61015 200 GET /auth_token.js
-2026/02/20 09:41:18 127.0.0.1:61016 200 GET /css/xterm.css
-2026/02/20 09:41:18 127.0.0.1:61019 200 GET /js/gotty.js
-2026/02/20 09:41:18 New client connected: 127.0.0.1:61021, connections: 1/0
-2026/02/20 09:41:20 Connection closed by client: 127.0.0.1:61021, connections: 0/0
-2026/02/20 09:41:20 127.0.0.1:61022 200 GET /
-2026/02/20 09:41:20 127.0.0.1:61022 200 GET /css/index.css
-2026/02/20 09:41:20 127.0.0.1:61025 200 GET /config.js
-2026/02/20 09:41:20 127.0.0.1:61024 200 GET /css/xterm_customize.css
-2026/02/20 09:41:20 127.0.0.1:61022 200 GET /auth_token.js
-2026/02/20 09:41:20 127.0.0.1:61023 200 GET /css/xterm.css
-2026/02/20 09:41:20 127.0.0.1:61026 200 GET /js/gotty.js
-2026/02/20 09:41:21 New client connected: 127.0.0.1:61030, connections: 1/0
-2026/02/20 09:41:22 Connection closed by client: 127.0.0.1:61030, connections: 0/0
-2026/02/20 09:41:22 127.0.0.1:61031 200 GET /
-2026/02/20 09:41:22 127.0.0.1:61031 200 GET /css/index.css
-2026/02/20 09:41:22 127.0.0.1:61033 200 GET /css/xterm_customize.css
-2026/02/20 09:41:22 127.0.0.1:61034 200 GET /config.js
-2026/02/20 09:41:22 127.0.0.1:61031 200 GET /auth_token.js
-2026/02/20 09:41:22 127.0.0.1:61032 200 GET /css/xterm.css
-2026/02/20 09:41:22 127.0.0.1:61035 200 GET /js/gotty.js
-2026/02/20 09:41:22 New client connected: 127.0.0.1:61037, connections: 1/0
-2026/02/20 09:41:23 Connection closed by client: 127.0.0.1:61037, connections: 0/0
-2026/02/20 09:41:24 127.0.0.1:61041 200 GET /
-2026/02/20 09:41:24 127.0.0.1:61041 200 GET /css/index.css
-2026/02/20 09:41:24 127.0.0.1:61043 200 GET /css/xterm_customize.css
-2026/02/20 09:41:24 127.0.0.1:61044 200 GET /auth_token.js
-2026/02/20 09:41:24 127.0.0.1:61041 200 GET /config.js
-2026/02/20 09:41:24 127.0.0.1:61042 200 GET /css/xterm.css
-2026/02/20 09:41:24 127.0.0.1:61045 200 GET /js/gotty.js
-2026/02/20 09:41:24 New client connected: 127.0.0.1:61047, connections: 1/0
-2026/02/20 09:41:27 Connection closed by client: 127.0.0.1:61047, connections: 0/0
-2026/02/20 09:41:27 127.0.0.1:61049 200 GET /
-2026/02/20 09:41:27 127.0.0.1:61049 200 GET /css/index.css
-2026/02/20 09:41:27 127.0.0.1:61049 200 GET /auth_token.js
-2026/02/20 09:41:27 127.0.0.1:61051 200 GET /css/xterm_customize.css
-2026/02/20 09:41:27 127.0.0.1:61052 200 GET /config.js
-2026/02/20 09:41:27 127.0.0.1:61050 200 GET /css/xterm.css
-2026/02/20 09:41:27 127.0.0.1:61053 200 GET /js/gotty.js
-2026/02/20 09:41:27 New client connected: 127.0.0.1:61055, connections: 1/0
-2026/02/20 09:41:30 Connection closed by client: 127.0.0.1:61055, connections: 0/0
-2026/02/20 09:41:30 127.0.0.1:61059 200 GET /
-2026/02/20 09:41:30 127.0.0.1:61059 200 GET /css/index.css
-2026/02/20 09:41:30 127.0.0.1:61059 200 GET /config.js
-2026/02/20 09:41:30 127.0.0.1:61062 200 GET /auth_token.js
-2026/02/20 09:41:30 127.0.0.1:61061 200 GET /css/xterm_customize.css
-2026/02/20 09:41:30 127.0.0.1:61060 200 GET /css/xterm.css
-2026/02/20 09:41:30 127.0.0.1:61063 200 GET /js/gotty.js
-2026/02/20 09:41:30 New client connected: 127.0.0.1:61065, connections: 1/0
-2026/02/20 09:41:35 Connection closed by client: 127.0.0.1:61065, connections: 0/0
-2026/02/20 09:41:35 127.0.0.1:61069 200 GET /
-2026/02/20 09:41:35 127.0.0.1:61069 200 GET /css/index.css
-2026/02/20 09:41:35 127.0.0.1:61071 200 GET /css/xterm_customize.css
-2026/02/20 09:41:35 127.0.0.1:61072 200 GET /config.js
-2026/02/20 09:41:35 127.0.0.1:61069 200 GET /auth_token.js
-2026/02/20 09:41:35 127.0.0.1:61070 200 GET /css/xterm.css
-2026/02/20 09:41:35 127.0.0.1:61073 200 GET /js/gotty.js
-2026/02/20 09:41:35 New client connected: 127.0.0.1:61075, connections: 1/0
-2026/02/20 09:41:36 Connection closed by client: 127.0.0.1:61075, connections: 0/0
-2026/02/20 09:41:36 127.0.0.1:61078 200 GET /
-2026/02/20 09:41:36 127.0.0.1:61078 200 GET /css/index.css
-2026/02/20 09:41:36 127.0.0.1:61080 200 GET /css/xterm_customize.css
-2026/02/20 09:41:36 127.0.0.1:61078 200 GET /auth_token.js
-2026/02/20 09:41:36 127.0.0.1:61081 200 GET /config.js
-2026/02/20 09:41:36 127.0.0.1:61079 200 GET /css/xterm.css
-2026/02/20 09:41:36 127.0.0.1:61082 200 GET /js/gotty.js
-2026/02/20 09:41:36 New client connected: 127.0.0.1:61084, connections: 1/0
-2026/02/20 09:41:38 Connection closed by client: 127.0.0.1:61084, connections: 0/0
-2026/02/20 09:41:38 127.0.0.1:61085 200 GET /
-2026/02/20 09:41:38 127.0.0.1:61085 200 GET /css/index.css
-2026/02/20 09:41:38 127.0.0.1:61085 200 GET /config.js
-2026/02/20 09:41:38 127.0.0.1:61088 200 GET /auth_token.js
-2026/02/20 09:41:38 127.0.0.1:61087 200 GET /css/xterm_customize.css
-2026/02/20 09:41:38 127.0.0.1:61086 200 GET /css/xterm.css
-2026/02/20 09:41:38 127.0.0.1:61089 200 GET /js/gotty.js
-2026/02/20 09:41:38 New client connected: 127.0.0.1:61091, connections: 1/0
-2026/02/20 09:41:39 Connection closed by client: 127.0.0.1:61091, connections: 0/0
-2026/02/20 09:41:39 127.0.0.1:61092 200 GET /
-2026/02/20 09:41:39 127.0.0.1:61092 200 GET /css/index.css
-2026/02/20 09:41:39 127.0.0.1:61094 200 GET /css/xterm_customize.css
-2026/02/20 09:41:39 127.0.0.1:61095 200 GET /auth_token.js
-2026/02/20 09:41:39 127.0.0.1:61092 200 GET /config.js
-2026/02/20 09:41:39 127.0.0.1:61093 200 GET /css/xterm.css
-2026/02/20 09:41:39 127.0.0.1:61096 200 GET /js/gotty.js
-2026/02/20 09:41:40 New client connected: 127.0.0.1:61099, connections: 1/0
-2026/02/20 09:41:41 Connection closed by client: 127.0.0.1:61099, connections: 0/0
-2026/02/20 09:41:41 127.0.0.1:61102 200 GET /
-2026/02/20 09:41:41 127.0.0.1:61102 200 GET /css/index.css
-2026/02/20 09:41:41 127.0.0.1:61102 200 GET /config.js
-2026/02/20 09:41:41 127.0.0.1:61104 200 GET /css/xterm_customize.css
-2026/02/20 09:41:41 127.0.0.1:61103 200 GET /css/xterm.css
-2026/02/20 09:41:41 127.0.0.1:61105 200 GET /auth_token.js
-2026/02/20 09:41:41 127.0.0.1:61106 200 GET /js/gotty.js
-2026/02/20 09:41:41 New client connected: 127.0.0.1:61108, connections: 1/0
-2026/02/20 09:41:46 Connection closed by client: 127.0.0.1:61108, connections: 0/0
-2026/02/20 09:41:46 127.0.0.1:61111 200 GET /
-2026/02/20 09:41:46 127.0.0.1:61111 200 GET /css/index.css
-2026/02/20 09:41:46 127.0.0.1:61113 200 GET /css/xterm_customize.css
-2026/02/20 09:41:46 127.0.0.1:61114 200 GET /config.js
-2026/02/20 09:41:46 127.0.0.1:61111 200 GET /auth_token.js
-2026/02/20 09:41:46 127.0.0.1:61112 200 GET /css/xterm.css
-2026/02/20 09:41:46 127.0.0.1:61115 200 GET /js/gotty.js
-2026/02/20 09:41:46 New client connected: 127.0.0.1:61117, connections: 1/0
-2026/02/20 09:41:48 Connection closed by client: 127.0.0.1:61117, connections: 0/0
-2026/02/20 09:41:48 127.0.0.1:61118 200 GET /
-2026/02/20 09:41:48 127.0.0.1:61118 200 GET /css/index.css
-2026/02/20 09:41:48 127.0.0.1:61120 200 GET /css/xterm_customize.css
-2026/02/20 09:41:48 127.0.0.1:61118 200 GET /auth_token.js
-2026/02/20 09:41:48 127.0.0.1:61121 200 GET /config.js
-2026/02/20 09:41:48 127.0.0.1:61119 200 GET /css/xterm.css
-2026/02/20 09:41:48 127.0.0.1:61122 200 GET /js/gotty.js
-2026/02/20 09:41:48 New client connected: 127.0.0.1:61124, connections: 1/0
-2026/02/20 09:41:50 Connection closed by client: 127.0.0.1:61124, connections: 0/0
-2026/02/20 09:41:50 127.0.0.1:61127 200 GET /
-2026/02/20 09:41:50 127.0.0.1:61127 200 GET /css/index.css
-2026/02/20 09:41:50 127.0.0.1:61129 200 GET /css/xterm_customize.css
-2026/02/20 09:41:50 127.0.0.1:61130 200 GET /config.js
-2026/02/20 09:41:50 127.0.0.1:61127 200 GET /auth_token.js
-2026/02/20 09:41:50 127.0.0.1:61128 200 GET /css/xterm.css
-2026/02/20 09:41:50 127.0.0.1:61131 200 GET /js/gotty.js
-2026/02/20 09:41:50 New client connected: 127.0.0.1:61133, connections: 1/0
-2026/02/20 09:41:51 Connection closed by client: 127.0.0.1:61133, connections: 0/0
-2026/02/20 09:41:51 127.0.0.1:61134 200 GET /
-2026/02/20 09:41:51 127.0.0.1:61134 200 GET /css/index.css
-2026/02/20 09:41:51 127.0.0.1:61136 200 GET /css/xterm_customize.css
-2026/02/20 09:41:51 127.0.0.1:61137 200 GET /config.js
-2026/02/20 09:41:51 127.0.0.1:61134 200 GET /auth_token.js
-2026/02/20 09:41:51 127.0.0.1:61135 200 GET /css/xterm.css
-2026/02/20 09:41:51 127.0.0.1:61138 200 GET /js/gotty.js
-2026/02/20 09:41:51 New client connected: 127.0.0.1:61140, connections: 1/0
-2026/02/20 09:41:53 Connection closed by client: 127.0.0.1:61140, connections: 0/0
-2026/02/20 09:41:53 127.0.0.1:61146 200 GET /
-2026/02/20 09:41:53 127.0.0.1:61146 200 GET /css/index.css
-2026/02/20 09:41:53 127.0.0.1:61149 200 GET /auth_token.js
-2026/02/20 09:41:53 127.0.0.1:61148 200 GET /css/xterm_customize.css
-2026/02/20 09:41:53 127.0.0.1:61147 200 GET /css/xterm.css
-2026/02/20 09:41:53 127.0.0.1:61146 200 GET /config.js
-2026/02/20 09:41:53 127.0.0.1:61150 200 GET /js/gotty.js
-2026/02/20 09:41:53 New client connected: 127.0.0.1:61152, connections: 1/0
-2026/02/20 09:41:54 Connection closed by client: 127.0.0.1:61152, connections: 0/0
-2026/02/20 09:41:54 127.0.0.1:61153 200 GET /
-2026/02/20 09:41:54 127.0.0.1:61153 200 GET /css/index.css
-2026/02/20 09:41:54 127.0.0.1:61155 200 GET /css/xterm_customize.css
-2026/02/20 09:41:54 127.0.0.1:61153 200 GET /config.js
-2026/02/20 09:41:54 127.0.0.1:61156 200 GET /auth_token.js
-2026/02/20 09:41:54 127.0.0.1:61154 200 GET /css/xterm.css
-2026/02/20 09:41:54 127.0.0.1:61157 200 GET /js/gotty.js
-2026/02/20 09:41:54 New client connected: 127.0.0.1:61159, connections: 1/0
-2026/02/20 09:41:56 Connection closed by client: 127.0.0.1:61159, connections: 0/0
-2026/02/20 09:41:56 127.0.0.1:61160 200 GET /
-2026/02/20 09:41:56 127.0.0.1:61160 200 GET /css/index.css
-2026/02/20 09:41:56 127.0.0.1:61160 200 GET /config.js
-2026/02/20 09:41:56 127.0.0.1:61162 200 GET /css/xterm_customize.css
-2026/02/20 09:41:56 127.0.0.1:61163 200 GET /auth_token.js
-2026/02/20 09:41:56 127.0.0.1:61161 200 GET /css/xterm.css
-2026/02/20 09:41:56 127.0.0.1:61164 200 GET /js/gotty.js
-2026/02/20 09:41:56 New client connected: 127.0.0.1:61166, connections: 1/0
-2026/02/20 09:41:57 Connection closed by client: 127.0.0.1:61166, connections: 0/0
-2026/02/20 09:41:57 127.0.0.1:61170 200 GET /
-2026/02/20 09:41:57 127.0.0.1:61170 200 GET /css/index.css
-2026/02/20 09:41:57 127.0.0.1:61172 200 GET /css/xterm_customize.css
-2026/02/20 09:41:57 127.0.0.1:61173 200 GET /auth_token.js
-2026/02/20 09:41:57 127.0.0.1:61171 200 GET /css/xterm.css
-2026/02/20 09:41:57 127.0.0.1:61170 200 GET /config.js
-2026/02/20 09:41:57 127.0.0.1:61174 200 GET /js/gotty.js
-2026/02/20 09:41:57 New client connected: 127.0.0.1:61176, connections: 1/0
-2026/02/20 09:41:58 127.0.0.1:61180 200 GET /api
-2026/02/20 09:41:58 127.0.0.1:61180 200 GET /api
-2026/02/20 09:41:58 127.0.0.1:61180 200 GET /api
-2026/02/20 09:41:58 127.0.0.1:61180 200 GET /api
-2026/02/20 09:41:58 127.0.0.1:61180 200 GET /api
-2026/02/20 09:41:59 Connection closed by client: 127.0.0.1:61176, connections: 0/0
-2026/02/20 09:41:59 127.0.0.1:61182 200 GET /
-2026/02/20 09:41:59 127.0.0.1:61182 200 GET /css/index.css
-2026/02/20 09:41:59 127.0.0.1:61182 200 GET /auth_token.js
-2026/02/20 09:41:59 127.0.0.1:61185 200 GET /config.js
-2026/02/20 09:41:59 127.0.0.1:61184 200 GET /css/xterm_customize.css
-2026/02/20 09:41:59 127.0.0.1:61183 200 GET /css/xterm.css
-2026/02/20 09:41:59 127.0.0.1:61186 200 GET /js/gotty.js
-2026/02/20 09:41:59 New client connected: 127.0.0.1:61188, connections: 1/0
-2026/02/20 09:42:00 Connection closed by client: 127.0.0.1:61188, connections: 0/0
-2026/02/20 09:42:01 127.0.0.1:61190 200 GET /
-2026/02/20 09:42:01 127.0.0.1:61190 200 GET /css/index.css
-2026/02/20 09:42:01 127.0.0.1:61190 200 GET /config.js
-2026/02/20 09:42:01 127.0.0.1:61192 200 GET /css/xterm_customize.css
-2026/02/20 09:42:01 127.0.0.1:61193 200 GET /auth_token.js
-2026/02/20 09:42:01 127.0.0.1:61191 200 GET /css/xterm.css
-2026/02/20 09:42:01 127.0.0.1:61194 200 GET /js/gotty.js
-2026/02/20 09:42:01 New client connected: 127.0.0.1:61196, connections: 1/0
-2026/02/20 09:42:03 Connection closed by client: 127.0.0.1:61196, connections: 0/0
-2026/02/20 09:42:03 127.0.0.1:61199 200 GET /
-2026/02/20 09:42:03 127.0.0.1:61199 200 GET /css/index.css
-2026/02/20 09:42:03 127.0.0.1:61202 200 GET /auth_token.js
-2026/02/20 09:42:03 127.0.0.1:61203 200 GET /config.js
-2026/02/20 09:42:03 127.0.0.1:61201 200 GET /css/xterm_customize.css
-2026/02/20 09:42:03 127.0.0.1:61200 200 GET /css/xterm.css
-2026/02/20 09:42:03 127.0.0.1:61199 200 GET /js/gotty.js
-2026/02/20 09:42:03 New client connected: 127.0.0.1:61205, connections: 1/0
-2026/02/20 09:42:04 Connection closed by client: 127.0.0.1:61205, connections: 0/0
-2026/02/20 09:42:04 127.0.0.1:61206 200 GET /
-2026/02/20 09:42:04 127.0.0.1:61206 200 GET /css/index.css
-2026/02/20 09:42:04 127.0.0.1:61206 200 GET /config.js
-2026/02/20 09:42:04 127.0.0.1:61209 200 GET /auth_token.js
-2026/02/20 09:42:04 127.0.0.1:61207 200 GET /css/xterm.css
-2026/02/20 09:42:04 127.0.0.1:61208 200 GET /css/xterm_customize.css
-2026/02/20 09:42:04 127.0.0.1:61210 200 GET /js/gotty.js
-2026/02/20 09:42:04 New client connected: 127.0.0.1:61212, connections: 1/0
-2026/02/20 09:42:06 Connection closed by client: 127.0.0.1:61212, connections: 0/0
-2026/02/20 09:42:06 127.0.0.1:61216 200 GET /
-2026/02/20 09:42:06 127.0.0.1:61216 200 GET /css/index.css
-2026/02/20 09:42:06 127.0.0.1:61218 200 GET /css/xterm_customize.css
-2026/02/20 09:42:06 127.0.0.1:61219 200 GET /auth_token.js
-2026/02/20 09:42:06 127.0.0.1:61216 200 GET /config.js
-2026/02/20 09:42:06 127.0.0.1:61217 200 GET /css/xterm.css
-2026/02/20 09:42:06 127.0.0.1:61220 200 GET /js/gotty.js
-2026/02/20 09:42:06 New client connected: 127.0.0.1:61222, connections: 1/0
-2026/02/20 09:42:07 Connection closed by client: 127.0.0.1:61222, connections: 0/0
-2026/02/20 09:42:07 127.0.0.1:61223 200 GET /
-2026/02/20 09:42:07 127.0.0.1:61223 200 GET /css/index.css
-2026/02/20 09:42:07 127.0.0.1:61225 200 GET /css/xterm_customize.css
-2026/02/20 09:42:07 127.0.0.1:61224 200 GET /css/xterm.css
-2026/02/20 09:42:07 127.0.0.1:61223 200 GET /auth_token.js
-2026/02/20 09:42:07 127.0.0.1:61226 200 GET /config.js
-2026/02/20 09:42:07 127.0.0.1:61227 200 GET /js/gotty.js
-2026/02/20 09:42:08 New client connected: 127.0.0.1:61229, connections: 1/0
-2026/02/20 09:42:09 Connection closed by client: 127.0.0.1:61229, connections: 0/0
-2026/02/20 09:42:09 127.0.0.1:61230 200 GET /
-2026/02/20 09:42:09 127.0.0.1:61230 200 GET /css/index.css
-2026/02/20 09:42:09 127.0.0.1:61230 200 GET /auth_token.js
-2026/02/20 09:42:09 127.0.0.1:61232 200 GET /css/xterm_customize.css
-2026/02/20 09:42:09 127.0.0.1:61233 200 GET /config.js
-2026/02/20 09:42:09 127.0.0.1:61231 200 GET /css/xterm.css
-2026/02/20 09:42:09 127.0.0.1:61234 200 GET /js/gotty.js
-2026/02/20 09:42:09 New client connected: 127.0.0.1:61236, connections: 1/0
-2026/02/20 09:42:10 Connection closed by client: 127.0.0.1:61236, connections: 0/0
-2026/02/20 09:42:10 127.0.0.1:61240 200 GET /
-2026/02/20 09:42:10 127.0.0.1:61240 200 GET /css/index.css
-2026/02/20 09:42:10 127.0.0.1:61242 200 GET /css/xterm_customize.css
-2026/02/20 09:42:10 127.0.0.1:61243 200 GET /config.js
-2026/02/20 09:42:10 127.0.0.1:61241 200 GET /css/xterm.css
-2026/02/20 09:42:10 127.0.0.1:61240 200 GET /auth_token.js
-2026/02/20 09:42:10 127.0.0.1:61244 200 GET /js/gotty.js
-2026/02/20 09:42:10 New client connected: 127.0.0.1:61246, connections: 1/0
-2026/02/20 09:42:13 Connection closed by client: 127.0.0.1:61246, connections: 0/0
-2026/02/20 09:42:13 127.0.0.1:61247 200 GET /
-2026/02/20 09:42:13 127.0.0.1:61247 200 GET /css/index.css
-2026/02/20 09:42:13 127.0.0.1:61250 200 GET /auth_token.js
-2026/02/20 09:42:13 127.0.0.1:61247 200 GET /config.js
-2026/02/20 09:42:13 127.0.0.1:61249 200 GET /css/xterm_customize.css
-2026/02/20 09:42:13 127.0.0.1:61248 200 GET /css/xterm.css
-2026/02/20 09:42:13 127.0.0.1:61251 200 GET /js/gotty.js
-2026/02/20 09:42:13 New client connected: 127.0.0.1:61253, connections: 1/0
-2026/02/20 09:42:15 Connection closed by client: 127.0.0.1:61253, connections: 0/0
-2026/02/20 09:42:15 127.0.0.1:61254 200 GET /
-2026/02/20 09:42:15 127.0.0.1:61254 200 GET /css/index.css
-2026/02/20 09:42:15 127.0.0.1:61254 200 GET /auth_token.js
-2026/02/20 09:42:15 127.0.0.1:61256 200 GET /css/xterm_customize.css
-2026/02/20 09:42:15 127.0.0.1:61255 200 GET /css/xterm.css
-2026/02/20 09:42:15 127.0.0.1:61257 200 GET /config.js
-2026/02/20 09:42:15 127.0.0.1:61258 200 GET /js/gotty.js
-2026/02/20 09:42:15 New client connected: 127.0.0.1:61260, connections: 1/0
-2026/02/20 09:42:18 Connection closed by client: 127.0.0.1:61260, connections: 0/0
-2026/02/20 09:42:18 127.0.0.1:61263 200 GET /
-2026/02/20 09:42:18 127.0.0.1:61263 200 GET /css/index.css
-2026/02/20 09:42:18 127.0.0.1:61263 200 GET /auth_token.js
-2026/02/20 09:42:18 127.0.0.1:61265 200 GET /css/xterm_customize.css
-2026/02/20 09:42:18 127.0.0.1:61266 200 GET /config.js
-2026/02/20 09:42:18 127.0.0.1:61264 200 GET /css/xterm.css
-2026/02/20 09:42:18 127.0.0.1:61267 200 GET /js/gotty.js
-2026/02/20 09:42:18 New client connected: 127.0.0.1:61269, connections: 1/0
-2026/02/20 09:42:19 Connection closed by client: 127.0.0.1:61269, connections: 0/0
-2026/02/20 09:42:19 127.0.0.1:61272 200 GET /
-2026/02/20 09:42:19 127.0.0.1:61272 200 GET /css/index.css
-2026/02/20 09:42:19 127.0.0.1:61272 200 GET /config.js
-2026/02/20 09:42:19 127.0.0.1:61274 200 GET /css/xterm_customize.css
-2026/02/20 09:42:19 127.0.0.1:61275 200 GET /auth_token.js
-2026/02/20 09:42:19 127.0.0.1:61273 200 GET /css/xterm.css
-2026/02/20 09:42:19 127.0.0.1:61276 200 GET /js/gotty.js
-2026/02/20 09:42:19 New client connected: 127.0.0.1:61278, connections: 1/0
-2026/02/20 09:42:21 Connection closed by client: 127.0.0.1:61278, connections: 0/0
-2026/02/20 09:42:21 127.0.0.1:61281 200 GET /
-2026/02/20 09:42:21 127.0.0.1:61281 200 GET /css/index.css
-2026/02/20 09:42:21 127.0.0.1:61284 200 GET /config.js
-2026/02/20 09:42:21 127.0.0.1:61281 200 GET /auth_token.js
-2026/02/20 09:42:21 127.0.0.1:61283 200 GET /css/xterm_customize.css
-2026/02/20 09:42:21 127.0.0.1:61282 200 GET /css/xterm.css
-2026/02/20 09:42:21 127.0.0.1:61285 200 GET /js/gotty.js
-2026/02/20 09:42:21 New client connected: 127.0.0.1:61287, connections: 1/0
+2026/02/20 09:42:38 GoTTY is starting with command: env ZDOTDIR=/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/shell/zdotdir zsh -i
+2026/02/20 09:42:38 Permitting clients to write input to the PTY.
+2026/02/20 09:42:38 HTTP server is listening at: http://127.0.0.1:8080/
+2026/02/20 09:42:39 127.0.0.1:61363 200 GET /
+2026/02/20 09:42:39 127.0.0.1:61366 200 GET /auth_token.js
+2026/02/20 09:42:39 127.0.0.1:61367 200 GET /config.js
+2026/02/20 09:42:39 127.0.0.1:61363 200 GET /css/index.css
+2026/02/20 09:42:39 127.0.0.1:61365 200 GET /css/xterm_customize.css
+2026/02/20 09:42:39 127.0.0.1:61364 200 GET /css/xterm.css
+2026/02/20 09:42:39 127.0.0.1:61368 200 GET /js/gotty.js
+2026/02/20 09:42:39 New client connected: 127.0.0.1:61369, connections: 1/0
+2026/02/20 09:42:41 127.0.0.1:61372 200 GET /
+2026/02/20 09:42:41 127.0.0.1:61372 200 GET /css/index.css
+2026/02/20 09:42:41 127.0.0.1:61374 200 GET /css/xterm_customize.css
+2026/02/20 09:42:41 127.0.0.1:61372 200 GET /auth_token.js
+2026/02/20 09:42:41 127.0.0.1:61375 200 GET /config.js
+2026/02/20 09:42:41 127.0.0.1:61373 200 GET /css/xterm.css
+2026/02/20 09:42:41 127.0.0.1:61376 200 GET /js/gotty.js
+2026/02/20 09:42:41 New client connected: 127.0.0.1:61378, connections: 2/0
+2026/02/20 09:42:42 127.0.0.1:61381 200 GET /
+2026/02/20 09:42:42 127.0.0.1:61385 200 GET /config.js
+2026/02/20 09:42:42 127.0.0.1:61383 200 GET /css/xterm_customize.css
+2026/02/20 09:42:42 127.0.0.1:61381 200 GET /css/index.css
+2026/02/20 09:42:42 127.0.0.1:61384 200 GET /auth_token.js
+2026/02/20 09:42:42 127.0.0.1:61382 200 GET /css/xterm.css
+2026/02/20 09:42:42 127.0.0.1:61386 200 GET /js/gotty.js
+2026/02/20 09:42:42 New client connected: 127.0.0.1:61387, connections: 3/0
+2026/02/20 09:42:44 127.0.0.1:61390 200 GET /
+2026/02/20 09:42:44 127.0.0.1:61390 200 GET /css/index.css
+2026/02/20 09:42:44 127.0.0.1:61392 200 GET /css/xterm_customize.css
+2026/02/20 09:42:44 127.0.0.1:61390 200 GET /auth_token.js
+2026/02/20 09:42:44 127.0.0.1:61393 200 GET /config.js
+2026/02/20 09:42:44 127.0.0.1:61391 200 GET /css/xterm.css
+2026/02/20 09:42:44 127.0.0.1:61394 200 GET /js/gotty.js
+2026/02/20 09:42:44 New client connected: 127.0.0.1:61396, connections: 4/0
+2026/02/20 09:42:47 127.0.0.1:61400 200 GET /
+2026/02/20 09:42:47 127.0.0.1:61400 200 GET /css/index.css
+2026/02/20 09:42:47 127.0.0.1:61400 200 GET /auth_token.js
+2026/02/20 09:42:47 127.0.0.1:61402 200 GET /css/xterm_customize.css
+2026/02/20 09:42:47 127.0.0.1:61401 200 GET /css/xterm.css
+2026/02/20 09:42:47 127.0.0.1:61403 200 GET /config.js
+2026/02/20 09:42:47 127.0.0.1:61404 200 GET /js/gotty.js
+2026/02/20 09:42:47 New client connected: 127.0.0.1:61406, connections: 5/0
+2026/02/20 09:42:49 127.0.0.1:61408 200 GET /
+2026/02/20 09:42:49 127.0.0.1:61408 200 GET /css/index.css
+2026/02/20 09:42:49 127.0.0.1:61410 200 GET /css/xterm_customize.css
+2026/02/20 09:42:49 127.0.0.1:61408 200 GET /auth_token.js
+2026/02/20 09:42:49 127.0.0.1:61411 200 GET /config.js
+2026/02/20 09:42:49 127.0.0.1:61409 200 GET /css/xterm.css
+2026/02/20 09:42:49 127.0.0.1:61412 200 GET /js/gotty.js
+2026/02/20 09:42:49 New client connected: 127.0.0.1:61414, connections: 6/0
+2026/02/20 09:42:51 127.0.0.1:61417 200 GET /
+2026/02/20 09:42:51 127.0.0.1:61417 200 GET /css/index.css
+2026/02/20 09:42:51 127.0.0.1:61420 200 GET /auth_token.js
+2026/02/20 09:42:51 127.0.0.1:61417 200 GET /config.js
+2026/02/20 09:42:51 127.0.0.1:61419 200 GET /css/xterm_customize.css
+2026/02/20 09:42:51 127.0.0.1:61418 200 GET /css/xterm.css
+2026/02/20 09:42:51 127.0.0.1:61421 200 GET /js/gotty.js
+2026/02/20 09:42:51 New client connected: 127.0.0.1:61423, connections: 7/0
+2026/02/20 09:42:51 Connection closed by client: 127.0.0.1:61369, connections: 6/0
+2026/02/20 09:42:52 Connection closed by client: 127.0.0.1:61378, connections: 5/0
+2026/02/20 09:42:53 127.0.0.1:61425 200 GET /
+2026/02/20 09:42:53 127.0.0.1:61425 200 GET /css/index.css
+2026/02/20 09:42:53 127.0.0.1:61425 200 GET /auth_token.js
+2026/02/20 09:42:53 127.0.0.1:61428 200 GET /config.js
+2026/02/20 09:42:53 127.0.0.1:61427 200 GET /css/xterm_customize.css
+2026/02/20 09:42:53 127.0.0.1:61426 200 GET /css/xterm.css
+2026/02/20 09:42:53 127.0.0.1:61429 200 GET /js/gotty.js
+2026/02/20 09:42:53 New client connected: 127.0.0.1:61431, connections: 6/0
+2026/02/20 09:42:53 Connection closed by client: 127.0.0.1:61387, connections: 5/0
+2026/02/20 09:42:55 127.0.0.1:61434 200 GET /
+2026/02/20 09:42:55 127.0.0.1:61434 200 GET /css/index.css
+2026/02/20 09:42:55 127.0.0.1:61436 200 GET /css/xterm_customize.css
+2026/02/20 09:42:55 127.0.0.1:61437 200 GET /config.js
+2026/02/20 09:42:55 127.0.0.1:61434 200 GET /auth_token.js
+2026/02/20 09:42:55 127.0.0.1:61435 200 GET /css/xterm.css
+2026/02/20 09:42:55 127.0.0.1:61438 200 GET /js/gotty.js
+2026/02/20 09:42:55 New client connected: 127.0.0.1:61440, connections: 6/0
+2026/02/20 09:42:56 127.0.0.1:61443 200 GET /
+2026/02/20 09:42:56 127.0.0.1:61443 200 GET /css/index.css
+2026/02/20 09:42:56 127.0.0.1:61443 200 GET /auth_token.js
+2026/02/20 09:42:56 127.0.0.1:61446 200 GET /config.js
+2026/02/20 09:42:56 127.0.0.1:61445 200 GET /css/xterm_customize.css
+2026/02/20 09:42:56 127.0.0.1:61444 200 GET /css/xterm.css
+2026/02/20 09:42:56 127.0.0.1:61447 200 GET /js/gotty.js
+2026/02/20 09:42:56 New client connected: 127.0.0.1:61449, connections: 7/0
+2026/02/20 09:42:57 Connection closed by client: 127.0.0.1:61396, connections: 6/0
+2026/02/20 09:42:59 Connection closed by client: 127.0.0.1:61406, connections: 5/0
+2026/02/20 09:43:01 Connection closed by client: 127.0.0.1:61414, connections: 4/0
+2026/02/20 09:43:02 127.0.0.1:61455 200 GET /
+2026/02/20 09:43:02 127.0.0.1:61455 200 GET /css/index.css
+2026/02/20 09:43:02 127.0.0.1:61455 200 GET /config.js
+2026/02/20 09:43:02 127.0.0.1:61458 200 GET /auth_token.js
+2026/02/20 09:43:02 127.0.0.1:61456 200 GET /css/xterm.css
+2026/02/20 09:43:02 127.0.0.1:61457 200 GET /css/xterm_customize.css
+2026/02/20 09:43:02 127.0.0.1:61459 200 GET /js/gotty.js
+2026/02/20 09:43:02 New client connected: 127.0.0.1:61461, connections: 5/0
+2026/02/20 09:43:03 Connection closed by client: 127.0.0.1:61423, connections: 4/0
+2026/02/20 09:43:05 Connection closed by client: 127.0.0.1:61431, connections: 3/0
+2026/02/20 09:43:05 127.0.0.1:61464 200 GET /
+2026/02/20 09:43:05 127.0.0.1:61464 200 GET /css/index.css
+2026/02/20 09:43:05 127.0.0.1:61464 200 GET /config.js
+2026/02/20 09:43:05 127.0.0.1:61467 200 GET /auth_token.js
+2026/02/20 09:43:05 127.0.0.1:61466 200 GET /css/xterm_customize.css
+2026/02/20 09:43:05 127.0.0.1:61465 200 GET /css/xterm.css
+2026/02/20 09:43:05 127.0.0.1:61468 200 GET /js/gotty.js
+2026/02/20 09:43:05 New client connected: 127.0.0.1:61470, connections: 4/0
+2026/02/20 09:43:06 Connection closed by client: 127.0.0.1:61440, connections: 3/0
+2026/02/20 09:43:07 127.0.0.1:61473 200 GET /
+2026/02/20 09:43:07 127.0.0.1:61473 200 GET /css/index.css
+2026/02/20 09:43:07 127.0.0.1:61473 200 GET /auth_token.js
+2026/02/20 09:43:07 127.0.0.1:61475 200 GET /css/xterm_customize.css
+2026/02/20 09:43:07 127.0.0.1:61476 200 GET /config.js
+2026/02/20 09:43:07 127.0.0.1:61474 200 GET /css/xterm.css
+2026/02/20 09:43:07 127.0.0.1:61477 200 GET /js/gotty.js
+2026/02/20 09:43:07 New client connected: 127.0.0.1:61479, connections: 4/0
+2026/02/20 09:43:08 127.0.0.1:61482 200 GET /
+2026/02/20 09:43:08 127.0.0.1:61482 200 GET /css/index.css
+2026/02/20 09:43:08 127.0.0.1:61482 200 GET /config.js
+2026/02/20 09:43:08 127.0.0.1:61485 200 GET /auth_token.js
+2026/02/20 09:43:08 127.0.0.1:61484 200 GET /css/xterm_customize.css
+2026/02/20 09:43:08 127.0.0.1:61483 200 GET /css/xterm.css
+2026/02/20 09:43:08 127.0.0.1:61486 200 GET /js/gotty.js
+2026/02/20 09:43:08 New client connected: 127.0.0.1:61488, connections: 5/0
+2026/02/20 09:43:10 127.0.0.1:61491 200 GET /
+2026/02/20 09:43:10 127.0.0.1:61491 200 GET /css/index.css
+2026/02/20 09:43:10 127.0.0.1:61494 200 GET /config.js
+2026/02/20 09:43:10 127.0.0.1:61493 200 GET /css/xterm_customize.css
+2026/02/20 09:43:10 127.0.0.1:61491 200 GET /auth_token.js
+2026/02/20 09:43:10 127.0.0.1:61492 200 GET /css/xterm.css
+2026/02/20 09:43:10 127.0.0.1:61495 200 GET /js/gotty.js
+2026/02/20 09:43:10 New client connected: 127.0.0.1:61497, connections: 6/0
+2026/02/20 09:43:12 127.0.0.1:61499 200 GET /
+2026/02/20 09:43:12 127.0.0.1:61499 200 GET /css/index.css
+2026/02/20 09:43:12 127.0.0.1:61499 200 GET /config.js
+2026/02/20 09:43:12 127.0.0.1:61502 200 GET /auth_token.js
+2026/02/20 09:43:12 127.0.0.1:61501 200 GET /css/xterm_customize.css
+2026/02/20 09:43:12 127.0.0.1:61500 200 GET /css/xterm.css
+2026/02/20 09:43:12 127.0.0.1:61503 200 GET /js/gotty.js
+2026/02/20 09:43:12 New client connected: 127.0.0.1:61505, connections: 7/0
+2026/02/20 09:43:14 127.0.0.1:61506 200 GET /
+2026/02/20 09:43:14 127.0.0.1:61506 200 GET /css/index.css
+2026/02/20 09:43:14 127.0.0.1:61506 200 GET /auth_token.js
+2026/02/20 09:43:14 127.0.0.1:61509 200 GET /config.js
+2026/02/20 09:43:14 127.0.0.1:61507 200 GET /css/xterm.css
+2026/02/20 09:43:14 127.0.0.1:61508 200 GET /css/xterm_customize.css
+2026/02/20 09:43:14 127.0.0.1:61510 200 GET /js/gotty.js
+2026/02/20 09:43:14 New client connected: 127.0.0.1:61512, connections: 8/0
+2026/02/20 09:43:15 Connection closed by client: 127.0.0.1:61461, connections: 7/0
+2026/02/20 09:43:15 127.0.0.1:61517 200 GET /
+2026/02/20 09:43:15 127.0.0.1:61517 200 GET /css/index.css
+2026/02/20 09:43:15 127.0.0.1:61517 200 GET /auth_token.js
+2026/02/20 09:43:15 127.0.0.1:61519 200 GET /css/xterm_customize.css
+2026/02/20 09:43:15 127.0.0.1:61520 200 GET /config.js
+2026/02/20 09:43:15 127.0.0.1:61518 200 GET /css/xterm.css
+2026/02/20 09:43:15 127.0.0.1:61521 200 GET /js/gotty.js
+2026/02/20 09:43:15 New client connected: 127.0.0.1:61523, connections: 8/0
+2026/02/20 09:43:16 127.0.0.1:61527 200 GET /api
+2026/02/20 09:43:16 127.0.0.1:61527 200 GET /api
+2026/02/20 09:43:16 127.0.0.1:61527 200 GET /api
+2026/02/20 09:43:16 127.0.0.1:61527 200 GET /api
+2026/02/20 09:43:16 127.0.0.1:61527 200 GET /api
+2026/02/20 09:43:17 Connection closed by client: 127.0.0.1:61470, connections: 7/0
+2026/02/20 09:43:18 127.0.0.1:61529 200 GET /
+2026/02/20 09:43:18 127.0.0.1:61529 200 GET /css/index.css
+2026/02/20 09:43:18 127.0.0.1:61529 200 GET /auth_token.js
+2026/02/20 09:43:18 127.0.0.1:61531 200 GET /css/xterm_customize.css
+2026/02/20 09:43:18 127.0.0.1:61532 200 GET /config.js
+2026/02/20 09:43:18 127.0.0.1:61530 200 GET /css/xterm.css
+2026/02/20 09:43:18 127.0.0.1:61533 200 GET /js/gotty.js
+2026/02/20 09:43:18 New client connected: 127.0.0.1:61536, connections: 8/0
+2026/02/20 09:43:18 Connection closed by client: 127.0.0.1:61479, connections: 7/0
+2026/02/20 09:43:19 127.0.0.1:61539 200 GET /
+2026/02/20 09:43:19 127.0.0.1:61539 200 GET /css/index.css
+2026/02/20 09:43:19 127.0.0.1:61541 200 GET /css/xterm_customize.css
+2026/02/20 09:43:19 127.0.0.1:61539 200 GET /auth_token.js
+2026/02/20 09:43:19 127.0.0.1:61542 200 GET /config.js
+2026/02/20 09:43:19 127.0.0.1:61540 200 GET /css/xterm.css
+2026/02/20 09:43:19 127.0.0.1:61543 200 GET /js/gotty.js
+2026/02/20 09:43:19 New client connected: 127.0.0.1:61545, connections: 8/0
+2026/02/20 09:43:20 Connection closed by client: 127.0.0.1:61488, connections: 7/0
+2026/02/20 09:43:22 Connection closed by client: 127.0.0.1:61497, connections: 6/0
+2026/02/20 09:43:22 127.0.0.1:61548 200 GET /
+2026/02/20 09:43:22 127.0.0.1:61548 200 GET /css/index.css
+2026/02/20 09:43:22 127.0.0.1:61550 200 GET /css/xterm_customize.css
+2026/02/20 09:43:22 127.0.0.1:61548 200 GET /auth_token.js
+2026/02/20 09:43:22 127.0.0.1:61551 200 GET /config.js
+2026/02/20 09:43:22 127.0.0.1:61549 200 GET /css/xterm.css
+2026/02/20 09:43:22 127.0.0.1:61552 200 GET /js/gotty.js
+2026/02/20 09:43:22 New client connected: 127.0.0.1:61554, connections: 7/0
+2026/02/20 09:43:23 Connection closed by client: 127.0.0.1:61505, connections: 6/0
+2026/02/20 09:43:23 127.0.0.1:61555 200 GET /
+2026/02/20 09:43:23 127.0.0.1:61555 200 GET /css/index.css
+2026/02/20 09:43:23 127.0.0.1:61557 200 GET /css/xterm_customize.css
+2026/02/20 09:43:23 127.0.0.1:61555 200 GET /auth_token.js
+2026/02/20 09:43:23 127.0.0.1:61558 200 GET /config.js
+2026/02/20 09:43:23 127.0.0.1:61556 200 GET /css/xterm.css
+2026/02/20 09:43:24 127.0.0.1:61559 200 GET /js/gotty.js
+2026/02/20 09:43:24 New client connected: 127.0.0.1:61563, connections: 7/0
+2026/02/20 09:43:25 Connection closed by client: 127.0.0.1:61512, connections: 6/0
+2026/02/20 09:43:26 127.0.0.1:61565 200 GET /
+2026/02/20 09:43:26 127.0.0.1:61565 200 GET /css/index.css
+2026/02/20 09:43:26 127.0.0.1:61568 200 GET /auth_token.js
+2026/02/20 09:43:26 127.0.0.1:61567 200 GET /css/xterm_customize.css
+2026/02/20 09:43:26 127.0.0.1:61565 200 GET /config.js
+2026/02/20 09:43:26 127.0.0.1:61566 200 GET /css/xterm.css
+2026/02/20 09:43:26 127.0.0.1:61569 200 GET /js/gotty.js
+2026/02/20 09:43:26 New client connected: 127.0.0.1:61571, connections: 7/0
+2026/02/20 09:43:28 Connection closed by client: 127.0.0.1:61523, connections: 6/0
+2026/02/20 09:43:28 127.0.0.1:61572 200 GET /
+2026/02/20 09:43:28 127.0.0.1:61572 200 GET /css/index.css
+2026/02/20 09:43:28 127.0.0.1:61574 200 GET /css/xterm_customize.css
+2026/02/20 09:43:28 127.0.0.1:61572 200 GET /auth_token.js
+2026/02/20 09:43:28 127.0.0.1:61575 200 GET /config.js
+2026/02/20 09:43:28 127.0.0.1:61573 200 GET /css/xterm.css
+2026/02/20 09:43:28 127.0.0.1:61576 200 GET /js/gotty.js
+2026/02/20 09:43:28 New client connected: 127.0.0.1:61580, connections: 7/0
+2026/02/20 09:43:29 127.0.0.1:61581 200 GET /
+2026/02/20 09:43:29 127.0.0.1:61581 200 GET /css/index.css
+2026/02/20 09:43:29 127.0.0.1:61581 200 GET /auth_token.js
+2026/02/20 09:43:29 127.0.0.1:61583 200 GET /css/xterm_customize.css
+2026/02/20 09:43:29 127.0.0.1:61584 200 GET /config.js
+2026/02/20 09:43:29 127.0.0.1:61582 200 GET /css/xterm.css
+2026/02/20 09:43:29 127.0.0.1:61585 200 GET /js/gotty.js
+2026/02/20 09:43:29 New client connected: 127.0.0.1:61587, connections: 8/0
+2026/02/20 09:43:29 Connection closed by client: 127.0.0.1:61536, connections: 7/0
+2026/02/20 09:43:31 127.0.0.1:61588 200 GET /
+2026/02/20 09:43:31 127.0.0.1:61588 200 GET /css/index.css
+2026/02/20 09:43:31 127.0.0.1:61591 200 GET /config.js
+2026/02/20 09:43:31 127.0.0.1:61588 200 GET /auth_token.js
+2026/02/20 09:43:31 127.0.0.1:61590 200 GET /css/xterm_customize.css
+2026/02/20 09:43:31 127.0.0.1:61589 200 GET /css/xterm.css
+2026/02/20 09:43:31 127.0.0.1:61592 200 GET /js/gotty.js
+2026/02/20 09:43:31 New client connected: 127.0.0.1:61594, connections: 8/0
+2026/02/20 09:43:32 Connection closed by client: 127.0.0.1:61545, connections: 7/0
+2026/02/20 09:43:33 Connection closed by client: 127.0.0.1:61554, connections: 6/0
+2026/02/20 09:43:35 127.0.0.1:61597 200 GET /
+2026/02/20 09:43:35 127.0.0.1:61597 200 GET /css/index.css
+2026/02/20 09:43:35 127.0.0.1:61599 200 GET /css/xterm_customize.css
+2026/02/20 09:43:35 127.0.0.1:61597 200 GET /config.js
+2026/02/20 09:43:35 127.0.0.1:61600 200 GET /auth_token.js
+2026/02/20 09:43:35 127.0.0.1:61598 200 GET /css/xterm.css
+2026/02/20 09:43:35 127.0.0.1:61601 200 GET /js/gotty.js
+2026/02/20 09:43:35 New client connected: 127.0.0.1:61603, connections: 7/0
+2026/02/20 09:43:36 Connection closed by client: 127.0.0.1:61563, connections: 6/0
+2026/02/20 09:43:38 Connection closed by client: 127.0.0.1:61571, connections: 5/0
+2026/02/20 09:43:39 127.0.0.1:61606 200 GET /
+2026/02/20 09:43:39 127.0.0.1:61606 200 GET /css/index.css
+2026/02/20 09:43:39 127.0.0.1:61608 200 GET /css/xterm_customize.css
+2026/02/20 09:43:39 127.0.0.1:61609 200 GET /config.js
+2026/02/20 09:43:39 127.0.0.1:61606 200 GET /auth_token.js
+2026/02/20 09:43:39 127.0.0.1:61607 200 GET /css/xterm.css
+2026/02/20 09:43:39 127.0.0.1:61610 200 GET /js/gotty.js
+2026/02/20 09:43:39 New client connected: 127.0.0.1:61612, connections: 6/0
+2026/02/20 09:43:39 Connection closed by client: 127.0.0.1:61580, connections: 5/0
+2026/02/20 09:43:41 Connection closed by client: 127.0.0.1:61587, connections: 4/0
+2026/02/20 09:43:42 127.0.0.1:61617 200 GET /
+2026/02/20 09:43:42 127.0.0.1:61617 200 GET /css/index.css
+2026/02/20 09:43:42 127.0.0.1:61620 200 GET /config.js
+2026/02/20 09:43:42 127.0.0.1:61619 200 GET /css/xterm_customize.css
+2026/02/20 09:43:42 127.0.0.1:61617 200 GET /auth_token.js
+2026/02/20 09:43:42 127.0.0.1:61618 200 GET /css/xterm.css
+2026/02/20 09:43:42 127.0.0.1:61621 200 GET /js/gotty.js
+2026/02/20 09:43:42 New client connected: 127.0.0.1:61623, connections: 5/0
+2026/02/20 09:43:44 127.0.0.1:61626 200 GET /
+2026/02/20 09:43:44 127.0.0.1:61626 200 GET /css/index.css
+2026/02/20 09:43:44 127.0.0.1:61629 200 GET /auth_token.js
+2026/02/20 09:43:44 127.0.0.1:61628 200 GET /css/xterm_customize.css
+2026/02/20 09:43:44 127.0.0.1:61626 200 GET /config.js
+2026/02/20 09:43:44 127.0.0.1:61627 200 GET /css/xterm.css
+2026/02/20 09:43:44 127.0.0.1:61630 200 GET /js/gotty.js
+2026/02/20 09:43:44 New client connected: 127.0.0.1:61632, connections: 6/0
+2026/02/20 09:43:45 Connection closed by client: 127.0.0.1:61594, connections: 5/0
+2026/02/20 09:43:45 127.0.0.1:61633 200 GET /
+2026/02/20 09:43:45 127.0.0.1:61633 200 GET /css/index.css
+2026/02/20 09:43:45 127.0.0.1:61635 200 GET /css/xterm_customize.css
+2026/02/20 09:43:45 127.0.0.1:61636 200 GET /auth_token.js
+2026/02/20 09:43:45 127.0.0.1:61633 200 GET /config.js
+2026/02/20 09:43:45 127.0.0.1:61634 200 GET /css/xterm.css
+2026/02/20 09:43:45 127.0.0.1:61637 200 GET /js/gotty.js
+2026/02/20 09:43:45 New client connected: 127.0.0.1:61639, connections: 6/0

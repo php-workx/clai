@@ -1,14 +1,293 @@
 {
   "summary": {
     "shell": "bash",
-    "total": 9,
-    "passed": 9,
-    "failed": 0,
-    "skipped": 1,
-    "duration_ms": 20484,
-    "failures": []
+    "total": 78,
+    "passed": 75,
+    "failed": 3,
+    "skipped": 19,
+    "duration_ms": 146093,
+    "failures": [
+      {
+        "ok": false,
+        "name": "History picker fuzzy search filters results",
+        "reason": "expected screen to contain: apple | expected screen to contain: apricot",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/002-History_picker_fuzzy_search_filters_results.png",
+        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "plan": "example-test-plan.yaml"
+      },
+      {
+        "ok": false,
+        "name": "CWD scope works with paths containing spaces",
+        "reason": "expected screen to contain: command in spaced dir",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/034-CWD_scope_works_with_paths_containing_spaces.png",
+        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "plan": "example-test-plan.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Alt+H opens suggestion picker (bash)",
+        "reason": "expected screen to match: (fzf|suggest|pick)",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/073-Alt_H_opens_suggestion_picker_bash_.png",
+        "terminal_excerpt": "        .tmp/e2e-test-server/home/Library/Caches/go-build/9b/9b1c80c67eb193afff02e8d6f6571a7b737c81881b59ca8dbc630ec63dc360ce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9b/9b21ed2a90aaa355000620487070a293684449cf4e3862465a5928de2795f34d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9b/9b4e74133dce045d09c38e62bad6a5587a270b3943bdf07f34e468e9568f4ec8-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9b/9bc176da9a334d98ff9206a123fbddd2983e364049e2c7e07bd17ca9c110b51b-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9d/9d4333081ec212ce09c489e256509b7905d4a9d4a72f85359bdcd3419a07915f-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9d/9dbdaccba4cf0aae2940434956fb7333be72c808d7efc6829ca848082fb10116-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a0/a01ff18289848d1be007c348fcf1551adcd7216b39deee1189d333b7803ed719-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a0/a075d2826d375f1fdf3ed8e5480caef7447154934f5136da567cad0fcb371705-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a2/a2810e42a195bf785188bb87cae4ba3031b4b6e3f1d7e5d3a9e483e73b7317ed-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a6/a66f5d80a2f83f1a4185ef79a3d938dbb6c019f337f7b6a4c7c74c16d70d7b2c-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/aa/aa3af6dc7762a6b31ca6c7a32f5a9775e7e23e2d8221ebdf4b65cb6abb63e516-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/b4/b43d4ff301c47c231a6247186d80368af3e3ae1ff88be17e02a09eacd0a9a2bb-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/bb/bbfce395ac7f45ad031614108be76c45f45c386675aea071c23785739f03fe11-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/be/be934b6fd1e51ea9f5a841f6009f8f5b7b279528375b56cd1a061c302f3f1788-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c0/c0ecedd3ef71dec72904de3e6e5c285143f28d6950239b8e0f920746ed1ca5a5-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c5/c521fbbffcb91ad29281a3f71dbfcb8ca8f78a2787955dc7a932fc744bb6861f-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c7/c7bada6e35b300771d95a1b3f534118be269c656416bbce37823097ebd763933-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c7/c7dd1517c2e7d4b3aed6a2de8fa29c8af98885a81c2f8250aee1bad2e3ed9213-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c8/c866b9deae53530aff5b645d8a3e3e98bb5415362cc572a4d17b67e75cdb7586-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/cc/cc2aba320315b514f5f053df2e30cee99e8c8a4c33ecd72808df4d9de5be246e-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/cf/cf35fe7321d610e8d94c624b7892cda9992c3b77a32a1fea21607233b7c6e6a3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/d0/d06d7ed25c4499d58106f00cb50a02202426e8a0fec7e69d4f80475ead3eb785-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/d7/d714e398225de7bd1ce5a52cd46bdec97618e4207c9390f54b989434e786c4c2-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/da/da7f1e0e2c964b1c9eb70b04f24410660fee93366cf55137420bf6807d4ccf43-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/dd/dd2f805447d5e288113fd90c7b53d2b5429e818aab39c826feaba120e0eaf5b8-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/de/de1f38f574b89c366ebe332743cfffe210a225172062c8899ebae6986d3dcf23-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/de/de66dd262acc41e03afb1fa7ba7df636cfe17349232fc3a8726ea11a0afc3cd6-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/de/de674657fcebfcfcb082efb060c65777e2d744c84fefc449cc6c75940596214e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e1/e135a9a9c841ac7723712e5619c14c6e05436d42c797f3437db57f616bbd999d-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e2/e28a9669393376648d9f28f7107b52f79bda37fff6fed12ee50f17f5eb162557-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e7/e714d85676f2869bbaaaff2ebb26e423fb62cf4a4286a900f21aa93817f90832-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/eb/eb2218896a686788fdc3339e07cd79872f9a85481000d93deb8b25ca7f879e94-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f3/f3e6d45e9d73dae3bbdb90d3717e79a0b4cffcbf56e209554f6d351cd9901dd2-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f4/f44ddf75bf67818c9f8b2d3c5fa55c85a6f8d839098e20e46e76a6699868ac0d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f4/f4bb3a9abc9bf1a6f9b6cf8d938d8af0c2964484bd6bcf48fd1372ec687fd3fe-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f6/f65a0a05296a4f46fbf14b15455236b94ec1e1b777fc6925242dd7a48c3d0079-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f8/f873ed966873c4d48e8b1426cb27960fe3e147165bea70e1eeeb1ed5795e2554-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f9/f987d65469e497f9a1194adce283d61b9be6c7fbbb15ef596770dc994240e1ce-a\n\nTEST>  ",
+        "plan": "suggestions-tests.yaml"
+      }
+    ]
   },
   "results": [
+    {
+      "ok": true,
+      "name": "History picker opens with Alt+H",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": false,
+      "name": "History picker fuzzy search filters results",
+      "reason": "expected screen to contain: apple | expected screen to contain: apricot",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/002-History_picker_fuzzy_search_filters_results.png",
+      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "History picker navigation with arrow keys",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "History picker Enter inserts command",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "History picker Escape cancels",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "History scope switching with Tab",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Session history is isolated from global",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Global history contains cross-session commands",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Long command shows truncation indicator",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Enter inserts full untruncated command",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Ctrl+C copies full untruncated command",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai loads successfully in bash",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Session ID is set",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "History command shows session history",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "clai cmd converts natural language to command",
+      "reason": "clai cmd not yet fully implemented",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "clai cmd caches suggestion for completion",
+      "reason": "clai cmd not yet fully implemented",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "clai ask answers terminal questions",
+      "reason": "clai ask not yet fully implemented",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "clai ask with context flag",
+      "reason": "clai ask not yet fully implemented",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai status shows session info",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai history with session flag",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai history with global flag",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai history filters by CWD",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai history filters successful commands",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai history filters failed commands",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai off disables integration",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai on re-enables integration",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "PTY wrapper captures stdout",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "PTY wrapper handles colors",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "PTY wrapper Ctrl+C handling",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Voice mode converts natural language",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Empty command line doesn't crash",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Very long command doesn't overflow",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Special characters handled correctly",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": false,
+      "name": "CWD scope works with paths containing spaces",
+      "reason": "expected screen to contain: command in spaced dir",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/034-CWD_scope_works_with_paths_containing_spaces.png",
+      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "History args handle special path characters",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito mode can be enabled",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Commands in incognito mode not persisted",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito mode can be disabled",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "CLAI_NO_RECORD prevents all ingestion",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Command ingestion captures exit code success",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Command ingestion captures exit code failure",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Command ingestion captures CWD",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Command with special characters ingested",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Command with unicode characters ingested",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai daemon status shows state",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai daemon start works",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai daemon stop graceful shutdown",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai daemon restart sequence",
+      "plan": "example-test-plan.yaml"
+    },
     {
       "ok": true,
       "name": "clai suggest text format",
@@ -17,6 +296,16 @@
     {
       "ok": true,
       "name": "clai suggest JSON format",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai suggest fzf format",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai suggest with limit",
       "plan": "suggestions-tests.yaml"
     },
     {
@@ -43,7 +332,27 @@
     },
     {
       "ok": true,
+      "name": "Suggestion context includes last_cmd_norm",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
       "name": "Ghost text suggestion appears",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Right arrow accepts full suggestion",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Escape clears suggestion",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Typing clears ghost text",
       "plan": "suggestions-tests.yaml"
     },
     {
@@ -53,12 +362,208 @@
     },
     {
       "ok": true,
+      "skipped": true,
+      "name": "Typo correction suggests on exit 127",
+      "reason": "Typo correction backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Typo correction respects similarity threshold",
+      "reason": "Typo correction backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Typo correction prioritizes high-frequency commands",
+      "reason": "Typo correction backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Slot filling learns argument values",
+      "reason": "Slot filling backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Slot filling respects frequency",
+      "reason": "Slot filling backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Slot scope repo overrides global",
+      "reason": "Slot filling backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Suggestions served from cache",
+      "reason": "Cache introspection not yet exposed in CLI",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Cache TTL expires stale entries",
+      "reason": "Cache introspection not yet exposed in CLI",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Cache invalidated on new command",
+      "reason": "Cache introspection not yet exposed in CLI",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Cache shows in debug endpoint",
+      "reason": "Cache introspection not yet exposed in CLI",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Alt+H opens suggestion picker (bash)",
+      "reason": "expected screen to match: (fzf|suggest|pick)",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/073-Alt_H_opens_suggestion_picker_bash_.png",
+      "terminal_excerpt": "        .tmp/e2e-test-server/home/Library/Caches/go-build/9b/9b1c80c67eb193afff02e8d6f6571a7b737c81881b59ca8dbc630ec63dc360ce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9b/9b21ed2a90aaa355000620487070a293684449cf4e3862465a5928de2795f34d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9b/9b4e74133dce045d09c38e62bad6a5587a270b3943bdf07f34e468e9568f4ec8-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9b/9bc176da9a334d98ff9206a123fbddd2983e364049e2c7e07bd17ca9c110b51b-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9d/9d4333081ec212ce09c489e256509b7905d4a9d4a72f85359bdcd3419a07915f-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9d/9dbdaccba4cf0aae2940434956fb7333be72c808d7efc6829ca848082fb10116-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a0/a01ff18289848d1be007c348fcf1551adcd7216b39deee1189d333b7803ed719-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a0/a075d2826d375f1fdf3ed8e5480caef7447154934f5136da567cad0fcb371705-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a2/a2810e42a195bf785188bb87cae4ba3031b4b6e3f1d7e5d3a9e483e73b7317ed-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a6/a66f5d80a2f83f1a4185ef79a3d938dbb6c019f337f7b6a4c7c74c16d70d7b2c-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/aa/aa3af6dc7762a6b31ca6c7a32f5a9775e7e23e2d8221ebdf4b65cb6abb63e516-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/b4/b43d4ff301c47c231a6247186d80368af3e3ae1ff88be17e02a09eacd0a9a2bb-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/bb/bbfce395ac7f45ad031614108be76c45f45c386675aea071c23785739f03fe11-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/be/be934b6fd1e51ea9f5a841f6009f8f5b7b279528375b56cd1a061c302f3f1788-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c0/c0ecedd3ef71dec72904de3e6e5c285143f28d6950239b8e0f920746ed1ca5a5-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c5/c521fbbffcb91ad29281a3f71dbfcb8ca8f78a2787955dc7a932fc744bb6861f-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c7/c7bada6e35b300771d95a1b3f534118be269c656416bbce37823097ebd763933-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c7/c7dd1517c2e7d4b3aed6a2de8fa29c8af98885a81c2f8250aee1bad2e3ed9213-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c8/c866b9deae53530aff5b645d8a3e3e98bb5415362cc572a4d17b67e75cdb7586-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/cc/cc2aba320315b514f5f053df2e30cee99e8c8a4c33ecd72808df4d9de5be246e-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/cf/cf35fe7321d610e8d94c624b7892cda9992c3b77a32a1fea21607233b7c6e6a3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/d0/d06d7ed25c4499d58106f00cb50a02202426e8a0fec7e69d4f80475ead3eb785-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/d7/d714e398225de7bd1ce5a52cd46bdec97618e4207c9390f54b989434e786c4c2-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/da/da7f1e0e2c964b1c9eb70b04f24410660fee93366cf55137420bf6807d4ccf43-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/dd/dd2f805447d5e288113fd90c7b53d2b5429e818aab39c826feaba120e0eaf5b8-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/de/de1f38f574b89c366ebe332743cfffe210a225172062c8899ebae6986d3dcf23-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/de/de66dd262acc41e03afb1fa7ba7df636cfe17349232fc3a8726ea11a0afc3cd6-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/de/de674657fcebfcfcb082efb060c65777e2d744c84fefc449cc6c75940596214e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e1/e135a9a9c841ac7723712e5619c14c6e05436d42c797f3437db57f616bbd999d-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e2/e28a9669393376648d9f28f7107b52f79bda37fff6fed12ee50f17f5eb162557-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e7/e714d85676f2869bbaaaff2ebb26e423fb62cf4a4286a900f21aa93817f90832-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/eb/eb2218896a686788fdc3339e07cd79872f9a85481000d93deb8b25ca7f879e94-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f3/f3e6d45e9d73dae3bbdb90d3717e79a0b4cffcbf56e209554f6d351cd9901dd2-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f4/f44ddf75bf67818c9f8b2d3c5fa55c85a6f8d839098e20e46e76a6699868ac0d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f4/f4bb3a9abc9bf1a6f9b6cf8d938d8af0c2964484bd6bcf48fd1372ec687fd3fe-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f6/f65a0a05296a4f46fbf14b15455236b94ec1e1b777fc6925242dd7a48c3d0079-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f8/f873ed966873c4d48e8b1426cb27960fe3e147165bea70e1eeeb1ed5795e2554-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f9/f987d65469e497f9a1194adce283d61b9be6c7fbbb15ef596770dc994240e1ce-a\n\nTEST>  ",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search basic query",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with repo filter",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with limit",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with JSON output",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search empty results",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with special characters",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Discovery finds package.json scripts",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Discovery finds Makefile targets",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
       "name": "Discovery shows project_task reason",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
+      "name": "Discovery finds Cargo.toml commands",
+      "reason": "Cargo discovery not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Discovery finds pyproject.toml scripts",
+      "reason": "pyproject.toml discovery not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug scores endpoint returns data",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug scores with limit parameter",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug transitions endpoint returns data",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug tasks endpoint returns discovered tasks",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug discovery-errors endpoint",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug endpoints return valid JSON",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito mode toggle",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito commands appear in session suggestions",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito commands not in global suggestions",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "CLAI_EPHEMERAL affects suggestions",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
       "name": "Suggest API returns expected JSON structure",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Suggest API includes cache status",
+      "reason": "Cache status field not yet exposed",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Suggest API includes timing info",
+      "reason": "Timing info not yet exposed",
       "plan": "suggestions-tests.yaml"
     }
   ]
