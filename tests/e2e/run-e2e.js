@@ -14,12 +14,15 @@ function parseArgs(argv) {
 			path.resolve("tests/e2e/suggestions-tests.yaml"),
 		],
 		outDir: path.resolve(".tmp/e2e-runs"),
+		grep: "",
 	};
 	for (let i = 2; i < argv.length; i++) {
 		const a = argv[i];
 		if (a === "--url") out.url = argv[++i];
 		else if (a === "--shell") out.shell = argv[++i];
+		else if (a === "--plan") out.plans = [path.resolve(argv[++i])];
 		else if (a === "--plans") out.plans = argv[++i].split(",").map((p) => path.resolve(p.trim())).filter(Boolean);
+		else if (a === "--grep") out.grep = String(argv[++i] || "");
 		else if (a === "--out") out.outDir = path.resolve(argv[++i]);
 	}
 	return out;
@@ -100,12 +103,33 @@ async function terminalText(page) {
 	});
 }
 
+function tailLines(text, n) {
+	const lines = String(text || "").split("\n");
+	if (lines.length <= n) return lines.join("\n");
+	return lines.slice(lines.length - n).join("\n");
+}
+
+async function waitForPrompt(page, timeoutMs = 8000) {
+	await page.waitForFunction(() => {
+		const rows = Array.from(document.querySelectorAll(".xterm-rows > div"));
+		const text = (rows.length > 0
+			? rows.map((r) => (r.textContent || "").replace(/\u00a0/g, " ")).join("\n")
+			: ((document.body && document.body.innerText) || "").replace(/\u00a0/g, " "));
+		return /(?:^|\n)TEST>\s*$/.test(text);
+	}, { timeout: timeoutMs });
+}
+
 async function runCommand(page, command) {
 	await focusTerminal(page);
 	await page.keyboard.press("Control+u");
 	await page.keyboard.type(String(command), { delay: 4 });
 	await page.keyboard.press("Enter");
-	await page.waitForTimeout(220);
+	try {
+		await waitForPrompt(page, 12000);
+	} catch {
+		// Fallback for cases where prompt detection is flaky.
+		await page.waitForTimeout(500);
+	}
 }
 
 async function runStep(page, step) {
@@ -149,6 +173,7 @@ async function runTest(browser, cfg, test, index, artifactDir) {
 	try {
 		await page.goto(cfg.url, { waitUntil: "domcontentloaded", timeout: 30000 });
 		await page.waitForTimeout(300);
+		await waitForPrompt(page, 10000);
 		for (const cmd of test.setup || []) {
 			await runCommand(page, cmd);
 		}
@@ -161,15 +186,32 @@ async function runTest(browser, cfg, test, index, artifactDir) {
 			if (!r.ok) failures.push(r.detail);
 		}
 		if (failures.length > 0) {
+			const text = await terminalText(page);
 			await page.screenshot({ path: screenshot, fullPage: true });
-			return { ok: false, name: test.name || "unnamed", reason: failures.join(" | "), screenshot };
+			return {
+				ok: false,
+				name: test.name || "unnamed",
+				reason: failures.join(" | "),
+				screenshot,
+				terminal_excerpt: tailLines(text, 40),
+			};
 		}
 		return { ok: true, name: test.name || "unnamed" };
 	} catch (err) {
+		let excerpt = "";
+		try {
+			excerpt = tailLines(await terminalText(page), 40);
+		} catch {}
 		try {
 			await page.screenshot({ path: screenshot, fullPage: true });
 		} catch {}
-		return { ok: false, name: test.name || "unnamed", reason: String(err && err.message ? err.message : err), screenshot };
+		return {
+			ok: false,
+			name: test.name || "unnamed",
+			reason: String(err && err.message ? err.message : err),
+			screenshot,
+			terminal_excerpt: excerpt,
+		};
 	} finally {
 		await page.close();
 	}
@@ -182,10 +224,15 @@ async function main() {
 	fs.mkdirSync(artifactDir, { recursive: true });
 
 	const selected = [];
+	let grepRe = null;
+	if (cfg.grep) {
+		grepRe = new RegExp(cfg.grep, "i");
+	}
 	for (const planPath of cfg.plans) {
 		const doc = yaml.load(fs.readFileSync(planPath, "utf8"));
 		for (const t of doc.tests || []) {
 			if (!appliesToShell(t, cfg.shell)) continue;
+			if (grepRe && !grepRe.test(String(t.name || ""))) continue;
 			selected.push({
 				name: t.name,
 				plan: path.basename(planPath),

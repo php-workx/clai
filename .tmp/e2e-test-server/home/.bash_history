@@ -1,14 +1,3 @@
-clai history --session=$CLAI_SESSION_ID 2>&1
-clear
-clai history --global --limit 5 2>&1
-clear
-clai history --limit 5 2>&1
-clear
-clai history --global --limit 10
-clear
-echo retest_session_cmd_A
-echo retest_session_cmd_B
-clear
 clai history --session=$CLAI_SESSION_ID
 clear
 true
@@ -498,3 +487,14 @@ clai history --session=$CLAI_SESSION_ID
 clai daemon status
 git status
 make build
+echo setup1
+git status
+make build
+clai suggest
+npm test
+clai suggest --format=json
+git status
+git log --oneline
+npm test
+make build
+clai suggest git

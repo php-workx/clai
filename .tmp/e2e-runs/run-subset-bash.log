@@ -1,0 +1,12 @@
+test server started
+shell: bash
+url: http://127.0.0.1:8080
+pid: 29460
+log: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/gotty.log
+[bash] 1/10 clai suggest text format
+  -> PASS
+[bash] 2/10 clai suggest JSON format
+  -> PASS
+[bash] 3/10 clai suggest with prefix filters results
+  -> PASS
+[bash] 4/10 Suggestion shows transition reason
