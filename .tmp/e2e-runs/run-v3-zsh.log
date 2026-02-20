@@ -77,3 +77,13 @@ url: http://127.0.0.1:8080
 [zsh] 38/54 Discovery finds Makefile targets
   -> PASS
 [zsh] 39/54 Discovery shows project_task reason
+  -> FAIL: expected screen to contain: project_task
+[zsh] 40/54 Discovery finds Cargo.toml commands
+  -> SKIP: Cargo discovery not yet implemented
+[zsh] 41/54 Discovery finds pyproject.toml scripts
+  -> SKIP: pyproject.toml discovery not yet implemented
+[zsh] 42/54 Debug scores endpoint returns data
+  -> PASS
+[zsh] 43/54 Debug scores with limit parameter
+  -> PASS
+[zsh] 44/54 Debug transitions endpoint returns data
