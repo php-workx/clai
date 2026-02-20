@@ -1,25 +1,17 @@
 {
   "summary": {
     "shell": "zsh",
-    "total": 10,
-    "passed": 8,
-    "failed": 2,
+    "total": 1,
+    "passed": 0,
+    "failed": 1,
     "skipped": 0,
-    "duration_ms": 30658,
+    "duration_ms": 5059,
     "failures": [
       {
         "ok": false,
         "name": "clai suggest with prefix filters results",
         "reason": "expected screen to contain: git",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/003-clai_suggest_with_prefix_filters_results.png",
-        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Suggestion shows transition reason",
-        "reason": "expected screen to match: (trans|transition|reasons)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/004-Suggestion_shows_transition_reason.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/001-clai_suggest_with_prefix_filters_results.png",
         "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
         "plan": "suggestions-tests.yaml"
       }
@@ -27,59 +19,11 @@
   },
   "results": [
     {
-      "ok": true,
-      "name": "clai suggest text format",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai suggest JSON format",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
       "ok": false,
       "name": "clai suggest with prefix filters results",
       "reason": "expected screen to contain: git",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/003-clai_suggest_with_prefix_filters_results.png",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/001-clai_suggest_with_prefix_filters_results.png",
       "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Suggestion shows transition reason",
-      "reason": "expected screen to match: (trans|transition|reasons)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/004-Suggestion_shows_transition_reason.png",
-      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Suggestion shows freq_repo reason",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Suggestion includes confidence score",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Ghost text suggestion appears",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Alt+Right accepts next token",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Discovery shows project_task reason",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Suggest API returns expected JSON structure",
       "plan": "suggestions-tests.yaml"
     }
   ]

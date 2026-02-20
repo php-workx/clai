@@ -112,7 +112,7 @@ tests:
     steps:
       - press: "Ctrl+L"
       - wait: "200ms"
-      - type: "clai suggest git --format=fzf --limit=5"
+      - type: "clai suggest git"
       - press: "Enter"
       - wait: "500ms"
     expect:

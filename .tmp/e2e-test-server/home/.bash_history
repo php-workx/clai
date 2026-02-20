@@ -1,14 +1,3 @@
-clai history --status=failure --global
-clai off
-clai off
-clai on
-echo 'hello world'
-ls --color=always
-sleep 60
-`list all files in current directory
-echo 'this is a very long command that should wrap properly in the terminal without causing any display issues or breaking the shell integration features'
-echo "hello 'world' $HOME"
-mkdir -p '/tmp/test dir with spaces'
 cd '/tmp/test dir with spaces'
 echo 'command in spaced dir'
 ls -la
@@ -498,3 +487,14 @@ cd /tmp/reason-test && clai suggest npm --format=json --limit=5
 git status
 git log --oneline -1
 clai suggest git --format=json --limit=5
+echo suggest_text_seed_one
+echo suggest_text_seed_two
+clai suggest echo --limit=3
+echo suggest_json_seed_one
+echo suggest_json_seed_two
+clai suggest echo --format=json --limit=3
+git status
+git log --oneline
+npm test
+make build
+clai suggest git
