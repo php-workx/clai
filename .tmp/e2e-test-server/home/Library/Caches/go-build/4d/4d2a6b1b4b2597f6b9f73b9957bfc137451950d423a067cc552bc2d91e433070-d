@@ -1,0 +1,3 @@
+./normalize.go
+./parse.go
+./parse_test.go

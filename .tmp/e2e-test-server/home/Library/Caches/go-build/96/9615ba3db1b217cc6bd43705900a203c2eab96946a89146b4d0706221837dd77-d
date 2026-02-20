@@ -1,0 +1,236 @@
+=== RUN   TestIntegration_BuildPickerBinary
+=== RUN   TestIntegration_BuildPickerBinary/help_flag
+--- PASS: TestIntegration_BuildPickerBinary/help_flag (2.29s)
+=== NAME  TestIntegration_BuildPickerBinary
+=== RUN   TestIntegration_BuildPickerBinary/version_flag
+--- PASS: TestIntegration_BuildPickerBinary/version_flag (0.01s)
+=== NAME  TestIntegration_BuildPickerBinary
+=== RUN   TestIntegration_BuildPickerBinary/unknown_command
+--- PASS: TestIntegration_BuildPickerBinary/unknown_command (0.01s)
+=== NAME  TestIntegration_BuildPickerBinary
+=== RUN   TestIntegration_BuildPickerBinary/no_args
+--- PASS: TestIntegration_BuildPickerBinary/no_args (0.01s)
+=== NAME  TestIntegration_BuildPickerBinary
+--- PASS: TestIntegration_BuildPickerBinary (3.46s)
+=== NAME  
+=== RUN   TestIntegration_GoBuildCompiles
+--- PASS: TestIntegration_GoBuildCompiles (0.63s)
+=== NAME  
+=== RUN   TestAcquireLock_Success
+--- PASS: TestAcquireLock_Success (0.00s)
+=== NAME  
+=== RUN   TestAcquireLock_SecondInstanceFails
+--- PASS: TestAcquireLock_SecondInstanceFails (0.00s)
+=== NAME  
+=== RUN   TestReleaseLock_InvalidFd
+--- PASS: TestReleaseLock_InvalidFd (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_Empty
+--- PASS: TestSanitizeQuery_Empty (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_PlainText
+--- PASS: TestSanitizeQuery_PlainText (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_StripControlChars
+--- PASS: TestSanitizeQuery_StripControlChars (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_PreserveTab
+--- PASS: TestSanitizeQuery_PreserveTab (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_RejectNewline
+--- PASS: TestSanitizeQuery_RejectNewline (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_RejectCarriageReturn
+--- PASS: TestSanitizeQuery_RejectCarriageReturn (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_TruncateLong
+--- PASS: TestSanitizeQuery_TruncateLong (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_ExactMaxLen
+--- PASS: TestSanitizeQuery_ExactMaxLen (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_TruncateLongUtf8Safe
+--- PASS: TestSanitizeQuery_TruncateLongUtf8Safe (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_ValidFlags
+--- PASS: TestParseHistoryFlags_ValidFlags (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_NoFlags
+--- PASS: TestParseHistoryFlags_NoFlags (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_UnknownFlag
+flag provided but not defined: -unknown
+Usage: clai-picker history [flags]
+
+Flags:
+  -cwd string
+    	working directory
+  -limit int
+    	number of items per page (positive integer)
+  -output string
+    	output format (only "plain" accepted)
+  -query string
+    	initial search query (max 4096 bytes)
+  -session string
+    	session ID
+  -tabs string
+    	comma-separated tab IDs
+--- PASS: TestParseHistoryFlags_UnknownFlag (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_InvalidLimit
+--- PASS: TestParseHistoryFlags_InvalidLimit (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_InvalidOutput
+--- PASS: TestParseHistoryFlags_InvalidOutput (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_QueryWithNewline
+--- PASS: TestParseHistoryFlags_QueryWithNewline (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_QueryStripsControlChars
+--- PASS: TestParseHistoryFlags_QueryStripsControlChars (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_UnexpectedPositionalArg
+--- PASS: TestParseHistoryFlags_UnexpectedPositionalArg (0.00s)
+=== NAME  
+=== RUN   TestSanitizeQuery_StripANSI
+--- PASS: TestSanitizeQuery_StripANSI (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_LimitZeroIsValid
+--- PASS: TestParseHistoryFlags_LimitZeroIsValid (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_OutputPlainIsValid
+--- PASS: TestParseHistoryFlags_OutputPlainIsValid (0.00s)
+=== NAME  
+=== RUN   TestParseHistoryFlags_OutputEmptyIsValid
+--- PASS: TestParseHistoryFlags_OutputEmptyIsValid (0.00s)
+=== NAME  
+=== RUN   TestSetColorProfile_PipeDetectsAscii
+--- PASS: TestSetColorProfile_PipeDetectsAscii (0.00s)
+=== NAME  
+=== RUN   TestSetColorProfile_ModifiesDefaultRenderer
+--- PASS: TestSetColorProfile_ModifiesDefaultRenderer (0.00s)
+=== NAME  
+=== RUN   TestSetColorProfile_TtyDetectsColor
+--- PASS: TestSetColorProfile_TtyDetectsColor (0.00s)
+=== NAME  
+=== RUN   TestDispatch_BuiltinIsDefault
+--- PASS: TestDispatch_BuiltinIsDefault (0.00s)
+=== NAME  
+=== RUN   TestDispatchBackend_FzfNotFoundWithEmptyPath
+--- PASS: TestDispatchBackend_FzfNotFoundWithEmptyPath (0.00s)
+=== NAME  
+=== RUN   TestResolveTabs_AllTabs
+--- PASS: TestResolveTabs_AllTabs (0.00s)
+=== NAME  
+=== RUN   TestResolveTabs_FilterByID
+--- PASS: TestResolveTabs_FilterByID (0.00s)
+=== NAME  
+=== RUN   TestResolveTabs_MultipleTabs
+--- PASS: TestResolveTabs_MultipleTabs (0.00s)
+=== NAME  
+=== RUN   TestResolveTabs_UnknownFallsBackToAll
+--- PASS: TestResolveTabs_UnknownFallsBackToAll (0.00s)
+=== NAME  
+=== RUN   TestSocketPath_DefaultWhenEmpty
+--- PASS: TestSocketPath_DefaultWhenEmpty (0.00s)
+=== NAME  
+=== RUN   TestSocketPath_CustomOverride
+--- PASS: TestSocketPath_CustomOverride (0.00s)
+=== NAME  
+=== RUN   TestResolveTabs_SubstitutesSessionID
+--- PASS: TestResolveTabs_SubstitutesSessionID (0.00s)
+=== NAME  
+=== RUN   TestResolveTabs_NoSubstitutionWithEmptySession
+--- PASS: TestResolveTabs_NoSubstitutionWithEmptySession (0.00s)
+=== NAME  
+=== RUN   TestResolveTabs_PreservesOtherArgs
+--- PASS: TestResolveTabs_PreservesOtherArgs (0.00s)
+=== NAME  
+=== RUN   TestResolveTabs_DoesNotModifyOriginalConfig
+--- PASS: TestResolveTabs_DoesNotModifyOriginalConfig (0.00s)
+=== NAME  
+=== RUN   TestNewSuggestModel_UsesBottomUpLayout
+--- PASS: TestNewSuggestModel_UsesBottomUpLayout (0.00s)
+=== NAME  
+=== RUN   TestParseRunInputs_CoversHistorySuggestAndErrors
+--- PASS: TestParseRunInputs_CoversHistorySuggestAndErrors (0.00s)
+=== NAME  
+=== RUN   TestParseSuggestFlags_Validation
+--- PASS: TestParseSuggestFlags_Validation (0.00s)
+=== NAME  
+=== RUN   TestApplyRunDefaults_CoversHistoryAndSuggest
+--- PASS: TestApplyRunDefaults_CoversHistoryAndSuggest (0.00s)
+=== NAME  
+=== RUN   TestDispatchRunCommand_Delegates
+--- PASS: TestDispatchRunCommand_Delegates (0.00s)
+=== NAME  
+=== RUN   TestDispatchBackend_CoversBranches
+--- PASS: TestDispatchBackend_CoversBranches (0.00s)
+=== NAME  
+=== RUN   TestDispatchHistory_UsesConfiguredBackend
+--- PASS: TestDispatchHistory_UsesConfiguredBackend (0.00s)
+=== NAME  
+=== RUN   TestDispatchSuggest_SuccessAndFallback
+--- PASS: TestDispatchSuggest_SuccessAndFallback (0.00s)
+=== NAME  
+=== RUN   TestDispatchBuiltin_SuccessAndFallback
+--- PASS: TestDispatchBuiltin_SuccessAndFallback (0.00s)
+=== NAME  
+=== RUN   TestDispatchFzf_CoversBranches
+--- PASS: TestDispatchFzf_CoversBranches (0.01s)
+=== NAME  
+=== RUN   TestRunFzfBackend_PaginatesAndReturnsSelection
+--- PASS: TestRunFzfBackend_PaginatesAndReturnsSelection (0.00s)
+=== NAME  
+=== RUN   TestRun_CoversEarlyFailureAndSuccessPath
+clai-picker: no tty
+--- PASS: TestRun_CoversEarlyFailureAndSuccessPath (0.00s)
+=== NAME  
+=== RUN   TestRun_HelpPathsReturnSuccess
+Usage: clai-picker <command> [flags]
+
+Commands:
+  history    Browse and search shell history
+  suggest    Browse and search smart suggestions
+
+Flags:
+  --help     Show this help message
+  --version  Print version information
+clai-picker dev
+  commit: unknown
+  built:  unknown
+Usage: clai-picker history [flags]
+
+Flags:
+  -cwd string
+    	working directory
+  -limit int
+    	number of items per page (positive integer)
+  -output string
+    	output format (only "plain" accepted)
+  -query string
+    	initial search query (max 4096 bytes)
+  -session string
+    	session ID
+  -tabs string
+    	comma-separated tab IDs
+Usage: clai-picker suggest [flags]
+
+Flags:
+  -cwd string
+    	working directory
+  -limit int
+    	max results to request (positive integer)
+  -output string
+    	output format (only "plain" accepted)
+  -query string
+    	initial buffer/query (max 4096 bytes)
+  -session string
+    	session ID
+--- PASS: TestRun_HelpPathsReturnSuccess (0.00s)
+=== NAME  
+=== RUN   TestDebugLogPrintUsageAndPrintVersion
+--- PASS: TestDebugLogPrintUsageAndPrintVersion (0.00s)
+=== NAME  
+PASS
+ok  	github.com/runger/clai/cmd/clai-picker	5.538s

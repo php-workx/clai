@@ -1,0 +1,6 @@
+./expect.go
+./bash_test.go
+./fish_test.go
+./hook_resilience_test.go
+./performance_test.go
+./zsh_test.go

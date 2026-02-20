@@ -1,0 +1,4 @@
+./endpoints.go
+./validate.go
+./endpoints_test.go
+./validate_test.go

@@ -1,0 +1,10 @@
+./anthropic.go
+./context.go
+./parse.go
+./provider.go
+./registry.go
+./anthropic_test.go
+./context_test.go
+./parse_test.go
+./provider_test.go
+./registry_test.go

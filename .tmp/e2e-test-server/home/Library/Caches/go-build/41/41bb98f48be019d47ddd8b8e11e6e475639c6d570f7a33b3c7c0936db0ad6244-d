@@ -1,0 +1,6 @@
+./capture.go
+./manager.go
+./store.go
+./capture_test.go
+./manager_test.go
+./store_test.go

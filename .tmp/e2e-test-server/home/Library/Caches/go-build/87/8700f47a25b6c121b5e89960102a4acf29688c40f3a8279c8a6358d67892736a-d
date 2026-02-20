@@ -1,0 +1,10 @@
+./config.go
+./discovery.go
+./makefile.go
+./packagejson.go
+./parser.go
+./runner.go
+./config_test.go
+./discovery_test.go
+./parser_test.go
+./runner_test.go

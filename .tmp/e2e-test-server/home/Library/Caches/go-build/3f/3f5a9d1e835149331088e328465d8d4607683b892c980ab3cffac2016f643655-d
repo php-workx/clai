@@ -1,0 +1,343 @@
+=== RUN   TestGetToolPrefix
+=== PAUSE TestGetToolPrefix
+=== NAME  
+=== RUN   TestNormalizeForDisplay
+=== PAUSE TestNormalizeForDisplay
+=== NAME  
+=== RUN   TestDeduplicateKey
+=== PAUSE TestDeduplicateKey
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_BasicRanking
+=== PAUSE TestDefaultRanker_Rank_BasicRanking
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_OrderedByScore
+=== PAUSE TestDefaultRanker_Rank_OrderedByScore
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_DoesNotSuggestLastCommand
+=== PAUSE TestDefaultRanker_Rank_DoesNotSuggestLastCommand
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_SessionWeightHighest
+=== PAUSE TestDefaultRanker_Rank_SessionWeightHighest
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_RecencyDecay
+=== PAUSE TestDefaultRanker_Rank_RecencyDecay
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_SuccessBias
+=== PAUSE TestDefaultRanker_Rank_SuccessBias
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_ToolAffinity
+=== PAUSE TestDefaultRanker_Rank_ToolAffinity
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_WithToolAffinity
+=== PAUSE TestDefaultRanker_Rank_WithToolAffinity
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_Deduplication
+=== PAUSE TestDefaultRanker_Rank_Deduplication
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_MaxResults
+=== PAUSE TestDefaultRanker_Rank_MaxResults
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_NilRequest
+=== PAUSE TestDefaultRanker_Rank_NilRequest
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_EmptyPrefix
+=== PAUSE TestDefaultRanker_Rank_EmptyPrefix
+=== NAME  
+=== RUN   TestDefaultRanker_Rank_MergesSources
+=== PAUSE TestDefaultRanker_Rank_MergesSources
+=== NAME  
+=== RUN   TestCalculateScore
+=== PAUSE TestCalculateScore
+=== NAME  
+=== RUN   TestRanker_Performance_10KCommands_Under50ms
+    ranker_test.go:641: Skipping flaky performance test (set RUN_PERF_TESTS=1 to enable)
+--- SKIP: TestRanker_Performance_10KCommands_Under50ms (0.00s)
+=== NAME  
+=== RUN   TestSourceWeight
+=== PAUSE TestSourceWeight
+=== NAME  
+=== RUN   TestCommandSource_QuerySession
+=== PAUSE TestCommandSource_QuerySession
+=== NAME  
+=== RUN   TestCommandSource_QuerySession_EmptySessionID
+=== PAUSE TestCommandSource_QuerySession_EmptySessionID
+=== NAME  
+=== RUN   TestCommandSource_QueryCWD
+=== PAUSE TestCommandSource_QueryCWD
+=== NAME  
+=== RUN   TestCommandSource_QueryCWD_EmptyCWD
+=== PAUSE TestCommandSource_QueryCWD_EmptyCWD
+=== NAME  
+=== RUN   TestCommandSource_QueryGlobal
+=== PAUSE TestCommandSource_QueryGlobal
+=== NAME  
+=== RUN   TestCommandSource_QueryGlobal_NoExclusion
+=== PAUSE TestCommandSource_QueryGlobal_NoExclusion
+=== NAME  
+=== RUN   TestCommandSource_QueryAllScopes
+=== PAUSE TestCommandSource_QueryAllScopes
+=== NAME  
+=== RUN   TestCommandSource_QueryAllScopes_EmptyResults
+=== PAUSE TestCommandSource_QueryAllScopes_EmptyResults
+=== NAME  
+=== CONT  TestNormalizeForDisplay
+=== CONT  TestDefaultRanker_Rank_MaxResults
+=== RUN   TestNormalizeForDisplay/simple_command
+=== CONT  TestDefaultRanker_Rank_NilRequest
+=== CONT  TestDefaultRanker_Rank_Deduplication
+=== CONT  TestDefaultRanker_Rank_ToolAffinity
+=== CONT  TestCommandSource_QueryCWD_EmptyCWD
+=== CONT  TestDefaultRanker_Rank_SuccessBias
+=== RUN   TestDefaultRanker_Rank_SuccessBias/all_success
+=== CONT  TestSourceWeight
+=== RUN   TestSourceWeight/session
+=== CONT  TestCommandSource_QueryAllScopes_EmptyResults
+=== CONT  TestDefaultRanker_Rank_WithToolAffinity
+=== PAUSE TestSourceWeight/session
+=== PAUSE TestNormalizeForDisplay/simple_command
+=== RUN   TestDefaultRanker_Rank_ToolAffinity/same_tool
+=== NAME  TestSourceWeight
+=== PAUSE TestDefaultRanker_Rank_ToolAffinity/same_tool
+=== NAME  TestDefaultRanker_Rank_ToolAffinity
+=== RUN   TestSourceWeight/cwd
+=== NAME  TestNormalizeForDisplay
+=== RUN   TestDefaultRanker_Rank_ToolAffinity/different_tool
+=== RUN   TestNormalizeForDisplay/extra_spaces
+=== PAUSE TestSourceWeight/cwd
+=== PAUSE TestDefaultRanker_Rank_SuccessBias/all_success
+=== NAME  TestSourceWeight
+=== PAUSE TestNormalizeForDisplay/extra_spaces
+=== RUN   TestSourceWeight/global
+=== NAME  TestNormalizeForDisplay
+=== PAUSE TestSourceWeight/global
+=== NAME  TestSourceWeight
+=== RUN   TestNormalizeForDisplay/leading_and_trailing_whitespace
+=== NAME  TestDefaultRanker_Rank_SuccessBias
+=== RUN   TestDefaultRanker_Rank_SuccessBias/all_failure
+=== PAUSE TestDefaultRanker_Rank_SuccessBias/all_failure
+=== NAME  TestDefaultRanker_Rank_SuccessBias
+=== RUN   TestDefaultRanker_Rank_SuccessBias/50/50
+=== PAUSE TestNormalizeForDisplay/leading_and_trailing_whitespace
+=== RUN   TestSourceWeight/ai
+=== NAME  TestNormalizeForDisplay
+=== PAUSE TestDefaultRanker_Rank_SuccessBias/50/50
+=== NAME  TestDefaultRanker_Rank_SuccessBias
+=== PAUSE TestDefaultRanker_Rank_ToolAffinity/different_tool
+=== PAUSE TestSourceWeight/ai
+=== NAME  TestSourceWeight
+=== NAME  TestDefaultRanker_Rank_ToolAffinity
+=== RUN   TestNormalizeForDisplay/tabs_and_spaces
+=== PAUSE TestNormalizeForDisplay/tabs_and_spaces
+=== NAME  TestNormalizeForDisplay
+=== RUN   TestDefaultRanker_Rank_SuccessBias/mostly_success
+=== RUN   TestSourceWeight/unknown
+=== RUN   TestDefaultRanker_Rank_ToolAffinity/no_last_command
+=== PAUSE TestDefaultRanker_Rank_ToolAffinity/no_last_command
+=== PAUSE TestSourceWeight/unknown
+=== NAME  TestDefaultRanker_Rank_ToolAffinity
+=== RUN   TestNormalizeForDisplay/empty_string
+=== PAUSE TestDefaultRanker_Rank_SuccessBias/mostly_success
+=== NAME  TestDefaultRanker_Rank_SuccessBias
+=== RUN   TestDefaultRanker_Rank_SuccessBias/mostly_failure
+=== PAUSE TestDefaultRanker_Rank_SuccessBias/mostly_failure
+=== RUN   TestDefaultRanker_Rank_ToolAffinity/complex_command
+=== NAME  TestSourceWeight
+=== PAUSE TestNormalizeForDisplay/empty_string
+=== NAME  TestDefaultRanker_Rank_SuccessBias
+=== RUN   TestDefaultRanker_Rank_SuccessBias/no_data
+=== NAME  TestNormalizeForDisplay
+=== RUN   TestNormalizeForDisplay/whitespace_only
+=== PAUSE TestDefaultRanker_Rank_SuccessBias/no_data
+=== PAUSE TestDefaultRanker_Rank_ToolAffinity/complex_command
+=== NAME  TestDefaultRanker_Rank_SuccessBias
+=== NAME  TestDefaultRanker_Rank_ToolAffinity
+=== CONT  TestCommandSource_QuerySession_EmptySessionID
+=== CONT  TestCommandSource_QueryGlobal
+=== PAUSE TestNormalizeForDisplay/whitespace_only
+=== CONT  TestCalculateScore
+=== RUN   TestCalculateScore/high_score_-_session,_recent,_success,_affinity
+=== PAUSE TestCalculateScore/high_score_-_session,_recent,_success,_affinity
+=== NAME  TestNormalizeForDisplay
+=== NAME  TestCalculateScore
+=== RUN   TestNormalizeForDisplay/complex_command
+=== RUN   TestCalculateScore/low_score_-_global,_old,_failure,_no_affinity
+=== PAUSE TestNormalizeForDisplay/complex_command
+=== NAME  TestNormalizeForDisplay
+=== PAUSE TestCalculateScore/low_score_-_global,_old,_failure,_no_affinity
+=== CONT  TestDefaultRanker_Rank_RecencyDecay
+=== NAME  TestCalculateScore
+=== RUN   TestCalculateScore/medium_score_-_cwd,_moderate_time,_mixed_success
+=== CONT  TestDefaultRanker_Rank_DoesNotSuggestLastCommand
+=== PAUSE TestCalculateScore/medium_score_-_cwd,_moderate_time,_mixed_success
+=== NAME  TestCalculateScore
+=== CONT  TestCommandSource_QuerySession
+--- PASS: TestDefaultRanker_Rank_RecencyDecay (0.00s)
+--- PASS: TestDefaultRanker_Rank_NilRequest (0.20s)
+=== CONT  TestDefaultRanker_Rank_SessionWeightHighest
+--- PASS: TestDefaultRanker_Rank_SessionWeightHighest (0.00s)
+=== CONT  TestDefaultRanker_Rank_EmptyPrefix
+--- PASS: TestCommandSource_QueryCWD_EmptyCWD (0.21s)
+=== CONT  TestDefaultRanker_Rank_OrderedByScore
+--- PASS: TestCommandSource_QuerySession_EmptySessionID (0.21s)
+=== CONT  TestCommandSource_QueryGlobal_NoExclusion
+=== CONT  TestDefaultRanker_Rank_BasicRanking
+--- PASS: TestCommandSource_QuerySession (0.22s)
+=== NAME  TestDefaultRanker_Rank_WithToolAffinity
+    ranker_test.go:289: Git score: 0.9999142816699956, Docker score: 0.8998310544125716
+--- PASS: TestCommandSource_QueryGlobal (0.23s)
+=== CONT  TestDeduplicateKey
+=== RUN   TestDeduplicateKey/identical_commands
+=== PAUSE TestDeduplicateKey/identical_commands
+=== NAME  TestDeduplicateKey
+=== RUN   TestDeduplicateKey/different_commands
+=== PAUSE TestDeduplicateKey/different_commands
+=== NAME  TestDeduplicateKey
+=== CONT  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/simple_command
+=== PAUSE TestGetToolPrefix/simple_command
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/command_with_flags
+=== PAUSE TestGetToolPrefix/command_with_flags
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/command_with_subcommand
+=== PAUSE TestGetToolPrefix/command_with_subcommand
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/single_word_command
+=== PAUSE TestGetToolPrefix/single_word_command
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/empty_string
+=== PAUSE TestGetToolPrefix/empty_string
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/whitespace_only
+=== PAUSE TestGetToolPrefix/whitespace_only
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/leading_whitespace
+=== PAUSE TestGetToolPrefix/leading_whitespace
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/env_var_prefix
+=== PAUSE TestGetToolPrefix/env_var_prefix
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/multiple_env_var_prefixes
+=== PAUSE TestGetToolPrefix/multiple_env_var_prefixes
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/env_var_only
+=== PAUSE TestGetToolPrefix/env_var_only
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/uppercase_command
+=== PAUSE TestGetToolPrefix/uppercase_command
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/mixed_case_command
+=== PAUSE TestGetToolPrefix/mixed_case_command
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/path_command
+=== PAUSE TestGetToolPrefix/path_command
+=== NAME  TestGetToolPrefix
+=== RUN   TestGetToolPrefix/command_with_equals_in_arg
+=== PAUSE TestGetToolPrefix/command_with_equals_in_arg
+=== NAME  TestGetToolPrefix
+=== CONT  TestCommandSource_QueryAllScopes
+--- PASS: TestDefaultRanker_Rank_WithToolAffinity (0.23s)
+=== CONT  TestCommandSource_QueryCWD
+--- PASS: TestCommandSource_QueryAllScopes_EmptyResults (0.24s)
+=== CONT  TestDefaultRanker_Rank_MergesSources
+--- PASS: TestDefaultRanker_Rank_DoesNotSuggestLastCommand (0.24s)
+=== CONT  TestSourceWeight/session
+=== CONT  TestSourceWeight/ai
+--- PASS: TestSourceWeight/session (0.00s)
+--- PASS: TestSourceWeight/ai (0.00s)
+=== CONT  TestSourceWeight/unknown
+=== CONT  TestSourceWeight/global
+=== CONT  TestSourceWeight/cwd
+--- PASS: TestSourceWeight/unknown (0.00s)
+=== CONT  TestDefaultRanker_Rank_SuccessBias/all_success
+--- PASS: TestSourceWeight/global (0.00s)
+=== CONT  TestDefaultRanker_Rank_SuccessBias/50/50
+--- PASS: TestSourceWeight/cwd (0.00s)
+=== CONT  TestDefaultRanker_Rank_SuccessBias/no_data
+--- PASS: TestSourceWeight (0.00s)
+=== CONT  TestDefaultRanker_Rank_SuccessBias/mostly_success
+--- PASS: TestDefaultRanker_Rank_SuccessBias/all_success (0.00s)
+=== CONT  TestDefaultRanker_Rank_SuccessBias/all_failure
+--- PASS: TestDefaultRanker_Rank_SuccessBias/50/50 (0.00s)
+=== CONT  TestDefaultRanker_Rank_SuccessBias/mostly_failure
+--- PASS: TestDefaultRanker_Rank_SuccessBias/all_failure (0.00s)
+=== CONT  TestDefaultRanker_Rank_ToolAffinity/same_tool
+--- PASS: TestDefaultRanker_Rank_SuccessBias/mostly_success (0.00s)
+--- PASS: TestDefaultRanker_Rank_ToolAffinity/same_tool (0.00s)
+--- PASS: TestDefaultRanker_Rank_SuccessBias/no_data (0.00s)
+=== CONT  TestDefaultRanker_Rank_ToolAffinity/complex_command
+--- PASS: TestDefaultRanker_Rank_SuccessBias/mostly_failure (0.00s)
+--- PASS: TestDefaultRanker_Rank_ToolAffinity/complex_command (0.00s)
+=== CONT  TestDefaultRanker_Rank_ToolAffinity/no_last_command
+--- PASS: TestDefaultRanker_Rank_SuccessBias (0.00s)
+--- PASS: TestDefaultRanker_Rank_ToolAffinity/no_last_command (0.00s)
+=== CONT  TestDefaultRanker_Rank_ToolAffinity/different_tool
+--- PASS: TestDefaultRanker_Rank_ToolAffinity/different_tool (0.00s)
+=== CONT  TestNormalizeForDisplay/simple_command
+--- PASS: TestDefaultRanker_Rank_ToolAffinity (0.00s)
+--- PASS: TestNormalizeForDisplay/simple_command (0.00s)
+=== CONT  TestNormalizeForDisplay/whitespace_only
+--- PASS: TestNormalizeForDisplay/whitespace_only (0.00s)
+=== CONT  TestNormalizeForDisplay/empty_string
+--- PASS: TestNormalizeForDisplay/empty_string (0.00s)
+=== CONT  TestNormalizeForDisplay/complex_command
+--- PASS: TestNormalizeForDisplay/complex_command (0.00s)
+=== CONT  TestNormalizeForDisplay/leading_and_trailing_whitespace
+--- PASS: TestNormalizeForDisplay/leading_and_trailing_whitespace (0.00s)
+=== CONT  TestNormalizeForDisplay/extra_spaces
+=== CONT  TestNormalizeForDisplay/tabs_and_spaces
+--- PASS: TestNormalizeForDisplay/extra_spaces (0.00s)
+=== CONT  TestCalculateScore/low_score_-_global,_old,_failure,_no_affinity
+--- PASS: TestNormalizeForDisplay/tabs_and_spaces (0.00s)
+--- PASS: TestCalculateScore/low_score_-_global,_old,_failure,_no_affinity (0.00s)
+=== CONT  TestCalculateScore/medium_score_-_cwd,_moderate_time,_mixed_success
+--- PASS: TestCalculateScore/medium_score_-_cwd,_moderate_time,_mixed_success (0.00s)
+--- PASS: TestNormalizeForDisplay (0.00s)
+=== CONT  TestCalculateScore/high_score_-_session,_recent,_success,_affinity
+--- PASS: TestCalculateScore/high_score_-_session,_recent,_success,_affinity (0.00s)
+--- PASS: TestCalculateScore (0.00s)
+=== CONT  TestDeduplicateKey/identical_commands
+--- PASS: TestDeduplicateKey/identical_commands (0.00s)
+=== CONT  TestDeduplicateKey/different_commands
+--- PASS: TestDeduplicateKey/different_commands (0.00s)
+--- PASS: TestDeduplicateKey (0.00s)
+=== CONT  TestGetToolPrefix/whitespace_only
+--- PASS: TestGetToolPrefix/whitespace_only (0.00s)
+=== CONT  TestGetToolPrefix/multiple_env_var_prefixes
+--- PASS: TestGetToolPrefix/multiple_env_var_prefixes (0.00s)
+=== CONT  TestGetToolPrefix/command_with_equals_in_arg
+--- PASS: TestGetToolPrefix/command_with_equals_in_arg (0.00s)
+=== CONT  TestGetToolPrefix/path_command
+--- PASS: TestGetToolPrefix/path_command (0.00s)
+=== CONT  TestGetToolPrefix/mixed_case_command
+--- PASS: TestGetToolPrefix/mixed_case_command (0.00s)
+=== CONT  TestGetToolPrefix/uppercase_command
+--- PASS: TestGetToolPrefix/uppercase_command (0.00s)
+=== CONT  TestGetToolPrefix/env_var_only
+--- PASS: TestGetToolPrefix/env_var_only (0.00s)
+=== CONT  TestGetToolPrefix/env_var_prefix
+--- PASS: TestGetToolPrefix/env_var_prefix (0.00s)
+=== CONT  TestGetToolPrefix/single_word_command
+--- PASS: TestGetToolPrefix/single_word_command (0.00s)
+=== CONT  TestGetToolPrefix/leading_whitespace
+--- PASS: TestGetToolPrefix/leading_whitespace (0.00s)
+=== CONT  TestGetToolPrefix/empty_string
+--- PASS: TestGetToolPrefix/empty_string (0.00s)
+=== CONT  TestGetToolPrefix/command_with_flags
+--- PASS: TestGetToolPrefix/command_with_flags (0.00s)
+=== CONT  TestGetToolPrefix/command_with_subcommand
+--- PASS: TestGetToolPrefix/command_with_subcommand (0.00s)
+=== CONT  TestGetToolPrefix/simple_command
+--- PASS: TestGetToolPrefix/simple_command (0.00s)
+--- PASS: TestGetToolPrefix (0.00s)
+--- PASS: TestDefaultRanker_Rank_Deduplication (0.24s)
+--- PASS: TestDefaultRanker_Rank_MaxResults (0.29s)
+--- PASS: TestDefaultRanker_Rank_OrderedByScore (0.20s)
+--- PASS: TestDefaultRanker_Rank_EmptyPrefix (0.22s)
+--- PASS: TestCommandSource_QueryGlobal_NoExclusion (0.21s)
+--- PASS: TestCommandSource_QueryCWD (0.19s)
+--- PASS: TestDefaultRanker_Rank_BasicRanking (0.21s)
+--- PASS: TestCommandSource_QueryAllScopes (0.20s)
+--- PASS: TestDefaultRanker_Rank_MergesSources (0.20s)
+PASS
+ok  	github.com/runger/clai/internal/suggest	3.335s

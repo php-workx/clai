@@ -1,0 +1,77 @@
+=== RUN   TestDiscoverWithPlaybook
+=== PAUSE TestDiscoverWithPlaybook
+=== NAME  
+=== RUN   TestDiscoverWithProjectTypes
+=== PAUSE TestDiscoverWithProjectTypes
+=== NAME  
+=== RUN   TestDiscoverWithToolCommonFallback
+=== PAUSE TestDiscoverWithToolCommonFallback
+=== NAME  
+=== RUN   TestDiscoverCooldownEnforcement
+=== PAUSE TestDiscoverCooldownEnforcement
+=== NAME  
+=== RUN   TestDiscoverLimitEnforcement
+=== PAUSE TestDiscoverLimitEnforcement
+=== NAME  
+=== RUN   TestDiscoverEmptySession
+=== PAUSE TestDiscoverEmptySession
+=== NAME  
+=== RUN   TestDiscoverSourcePriority
+=== PAUSE TestDiscoverSourcePriority
+=== NAME  
+=== RUN   TestDiscoverDeduplication
+=== PAUSE TestDiscoverDeduplication
+=== NAME  
+=== RUN   TestDiscoverDefaultLimit
+=== PAUSE TestDiscoverDefaultLimit
+=== NAME  
+=== RUN   TestDiscoverResetCooldowns
+=== PAUSE TestDiscoverResetCooldowns
+=== NAME  
+=== RUN   TestDiscoverInvalidPlaybookPath
+=== PAUSE TestDiscoverInvalidPlaybookPath
+=== NAME  
+=== RUN   TestDiscoverMultipleProjectTypes
+=== PAUSE TestDiscoverMultipleProjectTypes
+=== NAME  
+=== RUN   TestProjectTypePriorsCompleteness
+=== PAUSE TestProjectTypePriorsCompleteness
+=== NAME  
+=== RUN   TestToolCommonCommandsNotEmpty
+=== PAUSE TestToolCommonCommandsNotEmpty
+=== NAME  
+=== RUN   TestDiscoverConcurrentSafety
+=== PAUSE TestDiscoverConcurrentSafety
+=== NAME  
+=== CONT  TestDiscoverWithProjectTypes
+--- PASS: TestDiscoverWithProjectTypes (0.00s)
+=== CONT  TestDiscoverDeduplication
+=== CONT  TestDiscoverResetCooldowns
+--- PASS: TestDiscoverResetCooldowns (0.00s)
+=== CONT  TestDiscoverConcurrentSafety
+=== CONT  TestToolCommonCommandsNotEmpty
+=== CONT  TestDiscoverEmptySession
+=== CONT  TestDiscoverLimitEnforcement
+--- PASS: TestToolCommonCommandsNotEmpty (0.00s)
+--- PASS: TestDiscoverEmptySession (0.00s)
+--- PASS: TestDiscoverLimitEnforcement (0.00s)
+=== CONT  TestProjectTypePriorsCompleteness
+--- PASS: TestProjectTypePriorsCompleteness (0.00s)
+=== CONT  TestDiscoverMultipleProjectTypes
+--- PASS: TestDiscoverMultipleProjectTypes (0.00s)
+=== CONT  TestDiscoverInvalidPlaybookPath
+--- PASS: TestDiscoverConcurrentSafety (0.00s)
+--- PASS: TestDiscoverInvalidPlaybookPath (0.00s)
+=== CONT  TestDiscoverDefaultLimit
+=== CONT  TestDiscoverWithToolCommonFallback
+=== CONT  TestDiscoverCooldownEnforcement
+=== CONT  TestDiscoverSourcePriority
+=== CONT  TestDiscoverWithPlaybook
+--- PASS: TestDiscoverDefaultLimit (0.00s)
+--- PASS: TestDiscoverWithToolCommonFallback (0.00s)
+--- PASS: TestDiscoverCooldownEnforcement (0.00s)
+--- PASS: TestDiscoverDeduplication (0.00s)
+--- PASS: TestDiscoverSourcePriority (0.00s)
+--- PASS: TestDiscoverWithPlaybook (0.00s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/discover	2.530s

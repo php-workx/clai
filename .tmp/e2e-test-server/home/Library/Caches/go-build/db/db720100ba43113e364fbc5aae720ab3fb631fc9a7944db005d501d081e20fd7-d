@@ -1,0 +1,3 @@
+./levenshtein.go
+./typo.go
+./typo_test.go

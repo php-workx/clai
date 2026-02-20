@@ -1,0 +1,142 @@
+=== RUN   TestComputeScopeKey
+=== PAUSE TestComputeScopeKey
+=== NAME  
+=== RUN   TestTruncatePath
+=== PAUSE TestTruncatePath
+=== NAME  
+=== RUN   TestIsDirScope
+=== PAUSE TestIsDirScope
+=== NAME  
+=== CONT  TestIsDirScope
+=== RUN   TestIsDirScope/dir_scope
+=== CONT  TestTruncatePath
+=== PAUSE TestIsDirScope/dir_scope
+=== NAME  TestIsDirScope
+=== RUN   TestTruncatePath/empty
+=== CONT  TestComputeScopeKey
+=== RUN   TestIsDirScope/global_scope
+=== PAUSE TestTruncatePath/empty
+=== NAME  TestTruncatePath
+=== PAUSE TestIsDirScope/global_scope
+=== RUN   TestTruncatePath/dot
+=== RUN   TestComputeScopeKey/repo_root_returns_key
+=== NAME  TestIsDirScope
+=== RUN   TestIsDirScope/repo_scope
+=== PAUSE TestTruncatePath/dot
+=== PAUSE TestComputeScopeKey/repo_root_returns_key
+=== NAME  TestComputeScopeKey
+=== RUN   TestComputeScopeKey/subdirectory_returns_key
+=== PAUSE TestIsDirScope/repo_scope
+=== PAUSE TestComputeScopeKey/subdirectory_returns_key
+=== NAME  TestIsDirScope
+=== NAME  TestTruncatePath
+=== RUN   TestTruncatePath/single_level
+=== NAME  TestComputeScopeKey
+=== RUN   TestIsDirScope/empty
+=== PAUSE TestTruncatePath/single_level
+=== PAUSE TestIsDirScope/empty
+=== NAME  TestIsDirScope
+=== NAME  TestTruncatePath
+=== CONT  TestIsDirScope/dir_scope
+=== RUN   TestTruncatePath/two_levels
+=== CONT  TestIsDirScope/global_scope
+=== PAUSE TestTruncatePath/two_levels
+=== NAME  TestTruncatePath
+=== CONT  TestIsDirScope/repo_scope
+=== RUN   TestTruncatePath/three_levels
+--- PASS: TestIsDirScope/dir_scope (0.00s)
+=== CONT  TestIsDirScope/empty
+=== RUN   TestComputeScopeKey/deep_path_is_truncated
+=== PAUSE TestTruncatePath/three_levels
+--- PASS: TestIsDirScope/global_scope (0.00s)
+=== NAME  TestTruncatePath
+=== RUN   TestTruncatePath/four_levels_truncated
+=== PAUSE TestComputeScopeKey/deep_path_is_truncated
+=== NAME  TestComputeScopeKey
+--- PASS: TestIsDirScope/repo_scope (0.00s)
+=== RUN   TestComputeScopeKey/same_truncated_path_gives_same_key
+--- PASS: TestIsDirScope/empty (0.00s)
+=== PAUSE TestTruncatePath/four_levels_truncated
+--- PASS: TestIsDirScope (0.00s)
+=== NAME  TestTruncatePath
+=== PAUSE TestComputeScopeKey/same_truncated_path_gives_same_key
+=== RUN   TestTruncatePath/max_depth_1
+=== NAME  TestComputeScopeKey
+=== PAUSE TestTruncatePath/max_depth_1
+=== NAME  TestTruncatePath
+=== RUN   TestTruncatePath/max_depth_10
+=== PAUSE TestTruncatePath/max_depth_10
+=== NAME  TestTruncatePath
+=== CONT  TestTruncatePath/empty
+=== RUN   TestComputeScopeKey/outside_repo_returns_empty
+=== CONT  TestTruncatePath/max_depth_1
+=== PAUSE TestComputeScopeKey/outside_repo_returns_empty
+=== NAME  TestComputeScopeKey
+=== CONT  TestTruncatePath/max_depth_10
+=== CONT  TestTruncatePath/four_levels_truncated
+=== CONT  TestTruncatePath/two_levels
+=== CONT  TestTruncatePath/three_levels
+--- PASS: TestTruncatePath/empty (0.00s)
+=== CONT  TestTruncatePath/dot
+--- PASS: TestTruncatePath/max_depth_1 (0.00s)
+--- PASS: TestTruncatePath/max_depth_10 (0.00s)
+=== CONT  TestTruncatePath/single_level
+=== RUN   TestComputeScopeKey/empty_cwd_returns_empty
+--- PASS: TestTruncatePath/four_levels_truncated (0.00s)
+=== PAUSE TestComputeScopeKey/empty_cwd_returns_empty
+--- PASS: TestTruncatePath/dot (0.00s)
+=== NAME  TestComputeScopeKey
+--- PASS: TestTruncatePath/two_levels (0.00s)
+=== RUN   TestComputeScopeKey/empty_repoRoot_returns_empty
+=== PAUSE TestComputeScopeKey/empty_repoRoot_returns_empty
+=== NAME  TestComputeScopeKey
+--- PASS: TestTruncatePath/three_levels (0.00s)
+--- PASS: TestTruncatePath/single_level (0.00s)
+=== RUN   TestComputeScopeKey/zero_maxDepth_uses_default
+--- PASS: TestTruncatePath (0.00s)
+=== PAUSE TestComputeScopeKey/zero_maxDepth_uses_default
+=== NAME  TestComputeScopeKey
+=== RUN   TestComputeScopeKey/negative_maxDepth_uses_default
+=== PAUSE TestComputeScopeKey/negative_maxDepth_uses_default
+=== NAME  TestComputeScopeKey
+=== RUN   TestComputeScopeKey/maxDepth_1_truncates_to_one_level
+=== PAUSE TestComputeScopeKey/maxDepth_1_truncates_to_one_level
+=== NAME  TestComputeScopeKey
+=== RUN   TestComputeScopeKey/deterministic_for_same_truncated_path
+=== PAUSE TestComputeScopeKey/deterministic_for_same_truncated_path
+=== NAME  TestComputeScopeKey
+=== RUN   TestComputeScopeKey/different_paths_give_different_keys
+=== PAUSE TestComputeScopeKey/different_paths_give_different_keys
+=== NAME  TestComputeScopeKey
+=== RUN   TestComputeScopeKey/root_and_subdir_give_different_keys
+=== PAUSE TestComputeScopeKey/root_and_subdir_give_different_keys
+=== NAME  TestComputeScopeKey
+=== CONT  TestComputeScopeKey/same_truncated_path_gives_same_key
+=== CONT  TestComputeScopeKey/empty_repoRoot_returns_empty
+=== CONT  TestComputeScopeKey/deterministic_for_same_truncated_path
+=== CONT  TestComputeScopeKey/outside_repo_returns_empty
+=== CONT  TestComputeScopeKey/empty_cwd_returns_empty
+=== CONT  TestComputeScopeKey/deep_path_is_truncated
+--- PASS: TestComputeScopeKey/empty_repoRoot_returns_empty (0.00s)
+=== CONT  TestComputeScopeKey/repo_root_returns_key
+=== CONT  TestComputeScopeKey/negative_maxDepth_uses_default
+=== CONT  TestComputeScopeKey/subdirectory_returns_key
+=== CONT  TestComputeScopeKey/different_paths_give_different_keys
+--- PASS: TestComputeScopeKey/same_truncated_path_gives_same_key (0.00s)
+=== CONT  TestComputeScopeKey/maxDepth_1_truncates_to_one_level
+=== CONT  TestComputeScopeKey/root_and_subdir_give_different_keys
+--- PASS: TestComputeScopeKey/subdirectory_returns_key (0.00s)
+=== CONT  TestComputeScopeKey/zero_maxDepth_uses_default
+--- PASS: TestComputeScopeKey/root_and_subdir_give_different_keys (0.00s)
+--- PASS: TestComputeScopeKey/zero_maxDepth_uses_default (0.00s)
+--- PASS: TestComputeScopeKey/deterministic_for_same_truncated_path (0.00s)
+--- PASS: TestComputeScopeKey/empty_cwd_returns_empty (0.00s)
+--- PASS: TestComputeScopeKey/different_paths_give_different_keys (0.00s)
+--- PASS: TestComputeScopeKey/maxDepth_1_truncates_to_one_level (0.00s)
+--- PASS: TestComputeScopeKey/outside_repo_returns_empty (0.00s)
+--- PASS: TestComputeScopeKey/deep_path_is_truncated (0.00s)
+--- PASS: TestComputeScopeKey/repo_root_returns_key (0.00s)
+--- PASS: TestComputeScopeKey/negative_maxDepth_uses_default (0.00s)
+--- PASS: TestComputeScopeKey (0.00s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/dirscope	2.321s

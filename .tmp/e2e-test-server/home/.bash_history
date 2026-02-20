@@ -1,26 +1,3 @@
-clai history --session=$CLAI_SESSION_ID
-clear
-true
-clai history --format json --limit 1 2>&1
-clear
-false
-clai history --format json --limit 1 2>&1
-clear
-echo success_filter_test
-false
-clai history --status=success --global 2>&1
-clear
-echo will_succeed_test
-false
-clai history --status=failure --global 2>&1
-echo 'picker_apple_cmd'
-echo 'picker_banana_cmd'
-echo 'picker_apricot_cmd'
-echo 'setup command 1'
-echo 'setup command 2'
-ls -la
-echo apple
-echo banana
 echo apricot
 git status
 command one
@@ -498,3 +475,26 @@ git log --oneline
 npm test
 make build
 clai suggest git
+git add .
+git commit -m 'test'
+git add .
+git commit -m 'test2'
+git add .
+clai suggest --format=json
+make build
+make build
+make build
+make test
+git status
+clai suggest --format=json
+git status
+git log --oneline
+clai suggest 'git st' --format=fzf --limit=1
+kubectl get pods -n production
+mkdir -p /tmp/reason-test
+cd /tmp/reason-test
+echo '{"scripts":{"lint":"eslint"}}' > package.json
+cd /tmp/reason-test && clai suggest --format=json
+git status
+make build
+clai suggest --format=json

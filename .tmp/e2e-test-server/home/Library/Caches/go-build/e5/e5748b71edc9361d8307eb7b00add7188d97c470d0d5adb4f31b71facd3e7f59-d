@@ -1,0 +1,126 @@
+=== RUN   TestParseShimEvent
+=== RUN   TestParseShimEvent/valid_session_start
+--- PASS: TestParseShimEvent/valid_session_start (0.00s)
+=== NAME  TestParseShimEvent
+=== RUN   TestParseShimEvent/valid_session_end
+--- PASS: TestParseShimEvent/valid_session_end (0.00s)
+=== NAME  TestParseShimEvent
+=== RUN   TestParseShimEvent/valid_command_start
+--- PASS: TestParseShimEvent/valid_command_start (0.00s)
+=== NAME  TestParseShimEvent
+=== RUN   TestParseShimEvent/valid_command_end
+--- PASS: TestParseShimEvent/valid_command_end (0.00s)
+=== NAME  TestParseShimEvent
+=== RUN   TestParseShimEvent/parse_errors
+=== RUN   TestParseShimEvent/parse_errors/empty_data
+--- PASS: TestParseShimEvent/parse_errors/empty_data (0.00s)
+=== NAME  TestParseShimEvent/parse_errors
+=== RUN   TestParseShimEvent/parse_errors/invalid_JSON
+--- PASS: TestParseShimEvent/parse_errors/invalid_JSON (0.00s)
+=== NAME  TestParseShimEvent/parse_errors
+=== RUN   TestParseShimEvent/parse_errors/missing_type
+--- PASS: TestParseShimEvent/parse_errors/missing_type (0.00s)
+=== NAME  TestParseShimEvent/parse_errors
+=== RUN   TestParseShimEvent/parse_errors/unknown_type
+--- PASS: TestParseShimEvent/parse_errors/unknown_type (0.00s)
+=== NAME  TestParseShimEvent/parse_errors
+=== RUN   TestParseShimEvent/parse_errors/missing_session_id
+--- PASS: TestParseShimEvent/parse_errors/missing_session_id (0.00s)
+=== NAME  TestParseShimEvent/parse_errors
+--- PASS: TestParseShimEvent/parse_errors (0.00s)
+=== NAME  TestParseShimEvent
+--- PASS: TestParseShimEvent (0.00s)
+=== NAME  
+=== RUN   TestRunnerBasicFlow
+--- PASS: TestRunnerBasicFlow (0.00s)
+=== NAME  
+=== RUN   TestRunnerSkipsInvalidEvents
+--- PASS: TestRunnerSkipsInvalidEvents (0.00s)
+=== NAME  
+=== RUN   TestRunnerOneshotFallback
+    persistent_test.go:189: no dispatchers created (all dial attempts might have been for reconnect)
+--- PASS: TestRunnerOneshotFallback (0.00s)
+=== NAME  
+=== RUN   TestRunnerInitialConnectFailure
+--- PASS: TestRunnerInitialConnectFailure (0.00s)
+=== NAME  
+=== RUN   TestRunnerContextCancellation
+--- PASS: TestRunnerContextCancellation (0.01s)
+=== NAME  
+=== RUN   TestRunnerEmptyInput
+--- PASS: TestRunnerEmptyInput (0.00s)
+=== NAME  
+=== RUN   TestRunnerBrokenPipeDetection
+=== RUN   TestRunnerBrokenPipeDetection/nil_error
+--- PASS: TestRunnerBrokenPipeDetection/nil_error (0.00s)
+=== NAME  TestRunnerBrokenPipeDetection
+=== RUN   TestRunnerBrokenPipeDetection/broken_pipe_string
+--- PASS: TestRunnerBrokenPipeDetection/broken_pipe_string (0.00s)
+=== NAME  TestRunnerBrokenPipeDetection
+=== RUN   TestRunnerBrokenPipeDetection/connection_refused
+--- PASS: TestRunnerBrokenPipeDetection/connection_refused (0.00s)
+=== NAME  TestRunnerBrokenPipeDetection
+=== RUN   TestRunnerBrokenPipeDetection/transport_closing
+--- PASS: TestRunnerBrokenPipeDetection/transport_closing (0.00s)
+=== NAME  TestRunnerBrokenPipeDetection
+=== RUN   TestRunnerBrokenPipeDetection/unrelated_error
+--- PASS: TestRunnerBrokenPipeDetection/unrelated_error (0.00s)
+=== NAME  TestRunnerBrokenPipeDetection
+--- PASS: TestRunnerBrokenPipeDetection (0.00s)
+=== NAME  
+=== RUN   TestRunnerBrokenPipeFallsBackToOneshot
+--- PASS: TestRunnerBrokenPipeFallsBackToOneshot (0.00s)
+=== NAME  
+=== RUN   TestRunnerBufferingDuringReconnect
+--- PASS: TestRunnerBufferingDuringReconnect (0.00s)
+=== NAME  
+=== RUN   TestRunnerRingBufferCapacity
+--- PASS: TestRunnerRingBufferCapacity (0.00s)
+=== NAME  
+=== RUN   TestNewRingBuffer
+=== RUN   TestNewRingBuffer/uses_specified_capacity
+--- PASS: TestNewRingBuffer/uses_specified_capacity (0.00s)
+=== NAME  TestNewRingBuffer
+=== RUN   TestNewRingBuffer/defaults_to_DefaultRingCapacity_for_zero
+--- PASS: TestNewRingBuffer/defaults_to_DefaultRingCapacity_for_zero (0.00s)
+=== NAME  TestNewRingBuffer
+=== RUN   TestNewRingBuffer/defaults_to_DefaultRingCapacity_for_negative
+--- PASS: TestNewRingBuffer/defaults_to_DefaultRingCapacity_for_negative (0.00s)
+=== NAME  TestNewRingBuffer
+=== RUN   TestNewRingBuffer/starts_empty
+--- PASS: TestNewRingBuffer/starts_empty (0.00s)
+=== NAME  TestNewRingBuffer
+--- PASS: TestNewRingBuffer (0.00s)
+=== NAME  
+=== RUN   TestRingBufferPushAndDrain
+=== RUN   TestRingBufferPushAndDrain/push_and_drain_single_item
+--- PASS: TestRingBufferPushAndDrain/push_and_drain_single_item (0.00s)
+=== NAME  TestRingBufferPushAndDrain
+=== RUN   TestRingBufferPushAndDrain/push_and_drain_multiple_items_in_FIFO_order
+--- PASS: TestRingBufferPushAndDrain/push_and_drain_multiple_items_in_FIFO_order (0.00s)
+=== NAME  TestRingBufferPushAndDrain
+=== RUN   TestRingBufferPushAndDrain/drain_empty_buffer_returns_nil
+--- PASS: TestRingBufferPushAndDrain/drain_empty_buffer_returns_nil (0.00s)
+=== NAME  TestRingBufferPushAndDrain
+=== RUN   TestRingBufferPushAndDrain/drain_twice_returns_nil_second_time
+--- PASS: TestRingBufferPushAndDrain/drain_twice_returns_nil_second_time (0.00s)
+=== NAME  TestRingBufferPushAndDrain
+--- PASS: TestRingBufferPushAndDrain (0.00s)
+=== NAME  
+=== RUN   TestRingBufferOverflow
+=== RUN   TestRingBufferOverflow/drops_oldest_when_full
+--- PASS: TestRingBufferOverflow/drops_oldest_when_full (0.00s)
+=== NAME  TestRingBufferOverflow
+=== RUN   TestRingBufferOverflow/heavy_overflow_keeps_only_last_N_items
+--- PASS: TestRingBufferOverflow/heavy_overflow_keeps_only_last_N_items (0.00s)
+=== NAME  TestRingBufferOverflow
+=== RUN   TestRingBufferOverflow/push_after_drain_works_correctly
+--- PASS: TestRingBufferOverflow/push_after_drain_works_correctly (0.00s)
+=== NAME  TestRingBufferOverflow
+--- PASS: TestRingBufferOverflow (0.00s)
+=== NAME  
+=== RUN   TestRingBufferConcurrency
+--- PASS: TestRingBufferConcurrency (0.00s)
+=== NAME  
+PASS
+ok  	github.com/runger/clai/internal/shim	3.141s

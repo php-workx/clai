@@ -1,0 +1,7 @@
+./auto.go
+./describe.go
+./fts5.go
+./result.go
+./auto_test.go
+./describe_test.go
+./fts5_test.go

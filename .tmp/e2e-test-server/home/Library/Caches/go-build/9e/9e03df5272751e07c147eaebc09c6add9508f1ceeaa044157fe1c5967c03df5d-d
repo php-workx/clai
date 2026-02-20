@@ -1,0 +1,38 @@
+=== RUN   TestParseFlags_EmptyArgs
+--- PASS: TestParseFlags_EmptyArgs (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_KeyEqualsValue
+--- PASS: TestParseFlags_KeyEqualsValue (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_KeyValueSeparate
+--- PASS: TestParseFlags_KeyValueSeparate (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_BooleanFlag
+--- PASS: TestParseFlags_BooleanFlag (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_MixedFormats
+--- PASS: TestParseFlags_MixedFormats (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_DuplicateKeysLastWins
+--- PASS: TestParseFlags_DuplicateKeysLastWins (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_EmptyValue
+--- PASS: TestParseFlags_EmptyValue (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_ValueWithEquals
+--- PASS: TestParseFlags_ValueWithEquals (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_IgnoresNonFlags
+--- PASS: TestParseFlags_IgnoresNonFlags (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_BooleanAtEnd
+--- PASS: TestParseFlags_BooleanAtEnd (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_ValueStartsWithDash
+--- PASS: TestParseFlags_ValueStartsWithDash (0.00s)
+=== NAME  
+=== RUN   TestParseFlags_SingleDashValue
+--- PASS: TestParseFlags_SingleDashValue (0.00s)
+=== NAME  
+PASS
+ok  	github.com/runger/clai/cmd/clai-shim	1.793s

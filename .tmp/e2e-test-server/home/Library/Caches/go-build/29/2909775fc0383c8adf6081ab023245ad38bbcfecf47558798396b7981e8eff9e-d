@@ -1,0 +1,4 @@
+./miner.go
+./tracker.go
+./miner_test.go
+./tracker_test.go

@@ -1,0 +1,149 @@
+=== RUN   TestParseBashAliases_Simple
+--- PASS: TestParseBashAliases_Simple (0.00s)
+=== NAME  
+=== RUN   TestParseBashAliases_DoubleQuoted
+--- PASS: TestParseBashAliases_DoubleQuoted (0.00s)
+=== NAME  
+=== RUN   TestParseBashAliases_EmptyOutput
+--- PASS: TestParseBashAliases_EmptyOutput (0.00s)
+=== NAME  
+=== RUN   TestParseBashAliases_WithSpecialChars
+--- PASS: TestParseBashAliases_WithSpecialChars (0.00s)
+=== NAME  
+=== RUN   TestParseBashAliases_SkipsNonAliasLines
+--- PASS: TestParseBashAliases_SkipsNonAliasLines (0.00s)
+=== NAME  
+=== RUN   TestParseBashAliases_NoEquals
+--- PASS: TestParseBashAliases_NoEquals (0.00s)
+=== NAME  
+=== RUN   TestParseZshAliases_Simple
+--- PASS: TestParseZshAliases_Simple (0.00s)
+=== NAME  
+=== RUN   TestParseZshAliases_Quoted
+--- PASS: TestParseZshAliases_Quoted (0.00s)
+=== NAME  
+=== RUN   TestParseZshAliases_EmptyOutput
+--- PASS: TestParseZshAliases_EmptyOutput (0.00s)
+=== NAME  
+=== RUN   TestParseZshAliases_EmptyLines
+--- PASS: TestParseZshAliases_EmptyLines (0.00s)
+=== NAME  
+=== RUN   TestParseZshAliases_NoEquals
+--- PASS: TestParseZshAliases_NoEquals (0.00s)
+=== NAME  
+=== RUN   TestParseFishAbbreviations_ModernFormat
+--- PASS: TestParseFishAbbreviations_ModernFormat (0.00s)
+=== NAME  
+=== RUN   TestParseFishAbbreviations_AltModernFormat
+--- PASS: TestParseFishAbbreviations_AltModernFormat (0.00s)
+=== NAME  
+=== RUN   TestParseFishAbbreviations_SimpleFormat
+--- PASS: TestParseFishAbbreviations_SimpleFormat (0.00s)
+=== NAME  
+=== RUN   TestParseFishAbbreviations_LegacyFormat
+--- PASS: TestParseFishAbbreviations_LegacyFormat (0.00s)
+=== NAME  
+=== RUN   TestParseFishAbbreviations_EmptyOutput
+--- PASS: TestParseFishAbbreviations_EmptyOutput (0.00s)
+=== NAME  
+=== RUN   TestParseFishAbbreviations_QuotedExpansion
+--- PASS: TestParseFishAbbreviations_QuotedExpansion (0.00s)
+=== NAME  
+=== RUN   TestUnquote
+--- PASS: TestUnquote (0.00s)
+=== NAME  
+=== RUN   TestSplitFirstWord
+--- PASS: TestSplitFirstWord (0.00s)
+=== NAME  
+=== RUN   TestShouldResnapshot
+--- PASS: TestShouldResnapshot (0.00s)
+=== NAME  
+=== RUN   TestBuildReverseMap_Basic
+--- PASS: TestBuildReverseMap_Basic (0.00s)
+=== NAME  
+=== RUN   TestBuildReverseMap_DuplicateExpansions
+--- PASS: TestBuildReverseMap_DuplicateExpansions (0.00s)
+=== NAME  
+=== RUN   TestBuildReverseMap_EmptyExpansion
+--- PASS: TestBuildReverseMap_EmptyExpansion (0.00s)
+=== NAME  
+=== RUN   TestBuildReverseMap_Nil
+--- PASS: TestBuildReverseMap_Nil (0.00s)
+=== NAME  
+=== RUN   TestBuildReverseMap_Empty
+--- PASS: TestBuildReverseMap_Empty (0.00s)
+=== NAME  
+=== RUN   TestBuildReverseMap_SortOrder
+--- PASS: TestBuildReverseMap_SortOrder (0.00s)
+=== NAME  
+=== RUN   TestRenderWithAliases_ExactMatch
+--- PASS: TestRenderWithAliases_ExactMatch (0.00s)
+=== NAME  
+=== RUN   TestRenderWithAliases_PrefixMatch
+--- PASS: TestRenderWithAliases_PrefixMatch (0.00s)
+=== NAME  
+=== RUN   TestRenderWithAliases_NoMatch
+--- PASS: TestRenderWithAliases_NoMatch (0.00s)
+=== NAME  
+=== RUN   TestRenderWithAliases_LongestMatchFirst
+--- PASS: TestRenderWithAliases_LongestMatchFirst (0.00s)
+=== NAME  
+=== RUN   TestRenderWithAliases_EmptyCommand
+--- PASS: TestRenderWithAliases_EmptyCommand (0.00s)
+=== NAME  
+=== RUN   TestRenderWithAliases_NilReverseMap
+--- PASS: TestRenderWithAliases_NilReverseMap (0.00s)
+=== NAME  
+=== RUN   TestRenderWithAliases_WordBoundary
+--- PASS: TestRenderWithAliases_WordBoundary (0.00s)
+=== NAME  
+=== RUN   TestRenderWithAliases_TabSeparator
+--- PASS: TestRenderWithAliases_TabSeparator (0.00s)
+=== NAME  
+=== RUN   TestManager_SetAndExpand
+--- PASS: TestManager_SetAndExpand (0.01s)
+=== NAME  
+=== RUN   TestManager_SetAndRender
+--- PASS: TestManager_SetAndRender (0.00s)
+=== NAME  
+=== RUN   TestManager_Aliases
+--- PASS: TestManager_Aliases (0.00s)
+=== NAME  
+=== RUN   TestManager_SaveAndLoad
+--- PASS: TestManager_SaveAndLoad (0.00s)
+=== NAME  
+=== RUN   TestManager_ChainedExpansion
+--- PASS: TestManager_ChainedExpansion (0.00s)
+=== NAME  
+=== RUN   TestManager_CycleDetection
+--- PASS: TestManager_CycleDetection (0.00s)
+=== NAME  
+=== RUN   TestManager_EmptyInitialState
+--- PASS: TestManager_EmptyInitialState (0.00s)
+=== NAME  
+=== RUN   TestManager_DefaultMaxDepth
+--- PASS: TestManager_DefaultMaxDepth (0.00s)
+=== NAME  
+=== RUN   TestStore_SaveAndLoad
+--- PASS: TestStore_SaveAndLoad (0.00s)
+=== NAME  
+=== RUN   TestStore_LoadEmpty
+--- PASS: TestStore_LoadEmpty (0.00s)
+=== NAME  
+=== RUN   TestStore_SaveReplacesPrevious
+--- PASS: TestStore_SaveReplacesPrevious (0.00s)
+=== NAME  
+=== RUN   TestStore_SessionIsolation
+--- PASS: TestStore_SessionIsolation (0.00s)
+=== NAME  
+=== RUN   TestStore_DeleteAliases
+--- PASS: TestStore_DeleteAliases (0.00s)
+=== NAME  
+=== RUN   TestStore_CountAliases
+--- PASS: TestStore_CountAliases (0.00s)
+=== NAME  
+=== RUN   TestStore_SaveEmptyMap
+--- PASS: TestStore_SaveEmptyMap (0.00s)
+=== NAME  
+PASS
+ok  	github.com/runger/clai/internal/suggestions/alias	3.036s

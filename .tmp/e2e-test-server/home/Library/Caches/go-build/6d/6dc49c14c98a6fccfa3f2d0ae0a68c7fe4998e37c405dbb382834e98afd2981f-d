@@ -1,0 +1,56 @@
+=== RUN   TestValidShell
+=== RUN   TestValidShell/bash
+--- PASS: TestValidShell/bash (0.00s)
+=== NAME  TestValidShell
+=== RUN   TestValidShell/zsh
+--- PASS: TestValidShell/zsh (0.00s)
+=== NAME  TestValidShell
+=== RUN   TestValidShell/fish
+--- PASS: TestValidShell/fish (0.00s)
+=== NAME  TestValidShell
+=== RUN   TestValidShell/BASH
+--- PASS: TestValidShell/BASH (0.00s)
+=== NAME  TestValidShell
+=== RUN   TestValidShell/ZSH
+--- PASS: TestValidShell/ZSH (0.00s)
+=== NAME  TestValidShell
+=== RUN   TestValidShell/FISH
+--- PASS: TestValidShell/FISH (0.00s)
+=== NAME  TestValidShell
+=== RUN   TestValidShell/powershell
+--- PASS: TestValidShell/powershell (0.00s)
+=== NAME  TestValidShell
+=== RUN   TestValidShell/sh
+--- PASS: TestValidShell/sh (0.00s)
+=== NAME  TestValidShell
+=== RUN   TestValidShell/#00
+--- PASS: TestValidShell/#00 (0.00s)
+=== NAME  TestValidShell
+=== RUN   TestValidShell/ksh
+--- PASS: TestValidShell/ksh (0.00s)
+=== NAME  TestValidShell
+--- PASS: TestValidShell (0.00s)
+=== NAME  
+=== RUN   TestNewCommandEvent
+--- PASS: TestNewCommandEvent (0.00s)
+=== NAME  
+=== RUN   TestCommandEventJSONSerialization
+=== RUN   TestCommandEventJSONSerialization/minimal_event
+--- PASS: TestCommandEventJSONSerialization/minimal_event (0.00s)
+=== NAME  TestCommandEventJSONSerialization
+=== RUN   TestCommandEventJSONSerialization/full_event_with_duration
+--- PASS: TestCommandEventJSONSerialization/full_event_with_duration (0.00s)
+=== NAME  TestCommandEventJSONSerialization
+=== RUN   TestCommandEventJSONSerialization/roundtrip_serialization
+--- PASS: TestCommandEventJSONSerialization/roundtrip_serialization (0.00s)
+=== NAME  TestCommandEventJSONSerialization
+--- PASS: TestCommandEventJSONSerialization (0.00s)
+=== NAME  
+=== RUN   TestShellConstants
+--- PASS: TestShellConstants (0.00s)
+=== NAME  
+=== RUN   TestEventConstants
+--- PASS: TestEventConstants (0.00s)
+=== NAME  
+PASS
+ok  	github.com/runger/clai/internal/suggestions/event	2.092s

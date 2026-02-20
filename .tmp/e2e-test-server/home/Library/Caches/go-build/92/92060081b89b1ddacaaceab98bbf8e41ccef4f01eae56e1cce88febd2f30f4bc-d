@@ -1,0 +1,23 @@
+# test log
+getenv GOTMPDIR
+getenv TMPDIR
+stat /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverDeduplication3157148453/001/.clai
+stat /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverDeduplication3157148453/001
+open /nonexistent/path/tasks.yaml
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverDeduplication3157148453/001/.clai/tasks.yaml
+getenv GOTMPDIR
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverDeduplication3157148453/001/.clai/tasks.yaml
+getenv TMPDIR
+getenv GOTMPDIR
+getenv TMPDIR
+stat /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverSourcePriority3664193359/001/.clai
+stat /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverSourcePriority3664193359/001
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverSourcePriority3664193359/001/.clai/tasks.yaml
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T
+stat /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverWithPlaybook3457437580/001/.clai
+stat /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverWithPlaybook3457437580/001
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverWithPlaybook3457437580/001/.clai/tasks.yaml
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverSourcePriority3664193359/001/.clai/tasks.yaml
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T/TestDiscoverWithPlaybook3457437580/001/.clai/tasks.yaml
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T
+open /var/folders/cw/7cjc3nt55wl119pn0t4z7rmc0000gn/T

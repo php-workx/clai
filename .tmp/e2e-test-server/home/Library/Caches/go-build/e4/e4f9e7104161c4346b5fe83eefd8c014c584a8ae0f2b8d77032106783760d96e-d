@@ -1,0 +1,26 @@
+=== RUN   TestPingRPC
+--- PASS: TestPingRPC (0.00s)
+=== NAME  
+=== RUN   TestGetStatusRPC
+--- PASS: TestGetStatusRPC (0.00s)
+=== NAME  
+=== RUN   TestMessageSerialization
+=== RUN   TestMessageSerialization/ClientInfo
+--- PASS: TestMessageSerialization/ClientInfo (0.00s)
+=== NAME  TestMessageSerialization
+=== RUN   TestMessageSerialization/SessionStartRequest
+--- PASS: TestMessageSerialization/SessionStartRequest (0.00s)
+=== NAME  TestMessageSerialization
+=== RUN   TestMessageSerialization/SuggestRequest
+--- PASS: TestMessageSerialization/SuggestRequest (0.00s)
+=== NAME  TestMessageSerialization
+=== RUN   TestMessageSerialization/Suggestion
+--- PASS: TestMessageSerialization/Suggestion (0.00s)
+=== NAME  TestMessageSerialization
+=== RUN   TestMessageSerialization/DiagnoseResponse
+--- PASS: TestMessageSerialization/DiagnoseResponse (0.00s)
+=== NAME  TestMessageSerialization
+--- PASS: TestMessageSerialization (0.00s)
+=== NAME  
+PASS
+ok  	github.com/runger/clai/gen/clai/v1	2.115s

@@ -1,0 +1,79 @@
+=== RUN   TestNewWriter
+=== PAUSE TestNewWriter
+=== NAME  
+=== RUN   TestWriter_EnqueueAndFlush
+=== PAUSE TestWriter_EnqueueAndFlush
+=== NAME  
+=== RUN   TestWriter_BatchSizeFlush
+=== PAUSE TestWriter_BatchSizeFlush
+=== NAME  
+=== RUN   TestWriter_EphemeralEventsNotPersisted
+=== PAUSE TestWriter_EphemeralEventsNotPersisted
+=== NAME  
+=== RUN   TestWriter_NilEventIgnored
+=== PAUSE TestWriter_NilEventIgnored
+=== NAME  
+=== RUN   TestWriter_QueueFull
+=== PAUSE TestWriter_QueueFull
+=== NAME  
+=== RUN   TestWriter_GracefulShutdown
+=== PAUSE TestWriter_GracefulShutdown
+=== NAME  
+=== RUN   TestWriter_MultipleStops
+=== PAUSE TestWriter_MultipleStops
+=== NAME  
+=== RUN   TestWriter_TimerFlush
+=== PAUSE TestWriter_TimerFlush
+=== NAME  
+=== RUN   TestDefaultOptions
+--- PASS: TestDefaultOptions (0.00s)
+=== NAME  
+=== RUN   TestWriter_Stats
+=== PAUSE TestWriter_Stats
+=== NAME  
+=== RUN   TestBatchWriter_CallsWritePath
+=== PAUSE TestBatchWriter_CallsWritePath
+=== NAME  
+=== RUN   TestBatchWriter_WritePath_ErrorSkipsEvent
+=== PAUSE TestBatchWriter_WritePath_ErrorSkipsEvent
+=== NAME  
+=== RUN   TestBatchWriter_TransitionsAcrossBatches
+=== PAUSE TestBatchWriter_TransitionsAcrossBatches
+=== NAME  
+=== CONT  TestWriter_EnqueueAndFlush
+=== CONT  TestWriter_MultipleStops
+=== CONT  TestWriter_GracefulShutdown
+=== CONT  TestWriter_NilEventIgnored
+=== CONT  TestWriter_QueueFull
+=== CONT  TestBatchWriter_WritePath_ErrorSkipsEvent
+=== CONT  TestWriter_EphemeralEventsNotPersisted
+=== CONT  TestBatchWriter_CallsWritePath
+=== CONT  TestWriter_BatchSizeFlush
+=== CONT  TestNewWriter
+--- PASS: TestWriter_GracefulShutdown (0.02s)
+=== CONT  TestBatchWriter_TransitionsAcrossBatches
+=== RUN   TestNewWriter/default_options
+--- PASS: TestNewWriter/default_options (0.00s)
+=== NAME  TestNewWriter
+=== RUN   TestNewWriter/custom_options
+--- PASS: TestNewWriter/custom_options (0.00s)
+=== NAME  TestNewWriter
+=== RUN   TestNewWriter/zero_options_use_defaults
+--- PASS: TestNewWriter/zero_options_use_defaults (0.00s)
+=== NAME  TestNewWriter
+--- PASS: TestNewWriter (0.03s)
+=== CONT  TestWriter_TimerFlush
+--- PASS: TestWriter_MultipleStops (0.03s)
+=== CONT  TestWriter_Stats
+--- PASS: TestWriter_QueueFull (0.03s)
+--- PASS: TestWriter_BatchSizeFlush (0.08s)
+--- PASS: TestWriter_EphemeralEventsNotPersisted (0.08s)
+--- PASS: TestWriter_NilEventIgnored (0.09s)
+--- PASS: TestWriter_TimerFlush (0.11s)
+--- PASS: TestWriter_EnqueueAndFlush (0.14s)
+--- PASS: TestWriter_Stats (0.12s)
+--- PASS: TestBatchWriter_CallsWritePath (0.34s)
+--- PASS: TestBatchWriter_WritePath_ErrorSkipsEvent (0.35s)
+--- PASS: TestBatchWriter_TransitionsAcrossBatches (0.54s)
+PASS
+ok  	github.com/runger/clai/internal/suggestions/batch	3.287s

@@ -1,192 +1,66 @@
 {
   "summary": {
     "shell": "bash",
-    "total": 79,
-    "passed": 53,
-    "failed": 26,
-    "skipped": 18,
-    "duration_ms": 136214,
+    "total": 10,
+    "passed": 3,
+    "failed": 7,
+    "skipped": 0,
+    "duration_ms": 67695,
     "failures": [
-      {
-        "ok": false,
-        "name": "History picker fuzzy search filters results",
-        "reason": "expected screen to contain: apple | expected screen to contain: apricot",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/002-History_picker_fuzzy_search_filters_results.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "History scope switching with Tab",
-        "reason": "expected screen to match: (git|echo|ls|make)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/006-History_scope_switching_with_Tab.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Global history contains cross-session commands",
-        "reason": "expected screen to match: (git|make|cd|ls)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/008-Global_history_contains_cross-session_commands.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai loads successfully in bash",
-        "reason": "expected screen not to contain: Error",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/012-clai_loads_successfully_in_bash.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai status shows session info",
-        "reason": "expected screen to contain: bash",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/019-clai_status_shows_session_info.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai history filters successful commands",
-        "reason": "expected screen to contain: HISTORY_SUCCESS_FILTER_PASS",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/023-clai_history_filters_successful_commands.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai history filters failed commands",
-        "reason": "expected screen to contain: HISTORY_FAILURE_FILTER_PASS",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/024-clai_history_filters_failed_commands.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "CWD scope works with paths containing spaces",
-        "reason": "expected screen to contain: command in spaced dir",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/034-CWD_scope_works_with_paths_containing_spaces.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Incognito mode can be disabled",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/038-Incognito_mode_can_be_disabled.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "CLAI_NO_RECORD prevents all ingestion",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/039-CLAI_NO_RECORD_prevents_all_ingestion.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Command ingestion captures exit code success",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/040-Command_ingestion_captures_exit_code_success.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Command ingestion captures exit code failure",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/041-Command_ingestion_captures_exit_code_failure.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Command ingestion captures CWD",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/042-Command_ingestion_captures_CWD.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Command with special characters ingested",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/043-Command_with_special_characters_ingested.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Command with unicode characters ingested",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/044-Command_with_unicode_characters_ingested.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai daemon status shows state",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/045-clai_daemon_status_shows_state.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai daemon start works",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/046-clai_daemon_start_works.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai suggest text format",
-        "reason": "expected screen to match: \\d+\\.",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/049-clai_suggest_text_format.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai suggest with prefix filters results",
-        "reason": "expected screen not to contain: npm | expected screen not to contain: make",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/053-clai_suggest_with_prefix_filters_results.png",
-        "plan": "suggestions-tests.yaml"
-      },
       {
         "ok": false,
         "name": "Suggestion shows transition reason",
         "reason": "expected screen to contain: transition",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/054-Suggestion_shows_transition_reason.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/004-Suggestion_shows_transition_reason.png",
+        "terminal_excerpt": " create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/81/815a325c59fcf98513170790d50456d6082e861b9df32d36270f62085c7901aa-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/82/820f76222d3592270324f20233b5b2f67cac89eb04c46a159a8dc86049ec8158-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/83/832cb602b7b59bd7c07b569e0cce3e61a3aeee6cef0e3d13682f4527ee5d9ba9-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/83/8389686dc72601cfd42834efbe9e4dbaf5bdd679a0ffe5f93105b46d9d9a4378-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/84/845a6c1a4e6a2ae851bfab696bd7dc42502a30670ba0db346868b00a8788909f-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/85/85a10b9dbbdfe7d56c442c09194eeb30082916bd1dfb0e87fcb66b6c80423af3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/91/9159ae39d69dd0206bd9c93d4115b69cdd5903b8065f6f065f6966a9a899af11-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/91/91aa4cb758d5b22d285a914bcbe47a39ced781c17d07ad2a55678b32f94e72c3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/95/951550a10958c411813ace9b5fa7d657e47ab82d1d30f259437d87b80023fdae-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/9c/9ce20cb57beb8be90497b4f6624469e48724623d533139c6adb8038ab985fd97-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/9f/9fce68b594cf81ec6d82d5b040b3f7d8d48f21bbd9441afa99cdf28f012e033f-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/a2/a2bfe78a30638ac19517ce557361d13fa0ebfa10ecd32f067ca0bc3c9e261fc9-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ac/ac33aaa30a097cde7643a546b3e47f95d6d38596091c8d0b36833d7c199b88fc-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/b1/b11576801acde9c44a67508db525a52b102f71cfdc74738f14634bea6e58ffe3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/b1/b182fb81bdc5e24bf5e00ac887c2c6d8587b82e02c9b314e8b700ff1a66669fa-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c0/c042108bc82fc0649978687412aeb571395b4cd45a9d7736023b9352acafb889-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c2/c25820936bb8b3b57eb93d7e51c9226faca0cf1ea8e721343fc70510fb09e374-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c3/c31470a5549a34605bc0933777ec63c549a1e6252c8de40aa20bb1e674b1d45a-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c6/c664dbe153278e25e40093a4f4efe5d8cc604e2bbbec9836e98e68347326aff2-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c8/c857d87c884ddf214aa078f869ae2c88bb93cc860ab6ab821f3f055f16b58519-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ce/ce3dbd0b201e3f8c5f391cd1f640636dd03413964c55b2d9819334d6f6f94938-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/d0/d0540c1d8713898cfb9ae0b38b693680490497583d41ca47aff872aa01b78b66-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/df/dfb97b473f5c8b692387df61a4d8effedfe105529032139a71ca46687b4a6f32-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/df/dfe6e102ee526c1173eaa3dca3e009e8adda0d13430e515b0c204aa6a5820e5f-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/eb/eb77a89cfc28f079efcad95d91491a8aa6ac7c89fa5e1630490f7a7d11c831c7-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/f3/f3def181e2abe2f9d665b0dd48bc3654a5e83db0542be7b4594e06eae5e5362e-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/f8/f889e47cd0e10642cd139bd9acc68e7e3cb30084a494b750abd99f05b77caa4c-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/f9/f943889a0fa2e922ba3859f70146f4f8a9077889ccdf0492256321b2d490b69e-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/f9/f9c44b94f0037cf4498cfaede195d27f4b95104369cbbdef4349b02eb4820e40-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fb/fbafc3bde7cec46657313fc50b03a95e03ed2f51e19de1da55026381f0c64619-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fedc67db58e89c6eb791ab9513518eeac64cef22483469101e6a9e4993e8e5e7-a\nTEST> git add .\nTEST> git commit -m 'test2'\n[chore/spec-reviews 10330b2d] test2\n 2 files changed, 4 insertions(+)\nTEST> git add .\nTEST> clai suggest --format=json\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest --format=json\",\"last_cmd_norm\":\"cla\ni <arg> --format=json\"},\"suggestions\":[]}\nTEST>  ",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Suggestion shows freq_repo reason",
         "reason": "expected screen to match: (freq_repo|freq_global)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/055-Suggestion_shows_freq_repo_reason.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/005-Suggestion_shows_freq_repo_reason.png",
+        "terminal_excerpt": " ✓ ValidateDirectoryPermissions mode table 0600 (missing owner execute) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0700 (secure) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0701 (world exec) (0.01s)\n ✓ ValidateDirectoryPermissions mode table 0707 (world all) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0710 (group exec) (0.01s)\n ✓ ValidateDirectoryPermissions mode table 0750 (group read exec) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0755 (group+world read exec) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0770 (group all) (0.01s)\n ✓ ValidateDirectoryPermissions mode table 0777 (all access) (0.02s)\n ✓ ValidateDirectoryPermissions non existent (0.00s)\n ✓ ValidateDirectoryPermissions not a directory (0.00s)\n ✓ ValidateDirectoryPermissions secure (0.00s)\n ✓ ValidateDirectoryPermissions world readable (0.00s)\n ✓ Wait for process exit (0.11s)\n ✖ WaitForSocket default wrapper (0.00s)\n ✓ WaitForSocketWithContext cancelled (0.00s)\n ✓ WaitForSocketWithPaths exists (0.00s)\n ✓ WaitForSocketWithPaths timeout (0.10s)\n\nsuggegithub.com/runger/clai/internal/suggestions/feedback:\n ✓ CheckImplicitAcceptance empty inputs (0.00s)\n ✓ CheckImplicitAcceptance exact match (0.00s)\n ✓ CheckImplicitAcceptance no match (0.00s)\n ✓ CheckImplicitAcceptance outside window (0.00s)\n ✓ CheckImplicitAcceptance prefix match (0.01s)\n ✓ CheckImplicitAcceptance wrong session (0.00s)\n ✓ Count by action (0.01s)\n ✓ Is valid action (0.00s)\n ✓ NewStore nil logger (0.01s)\n ✓ Query feedback (0.01s)\n ✓ Record feedback (0.01s)\n ✓ RecordFeedback all actions (0.01s)\n ✓ RecordFeedback invalid action (0.00s)\n ✓ RecordFeedback missing session ID (0.01s)\n ✓ RecordFeedback missing suggested text (0.01s)\n ✓ Update slot correlation (0.01s)\n ✓ UpdateSlotCorrelation empty fields (0.00s)\n\nst --format=json\n ",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Suggestion includes confidence score",
+        "reason": "expected screen to contain: confidence",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/006-Suggestion_includes_confidence_score.png",
+        "terminal_excerpt": "        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdcfbf1deadc738f628cf5b19ee21c7d08043fba300b6324fb0385312755369d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdeee6517b6ec3cbc4c5504e2ebf7e4f72c0b5c30b1a136bb166cfc0d37c3c87-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdf02c4988e4f76022d55f709a32a2e156acd578caee8a1c2c3547510c3ea3ce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdf0575cbb0ec53d7df53ab85ee106437d1c705e6af22cdf5d94b138b96a5e4c-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe095be5bb554ac7372f515c20dab35f7dda027852545f7b8b5f16b2be80417d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe0dd71062f84ebe3b488ef7e8471843663e425cb8aa9a556c713d77e51c7422-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe185329db30a1a2bfe531cc2bcacf805bbf9bdc9427275f58cabf34739c5857-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe19cefda8bec9f931b536a1723266b159c0d2203e7f1eb6b3900b7b0ce69909-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1e1f3c2501cd043a2f0a717d6ce61174e3abe20f3429811eef6db4ea32e2c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1f0b507ce9832c54fb9d27da5c76342c1d3ce168c463437465b34dd764f08a-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe424e99baadc94a9ce541de5544ee3c2345cddbae290483d7eed1e5a922e15e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe5c7d1a20bd8448e9af041bcd5ecc9678007b00befbc398e0131ebaf62e5fce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe6377d91cc18d90f85d801e76ae2b48f86b9e292d2df60ae7b1976dc7407df7-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe9ccd78fbced52dad0fd72f4ad37a27121037c3126e1e670c59b7e399d718c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea1e475a4492979a2e1696e89eac82ba6b1a4a421863d116d086a2687585238-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea49bee6c30fa89c7d9f6940b6d25eb56a0c098a7c29c1ad1dbbf7c6d8d74fd-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/feb18baa95db1537c38cfe0d7bb3ff321e6c6c7dc213e7095cc150005ec7b140-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fecf3393bbfbc2cdc135f053dbf0175dbe1af89977eb0332127998734d6e4644-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fee9c8bfe7d4e41c2183d1eef93d8949912ab23bb323f6c647f5f919d3419154-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fef2b706e41d68309baa464eec5bb87d6391a5b4ccab1ad8aec8904356ea0294-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fefe85cebedbada75d373b6965c2009bfc6ed10551c874b0475b6b16ac0bc188-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff0eafab97e670fa7685b629092c0b1a54adfaf92cef43de1e2643acf81bdbf5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff2de6b16a21f5a32db5a1b2b8b74cd7403bbbc16b5436d2e1b5c54c6d32b876-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff4ee1d31db57a1bcd8b650b00d855af9f4a26a95186fcc8e9ea333da2d61940-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff80c52ff9fe9eb5f813d95fbc93270ce8fe0a91bee0008bdaafb5dab25888c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff96f7cbad6427f9a358cff05a8d120035e433afa4585de92536fc0e2d67085b-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffa6966a9d90b11fe3e315e2d1642179675eacd4f765a6a53ec170cd5c3d0aac-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb5117943a796108572c4f416fb30ce41fbcaee840cdceb74a1182c729cbdf5-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb792cf5f0d25665080b76c23d08d2605a3f97f63eee22d20f6f801530f5218-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffddfcabec0c7d551705636d4945289c55197285c4f9abe84ed285ea9dcbb6c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffeee505136bd4d01a56c9406ab18c9066a2d52d650683f3fbe7ce195d18a53d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/fff8ef9c114ac427168a67fc4397eaab05dc33cd47570cd825235ecbc2f6d08b-a\n\n[1]+  Done                    ( clai-shim session-start --session-id=\"$CLAI_SESSION_ID\" --cwd=\"$PWD\" --shell=\"$CLAI_CURRENT_SHELL\" > /dev/null 2>&1; alia\ns -p | clai-shim alias-sync --session-id=\"$CLAI_SESSION_ID\" --shell=\"$CLAI_CURRENT_SHELL\" --stdin > /dev/null 2>&1; clai-shim import-history --shell=\"$CL\nAI_CURRENT_SHELL\" --if-not-exists > /dev/null 2>&1 )\nTEST> clai suggest --format=json\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest --format=json\",\"last_cmd_norm\":\"cla\ni <arg> --format=json\"},\"suggestions\":[]}\nTEST>  ",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Ghost text suggestion appears",
         "reason": "expected screen to contain: git status",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/058-Ghost_text_suggestion_appears.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/007-Ghost_text_suggestion_appears.png",
+        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Alt+Right accepts next token",
         "reason": "expected screen to contain: kubectl get",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/062-Alt_Right_accepts_next_token.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Alt+H opens suggestion picker (bash)",
-        "reason": "expected screen to match: (fzf|suggest|pick)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/073-Alt_H_opens_suggestion_picker_bash_.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/008-Alt_Right_accepts_next_token.png",
+        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Discovery shows project_task reason",
         "reason": "expected screen to contain: project_task",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/082-Discovery_shows_project_task_reason.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/009-Discovery_shows_project_task_reason.png",
+        "terminal_excerpt": "{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"cd /tmp/reason-test\",\"last_cmd_norm\":\"cd <path>\"\n},\"suggestions\":[]}\nTEST>  \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Suggest API returns expected JSON structure",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/095-Suggest_API_returns_expected_JSON_structure.png",
+        "reason": "expected screen to contain: suggestions | expected screen to match: (reason|reasons)",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/010-Suggest_API_returns_expected_JSON_structure.png",
+        "terminal_excerpt": "        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe185329db30a1a2bfe531cc2bcacf805bbf9bdc9427275f58cabf34739c5857-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe19cefda8bec9f931b536a1723266b159c0d2203e7f1eb6b3900b7b0ce69909-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1e1f3c2501cd043a2f0a717d6ce61174e3abe20f3429811eef6db4ea32e2c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1f0b507ce9832c54fb9d27da5c76342c1d3ce168c463437465b34dd764f08a-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe424e99baadc94a9ce541de5544ee3c2345cddbae290483d7eed1e5a922e15e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe5c7d1a20bd8448e9af041bcd5ecc9678007b00befbc398e0131ebaf62e5fce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe6377d91cc18d90f85d801e76ae2b48f86b9e292d2df60ae7b1976dc7407df7-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe9ccd78fbced52dad0fd72f4ad37a27121037c3126e1e670c59b7e399d718c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea1e475a4492979a2e1696e89eac82ba6b1a4a421863d116d086a2687585238-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea49bee6c30fa89c7d9f6940b6d25eb56a0c098a7c29c1ad1dbbf7c6d8d74fd-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/feb18baa95db1537c38cfe0d7bb3ff321e6c6c7dc213e7095cc150005ec7b140-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fecf3393bbfbc2cdc135f053dbf0175dbe1af89977eb0332127998734d6e4644-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fee9c8bfe7d4e41c2183d1eef93d8949912ab23bb323f6c647f5f919d3419154-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fef2b706e41d68309baa464eec5bb87d6391a5b4ccab1ad8aec8904356ea0294-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fefe85cebedbada75d373b6965c2009bfc6ed10551c874b0475b6b16ac0bc188-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff0eafab97e670fa7685b629092c0b1a54adfaf92cef43de1e2643acf81bdbf5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff2de6b16a21f5a32db5a1b2b8b74cd7403bbbc16b5436d2e1b5c54c6d32b876-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff4ee1d31db57a1bcd8b650b00d855af9f4a26a95186fcc8e9ea333da2d61940-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff80c52ff9fe9eb5f813d95fbc93270ce8fe0a91bee0008bdaafb5dab25888c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff96f7cbad6427f9a358cff05a8d120035e433afa4585de92536fc0e2d67085b-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffa6966a9d90b11fe3e315e2d1642179675eacd4f765a6a53ec170cd5c3d0aac-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb5117943a796108572c4f416fb30ce41fbcaee840cdceb74a1182c729cbdf5-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb792cf5f0d25665080b76c23d08d2605a3f97f63eee22d20f6f801530f5218-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffddfcabec0c7d551705636d4945289c55197285c4f9abe84ed285ea9dcbb6c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffeee505136bd4d01a56c9406ab18c9066a2d52d650683f3fbe7ce195d18a53d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/fff8ef9c114ac427168a67fc4397eaab05dc33cd47570cd825235ecbc2f6d08b-a\n\n[1]+  Done                    ( clai-shim session-start --session-id=\"$CLAI_SESSION_ID\" --cwd=\"$PWD\" --shell=\"$CLAI_CURRENT_SHELL\" > /dev/null 2>&1; alia\ns -p | clai-shim alias-sync --session-id=\"$CLAI_SESSION_ID\" --shell=\"$CLAI_CURRENT_SHELL\" --stdin > /dev/null 2>&1; clai-shim import-history --shell=\"$CL\nAI_CURRENT_SHELL\" --if-not-exists > /dev/null 2>&1 )\nTEST> make build\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:13Z\" -o bin/clai ./cmd/clai\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:13Z\" -o bin/claid ./cmd/claid\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:13Z\" -o bin/clai-shim ./cmd/clai-shim\ngo build -ldflags \"-X main.Version=10330b2d-dirty -X main.GitCommit=10330b2d -X main.BuildDate=2026-02-20T08:30:13Z\" -o bin/clai-picker ./cmd/clai-picker\nTEST> clai suggest --format=json\n ",
         "plan": "suggestions-tests.yaml"
       }
     ]
@@ -194,291 +68,7 @@
   "results": [
     {
       "ok": true,
-      "name": "History picker opens with Alt+H",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "History picker fuzzy search filters results",
-      "reason": "expected screen to contain: apple | expected screen to contain: apricot",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/002-History_picker_fuzzy_search_filters_results.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "History picker navigation with arrow keys",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "History picker Enter inserts command",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "History picker Escape cancels",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "History scope switching with Tab",
-      "reason": "expected screen to match: (git|echo|ls|make)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/006-History_scope_switching_with_Tab.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Session history is isolated from global",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Global history contains cross-session commands",
-      "reason": "expected screen to match: (git|make|cd|ls)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/008-Global_history_contains_cross-session_commands.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Long command shows truncation indicator",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Enter inserts full untruncated command",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Ctrl+C copies full untruncated command",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "clai loads successfully in bash",
-      "reason": "expected screen not to contain: Error",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/012-clai_loads_successfully_in_bash.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Session ID is set",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "History command shows session history",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "clai cmd converts natural language to command",
-      "reason": "clai cmd not yet fully implemented",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "clai cmd caches suggestion for completion",
-      "reason": "clai cmd not yet fully implemented",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "clai ask answers terminal questions",
-      "reason": "clai ask not yet fully implemented",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "clai ask with context flag",
-      "reason": "clai ask not yet fully implemented",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "clai status shows session info",
-      "reason": "expected screen to contain: bash",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/019-clai_status_shows_session_info.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai history with session flag",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai history with global flag",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai history filters by CWD",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "clai history filters successful commands",
-      "reason": "expected screen to contain: HISTORY_SUCCESS_FILTER_PASS",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/023-clai_history_filters_successful_commands.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "clai history filters failed commands",
-      "reason": "expected screen to contain: HISTORY_FAILURE_FILTER_PASS",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/024-clai_history_filters_failed_commands.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai off disables integration",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai on re-enables integration",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "PTY wrapper captures stdout",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "PTY wrapper handles colors",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "PTY wrapper Ctrl+C handling",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Voice mode converts natural language",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Empty command line doesn't crash",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Very long command doesn't overflow",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Special characters handled correctly",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "CWD scope works with paths containing spaces",
-      "reason": "expected screen to contain: command in spaced dir",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/034-CWD_scope_works_with_paths_containing_spaces.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "History args handle special path characters",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Incognito mode can be enabled",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Commands in incognito mode not persisted",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Incognito mode can be disabled",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/038-Incognito_mode_can_be_disabled.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "CLAI_NO_RECORD prevents all ingestion",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/039-CLAI_NO_RECORD_prevents_all_ingestion.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Command ingestion captures exit code success",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/040-Command_ingestion_captures_exit_code_success.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Command ingestion captures exit code failure",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/041-Command_ingestion_captures_exit_code_failure.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Command ingestion captures CWD",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/042-Command_ingestion_captures_CWD.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Command with special characters ingested",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/043-Command_with_special_characters_ingested.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Command with unicode characters ingested",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/044-Command_with_unicode_characters_ingested.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "clai daemon status shows state",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/045-clai_daemon_status_shows_state.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "clai daemon start works",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/046-clai_daemon_start_works.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai daemon stop graceful shutdown",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai daemon restart sequence",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
       "name": "clai suggest text format",
-      "reason": "expected screen to match: \\d+\\.",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/049-clai_suggest_text_format.png",
       "plan": "suggestions-tests.yaml"
     },
     {
@@ -488,281 +78,63 @@
     },
     {
       "ok": true,
-      "name": "clai suggest fzf format",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai suggest with limit",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": false,
       "name": "clai suggest with prefix filters results",
-      "reason": "expected screen not to contain: npm | expected screen not to contain: make",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/053-clai_suggest_with_prefix_filters_results.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Suggestion shows transition reason",
       "reason": "expected screen to contain: transition",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/054-Suggestion_shows_transition_reason.png",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/004-Suggestion_shows_transition_reason.png",
+      "terminal_excerpt": " create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/81/815a325c59fcf98513170790d50456d6082e861b9df32d36270f62085c7901aa-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/82/820f76222d3592270324f20233b5b2f67cac89eb04c46a159a8dc86049ec8158-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/83/832cb602b7b59bd7c07b569e0cce3e61a3aeee6cef0e3d13682f4527ee5d9ba9-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/83/8389686dc72601cfd42834efbe9e4dbaf5bdd679a0ffe5f93105b46d9d9a4378-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/84/845a6c1a4e6a2ae851bfab696bd7dc42502a30670ba0db346868b00a8788909f-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/85/85a10b9dbbdfe7d56c442c09194eeb30082916bd1dfb0e87fcb66b6c80423af3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/91/9159ae39d69dd0206bd9c93d4115b69cdd5903b8065f6f065f6966a9a899af11-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/91/91aa4cb758d5b22d285a914bcbe47a39ced781c17d07ad2a55678b32f94e72c3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/95/951550a10958c411813ace9b5fa7d657e47ab82d1d30f259437d87b80023fdae-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/9c/9ce20cb57beb8be90497b4f6624469e48724623d533139c6adb8038ab985fd97-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/9f/9fce68b594cf81ec6d82d5b040b3f7d8d48f21bbd9441afa99cdf28f012e033f-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/a2/a2bfe78a30638ac19517ce557361d13fa0ebfa10ecd32f067ca0bc3c9e261fc9-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ac/ac33aaa30a097cde7643a546b3e47f95d6d38596091c8d0b36833d7c199b88fc-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/b1/b11576801acde9c44a67508db525a52b102f71cfdc74738f14634bea6e58ffe3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/b1/b182fb81bdc5e24bf5e00ac887c2c6d8587b82e02c9b314e8b700ff1a66669fa-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c0/c042108bc82fc0649978687412aeb571395b4cd45a9d7736023b9352acafb889-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c2/c25820936bb8b3b57eb93d7e51c9226faca0cf1ea8e721343fc70510fb09e374-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c3/c31470a5549a34605bc0933777ec63c549a1e6252c8de40aa20bb1e674b1d45a-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c6/c664dbe153278e25e40093a4f4efe5d8cc604e2bbbec9836e98e68347326aff2-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/c8/c857d87c884ddf214aa078f869ae2c88bb93cc860ab6ab821f3f055f16b58519-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ce/ce3dbd0b201e3f8c5f391cd1f640636dd03413964c55b2d9819334d6f6f94938-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/d0/d0540c1d8713898cfb9ae0b38b693680490497583d41ca47aff872aa01b78b66-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/df/dfb97b473f5c8b692387df61a4d8effedfe105529032139a71ca46687b4a6f32-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/df/dfe6e102ee526c1173eaa3dca3e009e8adda0d13430e515b0c204aa6a5820e5f-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/eb/eb77a89cfc28f079efcad95d91491a8aa6ac7c89fa5e1630490f7a7d11c831c7-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/f3/f3def181e2abe2f9d665b0dd48bc3654a5e83db0542be7b4594e06eae5e5362e-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/f8/f889e47cd0e10642cd139bd9acc68e7e3cb30084a494b750abd99f05b77caa4c-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/f9/f943889a0fa2e922ba3859f70146f4f8a9077889ccdf0492256321b2d490b69e-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/f9/f9c44b94f0037cf4498cfaede195d27f4b95104369cbbdef4349b02eb4820e40-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fb/fbafc3bde7cec46657313fc50b03a95e03ed2f51e19de1da55026381f0c64619-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fedc67db58e89c6eb791ab9513518eeac64cef22483469101e6a9e4993e8e5e7-a\nTEST> git add .\nTEST> git commit -m 'test2'\n[chore/spec-reviews 10330b2d] test2\n 2 files changed, 4 insertions(+)\nTEST> git add .\nTEST> clai suggest --format=json\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest --format=json\",\"last_cmd_norm\":\"cla\ni <arg> --format=json\"},\"suggestions\":[]}\nTEST>  ",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Suggestion shows freq_repo reason",
       "reason": "expected screen to match: (freq_repo|freq_global)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/055-Suggestion_shows_freq_repo_reason.png",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/005-Suggestion_shows_freq_repo_reason.png",
+      "terminal_excerpt": " ✓ ValidateDirectoryPermissions mode table 0600 (missing owner execute) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0700 (secure) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0701 (world exec) (0.01s)\n ✓ ValidateDirectoryPermissions mode table 0707 (world all) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0710 (group exec) (0.01s)\n ✓ ValidateDirectoryPermissions mode table 0750 (group read exec) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0755 (group+world read exec) (0.00s)\n ✓ ValidateDirectoryPermissions mode table 0770 (group all) (0.01s)\n ✓ ValidateDirectoryPermissions mode table 0777 (all access) (0.02s)\n ✓ ValidateDirectoryPermissions non existent (0.00s)\n ✓ ValidateDirectoryPermissions not a directory (0.00s)\n ✓ ValidateDirectoryPermissions secure (0.00s)\n ✓ ValidateDirectoryPermissions world readable (0.00s)\n ✓ Wait for process exit (0.11s)\n ✖ WaitForSocket default wrapper (0.00s)\n ✓ WaitForSocketWithContext cancelled (0.00s)\n ✓ WaitForSocketWithPaths exists (0.00s)\n ✓ WaitForSocketWithPaths timeout (0.10s)\n\nsuggegithub.com/runger/clai/internal/suggestions/feedback:\n ✓ CheckImplicitAcceptance empty inputs (0.00s)\n ✓ CheckImplicitAcceptance exact match (0.00s)\n ✓ CheckImplicitAcceptance no match (0.00s)\n ✓ CheckImplicitAcceptance outside window (0.00s)\n ✓ CheckImplicitAcceptance prefix match (0.01s)\n ✓ CheckImplicitAcceptance wrong session (0.00s)\n ✓ Count by action (0.01s)\n ✓ Is valid action (0.00s)\n ✓ NewStore nil logger (0.01s)\n ✓ Query feedback (0.01s)\n ✓ Record feedback (0.01s)\n ✓ RecordFeedback all actions (0.01s)\n ✓ RecordFeedback invalid action (0.00s)\n ✓ RecordFeedback missing session ID (0.01s)\n ✓ RecordFeedback missing suggested text (0.01s)\n ✓ Update slot correlation (0.01s)\n ✓ UpdateSlotCorrelation empty fields (0.00s)\n\nst --format=json\n ",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": true,
+      "ok": false,
       "name": "Suggestion includes confidence score",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Suggestion context includes last_cmd_norm",
+      "reason": "expected screen to contain: confidence",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/006-Suggestion_includes_confidence_score.png",
+      "terminal_excerpt": "        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdcfbf1deadc738f628cf5b19ee21c7d08043fba300b6324fb0385312755369d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdeee6517b6ec3cbc4c5504e2ebf7e4f72c0b5c30b1a136bb166cfc0d37c3c87-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdf02c4988e4f76022d55f709a32a2e156acd578caee8a1c2c3547510c3ea3ce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdf0575cbb0ec53d7df53ab85ee106437d1c705e6af22cdf5d94b138b96a5e4c-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe095be5bb554ac7372f515c20dab35f7dda027852545f7b8b5f16b2be80417d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe0dd71062f84ebe3b488ef7e8471843663e425cb8aa9a556c713d77e51c7422-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe185329db30a1a2bfe531cc2bcacf805bbf9bdc9427275f58cabf34739c5857-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe19cefda8bec9f931b536a1723266b159c0d2203e7f1eb6b3900b7b0ce69909-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1e1f3c2501cd043a2f0a717d6ce61174e3abe20f3429811eef6db4ea32e2c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1f0b507ce9832c54fb9d27da5c76342c1d3ce168c463437465b34dd764f08a-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe424e99baadc94a9ce541de5544ee3c2345cddbae290483d7eed1e5a922e15e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe5c7d1a20bd8448e9af041bcd5ecc9678007b00befbc398e0131ebaf62e5fce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe6377d91cc18d90f85d801e76ae2b48f86b9e292d2df60ae7b1976dc7407df7-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe9ccd78fbced52dad0fd72f4ad37a27121037c3126e1e670c59b7e399d718c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea1e475a4492979a2e1696e89eac82ba6b1a4a421863d116d086a2687585238-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea49bee6c30fa89c7d9f6940b6d25eb56a0c098a7c29c1ad1dbbf7c6d8d74fd-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/feb18baa95db1537c38cfe0d7bb3ff321e6c6c7dc213e7095cc150005ec7b140-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fecf3393bbfbc2cdc135f053dbf0175dbe1af89977eb0332127998734d6e4644-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fee9c8bfe7d4e41c2183d1eef93d8949912ab23bb323f6c647f5f919d3419154-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fef2b706e41d68309baa464eec5bb87d6391a5b4ccab1ad8aec8904356ea0294-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fefe85cebedbada75d373b6965c2009bfc6ed10551c874b0475b6b16ac0bc188-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff0eafab97e670fa7685b629092c0b1a54adfaf92cef43de1e2643acf81bdbf5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff2de6b16a21f5a32db5a1b2b8b74cd7403bbbc16b5436d2e1b5c54c6d32b876-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff4ee1d31db57a1bcd8b650b00d855af9f4a26a95186fcc8e9ea333da2d61940-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff80c52ff9fe9eb5f813d95fbc93270ce8fe0a91bee0008bdaafb5dab25888c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff96f7cbad6427f9a358cff05a8d120035e433afa4585de92536fc0e2d67085b-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffa6966a9d90b11fe3e315e2d1642179675eacd4f765a6a53ec170cd5c3d0aac-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb5117943a796108572c4f416fb30ce41fbcaee840cdceb74a1182c729cbdf5-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb792cf5f0d25665080b76c23d08d2605a3f97f63eee22d20f6f801530f5218-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffddfcabec0c7d551705636d4945289c55197285c4f9abe84ed285ea9dcbb6c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffeee505136bd4d01a56c9406ab18c9066a2d52d650683f3fbe7ce195d18a53d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/fff8ef9c114ac427168a67fc4397eaab05dc33cd47570cd825235ecbc2f6d08b-a\n\n[1]+  Done                    ( clai-shim session-start --session-id=\"$CLAI_SESSION_ID\" --cwd=\"$PWD\" --shell=\"$CLAI_CURRENT_SHELL\" > /dev/null 2>&1; alia\ns -p | clai-shim alias-sync --session-id=\"$CLAI_SESSION_ID\" --shell=\"$CLAI_CURRENT_SHELL\" --stdin > /dev/null 2>&1; clai-shim import-history --shell=\"$CL\nAI_CURRENT_SHELL\" --if-not-exists > /dev/null 2>&1 )\nTEST> clai suggest --format=json\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest --format=json\",\"last_cmd_norm\":\"cla\ni <arg> --format=json\"},\"suggestions\":[]}\nTEST>  ",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Ghost text suggestion appears",
       "reason": "expected screen to contain: git status",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/058-Ghost_text_suggestion_appears.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Right arrow accepts full suggestion",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Escape clears suggestion",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Typing clears ghost text",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/007-Ghost_text_suggestion_appears.png",
+      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Alt+Right accepts next token",
       "reason": "expected screen to contain: kubectl get",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/062-Alt_Right_accepts_next_token.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Typo correction suggests on exit 127",
-      "reason": "Typo correction backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Typo correction respects similarity threshold",
-      "reason": "Typo correction backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Typo correction prioritizes high-frequency commands",
-      "reason": "Typo correction backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Slot filling learns argument values",
-      "reason": "Slot filling backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Slot filling respects frequency",
-      "reason": "Slot filling backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Slot scope repo overrides global",
-      "reason": "Slot filling backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Suggestions served from cache",
-      "reason": "Cache introspection not yet exposed in CLI",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Cache TTL expires stale entries",
-      "reason": "Cache introspection not yet exposed in CLI",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Cache invalidated on new command",
-      "reason": "Cache introspection not yet exposed in CLI",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Cache shows in debug endpoint",
-      "reason": "Cache introspection not yet exposed in CLI",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Alt+H opens suggestion picker (bash)",
-      "reason": "expected screen to match: (fzf|suggest|pick)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/073-Alt_H_opens_suggestion_picker_bash_.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search basic query",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search with repo filter",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search with limit",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search with JSON output",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search empty results",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search with special characters",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Discovery finds package.json scripts",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Discovery finds Makefile targets",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/008-Alt_Right_accepts_next_token.png",
+      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Discovery shows project_task reason",
       "reason": "expected screen to contain: project_task",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/082-Discovery_shows_project_task_reason.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Discovery finds Cargo.toml commands",
-      "reason": "Cargo discovery not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Discovery finds pyproject.toml scripts",
-      "reason": "pyproject.toml discovery not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug scores endpoint returns data",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug scores with limit parameter",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug transitions endpoint returns data",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug tasks endpoint returns discovered tasks",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug discovery-errors endpoint",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug endpoints return valid JSON",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Incognito mode toggle",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Incognito commands appear in session suggestions",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Incognito commands not in global suggestions",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "CLAI_EPHEMERAL affects suggestions",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/009-Discovery_shows_project_task_reason.png",
+      "terminal_excerpt": "{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"cd /tmp/reason-test\",\"last_cmd_norm\":\"cd <path>\"\n},\"suggestions\":[]}\nTEST>  \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Suggest API returns expected JSON structure",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/095-Suggest_API_returns_expected_JSON_structure.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Suggest API includes cache status",
-      "reason": "Cache status field not yet exposed",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Suggest API includes timing info",
-      "reason": "Timing info not yet exposed",
+      "reason": "expected screen to contain: suggestions | expected screen to match: (reason|reasons)",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/010-Suggest_API_returns_expected_JSON_structure.png",
+      "terminal_excerpt": "        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe185329db30a1a2bfe531cc2bcacf805bbf9bdc9427275f58cabf34739c5857-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe19cefda8bec9f931b536a1723266b159c0d2203e7f1eb6b3900b7b0ce69909-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1e1f3c2501cd043a2f0a717d6ce61174e3abe20f3429811eef6db4ea32e2c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1f0b507ce9832c54fb9d27da5c76342c1d3ce168c463437465b34dd764f08a-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe424e99baadc94a9ce541de5544ee3c2345cddbae290483d7eed1e5a922e15e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe5c7d1a20bd8448e9af041bcd5ecc9678007b00befbc398e0131ebaf62e5fce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe6377d91cc18d90f85d801e76ae2b48f86b9e292d2df60ae7b1976dc7407df7-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe9ccd78fbced52dad0fd72f4ad37a27121037c3126e1e670c59b7e399d718c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea1e475a4492979a2e1696e89eac82ba6b1a4a421863d116d086a2687585238-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea49bee6c30fa89c7d9f6940b6d25eb56a0c098a7c29c1ad1dbbf7c6d8d74fd-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/feb18baa95db1537c38cfe0d7bb3ff321e6c6c7dc213e7095cc150005ec7b140-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fecf3393bbfbc2cdc135f053dbf0175dbe1af89977eb0332127998734d6e4644-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fee9c8bfe7d4e41c2183d1eef93d8949912ab23bb323f6c647f5f919d3419154-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fef2b706e41d68309baa464eec5bb87d6391a5b4ccab1ad8aec8904356ea0294-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fefe85cebedbada75d373b6965c2009bfc6ed10551c874b0475b6b16ac0bc188-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff0eafab97e670fa7685b629092c0b1a54adfaf92cef43de1e2643acf81bdbf5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff2de6b16a21f5a32db5a1b2b8b74cd7403bbbc16b5436d2e1b5c54c6d32b876-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff4ee1d31db57a1bcd8b650b00d855af9f4a26a95186fcc8e9ea333da2d61940-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff80c52ff9fe9eb5f813d95fbc93270ce8fe0a91bee0008bdaafb5dab25888c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff96f7cbad6427f9a358cff05a8d120035e433afa4585de92536fc0e2d67085b-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffa6966a9d90b11fe3e315e2d1642179675eacd4f765a6a53ec170cd5c3d0aac-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb5117943a796108572c4f416fb30ce41fbcaee840cdceb74a1182c729cbdf5-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb792cf5f0d25665080b76c23d08d2605a3f97f63eee22d20f6f801530f5218-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffddfcabec0c7d551705636d4945289c55197285c4f9abe84ed285ea9dcbb6c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffeee505136bd4d01a56c9406ab18c9066a2d52d650683f3fbe7ce195d18a53d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/fff8ef9c114ac427168a67fc4397eaab05dc33cd47570cd825235ecbc2f6d08b-a\n\n[1]+  Done                    ( clai-shim session-start --session-id=\"$CLAI_SESSION_ID\" --cwd=\"$PWD\" --shell=\"$CLAI_CURRENT_SHELL\" > /dev/null 2>&1; alia\ns -p | clai-shim alias-sync --session-id=\"$CLAI_SESSION_ID\" --shell=\"$CLAI_CURRENT_SHELL\" --stdin > /dev/null 2>&1; clai-shim import-history --shell=\"$CL\nAI_CURRENT_SHELL\" --if-not-exists > /dev/null 2>&1 )\nTEST> make build\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:13Z\" -o bin/clai ./cmd/clai\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:13Z\" -o bin/claid ./cmd/claid\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:13Z\" -o bin/clai-shim ./cmd/clai-shim\ngo build -ldflags \"-X main.Version=10330b2d-dirty -X main.GitCommit=10330b2d -X main.BuildDate=2026-02-20T08:30:13Z\" -o bin/clai-picker ./cmd/clai-picker\nTEST> clai suggest --format=json\n ",
       "plan": "suggestions-tests.yaml"
     }
   ]

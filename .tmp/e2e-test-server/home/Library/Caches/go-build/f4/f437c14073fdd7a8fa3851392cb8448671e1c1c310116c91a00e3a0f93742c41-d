@@ -1,0 +1,567 @@
+=== RUN   TestSQLiteStore_GetCached_Hit
+=== PAUSE TestSQLiteStore_GetCached_Hit
+=== NAME  
+=== RUN   TestSQLiteStore_GetCached_Miss
+=== PAUSE TestSQLiteStore_GetCached_Miss
+=== NAME  
+=== RUN   TestSQLiteStore_GetCached_Expired
+=== PAUSE TestSQLiteStore_GetCached_Expired
+=== NAME  
+=== RUN   TestSQLiteStore_GetCached_EmptyKey
+=== PAUSE TestSQLiteStore_GetCached_EmptyKey
+=== NAME  
+=== RUN   TestSQLiteStore_GetCached_IncrementsHitCount
+=== PAUSE TestSQLiteStore_GetCached_IncrementsHitCount
+=== NAME  
+=== RUN   TestSQLiteStore_SetCached_Success
+=== PAUSE TestSQLiteStore_SetCached_Success
+=== NAME  
+=== RUN   TestSQLiteStore_SetCached_DefaultTTL
+=== PAUSE TestSQLiteStore_SetCached_DefaultTTL
+=== NAME  
+=== RUN   TestSQLiteStore_SetCached_Upsert
+=== PAUSE TestSQLiteStore_SetCached_Upsert
+=== NAME  
+=== RUN   TestSQLiteStore_SetCached_Validation
+=== PAUSE TestSQLiteStore_SetCached_Validation
+=== NAME  
+=== RUN   TestSQLiteStore_PruneExpiredCache_RemovesExpired
+=== PAUSE TestSQLiteStore_PruneExpiredCache_RemovesExpired
+=== NAME  
+=== RUN   TestSQLiteStore_PruneExpiredCache_NoExpired
+=== PAUSE TestSQLiteStore_PruneExpiredCache_NoExpired
+=== NAME  
+=== RUN   TestSQLiteStore_GetCacheStats
+=== PAUSE TestSQLiteStore_GetCacheStats
+=== NAME  
+=== RUN   TestSQLiteStore_CreateCommand_Success
+=== PAUSE TestSQLiteStore_CreateCommand_Success
+=== NAME  
+=== RUN   TestSQLiteStore_CreateCommand_AutoNormalization
+=== PAUSE TestSQLiteStore_CreateCommand_AutoNormalization
+=== NAME  
+=== RUN   TestSQLiteStore_CreateCommand_InvalidSessionID
+=== PAUSE TestSQLiteStore_CreateCommand_InvalidSessionID
+=== NAME  
+=== RUN   TestSQLiteStore_CreateCommand_Validation
+=== PAUSE TestSQLiteStore_CreateCommand_Validation
+=== NAME  
+=== RUN   TestSQLiteStore_UpdateCommandEnd_Success
+=== PAUSE TestSQLiteStore_UpdateCommandEnd_Success
+=== NAME  
+=== RUN   TestSQLiteStore_UpdateCommandEnd_FailedCommand
+=== PAUSE TestSQLiteStore_UpdateCommandEnd_FailedCommand
+=== NAME  
+=== RUN   TestSQLiteStore_UpdateCommandEnd_NotFound
+=== PAUSE TestSQLiteStore_UpdateCommandEnd_NotFound
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_BySession
+=== PAUSE TestSQLiteStore_QueryCommands_BySession
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_ByCWD
+=== PAUSE TestSQLiteStore_QueryCommands_ByCWD
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_ByPrefix
+=== PAUSE TestSQLiteStore_QueryCommands_ByPrefix
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_WithOffset
+=== PAUSE TestSQLiteStore_QueryCommands_WithOffset
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_EmptyResult
+=== PAUSE TestSQLiteStore_QueryCommands_EmptyResult
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_Limit
+=== PAUSE TestSQLiteStore_QueryCommands_Limit
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_OrderByRecent
+=== PAUSE TestSQLiteStore_QueryCommands_OrderByRecent
+=== NAME  
+=== RUN   TestNormalizeCommand
+=== PAUSE TestNormalizeCommand
+=== NAME  
+=== RUN   TestHashCommand
+=== PAUSE TestHashCommand
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_SuccessOnly
+=== PAUSE TestSQLiteStore_QueryCommands_SuccessOnly
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_FailureOnly
+=== PAUSE TestSQLiteStore_QueryCommands_FailureOnly
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_Substring
+=== PAUSE TestSQLiteStore_QueryCommands_Substring
+=== NAME  
+=== RUN   TestSQLiteStore_QueryHistoryCommands_Deduplication
+=== PAUSE TestSQLiteStore_QueryHistoryCommands_Deduplication
+=== NAME  
+=== RUN   TestSQLiteStore_QueryHistoryCommands_KeepsMostRecent
+=== PAUSE TestSQLiteStore_QueryHistoryCommands_KeepsMostRecent
+=== NAME  
+=== RUN   TestSQLiteStore_QueryHistoryCommands_SessionScoped
+=== PAUSE TestSQLiteStore_QueryHistoryCommands_SessionScoped
+=== NAME  
+=== RUN   TestSQLiteStore_QueryHistoryCommands_SubstringFilter
+=== PAUSE TestSQLiteStore_QueryHistoryCommands_SubstringFilter
+=== NAME  
+=== RUN   TestSQLiteStore_QueryHistoryCommands_Pagination
+=== PAUSE TestSQLiteStore_QueryHistoryCommands_Pagination
+=== NAME  
+=== RUN   TestSQLiteStore_QueryHistoryCommands_EmptyResult
+=== PAUSE TestSQLiteStore_QueryHistoryCommands_EmptyResult
+=== NAME  
+=== RUN   TestSQLiteStore_QueryHistoryCommands_DoesNotCollapseNormalizedArgs
+=== PAUSE TestSQLiteStore_QueryHistoryCommands_DoesNotCollapseNormalizedArgs
+=== NAME  
+=== RUN   TestSQLiteStore_QueryCommands_StatusWithOtherFilters
+=== PAUSE TestSQLiteStore_QueryCommands_StatusWithOtherFilters
+=== NAME  
+=== RUN   TestNewSQLiteStore_CreatesDatabase
+=== PAUSE TestNewSQLiteStore_CreatesDatabase
+=== NAME  
+=== RUN   TestNewSQLiteStore_CreatesDirectory
+=== PAUSE TestNewSQLiteStore_CreatesDirectory
+=== NAME  
+=== RUN   TestSQLiteStore_Migration_CreatesSchema
+=== PAUSE TestSQLiteStore_Migration_CreatesSchema
+=== NAME  
+=== RUN   TestSQLiteStore_WALMode_Enabled
+=== PAUSE TestSQLiteStore_WALMode_Enabled
+=== NAME  
+=== RUN   TestSQLiteStore_ForeignKeys_Enabled
+=== PAUSE TestSQLiteStore_ForeignKeys_Enabled
+=== NAME  
+=== RUN   TestSQLiteStore_Close
+=== PAUSE TestSQLiteStore_Close
+=== NAME  
+=== RUN   TestSQLiteStore_ConcurrentWrites_Safe
+=== PAUSE TestSQLiteStore_ConcurrentWrites_Safe
+=== NAME  
+=== RUN   TestDefaultDBPath
+--- PASS: TestDefaultDBPath (0.00s)
+=== NAME  
+=== RUN   TestImportSessionID
+--- PASS: TestImportSessionID (0.00s)
+=== NAME  
+=== RUN   TestHasImportedHistory_Empty
+--- PASS: TestHasImportedHistory_Empty (0.06s)
+=== NAME  
+=== RUN   TestHasImportedHistory_AfterImport
+--- PASS: TestHasImportedHistory_AfterImport (0.05s)
+=== NAME  
+=== RUN   TestImportHistory_Basic
+--- PASS: TestImportHistory_Basic (0.05s)
+=== NAME  
+=== RUN   TestImportHistory_Empty
+--- PASS: TestImportHistory_Empty (0.05s)
+=== NAME  
+=== RUN   TestImportHistory_SkipsEmptyCommands
+--- PASS: TestImportHistory_SkipsEmptyCommands (0.05s)
+=== NAME  
+=== RUN   TestImportHistory_ReplacesExisting
+--- PASS: TestImportHistory_ReplacesExisting (0.05s)
+=== NAME  
+=== RUN   TestImportHistory_DifferentShellsIndependent
+--- PASS: TestImportHistory_DifferentShellsIndependent (0.06s)
+=== NAME  
+=== RUN   TestImportHistory_NoTimestamps
+--- PASS: TestImportHistory_NoTimestamps (0.06s)
+=== NAME  
+=== RUN   TestImportHistory_CommandMetadata
+--- PASS: TestImportHistory_CommandMetadata (0.06s)
+=== NAME  
+=== RUN   TestSQLiteStore_CreateSession_Success
+=== PAUSE TestSQLiteStore_CreateSession_Success
+=== NAME  
+=== RUN   TestSQLiteStore_CreateSession_MinimalFields
+=== PAUSE TestSQLiteStore_CreateSession_MinimalFields
+=== NAME  
+=== RUN   TestSQLiteStore_CreateSession_DuplicateID
+=== PAUSE TestSQLiteStore_CreateSession_DuplicateID
+=== NAME  
+=== RUN   TestSQLiteStore_CreateSession_Validation
+=== PAUSE TestSQLiteStore_CreateSession_Validation
+=== NAME  
+=== RUN   TestSQLiteStore_EndSession_Success
+=== PAUSE TestSQLiteStore_EndSession_Success
+=== NAME  
+=== RUN   TestSQLiteStore_EndSession_NotFound
+=== PAUSE TestSQLiteStore_EndSession_NotFound
+=== NAME  
+=== RUN   TestSQLiteStore_EndSession_EmptyID
+=== PAUSE TestSQLiteStore_EndSession_EmptyID
+=== NAME  
+=== RUN   TestSQLiteStore_GetSession_Success
+=== PAUSE TestSQLiteStore_GetSession_Success
+=== NAME  
+=== RUN   TestSQLiteStore_GetSession_NotFound
+=== PAUSE TestSQLiteStore_GetSession_NotFound
+=== NAME  
+=== RUN   TestSQLiteStore_GetSession_EmptyID
+=== PAUSE TestSQLiteStore_GetSession_EmptyID
+=== NAME  
+=== RUN   TestSQLiteStore_Session_WithEndedAt
+=== PAUSE TestSQLiteStore_Session_WithEndedAt
+=== NAME  
+=== RUN   TestSQLiteStore_GetSessionByPrefix_Success
+=== PAUSE TestSQLiteStore_GetSessionByPrefix_Success
+=== NAME  
+=== RUN   TestSQLiteStore_GetSessionByPrefix_NotFound
+=== PAUSE TestSQLiteStore_GetSessionByPrefix_NotFound
+=== NAME  
+=== RUN   TestSQLiteStore_GetSessionByPrefix_Ambiguous
+=== PAUSE TestSQLiteStore_GetSessionByPrefix_Ambiguous
+=== NAME  
+=== RUN   TestSQLiteStore_GetSessionByPrefix_EmptyPrefix
+=== PAUSE TestSQLiteStore_GetSessionByPrefix_EmptyPrefix
+=== NAME  
+=== RUN   TestCreateWorkflowRun_Success
+=== PAUSE TestCreateWorkflowRun_Success
+=== NAME  
+=== RUN   TestCreateWorkflowRun_DuplicateID
+=== PAUSE TestCreateWorkflowRun_DuplicateID
+=== NAME  
+=== RUN   TestCreateWorkflowRun_Validation
+=== PAUSE TestCreateWorkflowRun_Validation
+=== NAME  
+=== RUN   TestUpdateWorkflowRun_Success
+=== PAUSE TestUpdateWorkflowRun_Success
+=== NAME  
+=== RUN   TestUpdateWorkflowRun_NotFound
+=== PAUSE TestUpdateWorkflowRun_NotFound
+=== NAME  
+=== RUN   TestGetWorkflowRun_NotFound
+=== PAUSE TestGetWorkflowRun_NotFound
+=== NAME  
+=== RUN   TestGetWorkflowRun_EmptyID
+=== PAUSE TestGetWorkflowRun_EmptyID
+=== NAME  
+=== RUN   TestQueryWorkflowRuns_All
+=== PAUSE TestQueryWorkflowRuns_All
+=== NAME  
+=== RUN   TestQueryWorkflowRuns_FilterByName
+=== PAUSE TestQueryWorkflowRuns_FilterByName
+=== NAME  
+=== RUN   TestQueryWorkflowRuns_FilterByStatus
+=== PAUSE TestQueryWorkflowRuns_FilterByStatus
+=== NAME  
+=== RUN   TestQueryWorkflowRuns_Pagination
+=== PAUSE TestQueryWorkflowRuns_Pagination
+=== NAME  
+=== RUN   TestCreateWorkflowStep_Success
+=== PAUSE TestCreateWorkflowStep_Success
+=== NAME  
+=== RUN   TestCreateWorkflowStep_CompositeKey
+=== PAUSE TestCreateWorkflowStep_CompositeKey
+=== NAME  
+=== RUN   TestCreateWorkflowStep_Validation
+=== PAUSE TestCreateWorkflowStep_Validation
+=== NAME  
+=== RUN   TestUpdateWorkflowStep_Success
+=== PAUSE TestUpdateWorkflowStep_Success
+=== NAME  
+=== RUN   TestUpdateWorkflowStep_NotFound
+=== PAUSE TestUpdateWorkflowStep_NotFound
+=== NAME  
+=== RUN   TestGetWorkflowStep_NotFound
+=== PAUSE TestGetWorkflowStep_NotFound
+=== NAME  
+=== RUN   TestGetWorkflowStep_Validation
+=== PAUSE TestGetWorkflowStep_Validation
+=== NAME  
+=== RUN   TestCreateWorkflowAnalysis_Success
+=== PAUSE TestCreateWorkflowAnalysis_Success
+=== NAME  
+=== RUN   TestCreateWorkflowAnalysis_MultipleForSameStep
+=== PAUSE TestCreateWorkflowAnalysis_MultipleForSameStep
+=== NAME  
+=== RUN   TestCreateWorkflowAnalysis_Validation
+=== PAUSE TestCreateWorkflowAnalysis_Validation
+=== NAME  
+=== RUN   TestGetWorkflowAnalyses_Empty
+=== PAUSE TestGetWorkflowAnalyses_Empty
+=== NAME  
+=== RUN   TestGetWorkflowAnalyses_Validation
+=== PAUSE TestGetWorkflowAnalyses_Validation
+=== NAME  
+=== RUN   TestMigrationV3_CreatesWorkflowTables
+=== PAUSE TestMigrationV3_CreatesWorkflowTables
+=== NAME  
+=== CONT  TestSQLiteStore_GetCached_Hit
+=== CONT  TestSQLiteStore_Close
+=== CONT  TestUpdateWorkflowRun_Success
+=== CONT  TestCreateWorkflowStep_Validation
+=== CONT  TestSQLiteStore_QueryCommands_ByPrefix
+=== CONT  TestSQLiteStore_PruneExpiredCache_NoExpired
+=== CONT  TestCreateWorkflowRun_Validation
+=== CONT  TestCreateWorkflowStep_CompositeKey
+=== CONT  TestGetWorkflowStep_NotFound
+=== CONT  TestCreateWorkflowStep_Success
+--- PASS: TestSQLiteStore_Close (0.23s)
+=== CONT  TestSQLiteStore_WALMode_Enabled
+--- PASS: TestCreateWorkflowStep_Success (0.24s)
+=== CONT  TestNewSQLiteStore_CreatesDirectory
+--- PASS: TestCreateWorkflowStep_CompositeKey (0.24s)
+=== CONT  TestNewSQLiteStore_CreatesDatabase
+--- PASS: TestCreateWorkflowRun_Validation (0.25s)
+=== CONT  TestSQLiteStore_QueryCommands_StatusWithOtherFilters
+--- PASS: TestUpdateWorkflowRun_Success (0.26s)
+=== CONT  TestSQLiteStore_QueryHistoryCommands_DoesNotCollapseNormalizedArgs
+--- PASS: TestSQLiteStore_PruneExpiredCache_NoExpired (0.27s)
+=== CONT  TestSQLiteStore_Migration_CreatesSchema
+--- PASS: TestSQLiteStore_GetCached_Hit (0.27s)
+=== CONT  TestSQLiteStore_QueryHistoryCommands_Pagination
+--- PASS: TestGetWorkflowStep_NotFound (0.27s)
+=== CONT  TestSQLiteStore_QueryHistoryCommands_SubstringFilter
+--- PASS: TestSQLiteStore_QueryCommands_ByPrefix (0.27s)
+=== CONT  TestSQLiteStore_QueryHistoryCommands_SessionScoped
+--- PASS: TestCreateWorkflowStep_Validation (0.28s)
+=== CONT  TestSQLiteStore_QueryHistoryCommands_KeepsMostRecent
+--- PASS: TestSQLiteStore_WALMode_Enabled (0.23s)
+=== CONT  TestSQLiteStore_QueryHistoryCommands_EmptyResult
+--- PASS: TestNewSQLiteStore_CreatesDatabase (0.22s)
+=== CONT  TestSQLiteStore_QueryHistoryCommands_Deduplication
+--- PASS: TestNewSQLiteStore_CreatesDirectory (0.22s)
+=== CONT  TestSQLiteStore_QueryCommands_FailureOnly
+--- PASS: TestSQLiteStore_QueryHistoryCommands_DoesNotCollapseNormalizedArgs (0.22s)
+=== CONT  TestSQLiteStore_QueryCommands_SuccessOnly
+--- PASS: TestSQLiteStore_QueryHistoryCommands_Pagination (0.21s)
+=== CONT  TestSQLiteStore_QueryCommands_Substring
+--- PASS: TestSQLiteStore_Migration_CreatesSchema (0.22s)
+=== CONT  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/simple_command
+=== PAUSE TestNormalizeCommand/simple_command
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/command_with_flags
+=== PAUSE TestNormalizeCommand/command_with_flags
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/uppercase_to_lowercase
+=== PAUSE TestNormalizeCommand/uppercase_to_lowercase
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/trim_whitespace
+=== PAUSE TestNormalizeCommand/trim_whitespace
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/path_normalization
+=== PAUSE TestNormalizeCommand/path_normalization
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/home_path_normalization
+=== PAUSE TestNormalizeCommand/home_path_normalization
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/url_normalization
+=== PAUSE TestNormalizeCommand/url_normalization
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/number_normalization
+=== PAUSE TestNormalizeCommand/number_normalization
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/complex_command
+=== PAUSE TestNormalizeCommand/complex_command
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/empty_string
+=== PAUSE TestNormalizeCommand/empty_string
+=== NAME  TestNormalizeCommand
+=== RUN   TestNormalizeCommand/only_whitespace
+=== PAUSE TestNormalizeCommand/only_whitespace
+=== NAME  TestNormalizeCommand
+=== CONT  TestHashCommand
+--- PASS: TestHashCommand (0.00s)
+=== CONT  TestSQLiteStore_QueryCommands_OrderByRecent
+--- PASS: TestSQLiteStore_QueryHistoryCommands_KeepsMostRecent (0.21s)
+=== CONT  TestSQLiteStore_QueryCommands_EmptyResult
+--- PASS: TestSQLiteStore_QueryCommands_StatusWithOtherFilters (0.24s)
+=== CONT  TestSQLiteStore_QueryCommands_Limit
+--- PASS: TestSQLiteStore_QueryHistoryCommands_SessionScoped (0.23s)
+=== CONT  TestSQLiteStore_UpdateCommandEnd_Success
+=== CONT  TestSQLiteStore_QueryCommands_ByCWD
+--- PASS: TestSQLiteStore_QueryHistoryCommands_SubstringFilter (0.23s)
+=== CONT  TestSQLiteStore_QueryCommands_BySession
+--- PASS: TestSQLiteStore_QueryHistoryCommands_EmptyResult (0.21s)
+=== CONT  TestSQLiteStore_UpdateCommandEnd_NotFound
+--- PASS: TestSQLiteStore_QueryHistoryCommands_Deduplication (0.21s)
+=== CONT  TestSQLiteStore_QueryCommands_WithOffset
+--- PASS: TestSQLiteStore_QueryCommands_FailureOnly (0.22s)
+=== CONT  TestCreateWorkflowAnalysis_MultipleForSameStep
+--- PASS: TestSQLiteStore_QueryCommands_EmptyResult (0.20s)
+--- PASS: TestSQLiteStore_QueryCommands_SuccessOnly (0.21s)
+=== CONT  TestMigrationV3_CreatesWorkflowTables
+--- PASS: TestSQLiteStore_QueryCommands_OrderByRecent (0.21s)
+=== CONT  TestGetWorkflowAnalyses_Validation
+--- PASS: TestSQLiteStore_UpdateCommandEnd_Success (0.20s)
+=== CONT  TestGetWorkflowAnalyses_Empty
+--- PASS: TestSQLiteStore_QueryCommands_ByCWD (0.21s)
+=== CONT  TestCreateWorkflowAnalysis_Validation
+--- PASS: TestSQLiteStore_QueryCommands_Substring (0.24s)
+=== CONT  TestCreateWorkflowAnalysis_Success
+--- PASS: TestSQLiteStore_QueryCommands_Limit (0.23s)
+=== CONT  TestGetWorkflowStep_Validation
+--- PASS: TestSQLiteStore_QueryCommands_BySession (0.19s)
+=== CONT  TestSQLiteStore_EndSession_NotFound
+--- PASS: TestSQLiteStore_UpdateCommandEnd_NotFound (0.19s)
+=== CONT  TestCreateWorkflowRun_DuplicateID
+=== CONT  TestCreateWorkflowRun_Success
+--- PASS: TestMigrationV3_CreatesWorkflowTables (0.18s)
+--- PASS: TestCreateWorkflowAnalysis_MultipleForSameStep (0.19s)
+=== CONT  TestSQLiteStore_GetSessionByPrefix_EmptyPrefix
+--- PASS: TestGetWorkflowAnalyses_Validation (0.18s)
+=== CONT  TestSQLiteStore_GetSessionByPrefix_Ambiguous
+--- PASS: TestGetWorkflowAnalyses_Empty (0.19s)
+=== CONT  TestSQLiteStore_GetSessionByPrefix_NotFound
+--- PASS: TestSQLiteStore_QueryCommands_WithOffset (0.23s)
+=== CONT  TestSQLiteStore_Session_WithEndedAt
+=== CONT  TestSQLiteStore_GetSessionByPrefix_Success
+--- PASS: TestCreateWorkflowAnalysis_Validation (0.20s)
+--- PASS: TestGetWorkflowStep_Validation (0.20s)
+=== CONT  TestSQLiteStore_GetSession_EmptyID
+--- PASS: TestCreateWorkflowAnalysis_Success (0.20s)
+=== CONT  TestSQLiteStore_GetSession_NotFound
+--- PASS: TestSQLiteStore_EndSession_NotFound (0.20s)
+=== CONT  TestSQLiteStore_EndSession_EmptyID
+=== CONT  TestUpdateWorkflowStep_NotFound
+--- PASS: TestCreateWorkflowRun_DuplicateID (0.20s)
+--- PASS: TestCreateWorkflowRun_Success (0.20s)
+=== CONT  TestUpdateWorkflowStep_Success
+--- PASS: TestSQLiteStore_GetSessionByPrefix_Ambiguous (0.21s)
+=== CONT  TestGetWorkflowRun_NotFound
+=== CONT  TestQueryWorkflowRuns_FilterByStatus
+--- PASS: TestSQLiteStore_GetSessionByPrefix_EmptyPrefix (0.21s)
+--- PASS: TestSQLiteStore_GetSessionByPrefix_NotFound (0.21s)
+=== CONT  TestQueryWorkflowRuns_Pagination
+=== CONT  TestQueryWorkflowRuns_All
+--- PASS: TestSQLiteStore_GetSessionByPrefix_Success (0.19s)
+--- PASS: TestSQLiteStore_Session_WithEndedAt (0.19s)
+=== CONT  TestGetWorkflowRun_EmptyID
+--- PASS: TestSQLiteStore_GetSession_EmptyID (0.19s)
+=== CONT  TestSQLiteStore_CreateCommand_AutoNormalization
+--- PASS: TestSQLiteStore_GetSession_NotFound (0.19s)
+=== CONT  TestSQLiteStore_CreateCommand_Validation
+--- PASS: TestSQLiteStore_EndSession_EmptyID (0.19s)
+=== CONT  TestSQLiteStore_CreateCommand_InvalidSessionID
+--- PASS: TestUpdateWorkflowStep_NotFound (0.19s)
+=== CONT  TestQueryWorkflowRuns_FilterByName
+=== CONT  TestUpdateWorkflowRun_NotFound
+--- PASS: TestUpdateWorkflowStep_Success (0.19s)
+--- PASS: TestGetWorkflowRun_NotFound (0.19s)
+=== CONT  TestSQLiteStore_SetCached_Upsert
+--- PASS: TestQueryWorkflowRuns_FilterByStatus (0.20s)
+=== CONT  TestSQLiteStore_UpdateCommandEnd_FailedCommand
+--- PASS: TestGetWorkflowRun_EmptyID (0.19s)
+=== CONT  TestSQLiteStore_PruneExpiredCache_RemovesExpired
+--- PASS: TestSQLiteStore_CreateCommand_AutoNormalization (0.19s)
+=== CONT  TestSQLiteStore_SetCached_Validation
+--- PASS: TestQueryWorkflowRuns_Pagination (0.20s)
+=== CONT  TestSQLiteStore_SetCached_DefaultTTL
+=== RUN   TestSQLiteStore_CreateCommand_Validation/nil_command
+--- PASS: TestSQLiteStore_CreateCommand_Validation/nil_command (0.00s)
+=== NAME  TestSQLiteStore_CreateCommand_Validation
+=== RUN   TestSQLiteStore_CreateCommand_Validation/missing_command_id
+--- PASS: TestSQLiteStore_CreateCommand_Validation/missing_command_id (0.00s)
+=== NAME  TestSQLiteStore_CreateCommand_Validation
+=== RUN   TestSQLiteStore_CreateCommand_Validation/missing_session_id
+--- PASS: TestSQLiteStore_CreateCommand_Validation/missing_session_id (0.00s)
+=== NAME  TestSQLiteStore_CreateCommand_Validation
+=== RUN   TestSQLiteStore_CreateCommand_Validation/missing_cwd
+--- PASS: TestSQLiteStore_CreateCommand_Validation/missing_cwd (0.00s)
+=== NAME  TestSQLiteStore_CreateCommand_Validation
+=== RUN   TestSQLiteStore_CreateCommand_Validation/missing_command
+--- PASS: TestSQLiteStore_CreateCommand_Validation/missing_command (0.00s)
+=== NAME  TestSQLiteStore_CreateCommand_Validation
+--- PASS: TestQueryWorkflowRuns_All (0.20s)
+=== CONT  TestSQLiteStore_SetCached_Success
+--- PASS: TestSQLiteStore_CreateCommand_Validation (0.19s)
+=== CONT  TestSQLiteStore_GetCached_IncrementsHitCount
+--- PASS: TestSQLiteStore_CreateCommand_InvalidSessionID (0.19s)
+=== CONT  TestSQLiteStore_GetCached_Expired
+=== CONT  TestSQLiteStore_GetCached_Miss
+--- PASS: TestQueryWorkflowRuns_FilterByName (0.19s)
+--- PASS: TestUpdateWorkflowRun_NotFound (0.18s)
+=== CONT  TestSQLiteStore_GetCached_EmptyKey
+=== CONT  TestSQLiteStore_CreateCommand_Success
+--- PASS: TestSQLiteStore_SetCached_Upsert (0.19s)
+=== RUN   TestSQLiteStore_SetCached_Validation/nil_entry
+--- PASS: TestSQLiteStore_SetCached_Validation/nil_entry (0.00s)
+=== NAME  TestSQLiteStore_SetCached_Validation
+=== RUN   TestSQLiteStore_SetCached_Validation/missing_cache_key
+--- PASS: TestSQLiteStore_SetCached_Validation/missing_cache_key (0.00s)
+=== NAME  TestSQLiteStore_SetCached_Validation
+=== RUN   TestSQLiteStore_SetCached_Validation/missing_response_json
+--- PASS: TestSQLiteStore_SetCached_Validation/missing_response_json (0.00s)
+=== NAME  TestSQLiteStore_SetCached_Validation
+=== RUN   TestSQLiteStore_SetCached_Validation/missing_provider
+--- PASS: TestSQLiteStore_SetCached_Validation/missing_provider (0.00s)
+=== NAME  TestSQLiteStore_SetCached_Validation
+--- PASS: TestSQLiteStore_SetCached_Validation (0.19s)
+=== CONT  TestSQLiteStore_GetCacheStats
+--- PASS: TestSQLiteStore_UpdateCommandEnd_FailedCommand (0.19s)
+=== CONT  TestSQLiteStore_GetSession_Success
+--- PASS: TestSQLiteStore_SetCached_DefaultTTL (0.19s)
+=== CONT  TestSQLiteStore_EndSession_Success
+=== CONT  TestSQLiteStore_CreateSession_DuplicateID
+--- PASS: TestSQLiteStore_PruneExpiredCache_RemovesExpired (0.20s)
+--- PASS: TestSQLiteStore_SetCached_Success (0.20s)
+=== CONT  TestSQLiteStore_CreateSession_Validation
+--- PASS: TestSQLiteStore_GetCached_IncrementsHitCount (0.20s)
+=== CONT  TestSQLiteStore_CreateSession_Success
+=== CONT  TestSQLiteStore_CreateSession_MinimalFields
+--- PASS: TestSQLiteStore_GetCached_Expired (0.25s)
+=== CONT  TestSQLiteStore_ConcurrentWrites_Safe
+--- PASS: TestSQLiteStore_GetCached_Miss (0.25s)
+--- PASS: TestSQLiteStore_GetCached_EmptyKey (0.25s)
+=== CONT  TestSQLiteStore_ForeignKeys_Enabled
+--- PASS: TestSQLiteStore_CreateCommand_Success (0.25s)
+=== CONT  TestNormalizeCommand/simple_command
+--- PASS: TestNormalizeCommand/simple_command (0.00s)
+=== CONT  TestNormalizeCommand/only_whitespace
+--- PASS: TestNormalizeCommand/only_whitespace (0.00s)
+=== CONT  TestNormalizeCommand/empty_string
+--- PASS: TestNormalizeCommand/empty_string (0.00s)
+=== CONT  TestNormalizeCommand/complex_command
+--- PASS: TestNormalizeCommand/complex_command (0.00s)
+=== CONT  TestNormalizeCommand/number_normalization
+--- PASS: TestNormalizeCommand/number_normalization (0.00s)
+=== CONT  TestNormalizeCommand/home_path_normalization
+--- PASS: TestNormalizeCommand/home_path_normalization (0.00s)
+=== CONT  TestNormalizeCommand/path_normalization
+--- PASS: TestNormalizeCommand/path_normalization (0.00s)
+=== CONT  TestNormalizeCommand/url_normalization
+--- PASS: TestNormalizeCommand/url_normalization (0.00s)
+=== CONT  TestNormalizeCommand/trim_whitespace
+--- PASS: TestNormalizeCommand/trim_whitespace (0.00s)
+=== CONT  TestNormalizeCommand/uppercase_to_lowercase
+--- PASS: TestNormalizeCommand/uppercase_to_lowercase (0.00s)
+=== CONT  TestNormalizeCommand/command_with_flags
+--- PASS: TestNormalizeCommand/command_with_flags (0.00s)
+--- PASS: TestNormalizeCommand (0.00s)
+--- PASS: TestSQLiteStore_GetSession_Success (0.24s)
+--- PASS: TestSQLiteStore_GetCacheStats (0.25s)
+=== RUN   TestSQLiteStore_CreateSession_Validation/nil_session
+=== PAUSE TestSQLiteStore_CreateSession_Validation/nil_session
+=== NAME  TestSQLiteStore_CreateSession_Validation
+=== RUN   TestSQLiteStore_CreateSession_Validation/missing_session_id
+=== PAUSE TestSQLiteStore_CreateSession_Validation/missing_session_id
+=== NAME  TestSQLiteStore_CreateSession_Validation
+=== RUN   TestSQLiteStore_CreateSession_Validation/missing_shell
+=== PAUSE TestSQLiteStore_CreateSession_Validation/missing_shell
+=== NAME  TestSQLiteStore_CreateSession_Validation
+=== RUN   TestSQLiteStore_CreateSession_Validation/missing_os
+=== PAUSE TestSQLiteStore_CreateSession_Validation/missing_os
+=== NAME  TestSQLiteStore_CreateSession_Validation
+--- PASS: TestSQLiteStore_EndSession_Success (0.24s)
+=== RUN   TestSQLiteStore_CreateSession_Validation/missing_initial_cwd
+=== PAUSE TestSQLiteStore_CreateSession_Validation/missing_initial_cwd
+=== NAME  TestSQLiteStore_CreateSession_Validation
+=== CONT  TestSQLiteStore_CreateSession_Validation/missing_session_id
+--- PASS: TestSQLiteStore_CreateSession_Validation/missing_session_id (0.00s)
+=== CONT  TestSQLiteStore_CreateSession_Validation/missing_os
+--- PASS: TestSQLiteStore_CreateSession_Validation/missing_os (0.00s)
+=== CONT  TestSQLiteStore_CreateSession_Validation/missing_shell
+--- PASS: TestSQLiteStore_CreateSession_Validation/missing_shell (0.00s)
+=== CONT  TestSQLiteStore_CreateSession_Validation/nil_session
+--- PASS: TestSQLiteStore_CreateSession_Validation/nil_session (0.00s)
+=== CONT  TestSQLiteStore_CreateSession_Validation/missing_initial_cwd
+--- PASS: TestSQLiteStore_CreateSession_Validation/missing_initial_cwd (0.00s)
+--- PASS: TestSQLiteStore_CreateSession_Validation (0.24s)
+--- PASS: TestSQLiteStore_CreateSession_DuplicateID (0.24s)
+--- PASS: TestSQLiteStore_CreateSession_Success (0.24s)
+--- PASS: TestSQLiteStore_CreateSession_MinimalFields (0.14s)
+--- PASS: TestSQLiteStore_ForeignKeys_Enabled (0.12s)
+--- PASS: TestSQLiteStore_ConcurrentWrites_Safe (0.27s)
+PASS
+ok  	github.com/runger/clai/internal/storage	5.740s

@@ -1,0 +1,9 @@
+./history_provider.go
+./model.go
+./provider.go
+./sanitize.go
+./suggest_provider.go
+./history_provider_test.go
+./model_test.go
+./sanitize_test.go
+./suggest_provider_test.go

@@ -1,0 +1,502 @@
+=== RUN   TestHistoryProvider_BasicFetch
+=== PAUSE TestHistoryProvider_BasicFetch
+=== NAME  
+=== RUN   TestHistoryProvider_Timeout
+=== PAUSE TestHistoryProvider_Timeout
+=== NAME  
+=== RUN   TestHistoryProvider_EmptyResults
+=== PAUSE TestHistoryProvider_EmptyResults
+=== NAME  
+=== RUN   TestHistoryProvider_ANSIStripping
+=== PAUSE TestHistoryProvider_ANSIStripping
+=== NAME  
+=== RUN   TestHistoryProvider_SessionScoping
+=== PAUSE TestHistoryProvider_SessionScoping
+=== NAME  
+=== RUN   TestHistoryProvider_SessionKeyFallback
+=== PAUSE TestHistoryProvider_SessionKeyFallback
+=== NAME  
+=== RUN   TestHistoryProvider_SessionIDTakesPrecedence
+=== PAUSE TestHistoryProvider_SessionIDTakesPrecedence
+=== NAME  
+=== RUN   TestHistoryProvider_GlobalFlag
+=== PAUSE TestHistoryProvider_GlobalFlag
+=== NAME  
+=== RUN   TestHistoryProvider_RequestIDPassthrough
+=== PAUSE TestHistoryProvider_RequestIDPassthrough
+=== NAME  
+=== RUN   TestHistoryProvider_QueryAndPaginationMapping
+=== PAUSE TestHistoryProvider_QueryAndPaginationMapping
+=== NAME  
+=== RUN   TestHistoryProvider_RPCFailure
+=== PAUSE TestHistoryProvider_RPCFailure
+=== NAME  
+=== RUN   TestHistoryProvider_SessionUnder100_FallsThroughToGlobal
+=== PAUSE TestHistoryProvider_SessionUnder100_FallsThroughToGlobal
+=== NAME  
+=== RUN   TestHistoryProvider_SessionEmpty_ShowsGlobalDirectly
+=== PAUSE TestHistoryProvider_SessionEmpty_ShowsGlobalDirectly
+=== NAME  
+=== RUN   TestHistoryProvider_CompositePaginationOffsetCrossesBoundary
+=== PAUSE TestHistoryProvider_CompositePaginationOffsetCrossesBoundary
+=== NAME  
+=== RUN   TestHistoryProvider_SessionAtOrAbove100_DoesNotFallThrough
+=== PAUSE TestHistoryProvider_SessionAtOrAbove100_DoesNotFallThrough
+=== NAME  
+=== RUN   TestHistoryProvider_LongSession_FallsThroughAfterSessionEnd
+=== PAUSE TestHistoryProvider_LongSession_FallsThroughAfterSessionEnd
+=== NAME  
+=== RUN   TestHistoryProvider_DialFailure
+=== PAUSE TestHistoryProvider_DialFailure
+=== NAME  
+=== RUN   TestHistoryProvider_RecoversWhenDefaultSocketAppears
+--- PASS: TestHistoryProvider_RecoversWhenDefaultSocketAppears (0.01s)
+=== NAME  
+=== RUN   TestHistoryProvider_NilOptions
+=== PAUSE TestHistoryProvider_NilOptions
+=== NAME  
+=== RUN   TestHistoryProvider_UTF8WithMultibyteChars
+=== PAUSE TestHistoryProvider_UTF8WithMultibyteChars
+=== NAME  
+=== RUN   TestInitialState
+--- PASS: TestInitialState (0.00s)
+=== NAME  
+=== RUN   TestInit_TransitionsToLoading
+--- PASS: TestInit_TransitionsToLoading (0.00s)
+=== NAME  
+=== RUN   TestLoading_ToEmpty
+--- PASS: TestLoading_ToEmpty (0.00s)
+=== NAME  
+=== RUN   TestLoading_ToError
+--- PASS: TestLoading_ToError (0.00s)
+=== NAME  
+=== RUN   TestLoaded_ToLoading_OnTabChange
+--- PASS: TestLoaded_ToLoading_OnTabChange (0.00s)
+=== NAME  
+=== RUN   TestAnyCancelledOnEsc
+--- PASS: TestAnyCancelledOnEsc (0.00s)
+=== NAME  
+=== RUN   TestCtrlC_CopiesSelectedItem
+--- PASS: TestCtrlC_CopiesSelectedItem (0.00s)
+=== NAME  
+=== RUN   TestCtrlC_NoSelection_NoOp
+--- PASS: TestCtrlC_NoSelection_NoOp (0.00s)
+=== NAME  
+=== RUN   TestError_ToLoading_OnTabChange
+--- PASS: TestError_ToLoading_OnTabChange (0.00s)
+=== NAME  
+=== RUN   TestSelectionClamped_AfterItemsShrink
+--- PASS: TestSelectionClamped_AfterItemsShrink (0.00s)
+=== NAME  
+=== RUN   TestSelectionClamped_EmptyItems
+--- PASS: TestSelectionClamped_EmptyItems (0.00s)
+=== NAME  
+=== RUN   TestSelectionClamped_NegativeToZero
+--- PASS: TestSelectionClamped_NegativeToZero (0.00s)
+=== NAME  
+=== RUN   TestStaleResponse_Discarded
+--- PASS: TestStaleResponse_Discarded (0.00s)
+=== NAME  
+=== RUN   TestCurrentResponse_Accepted
+--- PASS: TestCurrentResponse_Accepted (0.00s)
+=== NAME  
+=== RUN   TestUpDown_Navigation
+--- PASS: TestUpDown_Navigation (0.00s)
+=== NAME  
+=== RUN   TestUpDown_NoOp_DuringLoading
+--- PASS: TestUpDown_NoOp_DuringLoading (0.00s)
+=== NAME  
+=== RUN   TestEnter_SelectsItem
+--- PASS: TestEnter_SelectsItem (0.00s)
+=== NAME  
+=== RUN   TestEnter_EmptyList_NoResult
+--- PASS: TestEnter_EmptyList_NoResult (0.00s)
+=== NAME  
+=== RUN   TestTabCycling
+--- PASS: TestTabCycling (0.00s)
+=== NAME  
+=== RUN   TestRightRefine_SetsQueryToSelectedItem
+--- PASS: TestRightRefine_SetsQueryToSelectedItem (0.00s)
+=== NAME  
+=== RUN   TestTabResetsOffset
+--- PASS: TestTabResetsOffset (0.00s)
+=== NAME  
+=== RUN   TestHintLabels_UTF8Locale
+--- PASS: TestHintLabels_UTF8Locale (0.00s)
+=== NAME  
+=== RUN   TestHintLabels_ASCIILocaleFallback
+--- PASS: TestHintLabels_ASCIILocaleFallback (0.00s)
+=== NAME  
+=== RUN   TestViewTabBar_HidesTabHintForSingleTab
+--- PASS: TestViewTabBar_HidesTabHintForSingleTab (0.00s)
+=== NAME  
+=== RUN   TestViewList_SelectedLineShowsRightRefineHint
+--- PASS: TestViewList_SelectedLineShowsRightRefineHint (0.00s)
+=== NAME  
+=== RUN   TestViewList_DimsSuggestionMetadataAsGhosttext
+--- PASS: TestViewList_DimsSuggestionMetadataAsGhosttext (0.00s)
+=== NAME  
+=== RUN   TestViewFooter_ShowsShortcuts
+--- PASS: TestViewFooter_ShowsShortcuts (0.00s)
+=== NAME  
+=== RUN   TestTyping_AppendsToQuery
+--- PASS: TestTyping_AppendsToQuery (0.00s)
+=== NAME  
+=== RUN   TestCtrlU_ClearsQueryAndFetches
+--- PASS: TestCtrlU_ClearsQueryAndFetches (0.00s)
+=== NAME  
+=== RUN   TestBackspace_RemovesFromQuery
+--- PASS: TestBackspace_RemovesFromQuery (0.00s)
+=== NAME  
+=== RUN   TestBackspace_EmptyQuery_NoOp
+--- PASS: TestBackspace_EmptyQuery_NoOp (0.00s)
+=== NAME  
+=== RUN   TestDebounce_NewKeystrokeCancelsPrevious
+--- PASS: TestDebounce_NewKeystrokeCancelsPrevious (0.00s)
+=== NAME  
+=== RUN   TestDebounce_CurrentTimerTriggersFetch
+--- PASS: TestDebounce_CurrentTimerTriggersFetch (0.00s)
+=== NAME  
+=== RUN   TestWindowResize
+--- PASS: TestWindowResize (0.00s)
+=== NAME  
+=== RUN   TestWindowResize_PreservesSelection
+--- PASS: TestWindowResize_PreservesSelection (0.00s)
+=== NAME  
+=== RUN   TestView_ShowsTabBar
+--- PASS: TestView_ShowsTabBar (0.00s)
+=== NAME  
+=== RUN   TestView_ShowsQueryLine
+--- PASS: TestView_ShowsQueryLine (0.00s)
+=== NAME  
+=== RUN   TestView_ShowsLoadingState
+--- PASS: TestView_ShowsLoadingState (0.00s)
+=== NAME  
+=== RUN   TestView_ShowsEmptyState
+--- PASS: TestView_ShowsEmptyState (0.00s)
+=== NAME  
+=== RUN   TestView_ShowsErrorState
+--- PASS: TestView_ShowsErrorState (0.00s)
+=== NAME  
+=== RUN   TestResult_EmptyOnCancel
+--- PASS: TestResult_EmptyOnCancel (0.00s)
+=== NAME  
+=== RUN   TestSingleTab_TabIsNoOp
+--- PASS: TestSingleTab_TabIsNoOp (0.00s)
+=== NAME  
+=== RUN   TestUpDown_NoOp_WhenEmpty
+--- PASS: TestUpDown_NoOp_WhenEmpty (0.00s)
+=== NAME  
+=== RUN   TestEsc_WorksWhenEmpty
+--- PASS: TestEsc_WorksWhenEmpty (0.00s)
+=== NAME  
+=== RUN   TestZeroResults_EnterIsNoOp
+--- PASS: TestZeroResults_EnterIsNoOp (0.00s)
+=== NAME  
+=== RUN   TestZeroResults_QueryEditable
+--- PASS: TestZeroResults_QueryEditable (0.00s)
+=== NAME  
+=== RUN   TestSelectionClamped_ItemsGrow
+--- PASS: TestSelectionClamped_ItemsGrow (0.00s)
+=== NAME  
+=== RUN   TestQueryChange_TriggersLoadingViaDebounce
+--- PASS: TestQueryChange_TriggersLoadingViaDebounce (0.00s)
+=== NAME  
+=== RUN   TestError_QueryEditableAndRetryViaDebounce
+--- PASS: TestError_QueryEditableAndRetryViaDebounce (0.00s)
+=== NAME  
+=== RUN   TestView_ShowsCancelledState
+--- PASS: TestView_ShowsCancelledState (0.00s)
+=== NAME  
+=== RUN   TestWithQuery
+--- PASS: TestWithQuery (0.00s)
+=== NAME  
+=== RUN   TestWithQuery_CursorAtEnd
+--- PASS: TestWithQuery_CursorAtEnd (0.00s)
+=== NAME  
+=== RUN   TestInit_ReturnsCmd
+--- PASS: TestInit_ReturnsCmd (0.00s)
+=== NAME  
+=== RUN   TestEnter_NoOp_DuringLoading
+--- PASS: TestEnter_NoOp_DuringLoading (0.00s)
+=== NAME  
+=== RUN   TestBottomUp_ViewList_ReversesItems
+--- PASS: TestBottomUp_ViewList_ReversesItems (0.00s)
+=== NAME  
+=== RUN   TestBottomUp_ViewList_BottomAligned
+--- PASS: TestBottomUp_ViewList_BottomAligned (0.00s)
+=== NAME  
+=== RUN   TestBottomUp_View_HasSeparator
+--- PASS: TestBottomUp_View_HasSeparator (0.00s)
+=== NAME  
+=== RUN   TestBottomUp_UpDown_InvertedNavigation
+--- PASS: TestBottomUp_UpDown_InvertedNavigation (0.00s)
+=== NAME  
+=== RUN   TestBottomUp_SelectionMarkerOnCorrectItem
+--- PASS: TestBottomUp_SelectionMarkerOnCorrectItem (0.00s)
+=== NAME  
+=== RUN   TestTopDown_ViewList_PreservesOrder
+--- PASS: TestTopDown_ViewList_PreservesOrder (0.00s)
+=== NAME  
+=== RUN   TestTopDown_View_NoSeparator
+--- PASS: TestTopDown_View_NoSeparator (0.00s)
+=== NAME  
+=== RUN   TestWithLayout
+--- PASS: TestWithLayout (0.00s)
+=== NAME  
+=== RUN   TestBottomUp_StatusMessages_BottomAligned
+--- PASS: TestBottomUp_StatusMessages_BottomAligned (0.00s)
+=== NAME  
+=== RUN   TestBottomUp_ListHeight_AccountsForSeparator
+--- PASS: TestBottomUp_ListHeight_AccountsForSeparator (0.00s)
+=== NAME  
+=== RUN   TestHighlightQuery_EmptyQuery
+--- PASS: TestHighlightQuery_EmptyQuery (0.00s)
+=== NAME  
+=== RUN   TestHighlightQuery_NoMatch
+--- PASS: TestHighlightQuery_NoMatch (0.00s)
+=== NAME  
+=== RUN   TestHighlightQuery_BasicMatch
+--- PASS: TestHighlightQuery_BasicMatch (0.00s)
+=== NAME  
+=== RUN   TestHighlightQuery_MatchAtEnd
+--- PASS: TestHighlightQuery_MatchAtEnd (0.00s)
+=== NAME  
+=== RUN   TestHighlightQuery_MatchInMiddle
+--- PASS: TestHighlightQuery_MatchInMiddle (0.00s)
+=== NAME  
+=== RUN   TestHighlightQuery_CaseInsensitive
+--- PASS: TestHighlightQuery_CaseInsensitive (0.00s)
+=== NAME  
+=== RUN   TestHighlightQuery_MultipleMatches
+--- PASS: TestHighlightQuery_MultipleMatches (0.00s)
+=== NAME  
+=== RUN   TestHighlightQuery_EntireString
+--- PASS: TestHighlightQuery_EntireString (0.00s)
+=== NAME  
+=== RUN   TestHighlightQuery_SelectedStyle
+--- PASS: TestHighlightQuery_SelectedStyle (0.00s)
+=== NAME  
+=== RUN   TestViewList_HighlightsQuery
+--- PASS: TestViewList_HighlightsQuery (0.00s)
+=== NAME  
+=== RUN   TestViewList_TruncationStyled
+--- PASS: TestViewList_TruncationStyled (0.00s)
+=== NAME  
+=== RUN   TestRenderItem_NoTruncation
+--- PASS: TestRenderItem_NoTruncation (0.00s)
+=== NAME  
+=== RUN   TestRenderItem_WithTruncation
+--- PASS: TestRenderItem_WithTruncation (0.00s)
+=== NAME  
+=== RUN   TestClipboardMsg_SetsCopied
+--- PASS: TestClipboardMsg_SetsCopied (0.00s)
+=== NAME  
+=== RUN   TestClipboardMsg_Error_NoCopied
+--- PASS: TestClipboardMsg_Error_NoCopied (0.00s)
+=== NAME  
+=== RUN   TestCopiedClearMsg_ClearsCopied
+--- PASS: TestCopiedClearMsg_ClearsCopied (0.00s)
+=== NAME  
+=== RUN   TestViewQuery_ShowsCopiedIndicator
+--- PASS: TestViewQuery_ShowsCopiedIndicator (0.00s)
+=== NAME  
+=== RUN   TestViewQuery_NoCopiedIndicator
+--- PASS: TestViewQuery_NoCopiedIndicator (0.00s)
+=== NAME  
+=== RUN   TestEsc_StillCancels
+--- PASS: TestEsc_StillCancels (0.00s)
+=== NAME  
+=== RUN   TestIsCancelled_TrueAfterEsc
+--- PASS: TestIsCancelled_TrueAfterEsc (0.00s)
+=== NAME  
+=== RUN   TestIsCancelled_FalseAfterEnter
+--- PASS: TestIsCancelled_FalseAfterEnter (0.00s)
+=== NAME  
+=== RUN   TestStripANSI_SGR
+=== RUN   TestStripANSI_SGR/plain_text
+--- PASS: TestStripANSI_SGR/plain_text (0.00s)
+=== NAME  TestStripANSI_SGR
+=== RUN   TestStripANSI_SGR/bold
+--- PASS: TestStripANSI_SGR/bold (0.00s)
+=== NAME  TestStripANSI_SGR
+=== RUN   TestStripANSI_SGR/color
+--- PASS: TestStripANSI_SGR/color (0.00s)
+=== NAME  TestStripANSI_SGR
+=== RUN   TestStripANSI_SGR/multiple_SGR
+--- PASS: TestStripANSI_SGR/multiple_SGR (0.00s)
+=== NAME  TestStripANSI_SGR
+=== RUN   TestStripANSI_SGR/mixed
+--- PASS: TestStripANSI_SGR/mixed (0.00s)
+=== NAME  TestStripANSI_SGR
+=== RUN   TestStripANSI_SGR/empty
+--- PASS: TestStripANSI_SGR/empty (0.00s)
+=== NAME  TestStripANSI_SGR
+--- PASS: TestStripANSI_SGR (0.00s)
+=== NAME  
+=== RUN   TestStripANSI_OSC
+=== RUN   TestStripANSI_OSC/OSC_with_BEL
+--- PASS: TestStripANSI_OSC/OSC_with_BEL (0.00s)
+=== NAME  TestStripANSI_OSC
+=== RUN   TestStripANSI_OSC/OSC_with_ST
+--- PASS: TestStripANSI_OSC/OSC_with_ST (0.00s)
+=== NAME  TestStripANSI_OSC
+=== RUN   TestStripANSI_OSC/OSC_hyperlink
+--- PASS: TestStripANSI_OSC/OSC_hyperlink (0.00s)
+=== NAME  TestStripANSI_OSC
+--- PASS: TestStripANSI_OSC (0.00s)
+=== NAME  
+=== RUN   TestStripANSI_Charset
+=== RUN   TestStripANSI_Charset/charset_G0_ASCII
+--- PASS: TestStripANSI_Charset/charset_G0_ASCII (0.00s)
+=== NAME  TestStripANSI_Charset
+=== RUN   TestStripANSI_Charset/charset_G1
+--- PASS: TestStripANSI_Charset/charset_G1 (0.00s)
+=== NAME  TestStripANSI_Charset
+--- PASS: TestStripANSI_Charset (0.00s)
+=== NAME  
+=== RUN   TestValidateUTF8
+=== RUN   TestValidateUTF8/valid_ASCII
+--- PASS: TestValidateUTF8/valid_ASCII (0.00s)
+=== NAME  TestValidateUTF8
+=== RUN   TestValidateUTF8/valid_UTF-8
+--- PASS: TestValidateUTF8/valid_UTF-8 (0.00s)
+=== NAME  TestValidateUTF8
+=== RUN   TestValidateUTF8/invalid_byte
+--- PASS: TestValidateUTF8/invalid_byte (0.00s)
+=== NAME  TestValidateUTF8
+=== RUN   TestValidateUTF8/invalid_continuation
+--- PASS: TestValidateUTF8/invalid_continuation (0.00s)
+=== NAME  TestValidateUTF8
+=== RUN   TestValidateUTF8/all_valid
+--- PASS: TestValidateUTF8/all_valid (0.00s)
+=== NAME  TestValidateUTF8
+=== RUN   TestValidateUTF8/empty
+--- PASS: TestValidateUTF8/empty (0.00s)
+=== NAME  TestValidateUTF8
+=== RUN   TestValidateUTF8/multiple_invalid
+--- PASS: TestValidateUTF8/multiple_invalid (0.00s)
+=== NAME  TestValidateUTF8
+--- PASS: TestValidateUTF8 (0.00s)
+=== NAME  
+=== RUN   TestPrettyEscapeLiterals
+=== RUN   TestPrettyEscapeLiterals/no_escapes
+--- PASS: TestPrettyEscapeLiterals/no_escapes (0.00s)
+=== NAME  TestPrettyEscapeLiterals
+=== RUN   TestPrettyEscapeLiterals/octal_csi
+--- PASS: TestPrettyEscapeLiterals/octal_csi (0.00s)
+=== NAME  TestPrettyEscapeLiterals
+=== RUN   TestPrettyEscapeLiterals/octal_osc
+--- PASS: TestPrettyEscapeLiterals/octal_osc (0.00s)
+=== NAME  TestPrettyEscapeLiterals
+=== RUN   TestPrettyEscapeLiterals/hex_csi
+--- PASS: TestPrettyEscapeLiterals/hex_csi (0.00s)
+=== NAME  TestPrettyEscapeLiterals
+=== RUN   TestPrettyEscapeLiterals/short_e_csi
+--- PASS: TestPrettyEscapeLiterals/short_e_csi (0.00s)
+=== NAME  TestPrettyEscapeLiterals
+--- PASS: TestPrettyEscapeLiterals (0.00s)
+=== NAME  
+=== RUN   TestMiddleTruncate_ASCII
+=== RUN   TestMiddleTruncate_ASCII/fits_exactly
+--- PASS: TestMiddleTruncate_ASCII/fits_exactly (0.00s)
+=== NAME  TestMiddleTruncate_ASCII
+=== RUN   TestMiddleTruncate_ASCII/fits_with_room
+--- PASS: TestMiddleTruncate_ASCII/fits_with_room (0.00s)
+=== NAME  TestMiddleTruncate_ASCII
+=== RUN   TestMiddleTruncate_ASCII/needs_truncation
+--- PASS: TestMiddleTruncate_ASCII/needs_truncation (0.00s)
+=== NAME  TestMiddleTruncate_ASCII
+=== RUN   TestMiddleTruncate_ASCII/max_3
+--- PASS: TestMiddleTruncate_ASCII/max_3 (0.00s)
+=== NAME  TestMiddleTruncate_ASCII
+=== RUN   TestMiddleTruncate_ASCII/max_2
+--- PASS: TestMiddleTruncate_ASCII/max_2 (0.00s)
+=== NAME  TestMiddleTruncate_ASCII
+=== RUN   TestMiddleTruncate_ASCII/max_1
+--- PASS: TestMiddleTruncate_ASCII/max_1 (0.00s)
+=== NAME  TestMiddleTruncate_ASCII
+=== RUN   TestMiddleTruncate_ASCII/max_0
+--- PASS: TestMiddleTruncate_ASCII/max_0 (0.00s)
+=== NAME  TestMiddleTruncate_ASCII
+=== RUN   TestMiddleTruncate_ASCII/empty_string
+--- PASS: TestMiddleTruncate_ASCII/empty_string (0.00s)
+=== NAME  TestMiddleTruncate_ASCII
+=== RUN   TestMiddleTruncate_ASCII/single_char
+--- PASS: TestMiddleTruncate_ASCII/single_char (0.00s)
+=== NAME  TestMiddleTruncate_ASCII
+--- PASS: TestMiddleTruncate_ASCII (0.00s)
+=== NAME  
+=== RUN   TestMiddleTruncate_CJK
+=== RUN   TestMiddleTruncate_CJK/CJK_truncation
+--- PASS: TestMiddleTruncate_CJK/CJK_truncation (0.00s)
+=== NAME  TestMiddleTruncate_CJK
+=== RUN   TestMiddleTruncate_CJK/CJK_fits
+--- PASS: TestMiddleTruncate_CJK/CJK_fits (0.00s)
+=== NAME  TestMiddleTruncate_CJK
+=== RUN   TestMiddleTruncate_CJK/CJK_exactly
+--- PASS: TestMiddleTruncate_CJK/CJK_exactly (0.00s)
+=== NAME  TestMiddleTruncate_CJK
+--- PASS: TestMiddleTruncate_CJK (0.00s)
+=== NAME  
+=== RUN   TestMiddleTruncate_Emoji
+=== RUN   TestMiddleTruncate_Emoji/emoji_fits
+--- PASS: TestMiddleTruncate_Emoji/emoji_fits (0.00s)
+=== NAME  TestMiddleTruncate_Emoji
+--- PASS: TestMiddleTruncate_Emoji (0.00s)
+=== NAME  
+=== RUN   TestSuggestProvider_BasicFetch_Detailed
+=== PAUSE TestSuggestProvider_BasicFetch_Detailed
+=== NAME  
+=== RUN   TestSuggestProvider_Timeout
+=== PAUSE TestSuggestProvider_Timeout
+=== NAME  
+=== RUN   TestSuggestProvider_RPCError_Propagates
+=== PAUSE TestSuggestProvider_RPCError_Propagates
+=== NAME  
+=== CONT  TestHistoryProvider_BasicFetch
+=== CONT  TestHistoryProvider_RPCFailure
+=== CONT  TestHistoryProvider_QueryAndPaginationMapping
+=== CONT  TestHistoryProvider_RequestIDPassthrough
+=== CONT  TestHistoryProvider_GlobalFlag
+=== CONT  TestHistoryProvider_SessionIDTakesPrecedence
+=== CONT  TestHistoryProvider_SessionUnder100_FallsThroughToGlobal
+=== CONT  TestHistoryProvider_EmptyResults
+=== CONT  TestHistoryProvider_DialFailure
+=== CONT  TestHistoryProvider_Timeout
+--- PASS: TestHistoryProvider_DialFailure (0.00s)
+=== CONT  TestHistoryProvider_SessionScoping
+--- PASS: TestHistoryProvider_RPCFailure (0.01s)
+=== CONT  TestHistoryProvider_ANSIStripping
+--- PASS: TestHistoryProvider_BasicFetch (0.01s)
+=== CONT  TestSuggestProvider_RPCError_Propagates
+=== CONT  TestHistoryProvider_SessionKeyFallback
+--- PASS: TestHistoryProvider_GlobalFlag (0.01s)
+--- PASS: TestHistoryProvider_QueryAndPaginationMapping (0.01s)
+=== CONT  TestHistoryProvider_UTF8WithMultibyteChars
+--- PASS: TestHistoryProvider_SessionUnder100_FallsThroughToGlobal (0.01s)
+=== CONT  TestHistoryProvider_SessionAtOrAbove100_DoesNotFallThrough
+--- PASS: TestHistoryProvider_SessionIDTakesPrecedence (0.01s)
+--- PASS: TestHistoryProvider_SessionScoping (0.01s)
+=== CONT  TestHistoryProvider_NilOptions
+--- PASS: TestHistoryProvider_EmptyResults (0.01s)
+=== CONT  TestHistoryProvider_CompositePaginationOffsetCrossesBoundary
+=== CONT  TestHistoryProvider_LongSession_FallsThroughAfterSessionEnd
+--- PASS: TestSuggestProvider_RPCError_Propagates (0.01s)
+=== CONT  TestSuggestProvider_Timeout
+--- PASS: TestHistoryProvider_UTF8WithMultibyteChars (0.01s)
+--- PASS: TestHistoryProvider_ANSIStripping (0.01s)
+=== CONT  TestHistoryProvider_SessionEmpty_ShowsGlobalDirectly
+=== CONT  TestSuggestProvider_BasicFetch_Detailed
+--- PASS: TestHistoryProvider_SessionAtOrAbove100_DoesNotFallThrough (0.01s)
+--- PASS: TestHistoryProvider_SessionKeyFallback (0.01s)
+--- PASS: TestHistoryProvider_NilOptions (0.01s)
+--- PASS: TestSuggestProvider_BasicFetch_Detailed (0.00s)
+--- PASS: TestHistoryProvider_SessionEmpty_ShowsGlobalDirectly (0.00s)
+--- PASS: TestHistoryProvider_CompositePaginationOffsetCrossesBoundary (0.01s)
+--- PASS: TestHistoryProvider_LongSession_FallsThroughAfterSessionEnd (0.01s)
+--- PASS: TestHistoryProvider_RequestIDPassthrough (0.02s)
+--- PASS: TestHistoryProvider_Timeout (0.51s)
+--- PASS: TestSuggestProvider_Timeout (2.00s)
+PASS
+ok  	github.com/runger/clai/internal/picker	5.735s
