@@ -1,31 +1,3 @@
-git add .
-git commit -m 'test'
- clai debug transitions
-clai incognito on
-clai incognito off
-mkdir -p /tmp/debug-task-test
-cd /tmp/debug-task-test
-echo '{"scripts":{"test":"jest"}}' > package.json
-clai suggest
-curl -s http://localhost:8765/debug/tasks 2>/dev/null || clai debug tasks
-curl -s http://localhost:8765/debug/discovery-errors 2>/dev/null || clai debug discovery-errors
-export CLAI_NO_RECORD=1
-echo 'NO_RECORD_TEST_CMD'
-unset CLAI_NO_RECORD
-if clai history --session=$CLAI_SESSION_ID | grep -q NO_RECORD_TEST_CMD; then echo NO_RECORD_FAIL; else echo NO_RECORD_PASS; fi
-curl -s http://localhost:8765/debug/cache 2>/dev/null | jq . || echo 'curl failed'
-true
-if clai history --session=$CLAI_SESSION_ID --format json | grep -q '"exit_code":0'; then echo EXIT_SUCCESS_PASS; else echo EXIT_SUCCESS_FAIL; fi
-clai incognito on
-clai incognito on
-echo 'ephemeral_session_cmd_12345'
-clai suggest
-false
-if clai history --session=$CLAI_SESSION_ID --format json | grep -q '"exit_code":1'; then echo EXIT_FAILURE_PASS; else echo EXIT_FAILURE_FAIL; fi
-cd /tmp && echo 'ingestion_cwd_test'
-clai history --cwd=/tmp --global
-clai incognito on
-echo 'incognito_only_cmd_xyz'
 echo 'incognito_only_cmd_xyz'
 echo 'incognito_only_cmd_xyz'
 clai incognito off
@@ -498,3 +470,31 @@ echo '{"scripts":{"lint":"eslint"}}' > package.json
 cd /tmp/reason-test && clai suggest npm --format=json --limit=5
 curl -s http://localhost:8765/debug/scores 2>/dev/null || clai debug scores
 curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5
+git status
+git add .
+git commit -m 'test'
+curl -s http://localhost:8765/debug/transitions 2>/dev/null || clai debug transitions
+mkdir -p /tmp/debug-task-test
+cd /tmp/debug-task-test
+echo '{"scripts":{"test":"jest"}}' > package.json
+clai suggest
+curl -s http://localhost:8765/debug/tasks 2>/dev/null || clai debug tasks
+curl -s http://localhost:8765/debug/discovery-errors 2>/dev/null || clai debug discovery-errors
+curl -s http://localhost:8765/debug/cache 2>/dev/null | jq . || echo 'curl failed'
+clai incognito on
+clai incognito on
+echo 'ephemeral_session_cmd_12345'
+clai suggest
+clai incognito on
+echo 'incognito_only_cmd_xyz'
+echo 'incognito_only_cmd_xyz'
+echo 'incognito_only_cmd_xyz'
+clai incognito off
+clai suggest --format=json
+export CLAI_EPHEMERAL=1
+echo 'ephemeral_env_test_cmd'
+unset CLAI_EPHEMERAL
+clai suggest --format=json
+echo api_json_seed_one
+echo api_json_seed_two
+clai suggest echo --format=json --limit=5
