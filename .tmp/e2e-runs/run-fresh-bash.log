@@ -3,3 +3,51 @@ url: http://127.0.0.1:8080
 [bash] 1/97 History picker opens with Alt+H
   -> PASS
 [bash] 2/97 History picker fuzzy search filters results
+  -> FAIL: expected screen to contain: apple | expected screen to contain: apricot
+[bash] 3/97 History picker navigation with arrow keys
+  -> PASS
+[bash] 4/97 History picker Enter inserts command
+  -> PASS
+[bash] 5/97 History picker Escape cancels
+  -> PASS
+[bash] 6/97 History scope switching with Tab
+  -> FAIL: expected screen to match: (git|echo|ls|make)
+[bash] 7/97 Session history is isolated from global
+  -> PASS
+[bash] 8/97 Global history contains cross-session commands
+  -> FAIL: expected screen to match: (git|make|cd|ls)
+[bash] 9/97 Long command shows truncation indicator
+  -> PASS
+[bash] 10/97 Enter inserts full untruncated command
+  -> PASS
+[bash] 11/97 Ctrl+C copies full untruncated command
+  -> PASS
+[bash] 12/97 clai loads successfully in bash
+  -> FAIL: expected screen not to contain: Error
+[bash] 13/97 Session ID is set
+  -> PASS
+[bash] 14/97 History command shows session history
+  -> PASS
+[bash] 15/97 clai cmd converts natural language to command
+  -> SKIP: clai cmd not yet fully implemented
+[bash] 16/97 clai cmd caches suggestion for completion
+  -> SKIP: clai cmd not yet fully implemented
+[bash] 17/97 clai ask answers terminal questions
+  -> SKIP: clai ask not yet fully implemented
+[bash] 18/97 clai ask with context flag
+  -> SKIP: clai ask not yet fully implemented
+[bash] 19/97 clai status shows session info
+  -> FAIL: expected screen to contain: bash
+[bash] 20/97 clai history with session flag
+  -> PASS
+[bash] 21/97 clai history with global flag
+  -> PASS
+[bash] 22/97 clai history filters by CWD
+  -> PASS
+[bash] 23/97 clai history filters successful commands
+  -> FAIL: expected screen to contain: HISTORY_SUCCESS_FILTER_PASS
+[bash] 24/97 clai history filters failed commands
+  -> FAIL: expected screen to contain: HISTORY_FAILURE_FILTER_PASS
+[bash] 25/97 clai off disables integration
+  -> PASS
+[bash] 26/97 clai on re-enables integration
