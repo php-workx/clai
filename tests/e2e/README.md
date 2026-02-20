@@ -1,6 +1,7 @@
 # E2E Testing with Claude + Playwright
 
-This directory contains end-to-end test plans for AI-assisted terminal testing.
+This directory contains end-to-end tests for terminal behavior.
+Suggestion tests run as native Playwright specs. Core tests remain YAML-driven.
 
 ## Quick Start
 
@@ -29,20 +30,25 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
    make test-e2e E2E_REPORTER=junit
    ```
 
-5. **Customize plans/output:**
+5. **Customize YAML plans/output (core suite only):**
    ```bash
    make test-e2e \
-     E2E_PLANS="tests/e2e/suggestions-tests.yaml" \
+     E2E_PLANS="tests/e2e/example-test-plan.yaml" \
      E2E_OUT=".tmp/e2e-runs-custom" \
      E2E_URL="http://127.0.0.1:8080"
    ```
 
-6. **Ask Claude to run tests (alternative):**
+6. **Include legacy suggestions YAML in addition to native suggestions spec (diagnostic only):**
+   ```bash
+   make test-e2e E2E_INCLUDE_SUGGESTIONS_YAML=1
+   ```
+
+7. **Ask Claude to run tests (alternative):**
    ```
    Run e2e tests from tests/e2e/example-test-plan.yaml against http://localhost:8080
    ```
 
-7. **Review results** - pass/fail summary and per-test JSON are written to `.tmp/e2e-runs/`
+8. **Review results** - pass/fail summary and per-test JSON are written to `.tmp/e2e-runs/`
    - `.tmp/e2e-runs/results-<shell>.json`
    - `.tmp/e2e-runs/results-all.json`
    - `.tmp/e2e-runs/summary.md`
@@ -63,8 +69,11 @@ npm --prefix tests/e2e install
 ```
 tests/e2e/
 ├── README.md                 # This file
+├── suggestions.spec.cjs      # Native Playwright suggestion tests
+├── yaml.spec.cjs             # YAML bridge spec (core plans)
+├── terminal_case_runner.cjs  # Shared terminal actions/assertions
 ├── example-test-plan.yaml    # Core functionality tests (picker, integration, CLI)
-├── suggestions-tests.yaml    # Suggestion engine tests (ghost text, typo, cache)
+├── suggestions-tests.yaml    # Legacy YAML suggestions plan (kept for parity checks)
 ├── screenshots/
 │   ├── baseline/             # Expected screenshots for visual regression
 │   └── current/              # Screenshots from current test run
@@ -75,12 +84,14 @@ tests/e2e/
 
 | File | Description |
 |------|-------------|
+| `suggestions.spec.cjs` | Native Playwright suggestion tests (primary path) |
+| `yaml.spec.cjs` | Executes YAML-defined plans through shared terminal runner |
 | `example-test-plan.yaml` | Core clai tests: history picker, shell integration, CLI commands, PTY wrapper, incognito, ingestion |
-| `suggestions-tests.yaml` | Suggestion engine tests: ghost text, clai suggest CLI, typo correction, slot filling, cache, FTS5 search, project discovery, debug endpoints (cross-shell coverage) |
+| `suggestions-tests.yaml` | Legacy YAML suggestions plan retained for migration parity checks |
 
 ## Writing Tests
 
-See `example-test-plan.yaml` for the complete schema reference. Key elements:
+Core YAML plans use this schema (`example-test-plan.yaml`):
 
 ```yaml
 tests:

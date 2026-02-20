@@ -8,10 +8,12 @@ E2E_SHELLS="${E2E_SHELLS:-bash zsh fish}"
 E2E_PLANS="${E2E_PLANS:-tests/e2e/example-test-plan.yaml,tests/e2e/suggestions-tests.yaml}"
 E2E_GREP="${E2E_GREP:-}"
 INSTALL_DEPS="${E2E_INSTALL_DEPS:-1}"
+E2E_INCLUDE_SUGGESTIONS_YAML="${E2E_INCLUDE_SUGGESTIONS_YAML:-0}"
 
 NODE_MODULES_DIR="$ROOT_DIR/tests/e2e/node_modules"
 PW_CONFIG="$ROOT_DIR/tests/e2e/playwright.config.cjs"
-PW_SPEC="$ROOT_DIR/tests/e2e/yaml.spec.cjs"
+PW_YAML_SPEC="$ROOT_DIR/tests/e2e/yaml.spec.cjs"
+PW_SUGGESTIONS_SPEC="$ROOT_DIR/tests/e2e/suggestions.spec.cjs"
 E2E_REPORTER="${E2E_REPORTER:-line}"
 
 require_cmd() {
@@ -45,6 +47,7 @@ run_shell_suite() {
 	local log_path="$OUT_DIR/run-$shell_name.log"
 	local result_json="$OUT_DIR/results-$shell_name.json"
 	local artifacts_dir="$OUT_DIR/artifacts-$shell_name"
+	local yaml_plans="$E2E_PLANS"
 	local rc=0
 
 	: >"$log_path"
@@ -60,12 +63,28 @@ run_shell_suite() {
 	local -a cmd
 	cmd=(
 		npx --prefix "$ROOT_DIR/tests/e2e"
-		playwright test "$PW_SPEC"
+		playwright test
 		--config "$PW_CONFIG"
 		--workers=1
 		--reporter "$reporter"
 		--output "$artifacts_dir"
 	)
+
+	if [[ "$E2E_INCLUDE_SUGGESTIONS_YAML" != "1" ]]; then
+		yaml_plans="$(
+			printf '%s' "$E2E_PLANS" \
+				| tr ',' '\n' \
+				| sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+				| awk 'NF && $0 !~ /(^|\/)suggestions-tests\.yaml$/ {print}' \
+				| paste -sd, -
+		)"
+	fi
+
+	cmd+=("$PW_SUGGESTIONS_SPEC")
+	if [[ -n "$yaml_plans" ]]; then
+		cmd+=("$PW_YAML_SPEC")
+	fi
+
 	if [[ -n "$E2E_GREP" ]]; then
 		cmd+=(--grep "$E2E_GREP")
 	fi
@@ -74,7 +93,7 @@ run_shell_suite() {
 	env \
 		E2E_SHELL="$shell_name" \
 		E2E_URL="$E2E_URL" \
-		E2E_PLANS="$E2E_PLANS" \
+		E2E_PLANS="$yaml_plans" \
 		PLAYWRIGHT_JSON_OUTPUT_FILE="$result_json" \
 		"${cmd[@]}" 2>&1 | tee -a "$log_path"
 	rc=${PIPESTATUS[0]}

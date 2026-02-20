@@ -2,7 +2,7 @@ const { defineConfig } = require("@playwright/test");
 
 module.exports = defineConfig({
 	testDir: __dirname,
-	testMatch: ["yaml.spec.cjs"],
+	testMatch: ["*.spec.cjs"],
 	timeout: 60_000,
 	fullyParallel: false,
 	workers: 1,
