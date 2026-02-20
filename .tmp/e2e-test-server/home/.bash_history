@@ -1,31 +1,3 @@
-echo confidence_seed_beta
-clai suggest echo --format=json --limit=3
-git status
-git log --oneline
-clai suggest git --format=fzf --limit=3
-kubectl get pods -n production
-clai suggest kubectl --format=fzf --limit=3
-mkdir -p /tmp/reason-test
-cd /tmp/reason-test
-echo '{"scripts":{"lint":"eslint"}}' > package.json
-cd /tmp/reason-test && clai suggest npm --format=json --limit=5
-echo api_json_seed_one
-echo api_json_seed_two
-clai suggest echo --format=json --limit=5
-echo 'setup command 1'
-echo 'setup command 2'
-ls -la
-echo apple
-echo banana
-echo apricot
-git status
-command one
-command two
-command three
-echo 'selected command'
-selected
-echo unique_session_test_command_12345
-echo session_specific_command
 echo this_is_a_very_long_command_that_should_be_truncated_in_the_middle_with_an_ellipsis_indicator_to_show_both_start_and_end
 echo UNIQUE_START_marker_this_is_a_very_long_command_with_lots_of_text_in_the_middle_UNIQUE_END_marker
 UNIQUE_START
@@ -498,3 +470,31 @@ echo '{"scripts":{"lint":"eslint"}}' > package.json
 cd /tmp/reason-test && clai suggest npm --format=json --limit=5
 curl -s http://localhost:8765/debug/scores 2>/dev/null || clai debug scores
 curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5
+git status
+git add .
+git commit -m 'test'
+curl -s http://localhost:8765/debug/transitions 2>/dev/null || clai debug transitions
+mkdir -p /tmp/debug-task-test
+cd /tmp/debug-task-test
+echo '{"scripts":{"test":"jest"}}' > package.json
+clai suggest
+curl -s http://localhost:8765/debug/tasks 2>/dev/null || clai debug tasks
+curl -s http://localhost:8765/debug/discovery-errors 2>/dev/null || clai debug discovery-errors
+curl -s http://localhost:8765/debug/cache 2>/dev/null | jq . || echo 'curl failed'
+clai incognito on
+clai incognito on
+echo 'ephemeral_session_cmd_12345'
+clai suggest
+clai incognito on
+echo 'incognito_only_cmd_xyz'
+echo 'incognito_only_cmd_xyz'
+echo 'incognito_only_cmd_xyz'
+clai incognito off
+clai suggest --format=json
+export CLAI_EPHEMERAL=1
+echo 'ephemeral_env_test_cmd'
+unset CLAI_EPHEMERAL
+clai suggest --format=json
+echo api_json_seed_one
+echo api_json_seed_two
+clai suggest echo --format=json --limit=5
