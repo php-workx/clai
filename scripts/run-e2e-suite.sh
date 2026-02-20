@@ -54,9 +54,10 @@ run_shell_suite() {
 		args+=(--grep "$E2E_GREP")
 	fi
 
-	if ! NODE_PATH="$NODE_MODULES_DIR" node "$RUNNER_JS" "${args[@]}" >>"$log_path" 2>&1; then
-		rc=$?
-	fi
+	set +e
+	NODE_PATH="$NODE_MODULES_DIR" node "$RUNNER_JS" "${args[@]}" 2>&1 | tee -a "$log_path"
+	rc=${PIPESTATUS[0]}
+	set -e
 
 	make -C "$ROOT_DIR" test-server-stop >>"$log_path" 2>&1 || true
 
@@ -67,7 +68,13 @@ const fs = require("fs");
 const p = process.argv[1];
 const d = JSON.parse(fs.readFileSync(p, "utf8"));
 const s = d.summary || {};
-console.log(`${p}: total=${s.total||0} pass=${s.passed||0} fail=${s.failed||0} skip=${s.skipped||0}`);
+console.log(`SUMMARY ${p}: total=${s.total||0} pass=${s.passed||0} fail=${s.failed||0} skip=${s.skipped||0}`);
+if (Array.isArray(s.failures) && s.failures.length > 0) {
+  console.log(`FAILURES ${p}:`);
+  for (const f of s.failures) {
+    console.log(` - ${f.name}: ${f.reason || "failed"}`);
+  }
+}
 ' "$result_json" | tee -a "$log_path"
 	else
 		echo "warning: missing result json: $result_json" | tee -a "$log_path"
@@ -139,6 +146,16 @@ for (const sh of shells) {
 
 const mdOut = path.join(outDir, "summary.md");
 fs.writeFileSync(mdOut, lines.join("\n"));
+console.log("=== E2E Aggregate Summary ===");
+for (const sh of shells) {
+  const s = aggregate.shells[sh] || {};
+  if (s.missing) {
+    console.log(`${sh}: missing results`);
+    continue;
+  }
+  console.log(`${sh}: total=${s.total||0} pass=${s.passed||0} fail=${s.failed||0} skip=${s.skipped||0}`);
+}
+console.log(`TOTAL: total=${aggregate.totals.total} pass=${aggregate.totals.passed} fail=${aggregate.totals.failed} skip=${aggregate.totals.skipped}`);
 console.log(`Wrote ${jsonOut}`);
 console.log(`Wrote ${mdOut}`);
 NODE
