@@ -7,7 +7,11 @@ BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 PICKER_LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-all test-interactive test-docker cover fmt lint vuln roam dev help proto bin/linux
+.PHONY: all build install install-dev clean test test-all test-interactive test-docker test-server test-server-stop test-server-status cover fmt lint vuln roam dev help proto bin/linux
+
+TEST_SHELL?=bash
+PORT?=8080
+ADDRESS?=127.0.0.1
 
 all: build
 
@@ -125,6 +129,19 @@ test-docker: bin/linux
 		echo "==> Running docker expect tests in $$svc"; \
 		$$compose_cmd run --rm $$svc expect.test -test.v -test.parallel=1; \
 	done
+
+## test-server: Start gotty-backed terminal server for browser e2e tests
+test-server:
+	@test_shell="$(if $(filter bash zsh fish,$(SHELL)),$(SHELL),$(TEST_SHELL))"; \
+	TEST_SHELL="$$test_shell" PORT="$(PORT)" ADDRESS="$(ADDRESS)" ./scripts/start-test-server.sh
+
+## test-server-stop: Stop gotty-backed terminal server
+test-server-stop:
+	@./scripts/stop-test-server.sh
+
+## test-server-status: Show status of gotty-backed terminal server
+test-server-status:
+	@./scripts/stop-test-server.sh --status
 
 ## fmt: Format code
 fmt:
