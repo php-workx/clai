@@ -1,410 +1,151 @@
 {
   "summary": {
     "shell": "zsh",
-    "total": 40,
-    "passed": 29,
-    "failed": 11,
-    "skipped": 14,
-    "duration_ms": 84185,
+    "total": 10,
+    "passed": 2,
+    "failed": 8,
+    "skipped": 0,
+    "duration_ms": 37851,
     "failures": [
       {
         "ok": false,
-        "name": "CWD scope filters correctly with spaces in path",
-        "reason": "expected screen to contain: in my project",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/004-CWD_scope_filters_correctly_with_spaces_in_path.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
         "name": "clai suggest text format",
-        "reason": "expected screen to match: \\d+\\.",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/006-clai_suggest_text_format.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai suggest JSON format",
-        "reason": "expected screen to contain: {",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/007-clai_suggest_JSON_format.png",
+        "reason": "expected screen to match: \\d+\\. | expected screen to match: \\(",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/001-clai_suggest_text_format.png",
+        "terminal_excerpt": "        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdf02c4988e4f76022d55f709a32a2e156acd578caee8a1c2c3547510c3ea3ce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdf0575cbb0ec53d7df53ab85ee106437d1c705e6af22cdf5d94b138b96a5e4c-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe095be5bb554ac7372f515c20dab35f7dda027852545f7b8b5f16b2be80417d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe0dd71062f84ebe3b488ef7e8471843663e425cb8aa9a556c713d77e51c7422-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe185329db30a1a2bfe531cc2bcacf805bbf9bdc9427275f58cabf34739c5857-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe19cefda8bec9f931b536a1723266b159c0d2203e7f1eb6b3900b7b0ce69909-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1e1f3c2501cd043a2f0a717d6ce61174e3abe20f3429811eef6db4ea32e2c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1f0b507ce9832c54fb9d27da5c76342c1d3ce168c463437465b34dd764f08a-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe424e99baadc94a9ce541de5544ee3c2345cddbae290483d7eed1e5a922e15e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe5c7d1a20bd8448e9af041bcd5ecc9678007b00befbc398e0131ebaf62e5fce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe6377d91cc18d90f85d801e76ae2b48f86b9e292d2df60ae7b1976dc7407df7-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe9ccd78fbced52dad0fd72f4ad37a27121037c3126e1e670c59b7e399d718c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea1e475a4492979a2e1696e89eac82ba6b1a4a421863d116d086a2687585238-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea49bee6c30fa89c7d9f6940b6d25eb56a0c098a7c29c1ad1dbbf7c6d8d74fd-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/feb18baa95db1537c38cfe0d7bb3ff321e6c6c7dc213e7095cc150005ec7b140-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fecf3393bbfbc2cdc135f053dbf0175dbe1af89977eb0332127998734d6e4644-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fee9c8bfe7d4e41c2183d1eef93d8949912ab23bb323f6c647f5f919d3419154-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fef2b706e41d68309baa464eec5bb87d6391a5b4ccab1ad8aec8904356ea0294-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fefe85cebedbada75d373b6965c2009bfc6ed10551c874b0475b6b16ac0bc188-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff0eafab97e670fa7685b629092c0b1a54adfaf92cef43de1e2643acf81bdbf5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff2de6b16a21f5a32db5a1b2b8b74cd7403bbbc16b5436d2e1b5c54c6d32b876-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff4ee1d31db57a1bcd8b650b00d855af9f4a26a95186fcc8e9ea333da2d61940-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff80c52ff9fe9eb5f813d95fbc93270ce8fe0a91bee0008bdaafb5dab25888c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff96f7cbad6427f9a358cff05a8d120035e433afa4585de92536fc0e2d67085b-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffa6966a9d90b11fe3e315e2d1642179675eacd4f765a6a53ec170cd5c3d0aac-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb5117943a796108572c4f416fb30ce41fbcaee840cdceb74a1182c729cbdf5-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb792cf5f0d25665080b76c23d08d2605a3f97f63eee22d20f6f801530f5218-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffddfcabec0c7d551705636d4945289c55197285c4f9abe84ed285ea9dcbb6c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffeee505136bd4d01a56c9406ab18c9066a2d52d650683f3fbe7ce195d18a53d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/fff8ef9c114ac427168a67fc4397eaab05dc33cd47570cd825235ecbc2f6d08b-a\n\nTEST> make build\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:19Z\" -o bin/clai ./cmd/clai\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:19Z\" -o bin/claid ./cmd/claid\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:19Z\" -o bin/clai-shim ./cmd/clai-shim\ngo build -ldflags \"-X main.Version=10330b2d-dirty -X main.GitCommit=10330b2d -X main.BuildDate=2026-02-20T08:30:19Z\" -o bin/clai-picker ./cmd/clai-picker\nTEST>  ",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "clai suggest with prefix filters results",
         "reason": "expected screen not to contain: npm | expected screen not to contain: make",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/010-clai_suggest_with_prefix_filters_results.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/003-clai_suggest_with_prefix_filters_results.png",
+        "terminal_excerpt": "bdc63cdc docs: modernize README with product-focused content\n6fe9ca80 docs: add user documentation for clai\n137781d4 feat: implement Wave 4 - Integration Tests\nab8871bc feat: implement Wave 3 - clai-daemon (Core Server)\nc77e6c6f feat: implement Wave 2 - clai-shim, Ranking, CLI & Shell Hooks\n3e109df3 chore: sync beads after Wave 1 implementation\n2b8cd8dd feat: implement Wave 1 - Storage Layer and Provider Adapters\n3dbfa133 fix: address code review issues for proto foundation\n0528a249 chore: close ai-terminal-0cx.1 (proto/gRPC foundation)\n054eeba0 feat: add proto/gRPC foundation for clai service\ne085acd3 Merge pull request #1 from php-workx/feat/dev-tooling\n7460ed4d fix: address code review feedback\n4e74a6e3 fix: update golangci-lint v2 config format\n826dc47b test: mock Claude CLI calls for fast tests\nee178c5d fix: update Go to 1.23 and golangci-lint to v2\nc83c775a fix: address remaining code review issues\nb8574a93 fix: address code review issues\n2128a9ea chore: doc updates\n8ea5acfe feat: add inline command suggestions from history while typing\ne5131414 feat: use Haiku model for daemon and move diagnosis to run wrapper\n18f79d19 feat: add development environment setup, CI workflows, and release automation\n32d896d1 Rename project from ai-terminal to clai\nffd3d70f feat: voice to command support using Claude\nc74fa708 Very basic initial version.\nTEST> npm test\nnpm error code ENOENT\nnpm error syscall open\nnpm error path /Users/runger/.claude-worktrees/clai/spec-reviews/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/Users/runger/.claude-worktrees/clai/spec-reviews/package.j\nson'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this run can be found in: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/home/.npm/_logs/2026-02-20T0\n8_30_25_122Z-debug-0.log\nTEST> make build\n^Lclai suggest gitgo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330\nb2d -X github.com/runger/clai/internal/cmd.BuildDate=2026-02-20T08:30:25Z\" -o bin/clai ./cmd/clai\n\n ",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Suggestion shows transition reason",
         "reason": "expected screen to contain: transition",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/011-Suggestion_shows_transition_reason.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/004-Suggestion_shows_transition_reason.png",
+        "terminal_excerpt": " create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe19cefda8bec9f931b536a1723266b159c0d2203e7f1eb6b3900b7b0ce69909-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1e1f3c2501cd043a2f0a717d6ce61174e3abe20f3429811eef6db4ea32e2c5-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1f0b507ce9832c54fb9d27da5c76342c1d3ce168c463437465b34dd764f08a-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe424e99baadc94a9ce541de5544ee3c2345cddbae290483d7eed1e5a922e15e-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe5c7d1a20bd8448e9af041bcd5ecc9678007b00befbc398e0131ebaf62e5fce-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe6377d91cc18d90f85d801e76ae2b48f86b9e292d2df60ae7b1976dc7407df7-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe9ccd78fbced52dad0fd72f4ad37a27121037c3126e1e670c59b7e399d718c5-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea1e475a4492979a2e1696e89eac82ba6b1a4a421863d116d086a2687585238-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea49bee6c30fa89c7d9f6940b6d25eb56a0c098a7c29c1ad1dbbf7c6d8d74fd-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/feb18baa95db1537c38cfe0d7bb3ff321e6c6c7dc213e7095cc150005ec7b140-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fecf3393bbfbc2cdc135f053dbf0175dbe1af89977eb0332127998734d6e4644-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fee9c8bfe7d4e41c2183d1eef93d8949912ab23bb323f6c647f5f919d3419154-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fef2b706e41d68309baa464eec5bb87d6391a5b4ccab1ad8aec8904356ea0294-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fefe85cebedbada75d373b6965c2009bfc6ed10551c874b0475b6b16ac0bc188-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff0eafab97e670fa7685b629092c0b1a54adfaf92cef43de1e2643acf81bdbf5-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff2de6b16a21f5a32db5a1b2b8b74cd7403bbbc16b5436d2e1b5c54c6d32b876-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff4ee1d31db57a1bcd8b650b00d855af9f4a26a95186fcc8e9ea333da2d61940-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff80c52ff9fe9eb5f813d95fbc93270ce8fe0a91bee0008bdaafb5dab25888c3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff96f7cbad6427f9a358cff05a8d120035e433afa4585de92536fc0e2d67085b-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffa6966a9d90b11fe3e315e2d1642179675eacd4f765a6a53ec170cd5c3d0aac-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb5117943a796108572c4f416fb30ce41fbcaee840cdceb74a1182c729cbdf5-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb792cf5f0d25665080b76c23d08d2605a3f97f63eee22d20f6f801530f5218-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffddfcabec0c7d551705636d4945289c55197285c4f9abe84ed285ea9dcbb6c3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffeee505136bd4d01a56c9406ab18c9066a2d52d650683f3fbe7ce195d18a53d-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/fff8ef9c114ac427168a67fc4397eaab05dc33cd47570cd825235ecbc2f6d08b-a\nTEST> git add .\nTEST> git commit -m 'test2'\n[chore/spec-reviews ed8033d4] test2\n 10 files changed, 41 insertions(+)\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/19/1916227b3e5758e7729b34462f073134f692b1f7ca045dca6f52b7b7eeb272d0-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/51/51d0f5ed1497cc0b22a8d78066bc8ff05ed7c80edce9df515b647479fe505dd2-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/5d/5deab41264219ff8c109b9684ee1396ad103a5dcff902963d78fdd086ad4b6a9-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/98/986393afd0fbf2f6f0bef5f6d3bb3f6c2d46c345f162c0518b1d86d74e2f2d17-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/a6/a6778d7ad337f29189715064f86add9404d8e39c363a3b59caff0a5fd90991df-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/b4/b411bb0896ec2544165abe1d2d19bfc575e0621340477266562a35e795b5dd43-a\nTEST> git add .\nTEST> clai suggest --format=json\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest --format=json\",\"last_cmd_norm\":\"cla\ni <arg> --format=json\"},\"suggestions\":[]}\nTEST>  ",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Suggestion shows freq_repo reason",
         "reason": "expected screen to match: (freq_repo|freq_global)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/012-Suggestion_shows_freq_repo_reason.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/005-Suggestion_shows_freq_repo_reason.png",
+        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Suggestion includes confidence score",
         "reason": "expected screen to contain: confidence",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/013-Suggestion_includes_confidence_score.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/006-Suggestion_includes_confidence_score.png",
+        "terminal_excerpt": "        modified:   .tmp/e2e-test-server/clai/logs/daemon.log\n        modified:   .tmp/e2e-test-server/clai/state.db-wal\n        modified:   .tmp/e2e-test-server/gotty.log\n        modified:   .tmp/e2e-test-server/home/.clai/suggestions_v2.db-wal\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/compile@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/go@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/link@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n        .tmp/e2e-runs/artifacts-zsh/004-Suggestion_shows_transition_reason.png\n        .tmp/e2e-runs/artifacts-zsh/005-Suggestion_shows_freq_repo_reason.png\n        .tmp/e2e-test-server/home/Library/Caches/go-build/01/01dba32bead924f82b9263e066b4ea9c65dacaf6d3b68082771b5fc2d5ba7d2d-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/04/0484cd5d1ba44505485d937617fce8c09c45bf9029181c6b4c2911d63c82e845-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/0c/0c589deaab7a19a0067cc768bb541c7b4c2be0bddc18a699065af182675ec0d4-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/3e/3e15a0322df7775bd33a9fe4cc407f99a0eedb1cedebcbeb9b39cdf4911e34a1-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/42/4227a49f6aa38597213cce240dad803e81667f3fd80f0a596a4441a3ff4bf6c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/45/451323985f988b4a9f8ed0bf0933b3e2d41606147e8019bd99c6b55ebe849d97-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/4e/4e83ecf15c3283b1d7fb1122f07896442a2f9c41cb759eac47f45fbdf123fe1a-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/5e/5e81daedbbadf0b9daf0151d5bf143954b68435f2e728fbab215f37490794894-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/7a/7ae25852a551895c9820d3458bb2117352829a004a727b214477300a9337ca29-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/91/91147a5a30deeb6e9d2b61c212ae72248b47fd19a48c52df165c902aa97c2e36-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/94/94813c3c09ce4e5c02c6dad906af357cc926425eb48342c011da3e078ba64a7e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a8/a8a4ed5e76e1fd20d766ffdd810904dbab2520e373abe20f4f946095f77143fa-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/b9/b95059ca798aa87dab135698919e861ba60b5d620f4e23a2593a657ab94eb06c-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ba/bab0aef53da6eda3e6fef67113c10df615d62c00218f02cfd49064b5c82bdb2d-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/be/be04e4c819fd1bca5134bc224b36dd90609aa6aa7e4960fa949247755a5e2414-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c7/c7b7aede6f3986d6470cb8fed8d20cc57ed00c08b26c72702c55b13710e28a10-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/cf/cfed606f710be8ca1b1b3e7e730f34f1867e5ac30231887d2afe1c7f052623a0-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/cf/cffcb6e055fd38acc91e3bd7aa2daed6a01b03170b47779ea215274ce67549de-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/da/dafa0d1288e8c62b386cf75ae07f78e0886ac8305ae4243d9c32354a0e28ff09-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e7/e7c8e7a6b4485c41a421be81a00eedb3746bd273c7a3706c5fb7ffebbe6062be-a\n\nTEST> clai suggest --format=json\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest --format=json\",\"last_cmd_norm\":\"cla\ni <arg> --format=json\"},\"suggestions\":[]}\nTEST>  \n\n\n",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Ghost text suggestion appears",
         "reason": "expected screen to contain: git status",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/015-Ghost_text_suggestion_appears.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/007-Ghost_text_suggestion_appears.png",
+        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Alt+Right accepts next token",
         "reason": "expected screen to contain: kubectl get",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/019-Alt_Right_accepts_next_token.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/008-Alt_Right_accepts_next_token.png",
+        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Discovery shows project_task reason",
         "reason": "expected screen to contain: project_task",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/039-Discovery_shows_project_task_reason.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Suggest API returns expected JSON structure",
-        "reason": "expected screen to match: (reason|reasons)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/052-Suggest_API_returns_expected_JSON_structure.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/009-Discovery_shows_project_task_reason.png",
+        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
         "plan": "suggestions-tests.yaml"
       }
     ]
   },
   "results": [
     {
-      "ok": true,
-      "name": "clai loads successfully in zsh",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai status in zsh",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "History picker works in zsh",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": false,
-      "name": "CWD scope filters correctly with spaces in path",
-      "reason": "expected screen to contain: in my project",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/004-CWD_scope_filters_correctly_with_spaces_in_path.png",
-      "plan": "example-test-plan.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Command ingestion in zsh",
-      "plan": "example-test-plan.yaml"
-    },
-    {
       "ok": false,
       "name": "clai suggest text format",
-      "reason": "expected screen to match: \\d+\\.",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/006-clai_suggest_text_format.png",
+      "reason": "expected screen to match: \\d+\\. | expected screen to match: \\(",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/001-clai_suggest_text_format.png",
+      "terminal_excerpt": "        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdf02c4988e4f76022d55f709a32a2e156acd578caee8a1c2c3547510c3ea3ce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fd/fdf0575cbb0ec53d7df53ab85ee106437d1c705e6af22cdf5d94b138b96a5e4c-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe095be5bb554ac7372f515c20dab35f7dda027852545f7b8b5f16b2be80417d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe0dd71062f84ebe3b488ef7e8471843663e425cb8aa9a556c713d77e51c7422-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe185329db30a1a2bfe531cc2bcacf805bbf9bdc9427275f58cabf34739c5857-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe19cefda8bec9f931b536a1723266b159c0d2203e7f1eb6b3900b7b0ce69909-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1e1f3c2501cd043a2f0a717d6ce61174e3abe20f3429811eef6db4ea32e2c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1f0b507ce9832c54fb9d27da5c76342c1d3ce168c463437465b34dd764f08a-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe424e99baadc94a9ce541de5544ee3c2345cddbae290483d7eed1e5a922e15e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe5c7d1a20bd8448e9af041bcd5ecc9678007b00befbc398e0131ebaf62e5fce-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe6377d91cc18d90f85d801e76ae2b48f86b9e292d2df60ae7b1976dc7407df7-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe9ccd78fbced52dad0fd72f4ad37a27121037c3126e1e670c59b7e399d718c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea1e475a4492979a2e1696e89eac82ba6b1a4a421863d116d086a2687585238-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea49bee6c30fa89c7d9f6940b6d25eb56a0c098a7c29c1ad1dbbf7c6d8d74fd-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/feb18baa95db1537c38cfe0d7bb3ff321e6c6c7dc213e7095cc150005ec7b140-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fecf3393bbfbc2cdc135f053dbf0175dbe1af89977eb0332127998734d6e4644-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fee9c8bfe7d4e41c2183d1eef93d8949912ab23bb323f6c647f5f919d3419154-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fef2b706e41d68309baa464eec5bb87d6391a5b4ccab1ad8aec8904356ea0294-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fefe85cebedbada75d373b6965c2009bfc6ed10551c874b0475b6b16ac0bc188-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff0eafab97e670fa7685b629092c0b1a54adfaf92cef43de1e2643acf81bdbf5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff2de6b16a21f5a32db5a1b2b8b74cd7403bbbc16b5436d2e1b5c54c6d32b876-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff4ee1d31db57a1bcd8b650b00d855af9f4a26a95186fcc8e9ea333da2d61940-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff80c52ff9fe9eb5f813d95fbc93270ce8fe0a91bee0008bdaafb5dab25888c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff96f7cbad6427f9a358cff05a8d120035e433afa4585de92536fc0e2d67085b-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffa6966a9d90b11fe3e315e2d1642179675eacd4f765a6a53ec170cd5c3d0aac-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb5117943a796108572c4f416fb30ce41fbcaee840cdceb74a1182c729cbdf5-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb792cf5f0d25665080b76c23d08d2605a3f97f63eee22d20f6f801530f5218-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffddfcabec0c7d551705636d4945289c55197285c4f9abe84ed285ea9dcbb6c3-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffeee505136bd4d01a56c9406ab18c9066a2d52d650683f3fbe7ce195d18a53d-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ff/fff8ef9c114ac427168a67fc4397eaab05dc33cd47570cd825235ecbc2f6d08b-a\n\nTEST> make build\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:19Z\" -o bin/clai ./cmd/clai\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:19Z\" -o bin/claid ./cmd/claid\ngo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330b2d -X github.com/\nrunger/clai/internal/cmd.BuildDate=2026-02-20T08:30:19Z\" -o bin/clai-shim ./cmd/clai-shim\ngo build -ldflags \"-X main.Version=10330b2d-dirty -X main.GitCommit=10330b2d -X main.BuildDate=2026-02-20T08:30:19Z\" -o bin/clai-picker ./cmd/clai-picker\nTEST>  ",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "clai suggest JSON format",
-      "reason": "expected screen to contain: {",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/007-clai_suggest_JSON_format.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai suggest fzf format",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai suggest with limit",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "clai suggest with prefix filters results",
       "reason": "expected screen not to contain: npm | expected screen not to contain: make",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/010-clai_suggest_with_prefix_filters_results.png",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/003-clai_suggest_with_prefix_filters_results.png",
+      "terminal_excerpt": "bdc63cdc docs: modernize README with product-focused content\n6fe9ca80 docs: add user documentation for clai\n137781d4 feat: implement Wave 4 - Integration Tests\nab8871bc feat: implement Wave 3 - clai-daemon (Core Server)\nc77e6c6f feat: implement Wave 2 - clai-shim, Ranking, CLI & Shell Hooks\n3e109df3 chore: sync beads after Wave 1 implementation\n2b8cd8dd feat: implement Wave 1 - Storage Layer and Provider Adapters\n3dbfa133 fix: address code review issues for proto foundation\n0528a249 chore: close ai-terminal-0cx.1 (proto/gRPC foundation)\n054eeba0 feat: add proto/gRPC foundation for clai service\ne085acd3 Merge pull request #1 from php-workx/feat/dev-tooling\n7460ed4d fix: address code review feedback\n4e74a6e3 fix: update golangci-lint v2 config format\n826dc47b test: mock Claude CLI calls for fast tests\nee178c5d fix: update Go to 1.23 and golangci-lint to v2\nc83c775a fix: address remaining code review issues\nb8574a93 fix: address code review issues\n2128a9ea chore: doc updates\n8ea5acfe feat: add inline command suggestions from history while typing\ne5131414 feat: use Haiku model for daemon and move diagnosis to run wrapper\n18f79d19 feat: add development environment setup, CI workflows, and release automation\n32d896d1 Rename project from ai-terminal to clai\nffd3d70f feat: voice to command support using Claude\nc74fa708 Very basic initial version.\nTEST> npm test\nnpm error code ENOENT\nnpm error syscall open\nnpm error path /Users/runger/.claude-worktrees/clai/spec-reviews/package.json\nnpm error errno -2\nnpm error enoent Could not read package.json: Error: ENOENT: no such file or directory, open '/Users/runger/.claude-worktrees/clai/spec-reviews/package.j\nson'\nnpm error enoent This is related to npm not being able to find a file.\nnpm error enoent\nnpm error A complete log of this run can be found in: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/home/.npm/_logs/2026-02-20T0\n8_30_25_122Z-debug-0.log\nTEST> make build\n^Lclai suggest gitgo build -ldflags \"-X github.com/runger/clai/internal/cmd.Version=10330b2d-dirty -X github.com/runger/clai/internal/cmd.GitCommit=10330\nb2d -X github.com/runger/clai/internal/cmd.BuildDate=2026-02-20T08:30:25Z\" -o bin/clai ./cmd/clai\n\n ",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Suggestion shows transition reason",
       "reason": "expected screen to contain: transition",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/011-Suggestion_shows_transition_reason.png",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/004-Suggestion_shows_transition_reason.png",
+      "terminal_excerpt": " create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe19cefda8bec9f931b536a1723266b159c0d2203e7f1eb6b3900b7b0ce69909-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1e1f3c2501cd043a2f0a717d6ce61174e3abe20f3429811eef6db4ea32e2c5-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe1f0b507ce9832c54fb9d27da5c76342c1d3ce168c463437465b34dd764f08a-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe424e99baadc94a9ce541de5544ee3c2345cddbae290483d7eed1e5a922e15e-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe5c7d1a20bd8448e9af041bcd5ecc9678007b00befbc398e0131ebaf62e5fce-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe6377d91cc18d90f85d801e76ae2b48f86b9e292d2df60ae7b1976dc7407df7-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe9ccd78fbced52dad0fd72f4ad37a27121037c3126e1e670c59b7e399d718c5-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea1e475a4492979a2e1696e89eac82ba6b1a4a421863d116d086a2687585238-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fea49bee6c30fa89c7d9f6940b6d25eb56a0c098a7c29c1ad1dbbf7c6d8d74fd-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/feb18baa95db1537c38cfe0d7bb3ff321e6c6c7dc213e7095cc150005ec7b140-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fecf3393bbfbc2cdc135f053dbf0175dbe1af89977eb0332127998734d6e4644-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fee9c8bfe7d4e41c2183d1eef93d8949912ab23bb323f6c647f5f919d3419154-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fef2b706e41d68309baa464eec5bb87d6391a5b4ccab1ad8aec8904356ea0294-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fefe85cebedbada75d373b6965c2009bfc6ed10551c874b0475b6b16ac0bc188-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff0eafab97e670fa7685b629092c0b1a54adfaf92cef43de1e2643acf81bdbf5-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff2de6b16a21f5a32db5a1b2b8b74cd7403bbbc16b5436d2e1b5c54c6d32b876-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff4ee1d31db57a1bcd8b650b00d855af9f4a26a95186fcc8e9ea333da2d61940-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff80c52ff9fe9eb5f813d95fbc93270ce8fe0a91bee0008bdaafb5dab25888c3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ff96f7cbad6427f9a358cff05a8d120035e433afa4585de92536fc0e2d67085b-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffa6966a9d90b11fe3e315e2d1642179675eacd4f765a6a53ec170cd5c3d0aac-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb5117943a796108572c4f416fb30ce41fbcaee840cdceb74a1182c729cbdf5-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffb792cf5f0d25665080b76c23d08d2605a3f97f63eee22d20f6f801530f5218-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffddfcabec0c7d551705636d4945289c55197285c4f9abe84ed285ea9dcbb6c3-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/ffeee505136bd4d01a56c9406ab18c9066a2d52d650683f3fbe7ce195d18a53d-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/ff/fff8ef9c114ac427168a67fc4397eaab05dc33cd47570cd825235ecbc2f6d08b-a\nTEST> git add .\nTEST> git commit -m 'test2'\n[chore/spec-reviews ed8033d4] test2\n 10 files changed, 41 insertions(+)\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/19/1916227b3e5758e7729b34462f073134f692b1f7ca045dca6f52b7b7eeb272d0-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/51/51d0f5ed1497cc0b22a8d78066bc8ff05ed7c80edce9df515b647479fe505dd2-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/5d/5deab41264219ff8c109b9684ee1396ad103a5dcff902963d78fdd086ad4b6a9-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/98/986393afd0fbf2f6f0bef5f6d3bb3f6c2d46c345f162c0518b1d86d74e2f2d17-d\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/a6/a6778d7ad337f29189715064f86add9404d8e39c363a3b59caff0a5fd90991df-a\n create mode 100644 .tmp/e2e-test-server/home/Library/Caches/go-build/b4/b411bb0896ec2544165abe1d2d19bfc575e0621340477266562a35e795b5dd43-a\nTEST> git add .\nTEST> clai suggest --format=json\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest --format=json\",\"last_cmd_norm\":\"cla\ni <arg> --format=json\"},\"suggestions\":[]}\nTEST>  ",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Suggestion shows freq_repo reason",
       "reason": "expected screen to match: (freq_repo|freq_global)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/012-Suggestion_shows_freq_repo_reason.png",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/005-Suggestion_shows_freq_repo_reason.png",
+      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Suggestion includes confidence score",
       "reason": "expected screen to contain: confidence",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/013-Suggestion_includes_confidence_score.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Suggestion context includes last_cmd_norm",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/006-Suggestion_includes_confidence_score.png",
+      "terminal_excerpt": "        modified:   .tmp/e2e-test-server/clai/logs/daemon.log\n        modified:   .tmp/e2e-test-server/clai/state.db-wal\n        modified:   .tmp/e2e-test-server/gotty.log\n        modified:   .tmp/e2e-test-server/home/.clai/suggestions_v2.db-wal\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/compile@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/go@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/link@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n        .tmp/e2e-runs/artifacts-zsh/004-Suggestion_shows_transition_reason.png\n        .tmp/e2e-runs/artifacts-zsh/005-Suggestion_shows_freq_repo_reason.png\n        .tmp/e2e-test-server/home/Library/Caches/go-build/01/01dba32bead924f82b9263e066b4ea9c65dacaf6d3b68082771b5fc2d5ba7d2d-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/04/0484cd5d1ba44505485d937617fce8c09c45bf9029181c6b4c2911d63c82e845-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/0c/0c589deaab7a19a0067cc768bb541c7b4c2be0bddc18a699065af182675ec0d4-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/3e/3e15a0322df7775bd33a9fe4cc407f99a0eedb1cedebcbeb9b39cdf4911e34a1-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/42/4227a49f6aa38597213cce240dad803e81667f3fd80f0a596a4441a3ff4bf6c5-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/45/451323985f988b4a9f8ed0bf0933b3e2d41606147e8019bd99c6b55ebe849d97-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/4e/4e83ecf15c3283b1d7fb1122f07896442a2f9c41cb759eac47f45fbdf123fe1a-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/5e/5e81daedbbadf0b9daf0151d5bf143954b68435f2e728fbab215f37490794894-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/7a/7ae25852a551895c9820d3458bb2117352829a004a727b214477300a9337ca29-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/91/91147a5a30deeb6e9d2b61c212ae72248b47fd19a48c52df165c902aa97c2e36-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/94/94813c3c09ce4e5c02c6dad906af357cc926425eb48342c011da3e078ba64a7e-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/a8/a8a4ed5e76e1fd20d766ffdd810904dbab2520e373abe20f4f946095f77143fa-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/b9/b95059ca798aa87dab135698919e861ba60b5d620f4e23a2593a657ab94eb06c-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ba/bab0aef53da6eda3e6fef67113c10df615d62c00218f02cfd49064b5c82bdb2d-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/be/be04e4c819fd1bca5134bc224b36dd90609aa6aa7e4960fa949247755a5e2414-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c7/c7b7aede6f3986d6470cb8fed8d20cc57ed00c08b26c72702c55b13710e28a10-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/cf/cfed606f710be8ca1b1b3e7e730f34f1867e5ac30231887d2afe1c7f052623a0-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/cf/cffcb6e055fd38acc91e3bd7aa2daed6a01b03170b47779ea215274ce67549de-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/da/dafa0d1288e8c62b386cf75ae07f78e0886ac8305ae4243d9c32354a0e28ff09-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e7/e7c8e7a6b4485c41a421be81a00eedb3746bd273c7a3706c5fb7ffebbe6062be-a\n\nTEST> clai suggest --format=json\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest --format=json\",\"last_cmd_norm\":\"cla\ni <arg> --format=json\"},\"suggestions\":[]}\nTEST>  \n\n\n",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Ghost text suggestion appears",
       "reason": "expected screen to contain: git status",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/015-Ghost_text_suggestion_appears.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Right arrow accepts full suggestion",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Escape clears suggestion",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Typing clears ghost text",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/007-Ghost_text_suggestion_appears.png",
+      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Alt+Right accepts next token",
       "reason": "expected screen to contain: kubectl get",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/019-Alt_Right_accepts_next_token.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Typo correction suggests on exit 127",
-      "reason": "Typo correction backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Typo correction respects similarity threshold",
-      "reason": "Typo correction backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Typo correction prioritizes high-frequency commands",
-      "reason": "Typo correction backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Slot filling learns argument values",
-      "reason": "Slot filling backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Slot filling respects frequency",
-      "reason": "Slot filling backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Slot scope repo overrides global",
-      "reason": "Slot filling backend not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Suggestions served from cache",
-      "reason": "Cache introspection not yet exposed in CLI",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Cache TTL expires stale entries",
-      "reason": "Cache introspection not yet exposed in CLI",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Cache invalidated on new command",
-      "reason": "Cache introspection not yet exposed in CLI",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Cache shows in debug endpoint",
-      "reason": "Cache introspection not yet exposed in CLI",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Alt+H opens suggestion picker (zsh)",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search basic query",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search with repo filter",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search with limit",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search with JSON output",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search empty results",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "clai search with special characters",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Discovery finds package.json scripts",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Discovery finds Makefile targets",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/008-Alt_Right_accepts_next_token.png",
+      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Discovery shows project_task reason",
       "reason": "expected screen to contain: project_task",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/039-Discovery_shows_project_task_reason.png",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/009-Discovery_shows_project_task_reason.png",
+      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
-      "skipped": true,
-      "name": "Discovery finds Cargo.toml commands",
-      "reason": "Cargo discovery not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Discovery finds pyproject.toml scripts",
-      "reason": "pyproject.toml discovery not yet implemented",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug scores endpoint returns data",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug scores with limit parameter",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug transitions endpoint returns data",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug tasks endpoint returns discovered tasks",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug discovery-errors endpoint",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Debug endpoints return valid JSON",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Incognito mode toggle",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Incognito commands appear in session suggestions",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "Incognito commands not in global suggestions",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "name": "CLAI_EPHEMERAL affects suggestions",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": false,
       "name": "Suggest API returns expected JSON structure",
-      "reason": "expected screen to match: (reason|reasons)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/052-Suggest_API_returns_expected_JSON_structure.png",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Suggest API includes cache status",
-      "reason": "Cache status field not yet exposed",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": true,
-      "skipped": true,
-      "name": "Suggest API includes timing info",
-      "reason": "Timing info not yet exposed",
       "plan": "suggestions-tests.yaml"
     }
   ]

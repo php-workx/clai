@@ -1,0 +1,12 @@
+test server started
+shell: fish
+url: http://127.0.0.1:8080
+pid: 34504
+log: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/gotty.log
+[fish] 1/10 clai suggest text format
+  -> FAIL: expected screen to match: \d+\. | expected screen to match: \(
+[fish] 2/10 clai suggest JSON format
+  -> PASS
+[fish] 3/10 clai suggest with prefix filters results
+  -> PASS
+[fish] 4/10 Suggestion shows transition reason
