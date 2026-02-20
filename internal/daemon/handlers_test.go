@@ -762,7 +762,7 @@ func TestServer_ApplyLearningProfile_ReordersSuggestions(t *testing.T) {
 		{Command: "git status", Score: 10.0},
 	}
 
-	server.applyLearningProfile(ctx, suggest2.SuggestContext{
+	server.applyLearningProfile(ctx, &suggest2.SuggestContext{
 		Scope:  "repo:demo",
 		Prefix: "git",
 	}, suggestions)
@@ -2908,30 +2908,30 @@ func TestHandler_FetchHistory_V2SearchPaginationOffset(t *testing.T) {
 		t.Fatalf("failed to open V2 DB: %v", err)
 	}
 	defer v2db.Close()
-	if _, err := v2db.DB().ExecContext(ctx, `
+	if _, ftsErr := v2db.DB().ExecContext(ctx, `
 		CREATE VIRTUAL TABLE IF NOT EXISTS command_fts USING fts5(cmd_raw, repo_key, cwd)
-	`); err != nil {
-		t.Fatalf("failed to create command_fts: %v", err)
+	`); ftsErr != nil {
+		t.Fatalf("failed to create command_fts: %v", ftsErr)
 	}
 
 	for i := 1; i <= 4; i++ {
 		cmd := fmt.Sprintf("git cmd %d", i)
-		res, err := v2db.DB().ExecContext(ctx, `
+		res, insertErr := v2db.DB().ExecContext(ctx, `
 			INSERT INTO command_event (session_id, ts_ms, cwd, repo_key, cmd_raw, cmd_norm, ephemeral)
 			VALUES (?, ?, ?, ?, ?, ?, 0)
 		`, "sess-v2", int64(1000+i), "/tmp", "repo-a", cmd, cmd)
-		if err != nil {
-			t.Fatalf("insert command_event failed: %v", err)
+		if insertErr != nil {
+			t.Fatalf("insert command_event failed: %v", insertErr)
 		}
-		id, err := res.LastInsertId()
-		if err != nil {
-			t.Fatalf("last insert id failed: %v", err)
+		id, idErr := res.LastInsertId()
+		if idErr != nil {
+			t.Fatalf("last insert id failed: %v", idErr)
 		}
-		if _, err := v2db.DB().ExecContext(ctx, `
+		if _, ftsInsertErr := v2db.DB().ExecContext(ctx, `
 			INSERT INTO command_fts(rowid, cmd_raw, repo_key, cwd)
 			VALUES (?, ?, ?, ?)
-		`, id, cmd, "repo-a", "/tmp"); err != nil {
-			t.Fatalf("insert command_fts failed: %v", err)
+		`, id, cmd, "repo-a", "/tmp"); ftsInsertErr != nil {
+			t.Fatalf("insert command_fts failed: %v", ftsInsertErr)
 		}
 	}
 
@@ -3005,7 +3005,7 @@ func TestHandler_FetchHistory_V2SearchErrorFallsBackToStorage(t *testing.T) {
 		SessionID:     "sess-fallback",
 		Command:       "git status",
 		CommandNorm:   "git status",
-		TsStartUnixMs: 1000,
+		TSStartUnixMs: 1000,
 		CWD:           "/tmp",
 	}
 

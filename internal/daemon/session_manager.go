@@ -8,25 +8,23 @@ import (
 
 // SessionInfo contains metadata about an active session.
 type SessionInfo struct {
-	SessionID    string
-	Shell        string
-	OS           string
-	Hostname     string
-	Username     string
-	CWD          string
-	StartedAt    time.Time
-	LastActivity time.Time
-
-	// Stashed command data from CommandStarted for CommandEnded to read.
-	LastCmdRaw     string // Raw command from CommandStarted
-	LastCmdCWD     string // CWD from CommandStarted
-	LastGitRepo    string // Git repo name from CommandStarted
-	LastGitRoot    string // Git repo root from CommandStarted
-	LastGitBranch  string // Git branch from CommandStarted
-	LastCmdID      string // Command ID from CommandStarted
-	LastTemplateID string
-	ProjectTypes   []string
+	StartedAt      time.Time
+	LastActivity   time.Time
 	Aliases        map[string]string
+	LastCmdRaw     string
+	LastGitRepo    string
+	CWD            string
+	Hostname       string
+	OS             string
+	SessionID      string
+	LastCmdCWD     string
+	Username       string
+	LastGitRoot    string
+	LastGitBranch  string
+	LastCmdID      string
+	LastTemplateID string
+	Shell          string
+	ProjectTypes   []string
 }
 
 // SessionManager tracks active sessions.

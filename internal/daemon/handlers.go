@@ -53,6 +53,8 @@ func v1WhyNarrative(sug *suggest.Suggestion, lastCmd string) string {
 		base = "Often used in this directory."
 	case "global":
 		base = "From your global history."
+	default:
+		// Unknown source; leave base empty.
 	}
 
 	total := sug.SuccessCount + sug.FailureCount
@@ -64,6 +66,8 @@ func v1WhyNarrative(sug *suggest.Suggestion, lastCmd string) string {
 			reliability = "It has been reliable."
 		case rate >= 0.60:
 			reliability = "It usually works."
+		default:
+			// Low reliability; no label.
 		}
 
 		if reliability != "" {
@@ -325,7 +329,7 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 				Aliases:      info.Aliases,
 				ExitCode:     int(req.ExitCode),
 				DurationMs:   &durationMs,
-				Ts:           tsEnd.UnixMilli(),
+				TS:           tsEnd.UnixMilli(),
 			}
 			s.batchWriter.Enqueue(ev)
 		}
@@ -783,6 +787,8 @@ func (s *Server) applyFeedbackUpdates(ctx context.Context, req *pb.RecordFeedbac
 			_ = s.dismissalStore.RecordNever(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID, nowMs)
 		case "unblock":
 			_ = s.dismissalStore.RecordUnblock(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID)
+		default:
+			// Unknown action; no dismissal update.
 		}
 	}
 
@@ -796,7 +802,7 @@ func (s *Server) applyFeedbackUpdates(ctx context.Context, req *pb.RecordFeedbac
 	if !ok {
 		return
 	}
-	s.learner.Update(ctx, scope, featureVectorFromSuggestion(pos, req), featureVectorFromSuggestion(neg, req))
+	s.learner.Update(ctx, scope, featureVectorFromSuggestion(&pos, req), featureVectorFromSuggestion(&neg, req))
 }
 
 func (s *Server) getSuggestSnapshot(sessionID string) (suggestSnapshot, bool) {
@@ -824,7 +830,7 @@ func findSnapshotSuggestion(suggestions []suggest2.Suggestion, text string) (sug
 	return suggest2.Suggestion{}, false
 }
 
-func learningPairFromFeedback(suggestions []suggest2.Suggestion, req *pb.RecordFeedbackRequest) (suggest2.Suggestion, suggest2.Suggestion, bool) {
+func learningPairFromFeedback(suggestions []suggest2.Suggestion, req *pb.RecordFeedbackRequest) (pos, neg suggest2.Suggestion, ok bool) {
 	target, found := findSnapshotSuggestion(suggestions, req.SuggestedText)
 	if !found || len(suggestions) == 0 {
 		return suggest2.Suggestion{}, suggest2.Suggestion{}, false
@@ -854,7 +860,7 @@ func learningPairFromFeedback(suggestions []suggest2.Suggestion, req *pb.RecordF
 	}
 }
 
-func featureVectorFromSuggestion(sug suggest2.Suggestion, req *pb.RecordFeedbackRequest) learning.FeatureVector {
+func featureVectorFromSuggestion(sug *suggest2.Suggestion, req *pb.RecordFeedbackRequest) *learning.FeatureVector {
 	b := sug.ScoreBreakdown()
 	prefix := 0.0
 	if req.Prefix != "" && strings.HasPrefix(sug.Command, req.Prefix) {
@@ -864,7 +870,7 @@ func featureVectorFromSuggestion(sug suggest2.Suggestion, req *pb.RecordFeedback
 	if sanitize.IsDestructive(sug.Command) {
 		riskPenalty = 1.0
 	}
-	return learning.FeatureVector{
+	return &learning.FeatureVector{
 		Transition:          clamp01((b.RepoTransition + b.GlobalTransition + b.DirTransition) / 100.0),
 		Frequency:           clamp01((b.RepoFrequency + b.GlobalFrequency + b.DirFrequency) / 100.0),
 		Success:             0.5,
@@ -940,10 +946,10 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 	}
 
 	usesSessionScope := strings.EqualFold(req.Scope, "session") || (!req.Global && req.SessionId != "")
-	if s.v2db != nil && req.Query != "" && !usesSessionScope &&
-		(req.Mode == pb.SearchMode_SEARCH_MODE_FTS ||
-			req.Mode == pb.SearchMode_SEARCH_MODE_DESCRIBE ||
-			req.Mode == pb.SearchMode_SEARCH_MODE_AUTO) {
+	isV2SearchMode := req.Mode == pb.SearchMode_SEARCH_MODE_FTS ||
+		req.Mode == pb.SearchMode_SEARCH_MODE_DESCRIBE ||
+		req.Mode == pb.SearchMode_SEARCH_MODE_AUTO
+	if s.v2db != nil && req.Query != "" && !usesSessionScope && isV2SearchMode {
 		items, atEnd, backend, ok := s.fetchHistoryV2Search(ctx, req, limit)
 		if ok {
 			return &pb.HistoryFetchResponse{
@@ -1033,7 +1039,7 @@ func (s *Server) fetchHistoryV2Search(
 	ctx context.Context,
 	req *pb.HistoryFetchRequest,
 	limit int,
-) ([]*pb.HistoryItem, bool, string, bool) {
+) (histItems []*pb.HistoryItem, done bool, source string, used bool) {
 	if s.v2db == nil || limit <= 0 {
 		return nil, true, "storage", false
 	}

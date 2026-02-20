@@ -32,7 +32,7 @@ func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResul
 		s.logger.Warn("V2 scorer failed", "error", err)
 		return nil
 	}
-	s.applyLearningProfile(ctx, suggestCtx, suggestions)
+	s.applyLearningProfile(ctx, &suggestCtx, suggestions)
 
 	if maxResults > 0 && len(suggestions) > maxResults {
 		suggestions = suggestions[:maxResults]
@@ -52,7 +52,7 @@ func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResul
 
 func (s *Server) applyLearningProfile(
 	ctx context.Context,
-	suggestCtx suggest2.SuggestContext,
+	suggestCtx *suggest2.SuggestContext,
 	suggestions []suggest2.Suggestion,
 ) {
 	if len(suggestions) == 0 || s.learningStore == nil {
@@ -82,7 +82,7 @@ func (s *Server) applyLearningProfile(
 		return
 	}
 	for i := range suggestions {
-		suggestions[i].Score += learningDelta(suggestions[i], suggestCtx.Prefix, profile.Weights)
+		suggestions[i].Score += learningDelta(&suggestions[i], suggestCtx.Prefix, &profile.Weights)
 	}
 	sort.SliceStable(suggestions, func(i, j int) bool {
 		if suggestions[i].Score != suggestions[j].Score {
@@ -92,7 +92,7 @@ func (s *Server) applyLearningProfile(
 	})
 }
 
-func learningDelta(sug suggest2.Suggestion, prefix string, w learning.Weights) float64 {
+func learningDelta(sug *suggest2.Suggestion, prefix string, w *learning.Weights) float64 {
 	// Keep adaptive contribution bounded so learned weights nudge ordering
 	// without overpowering base score signals.
 	const learningScale = 25.0

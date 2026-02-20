@@ -45,129 +45,70 @@ type LLMQuerier interface {
 }
 
 type suggestSnapshot struct {
-	Context     suggest2.SuggestContext
 	Suggestions []suggest2.Suggestion
+	Context     suggest2.SuggestContext
 	ShownAtMs   int64
 }
 
 // Server is the main daemon server that handles all gRPC requests.
 type Server struct {
 	pb.UnimplementedClaiServiceServer
-
-	// Dependencies
-	store    storage.Store
-	v2db     *suggestdb.DB // V2 suggestions database (optional, enables V2 features)
-	ranker   suggest.Ranker
-	registry *provider.Registry
-	llm      LLMQuerier
-
-	// Server state
-	grpcServer     *grpc.Server
-	listener       net.Listener
-	diagHTTPServer *http.Server
-	diagListener   net.Listener
-	paths          *config.Paths
-	logger         *slog.Logger
-	sessionManager *SessionManager
-
-	// Lifecycle
-	startTime    time.Time
-	lastActivity time.Time
-	idleTimeout  time.Duration
-	shutdownChan chan struct{}
-	shutdownOnce sync.Once
-	wg           sync.WaitGroup
-
-	// Feedback
-	feedbackStore  *feedback.Store
-	dismissalStore *dismissal.Store
-
-	// Maintenance
-	maintenanceRunner *maintenance.Runner
-	diagnosticsMux    *http.ServeMux
-
-	// V2 batch writer (nil if V2 disabled)
-	batchWriter *batch.Writer
-
-	// V2 scorer (nil if V2 disabled)
-	v2Scorer *suggest2.Scorer
-
-	// Scorer version: "v1" (default), "v2", or "blend"
-	scorerVersion string
-
-	// V2 runtime enrichers
-	projectDetector      *projecttype.Detector
+	lastActivity         time.Time
+	startTime            time.Time
+	diagListener         net.Listener
+	store                storage.Store
+	ranker               suggest.Ranker
+	llm                  LLMQuerier
+	listener             net.Listener
 	aliasStore           *alias.Store
-	workflowMiner        *workflow.Miner
-	workflowMineInterval time.Duration
-	learningStore        *learning.Store
-	learner              *learning.Learner
+	batchWriter          *batch.Writer
+	paths                *config.Paths
+	logger               *slog.Logger
+	sessionManager       *SessionManager
+	grpcServer           *grpc.Server
+	registry             *provider.Registry
+	circuitBreaker       *CircuitBreaker
+	shutdownChan         chan struct{}
+	ingestionQueue       *IngestionQueue
 	lastSuggestSnapshots map[string]suggestSnapshot
+	feedbackStore        *feedback.Store
+	dismissalStore       *dismissal.Store
+	maintenanceRunner    *maintenance.Runner
+	diagnosticsMux       *http.ServeMux
+	diagHTTPServer       *http.Server
+	v2Scorer             *suggest2.Scorer
+	learner              *learning.Learner
+	projectDetector      *projecttype.Detector
+	v2db                 *suggestdb.DB
+	workflowMiner        *workflow.Miner
+	learningStore        *learning.Store
+	scorerVersion        string
+	wg                   sync.WaitGroup
+	workflowMineInterval time.Duration
+	idleTimeout          time.Duration
+	commandsLogged       int64
 	snapshotMu           sync.RWMutex
-
-	// Backpressure
-	ingestionQueue *IngestionQueue
-	circuitBreaker *CircuitBreaker
-
-	// Metrics
-	mu             sync.RWMutex
-	commandsLogged int64
+	mu                   sync.RWMutex
+	shutdownOnce         sync.Once
 }
 
 // ServerConfig contains configuration options for the daemon server.
 type ServerConfig struct {
-	// Store is the storage backend (required)
-	Store storage.Store
-
-	// Ranker is the suggestion ranker (optional, created if nil)
-	Ranker suggest.Ranker
-
-	// Registry is the provider registry (optional, created if nil)
-	Registry *provider.Registry
-
-	// LLM is the LLM querier for workflow analysis (optional).
-	LLM LLMQuerier
-
-	// Paths is the path configuration (optional, uses defaults if nil)
-	Paths *config.Paths
-
-	// Logger is the structured logger (optional, uses default if nil)
-	Logger *slog.Logger
-
-	// IdleTimeout is the duration after which the daemon exits if idle
-	// Default: 20 minutes
-	IdleTimeout time.Duration
-
-	// FeedbackStore is the suggestion feedback store (optional)
-	FeedbackStore *feedback.Store
-
-	// DismissalStore tracks learned dismissal states (optional).
-	DismissalStore *dismissal.Store
-
-	// MaintenanceRunner is the background maintenance goroutine (optional).
-	// If non-nil, the runner is started with the server and notified on each
-	// ingested command event for activity tracking.
+	LLM               LLMQuerier
+	Ranker            suggest.Ranker
+	Store             storage.Store
 	MaintenanceRunner *maintenance.Runner
-
-	// V2DB is the V2 suggestions database (optional, enables V2 features).
-	// If nil, V2 features are disabled and the daemon operates with V1 only.
-	V2DB *suggestdb.DB
-
-	// BatchWriter is the V2 batch event writer (optional).
-	// If nil and V2DB is non-nil, a default batch writer is created.
-	BatchWriter *batch.Writer
-
-	// V2Scorer is the V2 suggestion scorer (optional).
-	// If nil, V2 scoring is not available until dependencies are initialized
-	// (see the separate scorer dependency initialization).
-	V2Scorer *suggest2.Scorer
-
-	// ScorerVersion is ignored in V2-only mode and retained only for compatibility.
-	ScorerVersion string
-
-	// ReloadFn is called on SIGHUP to reload configuration.
-	// If nil, SIGHUP is ignored.
-	ReloadFn ReloadFunc
+	Paths             *config.Paths
+	Logger            *slog.Logger
+	FeedbackStore     *feedback.Store
+	DismissalStore    *dismissal.Store
+	Registry          *provider.Registry
+	V2DB              *suggestdb.DB
+	BatchWriter       *batch.Writer
+	V2Scorer          *suggest2.Scorer
+	ReloadFn          ReloadFunc
+	ScorerVersion     string
+	IdleTimeout       time.Duration
 }
 
 // NewServer creates a new daemon server with the given configuration.
@@ -372,7 +313,8 @@ func resolveLearner(store *learning.Store) *learning.Learner {
 	if store == nil {
 		return nil
 	}
-	l := learning.NewLearner(learning.DefaultWeights(), learning.DefaultConfig(), store)
+	w := learning.DefaultWeights()
+	l := learning.NewLearner(&w, learning.DefaultConfig(), store)
 	_, _ = l.LoadFromStore(context.Background(), "global")
 	return l
 }

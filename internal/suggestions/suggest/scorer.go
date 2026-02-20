@@ -319,11 +319,10 @@ type SuggestContext struct {
 	Cwd            string
 	DirScopeKey    string
 	Scope          string
+	ProjectTypes   []string
 	LastExitCode   int
 	NowMs          int64
-	DirScopeKey    string // Directory scope key (from dirscope.ComputeScopeKey)
-	Scope          string // Scope for dismissal/recovery lookups
-	ProjectTypes   []string
+	LastFailed     bool
 }
 
 // Suggest generates scored suggestions based on the current context.
@@ -366,7 +365,6 @@ func (s *Scorer) normalizeSuggestContext(suggestCtx *SuggestContext) {
 	if suggestCtx.LastTemplateID == "" && suggestCtx.LastCmd != "" {
 		suggestCtx.LastTemplateID = normalize.PreNormalize(suggestCtx.LastCmd, normalize.PreNormConfig{}).TemplateID
 	}
-	return suggestCtx
 }
 
 func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx *SuggestContext, candidates map[string]*Suggestion) {
@@ -425,7 +423,7 @@ func (s *Scorer) collectTransitionCandidates(
 			return
 		}
 		for _, t := range transitions {
-			s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTsMs)
+			s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTSMs)
 		}
 		return
 	}
@@ -443,7 +441,7 @@ func (s *Scorer) collectTransitionCandidates(
 			transitions, legacyErr := s.transitionStore.GetTopNextCommands(ctx, scope, lastCmd, 10)
 			if legacyErr == nil {
 				for _, t := range transitions {
-					s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTsMs)
+					s.addCandidate(candidates, t.NextNorm, float64(t.Count), reason, weight, t.LastTSMs)
 				}
 				return
 			}
@@ -490,7 +488,7 @@ func (s *Scorer) collectFrequencyCandidates(
 			return
 		}
 		for _, f := range frequencies {
-			s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTsMs)
+			s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTSMs)
 		}
 		return
 	}
@@ -508,7 +506,7 @@ func (s *Scorer) collectFrequencyCandidates(
 			frequencies, legacyErr := s.freqStore.GetTopCommandsAt(ctx, scope, 10, nowMs)
 			if legacyErr == nil {
 				for _, f := range frequencies {
-					s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTsMs)
+					s.addCandidate(candidates, f.CmdNorm, f.Score, reason, weight, f.LastTSMs)
 				}
 				return
 			}
@@ -606,7 +604,7 @@ func (s *Scorer) collectProjectTypeCandidates(
 	}
 }
 
-func (s *Scorer) collectDiscoveryPriors(candidates map[string]*Suggestion, suggestCtx SuggestContext) {
+func (s *Scorer) collectDiscoveryPriors(candidates map[string]*Suggestion, suggestCtx *SuggestContext) {
 	if s.discoverEngine == nil {
 		return
 	}
@@ -625,7 +623,7 @@ func (s *Scorer) collectDiscoveryPriors(candidates map[string]*Suggestion, sugge
 	}
 }
 
-func (s *Scorer) applyContextBoosts(ctx context.Context, candidates map[string]*Suggestion, suggestCtx SuggestContext) {
+func (s *Scorer) applyContextBoosts(ctx context.Context, candidates map[string]*Suggestion, suggestCtx *SuggestContext) {
 	s.applyWorkflowBoost(candidates, suggestCtx)
 	s.applyPipelineConfidence(ctx, candidates, suggestCtx)
 	s.applyRecoveryBoost(ctx, candidates, suggestCtx)
@@ -891,6 +889,8 @@ func (s *Scorer) applyDismissalPenalties(ctx context.Context, candidates map[str
 			sug.Score *= penaltyFactor
 			sug.scores.dismissalPenalty = -penaltyAmount
 			sug.Reasons = append(sug.Reasons, ReasonDismissalPenalty)
+		default:
+			// StateNone or unknown: no penalty.
 		}
 	}
 }
@@ -1070,6 +1070,8 @@ func updateSuggestionRawSignals(suggestion *Suggestion, reason string, rawScore 
 		if int(rawScore) > suggestion.maxTransCount {
 			suggestion.maxTransCount = int(rawScore)
 		}
+	default:
+		// Other reasons don't track raw signals.
 	}
 }
 
@@ -1089,6 +1091,8 @@ func applySuggestionScore(suggestion *Suggestion, reason string, adjustedScore f
 		suggestion.scores.dirTransition += adjustedScore
 	case ReasonDirFrequency:
 		suggestion.scores.dirFrequency += adjustedScore
+	default:
+		// Amplifier reasons (workflow, pipeline, recovery, dismissal) are applied separately.
 	}
 }
 

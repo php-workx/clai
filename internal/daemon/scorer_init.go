@@ -45,8 +45,9 @@ func initV2Scorer(db *sql.DB, logger *slog.Logger) *suggest2.Scorer {
 
 	deps.DismissalStore = dismissal.NewStore(db, dismissal.DefaultConfig(), logger)
 
-	if re, err := recovery.NewEngine(db, nil, nil, recovery.DefaultEngineConfig()); err != nil {
-		logger.Warn("v2 scorer: recovery engine unavailable", "error", err)
+	re, recErr := recovery.NewEngine(db, nil, nil, recovery.DefaultEngineConfig())
+	if recErr != nil {
+		logger.Warn("v2 scorer: recovery engine unavailable", "error", recErr)
 	} else {
 		deps.RecoveryEngine = re
 	}

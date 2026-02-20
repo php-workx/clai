@@ -53,18 +53,12 @@ type WritePathContext struct {
 	RepoKey        string
 	Branch         string
 	PrevTemplateID string
-
-	// PrevExitCode is the exit code of the previous command (if PrevTemplateID is set).
-	PrevExitCode int
-
-	// PrevFailed indicates the previous command failed (exit code != 0).
-	PrevFailed bool
-
-	// NowMs is the current timestamp in milliseconds (from the event).
-	NowMs int64
-
-	// ProjectTypes active for the command context.
-	ProjectTypes []string
+	Slots          []normalize.SlotValue
+	ProjectTypes   []string
+	PreNorm        normalize.PreNormResult
+	PrevExitCode   int
+	NowMs          int64
+	PrevFailed     bool
 }
 
 // WritePathResult holds the output of a successful write-path transaction.
