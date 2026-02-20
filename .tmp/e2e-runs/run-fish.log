@@ -13,3 +13,69 @@
 [fish] 7/51 clai suggest with prefix filters results
   -> FAIL: expected screen not to contain: npm | expected screen not to contain: make
 [fish] 8/51 Suggestion shows transition reason
+  -> FAIL: expected screen to contain: transition
+[fish] 9/51 Suggestion shows freq_repo reason
+  -> FAIL: expected screen to match: (freq_repo|freq_global)
+[fish] 10/51 Suggestion includes confidence score
+  -> FAIL: expected screen to contain: confidence
+[fish] 11/51 Suggestion context includes last_cmd_norm
+  -> FAIL: expected screen to match: (context|last_cmd)
+[fish] 12/51 Ghost text suggestion appears
+  -> FAIL: expected screen to contain: atus
+[fish] 13/51 Right arrow accepts full suggestion
+  -> PASS
+[fish] 14/51 Escape clears suggestion
+  -> FAIL: expected screen not to contain: nstall
+[fish] 15/51 Typing clears ghost text
+  -> PASS
+[fish] 16/51 Alt+Right accepts next token
+  -> FAIL: expected screen not to contain: pods
+[fish] 17/51 Typo correction suggests on exit 127
+  -> PASS
+[fish] 18/51 Typo correction respects similarity threshold
+  -> FAIL: expected screen not to contain: xyzabc123
+[fish] 19/51 Typo correction prioritizes high-frequency commands
+  -> PASS
+[fish] 20/51 Slot filling learns argument values
+  -> PASS
+[fish] 21/51 Slot filling respects frequency
+  -> PASS
+[fish] 22/51 Slot scope repo overrides global
+  -> PASS
+[fish] 23/51 Suggestions served from cache
+  -> PASS
+[fish] 24/51 Cache TTL expires stale entries
+  -> PASS
+[fish] 25/51 Cache invalidated on new command
+  -> PASS
+[fish] 26/51 Cache shows in debug endpoint
+  -> PASS
+[fish] 27/51 Alt+Space opens suggestion picker (fish)
+  -> PASS
+[fish] 28/51 clai search basic query
+  -> FAIL: expected screen to contain: searchable_unique_term_abc123
+[fish] 29/51 clai search with repo filter
+  -> PASS
+[fish] 30/51 clai search with limit
+  -> PASS
+[fish] 31/51 clai search with JSON output
+  -> PASS
+[fish] 32/51 clai search empty results
+  -> PASS
+[fish] 33/51 clai search with special characters
+  -> PASS
+[fish] 34/51 Discovery finds package.json scripts
+  -> PASS
+[fish] 35/51 Discovery finds Makefile targets
+  -> PASS
+[fish] 36/51 Discovery shows project_task reason
+  -> FAIL: expected screen to contain: project_task
+[fish] 37/51 Discovery finds Cargo.toml commands
+  -> PASS
+[fish] 38/51 Discovery finds pyproject.toml scripts
+  -> PASS
+[fish] 39/51 Debug scores endpoint returns data
+  -> PASS
+[fish] 40/51 Debug scores with limit parameter
+  -> PASS
+[fish] 41/51 Debug transitions endpoint returns data
