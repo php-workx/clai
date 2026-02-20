@@ -16787,3 +16787,7 @@ time=2026-02-20T09:29:20.358+01:00 level=INFO msg=rpc method=/clai.v1.ClaiServic
 time=2026-02-20T09:29:20.371+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=4
 time=2026-02-20T09:29:20.378+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
 time=2026-02-20T09:29:20.782+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T09:29:21.056+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T09:29:21.211+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T09:29:21.733+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T09:29:21.826+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
