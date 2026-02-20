@@ -310,3 +310,116 @@ echo warmup
 clai suggest --format=json
 echo warmup
 clai suggest --format=json
+echo 'setup command 1'
+echo 'setup command 2'
+ls -la
+echo apple
+echo banana
+echo apricot
+git status
+command one
+command two
+command three
+echo 'selected command'
+selected
+echo unique_session_test_command_12345
+echo session_specific_command
+echo this_is_a_very_long_command_that_should_be_truncated_in_the_middle_with_an_ellipsis_indicator_to_show_both_start_and_end
+echo UNIQUE_START_marker_this_is_a_very_long_command_with_lots_of_text_in_the_middle_UNIQUE_END_marker
+UNIQUE_START
+echo CLIPBOARD_START_this_is_a_very_long_command_for_clipboard_test_CLIPBOARD_END
+source ~/.clai/shell/bash.sh
+echo $CLAI_SESSION_ID
+echo first
+echo second
+echo third
+history
+clai status
+echo test_history_cmd_1
+echo test_history_cmd_2
+clai history --session=$CLAI_SESSION_ID
+clai history --global --limit 10
+cd /tmp && echo from_tmp_dir
+cd ~ && echo from_home_dir
+if clai history --cwd=/tmp | grep -q from_tmp_dir && ! clai history --cwd=/tmp | grep -q from_home_dir; then echo HISTORY_CWD_FILTER_PASS; else echo HISTORY_CWD_FILTER_FAIL; fi
+echo success_command
+false
+if clai history --status=success | grep -q success_command && ! clai history --status=success | grep -q '^false$'; then echo HISTORY_SUCCESS_FILTER_PASS; else echo HISTORY_SUCCESS_FILTER_FAIL; fi
+echo will_succeed
+false
+if clai history --status=failure | grep -q '^false$' && ! clai history --status=failure | grep -q will_succeed; then echo HISTORY_FAILURE_FILTER_PASS; else echo HISTORY_FAILURE_FILTER_FAIL; fi
+clai off
+clai off
+clai on
+echo 'hello world'
+ls --color=always
+sleep 60
+`list all files in current directory
+echo 'this is a very long command that should wrap properly in the terminal without causing any display issues or breaking the shell integration features'
+echo "hello 'world' $HOME"
+mkdir -p '/tmp/test dir with spaces'
+cd '/tmp/test dir with spaces'
+echo 'command in spaced dir'
+ls -la
+mkdir -p "/tmp/path'with\"quotes"
+cd "/tmp/path'with\"quotes"
+echo 'special path command'
+clai incognito on
+clai incognito on
+echo 'SECRET_INCOGNITO_COMMAND_12345'
+clai incognito off
+if clai history --global | grep -q SECRET_INCOGNITO; then echo INCOGNITO_PERSISTED_FAIL; else echo INCOGNITO_PERSISTED_PASS; fi
+clai incognito on
+clai incognito off
+export CLAI_NO_RECORD=1
+echo 'NO_RECORD_TEST_CMD'
+unset CLAI_NO_RECORD
+if clai history --session=$CLAI_SESSION_ID | grep -q NO_RECORD_TEST_CMD; then echo NO_RECORD_FAIL; else echo NO_RECORD_PASS; fi
+true
+if clai history --session=$CLAI_SESSION_ID --format json | grep -q '"exit_code":0'; then echo EXIT_SUCCESS_PASS; else echo EXIT_SUCCESS_FAIL; fi
+false
+if clai history --session=$CLAI_SESSION_ID --format json | grep -q '"exit_code":1'; then echo EXIT_FAILURE_PASS; else echo EXIT_FAILURE_FAIL; fi
+cd /tmp && echo 'ingestion_cwd_test'
+clai history --cwd=/tmp --global
+echo "hello | world" > /dev/null && echo 'done'
+clai history --session=$CLAI_SESSION_ID
+echo '日本語 émoji 🎉'
+clai history --session=$CLAI_SESSION_ID
+clai daemon status
+clai daemon start
+clai daemon status
+clai daemon start
+clai daemon stop
+clai daemon status
+echo 'setup command 1'
+echo 'setup command 2'
+ls -la
+echo apple
+echo banana
+echo apricot
+git status
+clai daemon restart
+clai daemon status
+command one
+command two
+command three
+echo setup1
+git status
+make build
+echo 'selected command'
+selected
+npm test
+clai suggest --format=json
+docker ps
+clai suggest --format=fzf
+echo unique_session_test_command_12345
+echo session_specific_command
+cmd1
+cmd2
+cmd3
+clai suggest --limit=2
+echo this_is_a_very_long_command_that_should_be_truncated_in_the_middle_with_an_ellipsis_indicator_to_show_both_start_and_end
+git status
+git log --oneline
+npm test
+make build

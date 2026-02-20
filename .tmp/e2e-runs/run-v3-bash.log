@@ -1,0 +1,21 @@
+test server already running (pid=88797)
+url: http://127.0.0.1:8080
+[bash] 1/97 History picker opens with Alt+H
+  -> PASS
+[bash] 2/97 History picker fuzzy search filters results
+  -> FAIL: expected screen to contain: apple | expected screen to contain: apricot
+[bash] 3/97 History picker navigation with arrow keys
+  -> PASS
+[bash] 4/97 History picker Enter inserts command
+  -> PASS
+[bash] 5/97 History picker Escape cancels
+  -> PASS
+[bash] 6/97 History scope switching with Tab
+  -> PASS
+[bash] 7/97 Session history is isolated from global
+  -> PASS
+[bash] 8/97 Global history contains cross-session commands
+  -> PASS
+[bash] 9/97 Long command shows truncation indicator
+  -> PASS
+[bash] 10/97 Enter inserts full untruncated command

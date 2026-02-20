@@ -15,7 +15,7 @@ import (
 
 func TestWriteCachedSuggestionJSON_Empty(t *testing.T) {
 	output := captureStdout(t, func() {
-		if err := writeCachedSuggestionJSON("", nil); err != nil {
+		if err := writeCachedSuggestionJSON("", nil, nil); err != nil {
 			t.Fatalf("writeCachedSuggestionJSON() error = %v", err)
 		}
 	})
@@ -31,7 +31,7 @@ func TestWriteCachedSuggestionJSON_Empty(t *testing.T) {
 
 func TestWriteCachedSuggestionJSON_WithSuggestion(t *testing.T) {
 	output := captureStdout(t, func() {
-		if err := writeCachedSuggestionJSON("rm -rf /tmp/x", nil); err != nil {
+		if err := writeCachedSuggestionJSON("rm -rf /tmp/x", nil, nil); err != nil {
 			t.Fatalf("writeCachedSuggestionJSON() error = %v", err)
 		}
 	})

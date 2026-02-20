@@ -1,0 +1,484 @@
+{
+  "summary": {
+    "shell": "fish",
+    "url": "http://127.0.0.1:8080",
+    "plans": [
+      "/Users/runger/.claude-worktrees/clai/spec-reviews/tests/e2e/example-test-plan.yaml",
+      "/Users/runger/.claude-worktrees/clai/spec-reviews/tests/e2e/suggestions-tests.yaml"
+    ],
+    "total": 51,
+    "passed": 35,
+    "failed": 16,
+    "duration_ms": 112874,
+    "failures": [
+      {
+        "ok": false,
+        "name": "clai suggest JSON format",
+        "id": "004-clai_suggest_JSON_format",
+        "reason": "expected screen to contain: {",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/004-clai_suggest_JSON_format.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "clai suggest with prefix filters results",
+        "id": "007-clai_suggest_with_prefix_filters_results",
+        "reason": "expected screen not to contain: npm | expected screen not to contain: make",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/007-clai_suggest_with_prefix_filters_results.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Suggestion shows transition reason",
+        "id": "008-Suggestion_shows_transition_reason",
+        "reason": "expected screen to contain: transition",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/008-Suggestion_shows_transition_reason.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Suggestion shows freq_repo reason",
+        "id": "009-Suggestion_shows_freq_repo_reason",
+        "reason": "expected screen to match: (freq_repo|freq_global)",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/009-Suggestion_shows_freq_repo_reason.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Suggestion includes confidence score",
+        "id": "010-Suggestion_includes_confidence_score",
+        "reason": "expected screen to contain: confidence",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/010-Suggestion_includes_confidence_score.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Suggestion context includes last_cmd_norm",
+        "id": "011-Suggestion_context_includes_last_cmd_norm",
+        "reason": "expected screen to match: (context|last_cmd)",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/011-Suggestion_context_includes_last_cmd_norm.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Ghost text suggestion appears",
+        "id": "012-Ghost_text_suggestion_appears",
+        "reason": "expected screen to contain: atus",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/012-Ghost_text_suggestion_appears.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Escape clears suggestion",
+        "id": "014-Escape_clears_suggestion",
+        "reason": "expected screen not to contain: nstall",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/014-Escape_clears_suggestion.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Alt+Right accepts next token",
+        "id": "016-Alt_Right_accepts_next_token",
+        "reason": "expected screen not to contain: pods",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/016-Alt_Right_accepts_next_token.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Typo correction respects similarity threshold",
+        "id": "018-Typo_correction_respects_similarity_threshold",
+        "reason": "expected screen not to contain: xyzabc123",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/018-Typo_correction_respects_similarity_threshold.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "clai search basic query",
+        "id": "028-clai_search_basic_query",
+        "reason": "expected screen to contain: searchable_unique_term_abc123",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/028-clai_search_basic_query.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Discovery shows project_task reason",
+        "id": "036-Discovery_shows_project_task_reason",
+        "reason": "expected screen to contain: project_task",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/036-Discovery_shows_project_task_reason.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Incognito commands not in global suggestions",
+        "id": "047-Incognito_commands_not_in_global_suggestions",
+        "reason": "expected screen not to contain: incognito_only_cmd_xyz",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/047-Incognito_commands_not_in_global_suggestions.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "CLAI_EPHEMERAL affects suggestions",
+        "id": "048-CLAI_EPHEMERAL_affects_suggestions",
+        "reason": "expected screen not to contain: ephemeral_env_test_cmd",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/048-CLAI_EPHEMERAL_affects_suggestions.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Suggest API returns expected JSON structure",
+        "id": "049-Suggest_API_returns_expected_JSON_structure",
+        "reason": "expected screen to match: (reason|reasons)",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/049-Suggest_API_returns_expected_JSON_structure.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Suggest API includes cache status",
+        "id": "050-Suggest_API_includes_cache_status",
+        "reason": "expected screen to match: (cache_hit|cache_miss|from_cache)",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/050-Suggest_API_includes_cache_status.png",
+        "plan": "suggestions-tests.yaml"
+      }
+    ]
+  },
+  "results": [
+    {
+      "ok": true,
+      "name": "History picker works in fish",
+      "id": "001-History_picker_works_in_fish",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Command ingestion in fish",
+      "id": "002-Command_ingestion_in_fish",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai suggest text format",
+      "id": "003-clai_suggest_text_format",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "clai suggest JSON format",
+      "id": "004-clai_suggest_JSON_format",
+      "reason": "expected screen to contain: {",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/004-clai_suggest_JSON_format.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai suggest fzf format",
+      "id": "005-clai_suggest_fzf_format",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai suggest with limit",
+      "id": "006-clai_suggest_with_limit",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "clai suggest with prefix filters results",
+      "id": "007-clai_suggest_with_prefix_filters_results",
+      "reason": "expected screen not to contain: npm | expected screen not to contain: make",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/007-clai_suggest_with_prefix_filters_results.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Suggestion shows transition reason",
+      "id": "008-Suggestion_shows_transition_reason",
+      "reason": "expected screen to contain: transition",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/008-Suggestion_shows_transition_reason.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Suggestion shows freq_repo reason",
+      "id": "009-Suggestion_shows_freq_repo_reason",
+      "reason": "expected screen to match: (freq_repo|freq_global)",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/009-Suggestion_shows_freq_repo_reason.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Suggestion includes confidence score",
+      "id": "010-Suggestion_includes_confidence_score",
+      "reason": "expected screen to contain: confidence",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/010-Suggestion_includes_confidence_score.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Suggestion context includes last_cmd_norm",
+      "id": "011-Suggestion_context_includes_last_cmd_norm",
+      "reason": "expected screen to match: (context|last_cmd)",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/011-Suggestion_context_includes_last_cmd_norm.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Ghost text suggestion appears",
+      "id": "012-Ghost_text_suggestion_appears",
+      "reason": "expected screen to contain: atus",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/012-Ghost_text_suggestion_appears.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Right arrow accepts full suggestion",
+      "id": "013-Right_arrow_accepts_full_suggestion",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Escape clears suggestion",
+      "id": "014-Escape_clears_suggestion",
+      "reason": "expected screen not to contain: nstall",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/014-Escape_clears_suggestion.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Typing clears ghost text",
+      "id": "015-Typing_clears_ghost_text",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Alt+Right accepts next token",
+      "id": "016-Alt_Right_accepts_next_token",
+      "reason": "expected screen not to contain: pods",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/016-Alt_Right_accepts_next_token.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Typo correction suggests on exit 127",
+      "id": "017-Typo_correction_suggests_on_exit_127",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Typo correction respects similarity threshold",
+      "id": "018-Typo_correction_respects_similarity_threshold",
+      "reason": "expected screen not to contain: xyzabc123",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/018-Typo_correction_respects_similarity_threshold.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Typo correction prioritizes high-frequency commands",
+      "id": "019-Typo_correction_prioritizes_high-frequency_commands",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Slot filling learns argument values",
+      "id": "020-Slot_filling_learns_argument_values",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Slot filling respects frequency",
+      "id": "021-Slot_filling_respects_frequency",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Slot scope repo overrides global",
+      "id": "022-Slot_scope_repo_overrides_global",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Suggestions served from cache",
+      "id": "023-Suggestions_served_from_cache",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Cache TTL expires stale entries",
+      "id": "024-Cache_TTL_expires_stale_entries",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Cache invalidated on new command",
+      "id": "025-Cache_invalidated_on_new_command",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Cache shows in debug endpoint",
+      "id": "026-Cache_shows_in_debug_endpoint",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Alt+Space opens suggestion picker (fish)",
+      "id": "027-Alt_Space_opens_suggestion_picker_fish_",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "clai search basic query",
+      "id": "028-clai_search_basic_query",
+      "reason": "expected screen to contain: searchable_unique_term_abc123",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/028-clai_search_basic_query.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with repo filter",
+      "id": "029-clai_search_with_repo_filter",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with limit",
+      "id": "030-clai_search_with_limit",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with JSON output",
+      "id": "031-clai_search_with_JSON_output",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search empty results",
+      "id": "032-clai_search_empty_results",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with special characters",
+      "id": "033-clai_search_with_special_characters",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Discovery finds package.json scripts",
+      "id": "034-Discovery_finds_package.json_scripts",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Discovery finds Makefile targets",
+      "id": "035-Discovery_finds_Makefile_targets",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Discovery shows project_task reason",
+      "id": "036-Discovery_shows_project_task_reason",
+      "reason": "expected screen to contain: project_task",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/036-Discovery_shows_project_task_reason.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Discovery finds Cargo.toml commands",
+      "id": "037-Discovery_finds_Cargo.toml_commands",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Discovery finds pyproject.toml scripts",
+      "id": "038-Discovery_finds_pyproject.toml_scripts",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug scores endpoint returns data",
+      "id": "039-Debug_scores_endpoint_returns_data",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug scores with limit parameter",
+      "id": "040-Debug_scores_with_limit_parameter",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug transitions endpoint returns data",
+      "id": "041-Debug_transitions_endpoint_returns_data",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug tasks endpoint returns discovered tasks",
+      "id": "042-Debug_tasks_endpoint_returns_discovered_tasks",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug discovery-errors endpoint",
+      "id": "043-Debug_discovery-errors_endpoint",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug endpoints return valid JSON",
+      "id": "044-Debug_endpoints_return_valid_JSON",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito mode toggle",
+      "id": "045-Incognito_mode_toggle",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito commands appear in session suggestions",
+      "id": "046-Incognito_commands_appear_in_session_suggestions",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Incognito commands not in global suggestions",
+      "id": "047-Incognito_commands_not_in_global_suggestions",
+      "reason": "expected screen not to contain: incognito_only_cmd_xyz",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/047-Incognito_commands_not_in_global_suggestions.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "CLAI_EPHEMERAL affects suggestions",
+      "id": "048-CLAI_EPHEMERAL_affects_suggestions",
+      "reason": "expected screen not to contain: ephemeral_env_test_cmd",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/048-CLAI_EPHEMERAL_affects_suggestions.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Suggest API returns expected JSON structure",
+      "id": "049-Suggest_API_returns_expected_JSON_structure",
+      "reason": "expected screen to match: (reason|reasons)",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/049-Suggest_API_returns_expected_JSON_structure.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Suggest API includes cache status",
+      "id": "050-Suggest_API_includes_cache_status",
+      "reason": "expected screen to match: (cache_hit|cache_miss|from_cache)",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/050-Suggest_API_includes_cache_status.png",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Suggest API includes timing info",
+      "id": "051-Suggest_API_includes_timing_info",
+      "plan": "suggestions-tests.yaml"
+    }
+  ]
+}

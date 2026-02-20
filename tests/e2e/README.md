@@ -9,12 +9,23 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
    make test-server
    ```
 
-2. **Ask Claude to run tests:**
+2. **Run tests with the local Playwright runner:**
+   ```bash
+   # One-time deps
+   cd tests/e2e && npm init -y && npm install playwright js-yaml
+
+   # In repo root
+   node tests/e2e/run-e2e.js --shell bash --url http://127.0.0.1:8080
+   node tests/e2e/run-e2e.js --shell zsh --url http://127.0.0.1:8080
+   node tests/e2e/run-e2e.js --shell fish --url http://127.0.0.1:8080
+   ```
+
+3. **Ask Claude to run tests (alternative):**
    ```
    Run e2e tests from tests/e2e/example-test-plan.yaml against http://localhost:8080
    ```
 
-3. **Review results** - Claude will report pass/fail for each test
+4. **Review results** - pass/fail summary and per-test JSON are written to `.tmp/e2e-runs/`
 
 ## Directory Structure
 

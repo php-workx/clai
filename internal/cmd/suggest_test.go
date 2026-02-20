@@ -150,7 +150,7 @@ func TestOutputSuggestions_GhostFormat(t *testing.T) {
 			{Text: "make install", Source: "global", Score: 0.47},
 			{Text: "rm -rf /", Source: "global", Score: 0.99, Risk: "destructive"},
 		}
-		if err := outputSuggestions(suggestions, "ghost", nil); err != nil {
+		if err := outputSuggestions(suggestions, "ghost", nil, nil); err != nil {
 			t.Fatalf("outputSuggestions error: %v", err)
 		}
 	})

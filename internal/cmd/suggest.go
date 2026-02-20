@@ -72,20 +72,21 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 	prefix := parseSuggestPrefix(args)
 	lastCmd, lastCmdNorm := resolveLastCommand()
 	format := resolveSuggestFormat()
+	jsonCtx := newSuggestJSONContext(lastCmd, lastCmdNorm)
 
 	if integrationDisabled() {
-		return outputIntegrationDisabled(format)
+		return outputIntegrationDisabled(format, jsonCtx)
 	}
 
 	hint := buildSuggestTimingHint()
 
 	// Empty prefix - return cached AI suggestion
 	if prefix == "" {
-		return outputCachedSuggestion(format, hint, lastCmd, lastCmdNorm)
+		return outputCachedSuggestion(format, hint, jsonCtx, lastCmd, lastCmdNorm)
 	}
 
 	// Try daemon first for session-aware suggestions
-	suggestions := getSuggestionsFromDaemon(prefix, suggestLimit)
+	suggestions := getSuggestionsFromDaemon(prefix, suggestLimit, format == "json")
 
 	// Fall back to shell history if daemon returned nothing
 	if len(suggestions) == 0 {
@@ -98,7 +99,7 @@ func runSuggest(cmd *cobra.Command, args []string) error {
 	}
 
 	// Output based on format
-	return outputSuggestions(suggestions, format, hint)
+	return outputSuggestions(suggestions, format, hint, jsonCtx)
 }
 
 func parseSuggestPrefix(args []string) string {
@@ -124,11 +125,11 @@ func resolveSuggestFormat() string {
 	return format
 }
 
-func outputIntegrationDisabled(format string) error {
+func outputIntegrationDisabled(format string, jsonCtx *suggestJSONContext) error {
 	if format != "json" {
 		return nil
 	}
-	return writeSuggestJSON(nil, nil)
+	return writeSuggestJSON(nil, nil, jsonCtx)
 }
 
 func buildSuggestTimingHint() *timing.TimingHint {
@@ -146,13 +147,13 @@ func buildSuggestTimingHint() *timing.TimingHint {
 	return &h
 }
 
-func outputCachedSuggestion(format string, hint *timing.TimingHint, lastCmd, lastCmdNorm string) error {
+func outputCachedSuggestion(format string, hint *timing.TimingHint, jsonCtx *suggestJSONContext, lastCmd, lastCmdNorm string) error {
 	suggestion, _ := cache.ReadSuggestion()
 	if suggestion != "" && shouldSuppressLastCmd(suggestion, lastCmd, lastCmdNorm) {
 		suggestion = ""
 	}
 	if format == "json" {
-		return writeCachedSuggestionJSON(suggestion, hint)
+		return writeCachedSuggestionJSON(suggestion, hint, jsonCtx)
 	}
 	if suggestion != "" {
 		fmt.Println(suggestion)
@@ -160,17 +161,19 @@ func outputCachedSuggestion(format string, hint *timing.TimingHint, lastCmd, las
 	return nil
 }
 
-func writeCachedSuggestionJSON(suggestion string, hint *timing.TimingHint) error {
+func writeCachedSuggestionJSON(suggestion string, hint *timing.TimingHint, jsonCtx *suggestJSONContext) error {
 	if suggestion == "" {
-		return writeSuggestJSON(nil, hint)
+		return writeSuggestJSON(nil, hint, jsonCtx)
 	}
 	return writeSuggestJSON([]suggestOutput{{
 		Text:        suggestion,
 		Source:      "ai",
+		CmdNorm:     strings.TrimSpace(normalize.NormalizeSimple(suggestion)),
+		Confidence:  0,
 		Score:       0,
 		Description: "",
 		Risk:        riskFromText(suggestion),
-	}}, hint)
+	}}, hint, jsonCtx)
 }
 
 func shouldSuppressLastCmd(suggestion, lastCmd, lastCmdNorm string) bool {
@@ -225,10 +228,10 @@ func formatGhostMeta(s *suggestOutput) string {
 }
 
 // outputSuggestions formats and outputs suggestions based on format type.
-func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.TimingHint) error {
+func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.TimingHint, jsonCtx *suggestJSONContext) error {
 	switch format {
 	case "json":
-		return writeSuggestJSON(suggestions, hint)
+		return writeSuggestJSON(suggestions, hint, jsonCtx)
 	case "fzf":
 		outputPlainSuggestions(suggestions)
 	case "ghost":
@@ -264,17 +267,25 @@ func outputPlainSuggestions(suggestions []suggestOutput) {
 type suggestOutput struct {
 	Text        string           `json:"text"`
 	Source      string           `json:"source"`
+	CmdNorm     string           `json:"cmd_norm,omitempty"`
 	Description string           `json:"description"`
 	Risk        string           `json:"risk"`
 	Recency     string           `json:"recency,omitempty"`
 	Reasons     []explain.Reason `json:"reasons,omitempty"`
+	Confidence  float64          `json:"confidence"`
 	Score       float64          `json:"score"`
 	CwdMatch    bool             `json:"cwd_match,omitempty"`
+}
+
+type suggestJSONContext struct {
+	LastCmd     string `json:"last_cmd,omitempty"`
+	LastCmdNorm string `json:"last_cmd_norm,omitempty"`
 }
 
 // suggestJSONResponse wraps suggestions with optional timing hint for JSON output.
 type suggestJSONResponse struct {
 	TimingHint  *timing.TimingHint `json:"timing_hint,omitempty"`
+	Context     *suggestJSONContext `json:"context,omitempty"`
 	Suggestions []suggestOutput    `json:"suggestions"`
 }
 
@@ -285,13 +296,14 @@ func riskFromText(text string) string {
 	return ""
 }
 
-func writeSuggestJSON(suggestions []suggestOutput, hint *timing.TimingHint) error {
+func writeSuggestJSON(suggestions []suggestOutput, hint *timing.TimingHint, jsonCtx *suggestJSONContext) error {
 	if suggestions == nil {
 		suggestions = []suggestOutput{}
 	}
 	resp := suggestJSONResponse{
 		Suggestions: suggestions,
 		TimingHint:  hint,
+		Context:     jsonCtx,
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetEscapeHTML(false)
@@ -308,6 +320,8 @@ func getSuggestionsFromHistory(prefix string, limit int) []suggestOutput {
 		suggestions = append(suggestions, suggestOutput{
 			Text:        s,
 			Source:      "global",
+			CmdNorm:     strings.TrimSpace(normalize.NormalizeSimple(s)),
+			Confidence:  0,
 			Score:       0,
 			Description: "",
 			Risk:        riskFromText(s),
@@ -318,7 +332,7 @@ func getSuggestionsFromHistory(prefix string, limit int) []suggestOutput {
 
 // getSuggestionsFromDaemon tries to get suggestions from the running daemon.
 // Returns nil if daemon is unavailable or returns no results.
-func getSuggestionsFromDaemon(prefix string, limit int) []suggestOutput {
+func getSuggestionsFromDaemon(prefix string, limit int, forceIncludeReasons bool) []suggestOutput {
 	sessionID := os.Getenv("CLAI_SESSION_ID")
 	if sessionID == "" {
 		return nil
@@ -342,7 +356,7 @@ func getSuggestionsFromDaemon(prefix string, limit int) []suggestOutput {
 		return nil
 	}
 
-	includeReasons := shouldIncludeSuggestReasons()
+	includeReasons := forceIncludeReasons || shouldIncludeSuggestReasons()
 	results := make([]suggestOutput, len(daemonSuggestions))
 	for i, s := range daemonSuggestions {
 		results[i] = daemonSuggestionToOutput(s, includeReasons)
@@ -367,7 +381,9 @@ func daemonSuggestionToOutput(s *pb.Suggestion, includeReasons bool) suggestOutp
 	out := suggestOutput{
 		Text:        s.Text,
 		Source:      s.Source,
+		CmdNorm:     s.CmdNorm,
 		Score:       float64(s.Score),
+		Confidence:  float64(s.Confidence),
 		Description: s.Description,
 		Risk:        s.Risk,
 		CwdMatch:    cwdMatch,
@@ -377,6 +393,18 @@ func daemonSuggestionToOutput(s *pb.Suggestion, includeReasons bool) suggestOutp
 		out.Reasons = daemonReasonsToExplain(s.Reasons)
 	}
 	return out
+}
+
+func newSuggestJSONContext(lastCmd, lastCmdNorm string) *suggestJSONContext {
+	lastCmd = strings.TrimSpace(lastCmd)
+	lastCmdNorm = strings.TrimSpace(lastCmdNorm)
+	if lastCmd == "" && lastCmdNorm == "" {
+		return nil
+	}
+	return &suggestJSONContext{
+		LastCmd:     lastCmd,
+		LastCmdNorm: lastCmdNorm,
+	}
 }
 
 func deriveSuggestionMeta(s *pb.Suggestion) (cwdMatch bool, recency string) {
