@@ -126,11 +126,10 @@ tests:
     skip: true
     skip_reason: "Transition explainability not yet reliably surfaced in e2e runtime"
     setup:
-      - "git add ."
-      - "git commit -m 'test' >/dev/null 2>&1 || true"
-      - "git add ."
-      - "git commit -m 'test2' >/dev/null 2>&1 || true"
-      - "git add ."
+      - "echo transition_seed_one"
+      - "echo transition_seed_two"
+      - "echo transition_seed_one"
+      - "echo transition_seed_two"
     steps:
       - type: "clai suggest git --format=json --limit=5"
       - press: "Enter"
@@ -708,8 +707,8 @@ tests:
     tags: [debug, endpoints, transitions, cross-shell]
     setup:
       - "git status"
-      - "git add ."
-      - "git commit -m 'test'"
+      - "echo debug_transition_seed_one"
+      - "echo debug_transition_seed_two"
     steps:
       - type: "curl -s http://localhost:8765/debug/transitions 2>/dev/null || clai debug transitions"
       - press: "Enter"
