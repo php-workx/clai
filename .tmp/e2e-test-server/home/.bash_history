@@ -1,51 +1,3 @@
-echo "hello 'world' test123"
-clear
-clai history --global --limit 10
-clear
-true
-clai history --session=$CLAI_SESSION_ID --json | tail -1
-clear
-false
-clai history --session=$CLAI_SESSION_ID --json | tail -1
-clear
-clai off
-clear
-clai on
-clear
-clai history --global --limit 10
-clear
-echo investigate_test_cmd
-clai history --session=$CLAI_SESSION_ID --json 2>&1 | tail -5
-clear
-clai history --json --limit 3 2>&1
-clear
-clai history --global --limit 10
-clear
-true
-clai history --session=$CLAI_SESSION_ID --format json --limit 3 2>&1 | tail -3
-clear
-false
-clai history --session=$CLAI_SESSION_ID --format json --limit 1 2>&1
-clear
-echo test_history_session_cmd_1
-echo test_history_session_cmd_2
-clear
-clai history --session=$CLAI_SESSION_ID
-clear
-cd /tmp && echo 'ingestion_cwd_test_xyz' && cd -
-clai history --cwd=/tmp --global
-clear
-echo "hello | world" > /dev/null && echo done_special
-clai history --session=$CLAI_SESSION_ID
-clear
-echo 'unicode_test_日本語'
-clai history --session=$CLAI_SESSION_ID
-clear
-echo SESSION=$CLAI_SESSION_ID
-clear
-clai history --help
-clear
-echo debug_session_test_xyz
 clai history --session=$CLAI_SESSION_ID 2>&1
 clear
 clai history --global --limit 5 2>&1
@@ -498,3 +450,51 @@ echo 'special path command'
 curl -s http://localhost:8765/debug/scores 2>/dev/null || clai debug scores
 clai incognito on
 curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5
+clai incognito on
+echo 'SECRET_INCOGNITO_COMMAND_12345'
+clai incognito off
+if clai history --global | grep -q SECRET_INCOGNITO; then echo INCOGNITO_PERSISTED_FAIL; else echo INCOGNITO_PERSISTED_PASS; fi
+git status
+git add .
+git commit -m 'test'
+ clai debug transitions
+clai incognito on
+clai incognito off
+mkdir -p /tmp/debug-task-test
+cd /tmp/debug-task-test
+echo '{"scripts":{"test":"jest"}}' > package.json
+clai suggest
+curl -s http://localhost:8765/debug/tasks 2>/dev/null || clai debug tasks
+curl -s http://localhost:8765/debug/discovery-errors 2>/dev/null || clai debug discovery-errors
+export CLAI_NO_RECORD=1
+echo 'NO_RECORD_TEST_CMD'
+unset CLAI_NO_RECORD
+if clai history --session=$CLAI_SESSION_ID | grep -q NO_RECORD_TEST_CMD; then echo NO_RECORD_FAIL; else echo NO_RECORD_PASS; fi
+curl -s http://localhost:8765/debug/cache 2>/dev/null | jq . || echo 'curl failed'
+true
+if clai history --session=$CLAI_SESSION_ID --format json | grep -q '"exit_code":0'; then echo EXIT_SUCCESS_PASS; else echo EXIT_SUCCESS_FAIL; fi
+clai incognito on
+clai incognito on
+echo 'ephemeral_session_cmd_12345'
+clai suggest
+false
+if clai history --session=$CLAI_SESSION_ID --format json | grep -q '"exit_code":1'; then echo EXIT_FAILURE_PASS; else echo EXIT_FAILURE_FAIL; fi
+cd /tmp && echo 'ingestion_cwd_test'
+clai history --cwd=/tmp --global
+clai incognito on
+echo 'incognito_only_cmd_xyz'
+echo 'incognito_only_cmd_xyz'
+echo 'incognito_only_cmd_xyz'
+clai incognito off
+clai suggest --format=json
+echo "hello | world" > /dev/null && echo 'done'
+clai history --session=$CLAI_SESSION_ID
+export CLAI_EPHEMERAL=1
+echo 'ephemeral_env_test_cmd'
+unset CLAI_EPHEMERAL
+clai suggest --format=json
+echo '日本語 émoji 🎉'
+clai history --session=$CLAI_SESSION_ID
+clai daemon status
+git status
+make build

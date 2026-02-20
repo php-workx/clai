@@ -1,164 +1,29 @@
 {
   "summary": {
     "shell": "bash",
-    "url": "http://127.0.0.1:8080",
-    "plans": [
-      "/Users/runger/.claude-worktrees/clai/spec-reviews/tests/e2e/example-test-plan.yaml",
-      "/Users/runger/.claude-worktrees/clai/spec-reviews/tests/e2e/suggestions-tests.yaml"
-    ],
-    "total": 97,
-    "passed": 62,
-    "failed": 35,
-    "duration_ms": 214237,
+    "total": 79,
+    "passed": 68,
+    "failed": 11,
+    "skipped": 18,
+    "duration_ms": 159137,
     "failures": [
       {
         "ok": false,
         "name": "History picker fuzzy search filters results",
-        "id": "002-History_picker_fuzzy_search_filters_results",
-        "reason": "expected screen not to contain: banana | expected screen not to contain: git status",
+        "reason": "expected screen to contain: apple | expected screen to contain: apricot",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/002-History_picker_fuzzy_search_filters_results.png",
         "plan": "example-test-plan.yaml"
       },
       {
         "ok": false,
-        "name": "History picker navigation with arrow keys",
-        "id": "003-History_picker_navigation_with_arrow_keys",
-        "reason": "expected visible element: picker-selection",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/003-History_picker_navigation_with_arrow_keys.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "History picker Enter inserts command",
-        "id": "004-History_picker_Enter_inserts_command",
-        "reason": "expected screen not to contain: history",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/004-History_picker_Enter_inserts_command.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "History picker Escape cancels",
-        "id": "005-History_picker_Escape_cancels",
-        "reason": "expected screen not to contain: history",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/005-History_picker_Escape_cancels.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "History scope switching with Tab",
-        "id": "006-History_scope_switching_with_Tab",
-        "reason": "expected screen to contain: Global",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/006-History_scope_switching_with_Tab.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Session history is isolated from global",
-        "id": "007-Session_history_is_isolated_from_global",
-        "reason": "expected screen to contain: Session",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/007-Session_history_is_isolated_from_global.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Global history contains cross-session commands",
-        "id": "008-Global_history_contains_cross-session_commands",
-        "reason": "expected screen to contain: Global",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/008-Global_history_contains_cross-session_commands.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Long command shows truncation indicator",
-        "id": "009-Long_command_shows_truncation_indicator",
-        "reason": "expected screen to contain: …",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/009-Long_command_shows_truncation_indicator.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Ctrl+C copies full untruncated command",
-        "id": "011-Ctrl_C_copies_full_untruncated_command",
-        "reason": "expected screen to contain: Copied!",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/011-Ctrl_C_copies_full_untruncated_command.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai history filters by CWD",
-        "id": "022-clai_history_filters_by_CWD",
-        "reason": "expected screen not to contain: from_home_dir",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/022-clai_history_filters_by_CWD.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai history filters successful commands",
-        "id": "023-clai_history_filters_successful_commands",
-        "reason": "expected screen not to contain: false",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/023-clai_history_filters_successful_commands.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai history filters failed commands",
-        "id": "024-clai_history_filters_failed_commands",
-        "reason": "expected screen not to contain: will_succeed",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/024-clai_history_filters_failed_commands.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
         "name": "CWD scope works with paths containing spaces",
-        "id": "034-CWD_scope_works_with_paths_containing_spaces",
-        "reason": "expected screen to contain: CWD",
+        "reason": "expected screen to contain: command in spaced dir",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/034-CWD_scope_works_with_paths_containing_spaces.png",
         "plan": "example-test-plan.yaml"
       },
       {
         "ok": false,
-        "name": "Commands in incognito mode not persisted",
-        "id": "037-Commands_in_incognito_mode_not_persisted",
-        "reason": "expected screen not to contain: SECRET_INCOGNITO_COMMAND_12345",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/037-Commands_in_incognito_mode_not_persisted.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "CLAI_NO_RECORD prevents all ingestion",
-        "id": "039-CLAI_NO_RECORD_prevents_all_ingestion",
-        "reason": "expected screen not to contain: NO_RECORD_TEST_CMD",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/039-CLAI_NO_RECORD_prevents_all_ingestion.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Command ingestion captures exit code success",
-        "id": "040-Command_ingestion_captures_exit_code_success",
-        "reason": "expected screen to contain: exit_code",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/040-Command_ingestion_captures_exit_code_success.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Command ingestion captures exit code failure",
-        "id": "041-Command_ingestion_captures_exit_code_failure",
-        "reason": "expected screen to contain: exit_code",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/041-Command_ingestion_captures_exit_code_failure.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai suggest fzf format",
-        "id": "051-clai_suggest_fzf_format",
-        "reason": "expected screen not to contain: (",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/051-clai_suggest_fzf_format.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
         "name": "clai suggest with prefix filters results",
-        "id": "053-clai_suggest_with_prefix_filters_results",
         "reason": "expected screen not to contain: npm | expected screen not to contain: make",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/053-clai_suggest_with_prefix_filters_results.png",
         "plan": "suggestions-tests.yaml"
@@ -166,7 +31,6 @@
       {
         "ok": false,
         "name": "Suggestion shows transition reason",
-        "id": "054-Suggestion_shows_transition_reason",
         "reason": "expected screen to contain: transition",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/054-Suggestion_shows_transition_reason.png",
         "plan": "suggestions-tests.yaml"
@@ -174,7 +38,6 @@
       {
         "ok": false,
         "name": "Suggestion shows freq_repo reason",
-        "id": "055-Suggestion_shows_freq_repo_reason",
         "reason": "expected screen to match: (freq_repo|freq_global)",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/055-Suggestion_shows_freq_repo_reason.png",
         "plan": "suggestions-tests.yaml"
@@ -182,113 +45,43 @@
       {
         "ok": false,
         "name": "Suggestion includes confidence score",
-        "id": "056-Suggestion_includes_confidence_score",
         "reason": "expected screen to contain: confidence",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/056-Suggestion_includes_confidence_score.png",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
-        "name": "Suggestion context includes last_cmd_norm",
-        "id": "057-Suggestion_context_includes_last_cmd_norm",
-        "reason": "expected screen to match: (context|last_cmd)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/057-Suggestion_context_includes_last_cmd_norm.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
         "name": "Ghost text suggestion appears",
-        "id": "058-Ghost_text_suggestion_appears",
-        "reason": "expected screen to contain: atus",
+        "reason": "expected screen to contain: git status",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/058-Ghost_text_suggestion_appears.png",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
-        "name": "Escape clears suggestion",
-        "id": "060-Escape_clears_suggestion",
-        "reason": "expected screen not to contain: nstall",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/060-Escape_clears_suggestion.png",
+        "name": "Typing clears ghost text",
+        "reason": "expected screen not to contain: tatus",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/061-Typing_clears_ghost_text.png",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
         "name": "Alt+Right accepts next token",
-        "id": "062-Alt_Right_accepts_next_token",
-        "reason": "expected screen not to contain: pods",
+        "reason": "expected screen to contain: kubectl get",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/062-Alt_Right_accepts_next_token.png",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
-        "name": "Typo correction respects similarity threshold",
-        "id": "064-Typo_correction_respects_similarity_threshold",
-        "reason": "expected screen not to contain: xyzabc123",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/064-Typo_correction_respects_similarity_threshold.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Ctrl+Space opens suggestion picker (bash)",
-        "id": "073-Ctrl_Space_opens_suggestion_picker_bash_",
-        "reason": "keyboard.press: Unknown key: \"Ctrl\"",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/073-Ctrl_Space_opens_suggestion_picker_bash_.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai search basic query",
-        "id": "074-clai_search_basic_query",
-        "reason": "expected screen to contain: searchable_unique_term_abc123",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/074-clai_search_basic_query.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
         "name": "Discovery shows project_task reason",
-        "id": "082-Discovery_shows_project_task_reason",
         "reason": "expected screen to contain: project_task",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/082-Discovery_shows_project_task_reason.png",
         "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
-        "name": "Debug transitions endpoint returns data",
-        "id": "087-Debug_transitions_endpoint_returns_data",
-        "reason": "expected screen to match: (transitions|prev|next)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/087-Debug_transitions_endpoint_returns_data.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Incognito commands not in global suggestions",
-        "id": "093-Incognito_commands_not_in_global_suggestions",
-        "reason": "expected screen not to contain: incognito_only_cmd_xyz",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/093-Incognito_commands_not_in_global_suggestions.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "CLAI_EPHEMERAL affects suggestions",
-        "id": "094-CLAI_EPHEMERAL_affects_suggestions",
-        "reason": "expected screen not to contain: ephemeral_env_test_cmd",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/094-CLAI_EPHEMERAL_affects_suggestions.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
         "name": "Suggest API returns expected JSON structure",
-        "id": "095-Suggest_API_returns_expected_JSON_structure",
         "reason": "expected screen to match: (reason|reasons)",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/095-Suggest_API_returns_expected_JSON_structure.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Suggest API includes cache status",
-        "id": "096-Suggest_API_includes_cache_status",
-        "reason": "expected screen to match: (cache_hit|cache_miss|from_cache)",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/096-Suggest_API_includes_cache_status.png",
         "plan": "suggestions-tests.yaml"
       }
     ]
@@ -297,355 +90,278 @@
     {
       "ok": true,
       "name": "History picker opens with Alt+H",
-      "id": "001-History_picker_opens_with_Alt_H",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": false,
       "name": "History picker fuzzy search filters results",
-      "id": "002-History_picker_fuzzy_search_filters_results",
-      "reason": "expected screen not to contain: banana | expected screen not to contain: git status",
+      "reason": "expected screen to contain: apple | expected screen to contain: apricot",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/002-History_picker_fuzzy_search_filters_results.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "History picker navigation with arrow keys",
-      "id": "003-History_picker_navigation_with_arrow_keys",
-      "reason": "expected visible element: picker-selection",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/003-History_picker_navigation_with_arrow_keys.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "History picker Enter inserts command",
-      "id": "004-History_picker_Enter_inserts_command",
-      "reason": "expected screen not to contain: history",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/004-History_picker_Enter_inserts_command.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "History picker Escape cancels",
-      "id": "005-History_picker_Escape_cancels",
-      "reason": "expected screen not to contain: history",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/005-History_picker_Escape_cancels.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "History scope switching with Tab",
-      "id": "006-History_scope_switching_with_Tab",
-      "reason": "expected screen to contain: Global",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/006-History_scope_switching_with_Tab.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Session history is isolated from global",
-      "id": "007-Session_history_is_isolated_from_global",
-      "reason": "expected screen to contain: Session",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/007-Session_history_is_isolated_from_global.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Global history contains cross-session commands",
-      "id": "008-Global_history_contains_cross-session_commands",
-      "reason": "expected screen to contain: Global",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/008-Global_history_contains_cross-session_commands.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Long command shows truncation indicator",
-      "id": "009-Long_command_shows_truncation_indicator",
-      "reason": "expected screen to contain: …",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/009-Long_command_shows_truncation_indicator.png",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Enter inserts full untruncated command",
-      "id": "010-Enter_inserts_full_untruncated_command",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Ctrl+C copies full untruncated command",
-      "id": "011-Ctrl_C_copies_full_untruncated_command",
-      "reason": "expected screen to contain: Copied!",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/011-Ctrl_C_copies_full_untruncated_command.png",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai loads successfully in bash",
-      "id": "012-clai_loads_successfully_in_bash",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Session ID is set",
-      "id": "013-Session_ID_is_set",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "History command shows session history",
-      "id": "014-History_command_shows_session_history",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "clai cmd converts natural language to command",
-      "id": "015-clai_cmd_converts_natural_language_to_command",
+      "reason": "clai cmd not yet fully implemented",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "clai cmd caches suggestion for completion",
-      "id": "016-clai_cmd_caches_suggestion_for_completion",
+      "reason": "clai cmd not yet fully implemented",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "clai ask answers terminal questions",
-      "id": "017-clai_ask_answers_terminal_questions",
+      "reason": "clai ask not yet fully implemented",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "clai ask with context flag",
-      "id": "018-clai_ask_with_context_flag",
+      "reason": "clai ask not yet fully implemented",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai status shows session info",
-      "id": "019-clai_status_shows_session_info",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai history with session flag",
-      "id": "020-clai_history_with_session_flag",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai history with global flag",
-      "id": "021-clai_history_with_global_flag",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "clai history filters by CWD",
-      "id": "022-clai_history_filters_by_CWD",
-      "reason": "expected screen not to contain: from_home_dir",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/022-clai_history_filters_by_CWD.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "clai history filters successful commands",
-      "id": "023-clai_history_filters_successful_commands",
-      "reason": "expected screen not to contain: false",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/023-clai_history_filters_successful_commands.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "clai history filters failed commands",
-      "id": "024-clai_history_filters_failed_commands",
-      "reason": "expected screen not to contain: will_succeed",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/024-clai_history_filters_failed_commands.png",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai off disables integration",
-      "id": "025-clai_off_disables_integration",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai on re-enables integration",
-      "id": "026-clai_on_re-enables_integration",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "PTY wrapper captures stdout",
-      "id": "027-PTY_wrapper_captures_stdout",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "PTY wrapper handles colors",
-      "id": "028-PTY_wrapper_handles_colors",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "PTY wrapper Ctrl+C handling",
-      "id": "029-PTY_wrapper_Ctrl_C_handling",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Voice mode converts natural language",
-      "id": "030-Voice_mode_converts_natural_language",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Empty command line doesn't crash",
-      "id": "031-Empty_command_line_doesn_t_crash",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Very long command doesn't overflow",
-      "id": "032-Very_long_command_doesn_t_overflow",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Special characters handled correctly",
-      "id": "033-Special_characters_handled_correctly",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": false,
       "name": "CWD scope works with paths containing spaces",
-      "id": "034-CWD_scope_works_with_paths_containing_spaces",
-      "reason": "expected screen to contain: CWD",
+      "reason": "expected screen to contain: command in spaced dir",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/034-CWD_scope_works_with_paths_containing_spaces.png",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "History args handle special path characters",
-      "id": "035-History_args_handle_special_path_characters",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Incognito mode can be enabled",
-      "id": "036-Incognito_mode_can_be_enabled",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Commands in incognito mode not persisted",
-      "id": "037-Commands_in_incognito_mode_not_persisted",
-      "reason": "expected screen not to contain: SECRET_INCOGNITO_COMMAND_12345",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/037-Commands_in_incognito_mode_not_persisted.png",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Incognito mode can be disabled",
-      "id": "038-Incognito_mode_can_be_disabled",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "CLAI_NO_RECORD prevents all ingestion",
-      "id": "039-CLAI_NO_RECORD_prevents_all_ingestion",
-      "reason": "expected screen not to contain: NO_RECORD_TEST_CMD",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/039-CLAI_NO_RECORD_prevents_all_ingestion.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Command ingestion captures exit code success",
-      "id": "040-Command_ingestion_captures_exit_code_success",
-      "reason": "expected screen to contain: exit_code",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/040-Command_ingestion_captures_exit_code_success.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Command ingestion captures exit code failure",
-      "id": "041-Command_ingestion_captures_exit_code_failure",
-      "reason": "expected screen to contain: exit_code",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/041-Command_ingestion_captures_exit_code_failure.png",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Command ingestion captures CWD",
-      "id": "042-Command_ingestion_captures_CWD",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Command with special characters ingested",
-      "id": "043-Command_with_special_characters_ingested",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "Command with unicode characters ingested",
-      "id": "044-Command_with_unicode_characters_ingested",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai daemon status shows state",
-      "id": "045-clai_daemon_status_shows_state",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai daemon start works",
-      "id": "046-clai_daemon_start_works",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai daemon stop graceful shutdown",
-      "id": "047-clai_daemon_stop_graceful_shutdown",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai daemon restart sequence",
-      "id": "048-clai_daemon_restart_sequence",
       "plan": "example-test-plan.yaml"
     },
     {
       "ok": true,
       "name": "clai suggest text format",
-      "id": "049-clai_suggest_text_format",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "clai suggest JSON format",
-      "id": "050-clai_suggest_JSON_format",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "clai suggest fzf format",
-      "id": "051-clai_suggest_fzf_format",
-      "reason": "expected screen not to contain: (",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/051-clai_suggest_fzf_format.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "clai suggest with limit",
-      "id": "052-clai_suggest_with_limit",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "clai suggest with prefix filters results",
-      "id": "053-clai_suggest_with_prefix_filters_results",
       "reason": "expected screen not to contain: npm | expected screen not to contain: make",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/053-clai_suggest_with_prefix_filters_results.png",
       "plan": "suggestions-tests.yaml"
@@ -653,7 +369,6 @@
     {
       "ok": false,
       "name": "Suggestion shows transition reason",
-      "id": "054-Suggestion_shows_transition_reason",
       "reason": "expected screen to contain: transition",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/054-Suggestion_shows_transition_reason.png",
       "plan": "suggestions-tests.yaml"
@@ -661,7 +376,6 @@
     {
       "ok": false,
       "name": "Suggestion shows freq_repo reason",
-      "id": "055-Suggestion_shows_freq_repo_reason",
       "reason": "expected screen to match: (freq_repo|freq_global)",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/055-Suggestion_shows_freq_repo_reason.png",
       "plan": "suggestions-tests.yaml"
@@ -669,281 +383,251 @@
     {
       "ok": false,
       "name": "Suggestion includes confidence score",
-      "id": "056-Suggestion_includes_confidence_score",
       "reason": "expected screen to contain: confidence",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/056-Suggestion_includes_confidence_score.png",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Suggestion context includes last_cmd_norm",
-      "id": "057-Suggestion_context_includes_last_cmd_norm",
-      "reason": "expected screen to match: (context|last_cmd)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/057-Suggestion_context_includes_last_cmd_norm.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Ghost text suggestion appears",
-      "id": "058-Ghost_text_suggestion_appears",
-      "reason": "expected screen to contain: atus",
+      "reason": "expected screen to contain: git status",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/058-Ghost_text_suggestion_appears.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Right arrow accepts full suggestion",
-      "id": "059-Right_arrow_accepts_full_suggestion",
-      "plan": "suggestions-tests.yaml"
-    },
-    {
-      "ok": false,
-      "name": "Escape clears suggestion",
-      "id": "060-Escape_clears_suggestion",
-      "reason": "expected screen not to contain: nstall",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/060-Escape_clears_suggestion.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "name": "Escape clears suggestion",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
       "name": "Typing clears ghost text",
-      "id": "061-Typing_clears_ghost_text",
+      "reason": "expected screen not to contain: tatus",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/061-Typing_clears_ghost_text.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Alt+Right accepts next token",
-      "id": "062-Alt_Right_accepts_next_token",
-      "reason": "expected screen not to contain: pods",
+      "reason": "expected screen to contain: kubectl get",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/062-Alt_Right_accepts_next_token.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Typo correction suggests on exit 127",
-      "id": "063-Typo_correction_suggests_on_exit_127",
+      "reason": "Typo correction backend not yet implemented",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
+      "skipped": true,
       "name": "Typo correction respects similarity threshold",
-      "id": "064-Typo_correction_respects_similarity_threshold",
-      "reason": "expected screen not to contain: xyzabc123",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/064-Typo_correction_respects_similarity_threshold.png",
+      "reason": "Typo correction backend not yet implemented",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Typo correction prioritizes high-frequency commands",
-      "id": "065-Typo_correction_prioritizes_high-frequency_commands",
+      "reason": "Typo correction backend not yet implemented",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Slot filling learns argument values",
-      "id": "066-Slot_filling_learns_argument_values",
+      "reason": "Slot filling backend not yet implemented",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Slot filling respects frequency",
-      "id": "067-Slot_filling_respects_frequency",
+      "reason": "Slot filling backend not yet implemented",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Slot scope repo overrides global",
-      "id": "068-Slot_scope_repo_overrides_global",
+      "reason": "Slot filling backend not yet implemented",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Suggestions served from cache",
-      "id": "069-Suggestions_served_from_cache",
+      "reason": "Cache introspection not yet exposed in CLI",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Cache TTL expires stale entries",
-      "id": "070-Cache_TTL_expires_stale_entries",
+      "reason": "Cache introspection not yet exposed in CLI",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Cache invalidated on new command",
-      "id": "071-Cache_invalidated_on_new_command",
+      "reason": "Cache introspection not yet exposed in CLI",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Cache shows in debug endpoint",
-      "id": "072-Cache_shows_in_debug_endpoint",
+      "reason": "Cache introspection not yet exposed in CLI",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
-      "name": "Ctrl+Space opens suggestion picker (bash)",
-      "id": "073-Ctrl_Space_opens_suggestion_picker_bash_",
-      "reason": "keyboard.press: Unknown key: \"Ctrl\"",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/073-Ctrl_Space_opens_suggestion_picker_bash_.png",
+      "ok": true,
+      "name": "Alt+H opens suggestion picker (bash)",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "clai search basic query",
-      "id": "074-clai_search_basic_query",
-      "reason": "expected screen to contain: searchable_unique_term_abc123",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/074-clai_search_basic_query.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "clai search with repo filter",
-      "id": "075-clai_search_with_repo_filter",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "clai search with limit",
-      "id": "076-clai_search_with_limit",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "clai search with JSON output",
-      "id": "077-clai_search_with_JSON_output",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "clai search empty results",
-      "id": "078-clai_search_empty_results",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "clai search with special characters",
-      "id": "079-clai_search_with_special_characters",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Discovery finds package.json scripts",
-      "id": "080-Discovery_finds_package.json_scripts",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Discovery finds Makefile targets",
-      "id": "081-Discovery_finds_Makefile_targets",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Discovery shows project_task reason",
-      "id": "082-Discovery_shows_project_task_reason",
       "reason": "expected screen to contain: project_task",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/082-Discovery_shows_project_task_reason.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Discovery finds Cargo.toml commands",
-      "id": "083-Discovery_finds_Cargo.toml_commands",
+      "reason": "Cargo discovery not yet implemented",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Discovery finds pyproject.toml scripts",
-      "id": "084-Discovery_finds_pyproject.toml_scripts",
+      "reason": "pyproject.toml discovery not yet implemented",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Debug scores endpoint returns data",
-      "id": "085-Debug_scores_endpoint_returns_data",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Debug scores with limit parameter",
-      "id": "086-Debug_scores_with_limit_parameter",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Debug transitions endpoint returns data",
-      "id": "087-Debug_transitions_endpoint_returns_data",
-      "reason": "expected screen to match: (transitions|prev|next)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/087-Debug_transitions_endpoint_returns_data.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Debug tasks endpoint returns discovered tasks",
-      "id": "088-Debug_tasks_endpoint_returns_discovered_tasks",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Debug discovery-errors endpoint",
-      "id": "089-Debug_discovery-errors_endpoint",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Debug endpoints return valid JSON",
-      "id": "090-Debug_endpoints_return_valid_JSON",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Incognito mode toggle",
-      "id": "091-Incognito_mode_toggle",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
       "name": "Incognito commands appear in session suggestions",
-      "id": "092-Incognito_commands_appear_in_session_suggestions",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Incognito commands not in global suggestions",
-      "id": "093-Incognito_commands_not_in_global_suggestions",
-      "reason": "expected screen not to contain: incognito_only_cmd_xyz",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/093-Incognito_commands_not_in_global_suggestions.png",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "CLAI_EPHEMERAL affects suggestions",
-      "id": "094-CLAI_EPHEMERAL_affects_suggestions",
-      "reason": "expected screen not to contain: ephemeral_env_test_cmd",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/094-CLAI_EPHEMERAL_affects_suggestions.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Suggest API returns expected JSON structure",
-      "id": "095-Suggest_API_returns_expected_JSON_structure",
       "reason": "expected screen to match: (reason|reasons)",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/095-Suggest_API_returns_expected_JSON_structure.png",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
+      "skipped": true,
       "name": "Suggest API includes cache status",
-      "id": "096-Suggest_API_includes_cache_status",
-      "reason": "expected screen to match: (cache_hit|cache_miss|from_cache)",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/096-Suggest_API_includes_cache_status.png",
+      "reason": "Cache status field not yet exposed",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
       "name": "Suggest API includes timing info",
-      "id": "097-Suggest_API_includes_timing_info",
+      "reason": "Timing info not yet exposed",
       "plan": "suggestions-tests.yaml"
     }
   ]

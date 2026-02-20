@@ -1,0 +1,21 @@
+[zsh] 1/54 clai loads successfully in zsh
+  -> PASS
+[zsh] 2/54 clai status in zsh
+  -> PASS
+[zsh] 3/54 History picker works in zsh
+  -> PASS
+[zsh] 4/54 CWD scope filters correctly with spaces in path
+  -> FAIL: expected screen to contain: in my project
+[zsh] 5/54 Command ingestion in zsh
+  -> PASS
+[zsh] 6/54 clai suggest text format
+  -> PASS
+[zsh] 7/54 clai suggest JSON format
+  -> FAIL: expected screen to contain: {
+[zsh] 8/54 clai suggest fzf format
+  -> PASS
+[zsh] 9/54 clai suggest with limit
+  -> PASS
+[zsh] 10/54 clai suggest with prefix filters results
+  -> FAIL: expected screen not to contain: npm | expected screen not to contain: make
+[zsh] 11/54 Suggestion shows transition reason
