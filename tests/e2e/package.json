@@ -1,0 +1,15 @@
+{
+  "name": "clai-e2e",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Gotty + Playwright E2E runner for clai",
+  "license": "UNLICENSED",
+  "scripts": {
+    "run": "node run-e2e.js",
+    "install:browsers": "playwright install chromium"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "playwright": "^1.52.0"
+  }
+}

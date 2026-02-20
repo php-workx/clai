@@ -7,11 +7,17 @@ BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 PICKER_LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-all test-interactive test-docker test-server test-server-stop test-server-status cover fmt lint vuln roam dev help proto bin/linux
+.PHONY: all build install install-dev clean test test-all test-interactive test-docker test-server test-server-stop test-server-status test-e2e test-e2e-shell cover fmt lint vuln roam dev help proto bin/linux
 
 TEST_SHELL?=bash
 PORT?=8080
 ADDRESS?=127.0.0.1
+E2E_SHELL?=bash
+E2E_SHELLS?=bash zsh fish
+E2E_PLANS?=tests/e2e/example-test-plan.yaml,tests/e2e/suggestions-tests.yaml
+E2E_GREP?=
+E2E_OUT?=.tmp/e2e-runs
+E2E_URL?=http://127.0.0.1:8080
 
 all: build
 
@@ -142,6 +148,24 @@ test-server-stop:
 ## test-server-status: Show status of gotty-backed terminal server
 test-server-status:
 	@./scripts/stop-test-server.sh --status
+
+## test-e2e: Run gotty+Playwright e2e suite for bash/zsh/fish and aggregate results
+test-e2e:
+	@E2E_SHELLS="$(E2E_SHELLS)" \
+	E2E_PLANS="$(E2E_PLANS)" \
+	E2E_GREP="$(E2E_GREP)" \
+	E2E_OUT="$(E2E_OUT)" \
+	E2E_URL="$(E2E_URL)" \
+	./scripts/run-e2e-suite.sh
+
+## test-e2e-shell: Run gotty+Playwright e2e suite for one shell (set E2E_SHELL=bash|zsh|fish)
+test-e2e-shell:
+	@E2E_SHELLS="$(E2E_SHELL)" \
+	E2E_PLANS="$(E2E_PLANS)" \
+	E2E_GREP="$(E2E_GREP)" \
+	E2E_OUT="$(E2E_OUT)" \
+	E2E_URL="$(E2E_URL)" \
+	./scripts/run-e2e-suite.sh
 
 ## fmt: Format code
 fmt:

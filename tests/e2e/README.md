@@ -4,28 +4,50 @@ This directory contains end-to-end test plans for AI-assisted terminal testing.
 
 ## Quick Start
 
-1. **Start the terminal server:**
+1. **Run full e2e suite (all shells):**
    ```bash
-   make test-server
+   make test-e2e
    ```
 
-2. **Run tests with the local Playwright runner:**
+2. **Run one shell:**
    ```bash
-   # One-time deps
-   cd tests/e2e && npm init -y && npm install playwright js-yaml
-
-   # In repo root
-   node tests/e2e/run-e2e.js --shell bash --url http://127.0.0.1:8080
-   node tests/e2e/run-e2e.js --shell zsh --url http://127.0.0.1:8080
-   node tests/e2e/run-e2e.js --shell fish --url http://127.0.0.1:8080
+   make test-e2e-shell E2E_SHELL=bash
+   make test-e2e-shell E2E_SHELL=zsh
+   make test-e2e-shell E2E_SHELL=fish
    ```
 
-3. **Ask Claude to run tests (alternative):**
+3. **Run a filtered subset:**
+   ```bash
+   make test-e2e E2E_GREP="suggest|search"
+   ```
+
+4. **Customize plans/output:**
+   ```bash
+   make test-e2e \
+     E2E_PLANS="tests/e2e/suggestions-tests.yaml" \
+     E2E_OUT=".tmp/e2e-runs-custom" \
+     E2E_URL="http://127.0.0.1:8080"
+   ```
+
+5. **Ask Claude to run tests (alternative):**
    ```
    Run e2e tests from tests/e2e/example-test-plan.yaml against http://localhost:8080
    ```
 
-4. **Review results** - pass/fail summary and per-test JSON are written to `.tmp/e2e-runs/`
+6. **Review results** - pass/fail summary and per-test JSON are written to `.tmp/e2e-runs/`
+   - `.tmp/e2e-runs/results-<shell>.json`
+   - `.tmp/e2e-runs/results-all.json`
+   - `.tmp/e2e-runs/summary.md`
+   - `.tmp/e2e-runs/artifacts-<shell>/...` (failure screenshots)
+
+## Dependency Management
+
+The suite runner installs Node dependencies from `tests/e2e/package.json` on demand.
+To preinstall manually:
+
+```bash
+npm --prefix tests/e2e install
+```
 
 ## Directory Structure
 
