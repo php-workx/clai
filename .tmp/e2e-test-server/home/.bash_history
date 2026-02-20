@@ -1,29 +1,3 @@
-UNIQUE_START
-echo CLIPBOARD_START_this_is_a_very_long_command_for_clipboard_test_CLIPBOARD_END
-source ~/.clai/shell/bash.sh
-echo $CLAI_SESSION_ID
-echo first
-echo second
-echo third
-history
-clai cmd 'list all files in current directory'
-clai cmd 'show git log with one line per commit'
-clai suggest
-clai ask 'How do I find large files?'
-clai ask --context 'error: permission denied' 'What went wrong?'
-clai status
-echo test_history_cmd_1
-echo test_history_cmd_2
-clai history --session=$CLAI_SESSION_ID
-clai history --global --limit 10
-cd /tmp && echo from_tmp_dir
-cd ~ && echo from_home_dir
-clai history --cwd=/tmp --global
-echo success_command
-false
-clai history --status=success --global
-echo will_succeed
-false
 clai history --status=failure --global
 clai off
 clai off
@@ -498,3 +472,29 @@ git log --oneline
 npm test
 make build
 clai suggest git --format=fzf --limit=5
+git add .
+git commit -m 'test' >/dev/null 2>&1 || true
+git add .
+git commit -m 'test2' >/dev/null 2>&1 || true
+git add .
+clai suggest git --format=json --limit=5
+echo freq_reason_seed
+echo freq_reason_seed
+echo freq_reason_seed
+echo freq_reason_other
+clai suggest echo --format=json --limit=5
+echo confidence_seed_alpha
+echo confidence_seed_beta
+clai suggest echo --format=json --limit=3
+git status
+git log --oneline
+clai suggest git --format=fzf --limit=3
+kubectl get pods -n production
+clai suggest kubectl --format=fzf --limit=3
+mkdir -p /tmp/reason-test
+cd /tmp/reason-test
+echo '{"scripts":{"lint":"eslint"}}' > package.json
+cd /tmp/reason-test && clai suggest npm --format=json --limit=5
+git status
+git log --oneline -1
+clai suggest git --format=json --limit=5

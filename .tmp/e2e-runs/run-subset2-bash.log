@@ -10,3 +10,19 @@ log: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/gott
 [bash] 3/10 clai suggest with prefix filters results
   -> PASS
 [bash] 4/10 Suggestion shows transition reason
+  -> FAIL: expected screen to match: (trans|transition|reasons)
+[bash] 5/10 Suggestion shows freq_repo reason
+  -> PASS
+[bash] 6/10 Suggestion includes confidence score
+  -> PASS
+[bash] 7/10 Ghost text suggestion appears
+  -> PASS
+[bash] 8/10 Alt+Right accepts next token
+  -> PASS
+[bash] 9/10 Discovery shows project_task reason
+  -> PASS
+[bash] 10/10 Suggest API returns expected JSON structure
+  -> PASS
+SUMMARY shell=bash total=10 passed=9 failed=1 skipped=0 duration_ms=24814
+RESULTS_JSON /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/results-bash.json
+test server stopped (pid=40011)

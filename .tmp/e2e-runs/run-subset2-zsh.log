@@ -1,0 +1,12 @@
+test server started
+shell: zsh
+url: http://127.0.0.1:8080
+pid: 40760
+log: /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/gotty.log
+[zsh] 1/10 clai suggest text format
+  -> PASS
+[zsh] 2/10 clai suggest JSON format
+  -> PASS
+[zsh] 3/10 clai suggest with prefix filters results
+  -> FAIL: expected screen to contain: git
+[zsh] 4/10 Suggestion shows transition reason
