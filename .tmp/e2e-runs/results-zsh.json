@@ -1,29 +1,96 @@
 {
   "summary": {
     "shell": "zsh",
-    "total": 1,
-    "passed": 0,
-    "failed": 1,
+    "total": 10,
+    "passed": 7,
+    "failed": 3,
     "skipped": 0,
-    "duration_ms": 5059,
+    "duration_ms": 29801,
     "failures": [
       {
         "ok": false,
         "name": "clai suggest with prefix filters results",
         "reason": "expected screen to contain: git",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/001-clai_suggest_with_prefix_filters_results.png",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/003-clai_suggest_with_prefix_filters_results.png",
         "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Suggestion shows transition reason",
+        "reason": "expected screen to match: (trans|transition|reasons)",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/004-Suggestion_shows_transition_reason.png",
+        "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "Suggest API returns expected JSON structure",
+        "reason": "expected screen to match: (reason|reasons|source)",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/010-Suggest_API_returns_expected_JSON_structure.png",
+        "terminal_excerpt": "        modified:   .tmp/e2e-test-server/clai/logs/daemon.log\n        modified:   .tmp/e2e-test-server/clai/state.db\n        modified:   .tmp/e2e-test-server/clai/state.db-wal\n        modified:   .tmp/e2e-test-server/gotty.log\n        modified:   .tmp/e2e-test-server/home/.clai/suggestions_v2.db-wal\n        modified:   .tmp/e2e-test-server/home/.kube/cache/http/859e5574972018b481cf40fcba021a31756afcc36a2b88b1f6aaf9dfd67b21cd\n\nTEST> git log --oneline -1\ndf2c1e1c (HEAD -> chore/spec-reviews) test2\nTEST> clai suggest git --format=json --limit=5\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest git --format=json --limit=5\",\"last_\ncmd_norm\":\"clai <arg> <arg> --format=json --limit=5\"},\"suggestions\":[]}\nTEST>  \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
         "plan": "suggestions-tests.yaml"
       }
     ]
   },
   "results": [
     {
+      "ok": true,
+      "name": "clai suggest text format",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai suggest JSON format",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
       "ok": false,
       "name": "clai suggest with prefix filters results",
       "reason": "expected screen to contain: git",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/001-clai_suggest_with_prefix_filters_results.png",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/003-clai_suggest_with_prefix_filters_results.png",
       "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Suggestion shows transition reason",
+      "reason": "expected screen to match: (trans|transition|reasons)",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/004-Suggestion_shows_transition_reason.png",
+      "terminal_excerpt": "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Suggestion shows freq_repo reason",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Suggestion includes confidence score",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Ghost text suggestion appears",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Alt+Right accepts next token",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Discovery shows project_task reason",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Suggest API returns expected JSON structure",
+      "reason": "expected screen to match: (reason|reasons|source)",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/010-Suggest_API_returns_expected_JSON_structure.png",
+      "terminal_excerpt": "        modified:   .tmp/e2e-test-server/clai/logs/daemon.log\n        modified:   .tmp/e2e-test-server/clai/state.db\n        modified:   .tmp/e2e-test-server/clai/state.db-wal\n        modified:   .tmp/e2e-test-server/gotty.log\n        modified:   .tmp/e2e-test-server/home/.clai/suggestions_v2.db-wal\n        modified:   .tmp/e2e-test-server/home/.kube/cache/http/859e5574972018b481cf40fcba021a31756afcc36a2b88b1f6aaf9dfd67b21cd\n\nTEST> git log --oneline -1\ndf2c1e1c (HEAD -> chore/spec-reviews) test2\nTEST> clai suggest git --format=json --limit=5\n{\"timing_hint\":{\"user_speed_class\":\"moderate\",\"suggested_pause_threshold_ms\":200},\"context\":{\"last_cmd\":\"clai suggest git --format=json --limit=5\",\"last_\ncmd_norm\":\"clai <arg> <arg> --format=json --limit=5\"},\"suggestions\":[]}\nTEST>  \n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
       "plan": "suggestions-tests.yaml"
     }
   ]
