@@ -134,3 +134,67 @@ Call log:
 [bash] 53/97 clai suggest with prefix filters results
   -> FAIL: expected screen not to contain: npm | expected screen not to contain: make
 [bash] 54/97 Suggestion shows transition reason
+  -> FAIL: expected screen to contain: transition
+[bash] 55/97 Suggestion shows freq_repo reason
+  -> FAIL: expected screen to match: (freq_repo|freq_global)
+[bash] 56/97 Suggestion includes confidence score
+  -> PASS
+[bash] 57/97 Suggestion context includes last_cmd_norm
+  -> PASS
+[bash] 58/97 Ghost text suggestion appears
+  -> FAIL: expected screen to contain: git status
+[bash] 59/97 Right arrow accepts full suggestion
+  -> PASS
+[bash] 60/97 Escape clears suggestion
+  -> PASS
+[bash] 61/97 Typing clears ghost text
+  -> PASS
+[bash] 62/97 Alt+Right accepts next token
+  -> FAIL: expected screen to contain: kubectl get
+[bash] 63/97 Typo correction suggests on exit 127
+  -> SKIP: Typo correction backend not yet implemented
+[bash] 64/97 Typo correction respects similarity threshold
+  -> SKIP: Typo correction backend not yet implemented
+[bash] 65/97 Typo correction prioritizes high-frequency commands
+  -> SKIP: Typo correction backend not yet implemented
+[bash] 66/97 Slot filling learns argument values
+  -> SKIP: Slot filling backend not yet implemented
+[bash] 67/97 Slot filling respects frequency
+  -> SKIP: Slot filling backend not yet implemented
+[bash] 68/97 Slot scope repo overrides global
+  -> SKIP: Slot filling backend not yet implemented
+[bash] 69/97 Suggestions served from cache
+  -> SKIP: Cache introspection not yet exposed in CLI
+[bash] 70/97 Cache TTL expires stale entries
+  -> SKIP: Cache introspection not yet exposed in CLI
+[bash] 71/97 Cache invalidated on new command
+  -> SKIP: Cache introspection not yet exposed in CLI
+[bash] 72/97 Cache shows in debug endpoint
+  -> SKIP: Cache introspection not yet exposed in CLI
+[bash] 73/97 Alt+H opens suggestion picker (bash)
+  -> FAIL: expected screen to match: (fzf|suggest|pick)
+[bash] 74/97 clai search basic query
+  -> PASS
+[bash] 75/97 clai search with repo filter
+  -> PASS
+[bash] 76/97 clai search with limit
+  -> PASS
+[bash] 77/97 clai search with JSON output
+  -> PASS
+[bash] 78/97 clai search empty results
+  -> PASS
+[bash] 79/97 clai search with special characters
+  -> PASS
+[bash] 80/97 Discovery finds package.json scripts
+  -> PASS
+[bash] 81/97 Discovery finds Makefile targets
+  -> PASS
+[bash] 82/97 Discovery shows project_task reason
+  -> FAIL: expected screen to contain: project_task
+[bash] 83/97 Discovery finds Cargo.toml commands
+  -> SKIP: Cargo discovery not yet implemented
+[bash] 84/97 Discovery finds pyproject.toml scripts
+  -> SKIP: pyproject.toml discovery not yet implemented
+[bash] 85/97 Debug scores endpoint returns data
+  -> PASS
+[bash] 86/97 Debug scores with limit parameter
