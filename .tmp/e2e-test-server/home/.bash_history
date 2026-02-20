@@ -1,17 +1,3 @@
-echo 'setup command 1'
-echo 'setup command 2'
-ls -la
-clai status
-echo $CLAI_SESSION_ID
-clai daemon status
-echo first_hist_test
-echo second_hist_test
-echo third_hist_test
-clear
-history
-clear
-echo 'this is a very long command that should wrap properly in the terminal without causing any display issues or breaking the shell integration features'
-clear
 echo "hello 'world' test123"
 clear
 clai history --global --limit 10
@@ -423,3 +409,92 @@ git status
 git log --oneline
 npm test
 make build
+echo UNIQUE_START_marker_this_is_a_very_long_command_with_lots_of_text_in_the_middle_UNIQUE_END_marker
+UNIQUE_START
+git add .
+git commit -m 'test'
+git commit -m 'test2'
+git add .
+clai suggest --format=json
+echo CLIPBOARD_START_this_is_a_very_long_command_for_clipboard_test_CLIPBOARD_END
+make build
+source ~/.clai/shell/bash.sh
+git status
+clai suggest --format=json
+echo $CLAI_SESSION_ID
+git status
+clai suggest --format=json
+echo first
+echo second
+echo third
+history
+clai status
+git status
+git log --oneline
+clai suggest 'git st' --format=fzf --limit=1
+docker ps -a
+echo test_history_cmd_1
+echo test_history_cmd_2
+clai history --session=$CLAI_SESSION_ID
+npm install
+clai history --global --limit 10
+git status
+cd /tmp && echo from_tmp_dir
+cd ~ && echo from_home_dir
+if clai history --cwd=/tmp | grep -q from_tmp_dir && ! clai history --cwd=/tmp | grep -q from_home_dir; then echo HISTORY_CWD_FILTER_PASS; else echo HISTORY_CWD_FILTER_FAIL; fi
+kubectl get pods -n production
+echo test1
+git status
+echo success_command
+false
+if clai history --status=success | grep -q success_command && ! clai history --status=success | grep -q '^false$'; then echo HISTORY_SUCCESS_FILTER_PASS; else echo HISTORY_SUCCESS_FILTER_FAIL; fi
+echo 'searchable_unique_term_abc123'
+git status
+clai search 'searchable_unique'
+echo will_succeed
+false
+if clai history --status=failure | grep -q '^false$' && ! clai history --status=failure | grep -q will_succeed; then echo HISTORY_FAILURE_FILTER_PASS; else echo HISTORY_FAILURE_FILTER_FAIL; fi
+echo 'repo_specific_search_term'
+clai search --repo 'repo_specific'
+clai off
+clai off
+clai on
+echo search_limit_1
+echo search_limit_2
+echo search_limit_3
+echo search_limit_4
+echo search_limit_5
+clai search --limit 2 'search_limit'
+echo 'hello world'
+ls --color=always
+echo json_search_test
+clai search --json 'json_search'
+sleep 60
+clai search 'xyznonexistent98765'
+echo 'test-with-dashes_and_underscores'
+clai search 'test-with-dashes'
+`list all files in current directory
+mkdir -p /tmp/node-test-project
+cd /tmp/node-test-project
+echo '{"scripts":{"test":"jest","build":"tsc"}}' > package.json
+cd /tmp/node-test-project && clai suggest
+echo 'this is a very long command that should wrap properly in the terminal without causing any display issues or breaking the shell integration features'
+echo "hello 'world' $HOME"
+mkdir -p /tmp/make-test-project
+cd /tmp/make-test-project
+printf 'build:\n\techo build\ntest:\n\techo test\n' > Makefile
+cd /tmp/make-test-project && clai suggest
+mkdir -p '/tmp/test dir with spaces'
+cd '/tmp/test dir with spaces'
+echo 'command in spaced dir'
+ls -la
+mkdir -p /tmp/reason-test
+cd /tmp/reason-test
+echo '{"scripts":{"lint":"eslint"}}' > package.json
+cd /tmp/reason-test && clai suggest --format=json
+mkdir -p "/tmp/path'with\"quotes"
+cd "/tmp/path'with\"quotes"
+echo 'special path command'
+curl -s http://localhost:8765/debug/scores 2>/dev/null || clai debug scores
+clai incognito on
+curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5
