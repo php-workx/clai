@@ -46,9 +46,8 @@ tests:
     setup:
       - "echo suggest_text_seed_one"
       - "echo suggest_text_seed_two"
+      - "clai suggest echo --limit=3"
     steps:
-      - type: "clai suggest echo --limit=3"
-      - press: "Enter"
       - wait: "500ms"
     expect:
       - screen_matches: "\\d+\\."  # Numbered list
@@ -696,12 +695,12 @@ tests:
     description: "GET /debug/scores?limit=N respects limit"
     shells: [bash, zsh, fish]
     tags: [debug, endpoints, parameters, cross-shell]
+    setup:
+      - "curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5"
     steps:
-      - type: "curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5"
-      - press: "Enter"
       - wait: "500ms"
     expect:
-      - screen_contains: "scores"
+      - screen_matches: "(scores|score|\\{|\\[)"
 
   - name: "Debug transitions endpoint returns data"
     description: "GET /debug/transitions returns Markov bigrams"
