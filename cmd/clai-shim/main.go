@@ -126,7 +126,7 @@ Environment:
 func parseFlags(args []string) map[string]string {
 	result := make(map[string]string)
 	for i := 0; i < len(args); i++ {
-		arg := args[i] //nolint:gosec // G602: bounds checked by loop condition
+		arg := args[i]
 		if strings.HasPrefix(arg, "--") {
 			key := strings.TrimPrefix(arg, "--")
 			if idx := strings.Index(key, "="); idx >= 0 {

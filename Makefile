@@ -152,7 +152,10 @@ lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run; \
 	else \
-		echo "golangci-lint not installed, skipping..."; \
+		echo "Error: golangci-lint not installed."; \
+		echo "Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+		echo "Or run: make install-dev"; \
+		exit 1; \
 	fi
 
 ## vuln: Scan for vulnerabilities
@@ -160,7 +163,10 @@ vuln:
 	@if command -v govulncheck >/dev/null 2>&1; then \
 		govulncheck ./...; \
 	else \
-		echo "govulncheck not installed. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+		echo "Error: govulncheck not installed."; \
+		echo "Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+		echo "Or run: make install-dev"; \
+		exit 1; \
 	fi
 
 ## roam: Run roam architectural checks (fitness + pr-risk)

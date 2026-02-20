@@ -22,7 +22,7 @@ import (
 )
 
 // createTestDB creates a temporary SQLite database for testing.
-func createTestDB(t testing.TB) *sql.DB { //nolint:funlen // test DB setup with full V2 schema
+func createTestDB(t testing.TB) *sql.DB {
 	t.Helper()
 
 	dir, err := os.MkdirTemp("", "clai-scorer-test-*")

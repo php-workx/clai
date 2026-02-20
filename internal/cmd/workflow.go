@@ -33,8 +33,8 @@ const (
 	ExitHumanReject       = 3
 	ExitCancelled         = 4
 	ExitNeedsHuman        = 5
-	ExitDaemonUnavailable = 6 //nolint:unused // reserved for future use
-	ExitPolicyHalt        = 7 //nolint:unused // reserved for future use
+	ExitDaemonUnavailable = 6
+	ExitPolicyHalt        = 7
 	ExitDependencyMissing = 8
 	ExitTimeout           = 124
 )

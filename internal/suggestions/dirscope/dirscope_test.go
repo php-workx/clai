@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestComputeScopeKey(t *testing.T) { //nolint:funlen // table-driven test with many cases
+func TestComputeScopeKey(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {

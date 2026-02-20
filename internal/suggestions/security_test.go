@@ -25,7 +25,7 @@ import (
 )
 
 // createSecurityTestDB creates a full V2 schema database for security tests.
-func createSecurityTestDB(t *testing.T) *sql.DB { //nolint:funlen // security test DB setup with full V2 schema
+func createSecurityTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
 	dir, err := os.MkdirTemp("", "clai-security-test-*")

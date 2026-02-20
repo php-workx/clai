@@ -179,7 +179,7 @@ func (c *Client) Suggest(ctx context.Context, sessionID, cwd, buffer string, cur
 		Buffer:     buffer,
 		CursorPos:  int32(cursorPos), //nolint:gosec // G115: cursor pos is bounded by terminal width
 		IncludeAi:  includeAI,
-		MaxResults: int32(maxResults), //nolint:gosec // G115: max results is a small positive integer
+		MaxResults: int32(maxResults),
 	}
 
 	resp, err := c.client.Suggest(ctx, req)

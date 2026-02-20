@@ -203,7 +203,7 @@ func TestBash_NonInteractiveBashC_DoesNotRunHooks(t *testing.T) {
 	}
 
 	shimDir, logPath := createLoggingShim(t)
-	cmd := exec.Command("bash", "--norc", "--noprofile", "-c", //nolint:gosec // G204: test launches known binary with test-controlled args
+	cmd := exec.Command("bash", "--norc", "--noprofile", "-c",
 		fmt.Sprintf("source %q; echo NON_INTERACTIVE_OK", hookFile))
 	cmd.Env = append(os.Environ(),
 		"PATH="+shimDir+string(os.PathListSeparator)+os.Getenv("PATH"),

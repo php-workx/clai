@@ -806,7 +806,7 @@ func TestHashCommand(t *testing.T) {
 }
 
 func generateTestCommandID(n int) string {
-	return "test-cmd-" + string(rune('A'+n)) //nolint:gosec // G115: test helper, n is small and bounded
+	return "test-cmd-" + string(rune('A'+n))
 }
 
 func boolPtr(b bool) *bool {

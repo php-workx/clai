@@ -22,7 +22,7 @@ import (
 
 // createBenchDB creates a temporary SQLite database for benchmarks.
 // It uses the V2 schema tables that the scorer and write path depend on.
-func createBenchDB(b *testing.B) *sql.DB { //nolint:funlen // benchmark DB setup with full V2 schema
+func createBenchDB(b *testing.B) *sql.DB {
 	b.Helper()
 
 	dir, err := os.MkdirTemp("", "clai-bench-*")

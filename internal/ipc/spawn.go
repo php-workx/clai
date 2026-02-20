@@ -232,7 +232,7 @@ func findDaemonBinary() (string, error) {
 
 	// Check PATH
 	if path, err := exec.LookPath(DaemonBinaryName); err == nil {
-		absPath, absErr := filepath.Abs(path) //nolint:gosec // G703: daemon binary path resolved from user's PATH
+		absPath, absErr := filepath.Abs(path)
 		if absErr == nil {
 			return absPath, nil
 		}
