@@ -33,3 +33,4 @@
 2026/02/20 09:30:26 127.0.0.1:59435 200 GET /css/xterm.css
 2026/02/20 09:30:26 127.0.0.1:59438 200 GET /js/gotty.js
 2026/02/20 09:30:26 New client connected: 127.0.0.1:59440, connections: 4/0
+2026/02/20 09:30:33 Connection closed by client: 127.0.0.1:59422, connections: 3/0
