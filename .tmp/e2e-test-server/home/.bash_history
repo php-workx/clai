@@ -280,3 +280,33 @@ echo '[project.scripts]\ntest = "pytest"' > pyproject.toml
 cd /tmp/python-test-project && clai suggest
 curl -s http://localhost:8765/debug/scores 2>/dev/null || clai debug scores
 curl -s 'http://localhost:8765/debug/scores?limit=5' 2>/dev/null || clai debug scores --limit=5
+git status
+git add .
+git commit -m 'test'
+mkdir -p /tmp/debug-task-test
+cd /tmp/debug-task-test
+echo '{"scripts":{"test":"jest"}}' > package.json
+clai suggest
+curl -s http://localhost:8765/debug/tasks 2>/dev/null || clai debug tasks
+curl -s http://localhost:8765/debug/discovery-errors 2>/dev/null || clai debug discovery-errors
+curl -s http://localhost:8765/debug/cache 2>/dev/null | jq . || echo 'curl failed'
+clai incognito on
+clai incognito on
+echo 'ephemeral_session_cmd_12345'
+clai suggest
+clai incognito on
+echo 'incognito_only_cmd_xyz'
+echo 'incognito_only_cmd_xyz'
+echo 'incognito_only_cmd_xyz'
+clai incognito off
+clai suggest --format=json
+export CLAI_EPHEMERAL=1
+echo 'ephemeral_env_test_cmd'
+unset CLAI_EPHEMERAL
+clai suggest --format=json
+git status
+make build
+echo warmup
+clai suggest --format=json
+echo warmup
+clai suggest --format=json

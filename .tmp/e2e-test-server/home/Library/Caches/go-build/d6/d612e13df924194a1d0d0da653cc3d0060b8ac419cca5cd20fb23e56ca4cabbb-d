@@ -1,0 +1,4 @@
+./frequency.go
+./pipeline.go
+./slot.go
+./transition.go

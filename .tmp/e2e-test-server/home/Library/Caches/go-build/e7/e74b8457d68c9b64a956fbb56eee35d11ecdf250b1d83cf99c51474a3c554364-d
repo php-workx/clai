@@ -1,0 +1,3 @@
+./patterns.go
+./risk.go
+./sanitizer.go

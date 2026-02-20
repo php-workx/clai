@@ -171,3 +171,26 @@
 [bash] 86/97 Debug scores with limit parameter
   -> PASS
 [bash] 87/97 Debug transitions endpoint returns data
+  -> FAIL: expected screen to match: (transitions|prev|next)
+[bash] 88/97 Debug tasks endpoint returns discovered tasks
+  -> PASS
+[bash] 89/97 Debug discovery-errors endpoint
+  -> PASS
+[bash] 90/97 Debug endpoints return valid JSON
+  -> PASS
+[bash] 91/97 Incognito mode toggle
+  -> PASS
+[bash] 92/97 Incognito commands appear in session suggestions
+  -> PASS
+[bash] 93/97 Incognito commands not in global suggestions
+  -> FAIL: expected screen not to contain: incognito_only_cmd_xyz
+[bash] 94/97 CLAI_EPHEMERAL affects suggestions
+  -> FAIL: expected screen not to contain: ephemeral_env_test_cmd
+[bash] 95/97 Suggest API returns expected JSON structure
+  -> FAIL: expected screen to match: (reason|reasons)
+[bash] 96/97 Suggest API includes cache status
+  -> FAIL: expected screen to match: (cache_hit|cache_miss|from_cache)
+[bash] 97/97 Suggest API includes timing info
+  -> PASS
+SUMMARY shell=bash total=97 passed=62 failed=35 duration_ms=214237
+RESULTS_JSON /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/results-bash.json

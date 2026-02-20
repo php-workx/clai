@@ -44,7 +44,7 @@ function keyName(raw) {
     Esc: 'Escape',
     Return: 'Enter',
     Del: 'Delete',
-    Space: ' ',
+    Space: 'Space',
   };
   return map[k] || k;
 }

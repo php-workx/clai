@@ -1,0 +1,110 @@
+[zsh] 1/54 clai loads successfully in zsh
+  -> PASS
+[zsh] 2/54 clai status in zsh
+  -> PASS
+[zsh] 3/54 History picker works in zsh
+  -> PASS
+[zsh] 4/54 CWD scope filters correctly with spaces in path
+  -> FAIL: expected screen not to contain: in tmp root
+[zsh] 5/54 Command ingestion in zsh
+  -> PASS
+[zsh] 6/54 clai suggest text format
+  -> PASS
+[zsh] 7/54 clai suggest JSON format
+  -> FAIL: expected screen to contain: {
+[zsh] 8/54 clai suggest fzf format
+  -> PASS
+[zsh] 9/54 clai suggest with limit
+  -> PASS
+[zsh] 10/54 clai suggest with prefix filters results
+  -> FAIL: expected screen not to contain: npm | expected screen not to contain: make
+[zsh] 11/54 Suggestion shows transition reason
+  -> FAIL: expected screen to contain: transition
+[zsh] 12/54 Suggestion shows freq_repo reason
+  -> FAIL: expected screen to match: (freq_repo|freq_global)
+[zsh] 13/54 Suggestion includes confidence score
+  -> FAIL: expected screen to contain: confidence
+[zsh] 14/54 Suggestion context includes last_cmd_norm
+  -> FAIL: expected screen to match: (context|last_cmd)
+[zsh] 15/54 Ghost text suggestion appears
+  -> FAIL: expected screen to contain: atus
+[zsh] 16/54 Right arrow accepts full suggestion
+  -> PASS
+[zsh] 17/54 Escape clears suggestion
+  -> FAIL: expected screen not to contain: nstall
+[zsh] 18/54 Typing clears ghost text
+  -> PASS
+[zsh] 19/54 Alt+Right accepts next token
+  -> FAIL: expected screen not to contain: pods
+[zsh] 20/54 Typo correction suggests on exit 127
+  -> PASS
+[zsh] 21/54 Typo correction respects similarity threshold
+  -> FAIL: expected screen not to contain: xyzabc123
+[zsh] 22/54 Typo correction prioritizes high-frequency commands
+  -> PASS
+[zsh] 23/54 Slot filling learns argument values
+  -> PASS
+[zsh] 24/54 Slot filling respects frequency
+  -> PASS
+[zsh] 25/54 Slot scope repo overrides global
+  -> PASS
+[zsh] 26/54 Suggestions served from cache
+  -> PASS
+[zsh] 27/54 Cache TTL expires stale entries
+  -> PASS
+[zsh] 28/54 Cache invalidated on new command
+  -> PASS
+[zsh] 29/54 Cache shows in debug endpoint
+  -> PASS
+[zsh] 30/54 Ctrl+Space opens suggestion picker (zsh)
+  -> FAIL: keyboard.press: Unknown key: "Ctrl"
+[zsh] 31/54 clai search basic query
+  -> FAIL: expected screen to contain: searchable_unique_term_abc123
+[zsh] 32/54 clai search with repo filter
+  -> PASS
+[zsh] 33/54 clai search with limit
+  -> PASS
+[zsh] 34/54 clai search with JSON output
+  -> FAIL: expected screen to contain: { | expected screen to contain: results
+[zsh] 35/54 clai search empty results
+  -> PASS
+[zsh] 36/54 clai search with special characters
+  -> PASS
+[zsh] 37/54 Discovery finds package.json scripts
+  -> PASS
+[zsh] 38/54 Discovery finds Makefile targets
+  -> PASS
+[zsh] 39/54 Discovery shows project_task reason
+  -> FAIL: expected screen to contain: project_task
+[zsh] 40/54 Discovery finds Cargo.toml commands
+  -> PASS
+[zsh] 41/54 Discovery finds pyproject.toml scripts
+  -> PASS
+[zsh] 42/54 Debug scores endpoint returns data
+  -> FAIL: expected screen to contain: scores
+[zsh] 43/54 Debug scores with limit parameter
+  -> PASS
+[zsh] 44/54 Debug transitions endpoint returns data
+  -> PASS
+[zsh] 45/54 Debug tasks endpoint returns discovered tasks
+  -> PASS
+[zsh] 46/54 Debug discovery-errors endpoint
+  -> FAIL: expected screen to match: (errors|count)
+[zsh] 47/54 Debug endpoints return valid JSON
+  -> PASS
+[zsh] 48/54 Incognito mode toggle
+  -> PASS
+[zsh] 49/54 Incognito commands appear in session suggestions
+  -> PASS
+[zsh] 50/54 Incognito commands not in global suggestions
+  -> FAIL: expected screen not to contain: incognito_only_cmd_xyz
+[zsh] 51/54 CLAI_EPHEMERAL affects suggestions
+  -> FAIL: expected screen not to contain: ephemeral_env_test_cmd
+[zsh] 52/54 Suggest API returns expected JSON structure
+  -> FAIL: expected screen to match: (reason|reasons)
+[zsh] 53/54 Suggest API includes cache status
+  -> FAIL: expected screen to match: (cache_hit|cache_miss|from_cache)
+[zsh] 54/54 Suggest API includes timing info
+  -> PASS
+SUMMARY shell=zsh total=54 passed=33 failed=21 duration_ms=124947
+RESULTS_JSON /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/results-zsh.json
