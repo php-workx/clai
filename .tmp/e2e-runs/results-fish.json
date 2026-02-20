@@ -1,14 +1,33 @@
 {
   "summary": {
     "shell": "fish",
-    "total": 9,
-    "passed": 9,
-    "failed": 0,
-    "skipped": 1,
-    "duration_ms": 19544,
-    "failures": []
+    "total": 36,
+    "passed": 35,
+    "failed": 1,
+    "skipped": 15,
+    "duration_ms": 66831,
+    "failures": [
+      {
+        "ok": false,
+        "name": "Typing clears ghost text",
+        "reason": "expected screen not to contain: tatus",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/015-Typing_clears_ghost_text.png",
+        "terminal_excerpt": "        modified:   .tmp/e2e-test-server/gotty.log\n        modified:   .tmp/e2e-test-server/gotty.pid\n        modified:   .tmp/e2e-test-server/home/.clai/suggestions_v2.db-wal\n        modified:   .tmp/e2e-test-server/home/.local/share/fish/fish_history\n        deleted:    .tmp/e2e-test-server/home/.npm/_logs/2026-02-20T08_35_45_332Z-debug-0.log\n        deleted:    .tmp/e2e-test-server/home/.npm/_logs/2026-02-20T08_36_50_426Z-debug-0.log\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/compile@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/go@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/link@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/runtime.env\n        modified:   .tmp/e2e-test-server/shell/zdotdir/.zsh_history\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n        .tmp/e2e-runs/run-full2-fish.log\n        .tmp/e2e-test-server/home/.npm/_logs/2026-02-20T08_44_22_102Z-debug-0.log\n        .tmp/e2e-test-server/home/.npm/_logs/2026-02-20T08_44_35_155Z-debug-0.log\n        .tmp/e2e-test-server/home/Library/Caches/go-build/14/149702cddd9e1471dff3593df1723a8a8800b38caba77b47d041c84a8cbc7b0c-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/1f/1f0bd8eefbcdfb050aac379e46b6bac2a57ae2cc84e094e027a4d7bc3420ca36-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/35/3505cf653aaf24957b0fb63a96f246121f29bc7502bf52f95829da378fd8ce11-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/44/4402f44e39a135ad6f3b65d0bbaceba673f63466d9d32288eae3cce02c577ee7-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/48/48442e61ab276fed99c86da2ef318620fdbb4fe88784a09ab5c8eb6a8441685a-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/4b/4b44907c778c00b8a5c0bea9e08f47e3a7a64ba889434d96cdca070550768c66-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/5c/5c82d281cad61e01324bc8313a65cb9b08c36d2723bc8a7ad07e4d650062cf6f-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/64/6462529c421f3d45b85660b559a146bd8837f448036b5f38f95fcc5e67861608-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/66/66da687e34cf28a8c0aef72f0e489b7fafccbc73ab364e6a0746c56572bc7e6b-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/89/8943a4a603db998ecfa3378da59f6a8eefee2ab41a877ef24ad081feb344e9de-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9d/9d3c535818f79e101cca523d1522e120239977225d3042ac5bfdd1485c415a40-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9f/9fe0664f366bdba8f9aec50d7ef02b919340171e129390c28173434180ae84b7-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c6/c61021d86950377c653ecacdc23558098d110be51e994972247b14c2488999d6-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ce/ce2250698f5766deeeedce2f208fc0b71d2e0d009ea6f6746e82136bd43755c0-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/d5/d5480ce041fd5c94d58d2f4e79cbc4e1c1442809b8d4e2ee69e5e6dd4f1707fe-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/dc/dcab75bf590db52f0104ac853e6a803e71197122c08d03af46694a2e3f48cfe7-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e5/e57c52430958e69d331bea5db2b22be2d34cb80f80191285c9846f025be94825-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f5/f5b28589a932678b187d71827fe377f9ce7698654b846fb98de07599e0e19ac9-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fc/fc19fde85df9cb48857d9e874b62f60b3d51850b5972631a4ad5b5b13fb79f39-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe55ffe4c08c17ae405787d982888354f8571701ac78c1943ee0c125481f2fda-d\n\nno changes added to commit (use \"git add\" and/or \"git commit -a\")\nTEST> git sx ",
+        "plan": "suggestions-tests.yaml"
+      }
+    ]
   },
   "results": [
+    {
+      "ok": true,
+      "name": "History picker works in fish",
+      "plan": "example-test-plan.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Command ingestion in fish",
+      "plan": "example-test-plan.yaml"
+    },
     {
       "ok": true,
       "name": "clai suggest text format",
@@ -17,6 +36,16 @@
     {
       "ok": true,
       "name": "clai suggest JSON format",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai suggest fzf format",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai suggest with limit",
       "plan": "suggestions-tests.yaml"
     },
     {
@@ -43,7 +72,30 @@
     },
     {
       "ok": true,
+      "name": "Suggestion context includes last_cmd_norm",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
       "name": "Ghost text suggestion appears",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Right arrow accepts full suggestion",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Escape clears suggestion",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": false,
+      "name": "Typing clears ghost text",
+      "reason": "expected screen not to contain: tatus",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-fish/015-Typing_clears_ghost_text.png",
+      "terminal_excerpt": "        modified:   .tmp/e2e-test-server/gotty.log\n        modified:   .tmp/e2e-test-server/gotty.pid\n        modified:   .tmp/e2e-test-server/home/.clai/suggestions_v2.db-wal\n        modified:   .tmp/e2e-test-server/home/.local/share/fish/fish_history\n        deleted:    .tmp/e2e-test-server/home/.npm/_logs/2026-02-20T08_35_45_332Z-debug-0.log\n        deleted:    .tmp/e2e-test-server/home/.npm/_logs/2026-02-20T08_36_50_426Z-debug-0.log\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/compile@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/go@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/home/Library/Application Support/go/telemetry/local/link@go1.26.0-go1.26.0-darwin-arm64-2026-02-20.v1.count\n        modified:   .tmp/e2e-test-server/runtime.env\n        modified:   .tmp/e2e-test-server/shell/zdotdir/.zsh_history\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n        .tmp/e2e-runs/run-full2-fish.log\n        .tmp/e2e-test-server/home/.npm/_logs/2026-02-20T08_44_22_102Z-debug-0.log\n        .tmp/e2e-test-server/home/.npm/_logs/2026-02-20T08_44_35_155Z-debug-0.log\n        .tmp/e2e-test-server/home/Library/Caches/go-build/14/149702cddd9e1471dff3593df1723a8a8800b38caba77b47d041c84a8cbc7b0c-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/1f/1f0bd8eefbcdfb050aac379e46b6bac2a57ae2cc84e094e027a4d7bc3420ca36-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/35/3505cf653aaf24957b0fb63a96f246121f29bc7502bf52f95829da378fd8ce11-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/44/4402f44e39a135ad6f3b65d0bbaceba673f63466d9d32288eae3cce02c577ee7-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/48/48442e61ab276fed99c86da2ef318620fdbb4fe88784a09ab5c8eb6a8441685a-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/4b/4b44907c778c00b8a5c0bea9e08f47e3a7a64ba889434d96cdca070550768c66-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/5c/5c82d281cad61e01324bc8313a65cb9b08c36d2723bc8a7ad07e4d650062cf6f-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/64/6462529c421f3d45b85660b559a146bd8837f448036b5f38f95fcc5e67861608-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/66/66da687e34cf28a8c0aef72f0e489b7fafccbc73ab364e6a0746c56572bc7e6b-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/89/8943a4a603db998ecfa3378da59f6a8eefee2ab41a877ef24ad081feb344e9de-d\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9d/9d3c535818f79e101cca523d1522e120239977225d3042ac5bfdd1485c415a40-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/9f/9fe0664f366bdba8f9aec50d7ef02b919340171e129390c28173434180ae84b7-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/c6/c61021d86950377c653ecacdc23558098d110be51e994972247b14c2488999d6-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/ce/ce2250698f5766deeeedce2f208fc0b71d2e0d009ea6f6746e82136bd43755c0-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/d5/d5480ce041fd5c94d58d2f4e79cbc4e1c1442809b8d4e2ee69e5e6dd4f1707fe-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/dc/dcab75bf590db52f0104ac853e6a803e71197122c08d03af46694a2e3f48cfe7-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/e5/e57c52430958e69d331bea5db2b22be2d34cb80f80191285c9846f025be94825-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/f5/f5b28589a932678b187d71827fe377f9ce7698654b846fb98de07599e0e19ac9-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fc/fc19fde85df9cb48857d9e874b62f60b3d51850b5972631a4ad5b5b13fb79f39-a\n        .tmp/e2e-test-server/home/Library/Caches/go-build/fe/fe55ffe4c08c17ae405787d982888354f8571701ac78c1943ee0c125481f2fda-d\n\nno changes added to commit (use \"git add\" and/or \"git commit -a\")\nTEST> git sx ",
       "plan": "suggestions-tests.yaml"
     },
     {
@@ -53,12 +105,205 @@
     },
     {
       "ok": true,
+      "skipped": true,
+      "name": "Typo correction suggests on exit 127",
+      "reason": "Typo correction backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Typo correction respects similarity threshold",
+      "reason": "Typo correction backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Typo correction prioritizes high-frequency commands",
+      "reason": "Typo correction backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Slot filling learns argument values",
+      "reason": "Slot filling backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Slot filling respects frequency",
+      "reason": "Slot filling backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Slot scope repo overrides global",
+      "reason": "Slot filling backend not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Suggestions served from cache",
+      "reason": "Cache introspection not yet exposed in CLI",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Cache TTL expires stale entries",
+      "reason": "Cache introspection not yet exposed in CLI",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Cache invalidated on new command",
+      "reason": "Cache introspection not yet exposed in CLI",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Cache shows in debug endpoint",
+      "reason": "Cache introspection not yet exposed in CLI",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Alt+H opens suggestion picker (fish)",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search basic query",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with repo filter",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with limit",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with JSON output",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search empty results",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "clai search with special characters",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Discovery finds package.json scripts",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Discovery finds Makefile targets",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
       "name": "Discovery shows project_task reason",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": true,
+      "skipped": true,
+      "name": "Discovery finds Cargo.toml commands",
+      "reason": "Cargo discovery not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Discovery finds pyproject.toml scripts",
+      "reason": "pyproject.toml discovery not yet implemented",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug scores endpoint returns data",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug scores with limit parameter",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug transitions endpoint returns data",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug tasks endpoint returns discovered tasks",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug discovery-errors endpoint",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Debug endpoints return valid JSON",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito mode toggle",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito commands appear in session suggestions",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "Incognito commands not in global suggestions",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "name": "CLAI_EPHEMERAL affects suggestions",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
       "name": "Suggest API returns expected JSON structure",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Suggest API includes cache status",
+      "reason": "Cache status field not yet exposed",
+      "plan": "suggestions-tests.yaml"
+    },
+    {
+      "ok": true,
+      "skipped": true,
+      "name": "Suggest API includes timing info",
+      "reason": "Timing info not yet exposed",
       "plan": "suggestions-tests.yaml"
     }
   ]
