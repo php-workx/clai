@@ -2,10 +2,10 @@
   "summary": {
     "shell": "bash",
     "total": 79,
-    "passed": 68,
-    "failed": 11,
+    "passed": 67,
+    "failed": 12,
     "skipped": 18,
-    "duration_ms": 159137,
+    "duration_ms": 162191,
     "failures": [
       {
         "ok": false,
@@ -20,6 +20,20 @@
         "reason": "expected screen to contain: command in spaced dir",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/034-CWD_scope_works_with_paths_containing_spaces.png",
         "plan": "example-test-plan.yaml"
+      },
+      {
+        "ok": false,
+        "name": "clai daemon start works",
+        "reason": "expected screen to contain: running",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/046-clai_daemon_start_works.png",
+        "plan": "example-test-plan.yaml"
+      },
+      {
+        "ok": false,
+        "name": "clai suggest JSON format",
+        "reason": "expected screen to contain: {",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/050-clai_suggest_JSON_format.png",
+        "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
@@ -54,13 +68,6 @@
         "name": "Ghost text suggestion appears",
         "reason": "expected screen to contain: git status",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/058-Ghost_text_suggestion_appears.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
-        "name": "Typing clears ghost text",
-        "reason": "expected screen not to contain: tatus",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/061-Typing_clears_ghost_text.png",
         "plan": "suggestions-tests.yaml"
       },
       {
@@ -325,8 +332,10 @@
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": true,
+      "ok": false,
       "name": "clai daemon start works",
+      "reason": "expected screen to contain: running",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/046-clai_daemon_start_works.png",
       "plan": "example-test-plan.yaml"
     },
     {
@@ -345,8 +354,10 @@
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": true,
+      "ok": false,
       "name": "clai suggest JSON format",
+      "reason": "expected screen to contain: {",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/050-clai_suggest_JSON_format.png",
       "plan": "suggestions-tests.yaml"
     },
     {
@@ -410,10 +421,8 @@
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "Typing clears ghost text",
-      "reason": "expected screen not to contain: tatus",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-bash/061-Typing_clears_ghost_text.png",
       "plan": "suggestions-tests.yaml"
     },
     {

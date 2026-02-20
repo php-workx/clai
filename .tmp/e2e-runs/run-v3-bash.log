@@ -173,3 +173,27 @@ url: http://127.0.0.1:8080
 [bash] 86/97 Debug scores with limit parameter
   -> PASS
 [bash] 87/97 Debug transitions endpoint returns data
+  -> PASS
+[bash] 88/97 Debug tasks endpoint returns discovered tasks
+  -> PASS
+[bash] 89/97 Debug discovery-errors endpoint
+  -> PASS
+[bash] 90/97 Debug endpoints return valid JSON
+  -> PASS
+[bash] 91/97 Incognito mode toggle
+  -> PASS
+[bash] 92/97 Incognito commands appear in session suggestions
+  -> PASS
+[bash] 93/97 Incognito commands not in global suggestions
+  -> PASS
+[bash] 94/97 CLAI_EPHEMERAL affects suggestions
+  -> PASS
+[bash] 95/97 Suggest API returns expected JSON structure
+  -> FAIL: expected screen to match: (reason|reasons)
+[bash] 96/97 Suggest API includes cache status
+  -> SKIP: Cache status field not yet exposed
+[bash] 97/97 Suggest API includes timing info
+  -> SKIP: Timing info not yet exposed
+SUMMARY shell=bash total=79 passed=67 failed=12 skipped=18 duration_ms=162191
+RESULTS_JSON /Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/results-bash.json
+test server stopped (pid=94555)
