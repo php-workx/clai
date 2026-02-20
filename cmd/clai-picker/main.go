@@ -225,6 +225,8 @@ func applyRunDefaults(cmd subcommand, cfg *config.Config, opts *pickerOpts) {
 		if opts.limit == 0 {
 			opts.limit = cfg.Suggestions.MaxResults
 		}
+	default:
+		// No defaults to apply for other subcommands.
 	}
 }
 

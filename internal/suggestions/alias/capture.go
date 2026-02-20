@@ -248,8 +248,9 @@ func ShouldResnapshot(cmd string) bool {
 	switch first {
 	case "alias", "unalias", "abbr":
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // ReverseEntry is a reverse mapping from expansion to alias name.
