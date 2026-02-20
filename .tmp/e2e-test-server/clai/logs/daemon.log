@@ -1,0 +1,728 @@
+claid: failed to open database: failed to connect to database: database is locked (5) (SQLITE_BUSY)
+claid: failed to open database: failed to connect to database: database is locked (5) (SQLITE_BUSY)
+time=2026-02-20T07:04:11.182+01:00 level=WARN msg="v2 scorer: discovery service unavailable" error="SQL logic error: no such table: project_task (1)"
+time=2026-02-20T07:04:11.183+01:00 level=INFO msg="v2 scorer initialized"
+time=2026-02-20T07:04:11.186+01:00 level=INFO msg="diagnostics api listening" addr=127.0.0.1:62600
+time=2026-02-20T07:04:11.186+01:00 level=INFO msg="daemon starting" socket=/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/clai/clai.sock pid=63395 version=dev
+time=2026-02-20T07:04:11.186+01:00 level=INFO msg="maintenance runner started" interval=5m0s retention_days=90 batch_size=1000
+time=2026-02-20T07:04:27.907+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567467-32393 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:04:27.907+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:04:27.908+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567467-32393 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:04:27.908+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:04:32.445+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567472-5344 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:04:32.445+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:04:32.454+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567472-5344 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:04:32.454+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:04:36.450+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567476-16104 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:04:36.450+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:04:36.471+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567476-16104 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:04:36.471+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:05:08.564+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/FetchHistory code=OK duration_ms=0
+time=2026-02-20T07:05:08.564+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/FetchHistory code=OK duration_ms=0
+time=2026-02-20T07:06:07.551+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567567-3154 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:07.551+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:06:07.594+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567567-3154 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:07.594+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:09.017+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567568-17244 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:09.017+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:09.029+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567568-17244 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:09.029+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:10.538+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567570-26137 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:10.539+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:10.561+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567570-26137 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:10.561+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:29.841+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567589-32344 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:29.842+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:29.841+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567589-32344 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:29.842+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:31.321+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567591-1253 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:31.321+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:31.331+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567591-1253 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:31.331+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:32.845+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567592-27894 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:32.845+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:32.852+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567592-27894 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:32.852+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:34.367+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567594-13249 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:34.367+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:34.385+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567594-13249 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:34.385+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:34.882+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567594-26019 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:34.882+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:34.947+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567594-26019 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:34.947+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:36.402+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567596-4592 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:36.402+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:36.414+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567596-4592 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:36.414+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:36.918+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567596-7111 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:36.918+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:36.928+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567596-7111 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:36.928+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:38.435+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567598-1954 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:38.435+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:38.448+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567598-1954 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:38.448+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:38.949+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567598-23648 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:38.950+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:38.957+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567598-23648 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:38.957+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:40.455+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567600-1070 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:40.455+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:40.466+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567600-1070 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:40.466+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:40.970+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567600-21575 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:40.970+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:40.992+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567600-21575 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:40.992+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:42.480+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567602-29707 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:42.480+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:42.492+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567602-29707 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:42.492+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:42.988+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567602-11160 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:42.988+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:42.996+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567602-11160 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:42.996+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:44.507+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567604-8379 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:44.507+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:44.530+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567604-8379 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:44.530+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:46.023+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567606-6778 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:46.024+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:46.036+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567606-6778 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:46.036+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:46.543+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567606-30319 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:46.544+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:46.572+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567606-30319 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:46.572+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:48.049+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567608-562 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:48.049+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:48.076+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567608-562 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:48.076+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:49.556+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567609-27398 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:49.556+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:06:49.570+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567609-27398 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:06:49.570+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:06:50.066+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567610-14918 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:06:50.066+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:02.471+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567622-26555 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:02.471+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:02.471+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567622-26555 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:02.471+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:03.237+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567623-21537 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:03.237+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:03.307+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567623-21537 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:03.308+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:04.965+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567624-4757 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:04.965+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:04.977+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567624-4757 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:04.977+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:05.474+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567625-18549 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:05.474+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:05.484+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567625-18549 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:05.484+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:06.985+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567626-5755 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:06.985+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:07.009+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567626-5755 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:07.009+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:08.999+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567628-76 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:08.999+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:07:09.012+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567628-76 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:09.012+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:09.506+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567629-124 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:09.506+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:09.527+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567629-124 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:09.527+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:38.693+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567658-10376 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:38.693+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:38.693+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567658-10376 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:38.694+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:39.223+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567659-26283 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:39.223+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:39.318+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567659-26283 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:39.318+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:41.227+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567661-26944 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:41.227+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:41.242+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567661-26944 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:41.242+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:41.732+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567661-16539 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:41.732+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:41.741+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567661-16539 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:41.741+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:43.245+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567663-9025 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:43.245+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:43.271+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567663-9025 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:43.271+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:45.255+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567665-4958 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:45.255+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:45.269+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567665-4958 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:45.269+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:45.765+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567665-27800 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:45.765+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:45.776+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567665-27800 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:45.776+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:47.293+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567667-17050 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:47.293+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:47.325+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567667-17050 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:47.325+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:49.329+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567669-23022 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:49.330+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:49.342+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567669-23022 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:49.342+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:49.820+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567669-28177 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:49.820+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:49.830+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567669-28177 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:49.830+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:51.383+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567671-25896 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:51.383+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:51.402+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567671-25896 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:51.402+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:52.863+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567672-11942 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:52.863+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:52.877+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567672-11942 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:52.877+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:53.383+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567673-8823 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:53.383+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:53.407+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567673-8823 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:53.407+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:54.893+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567674-14284 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:54.893+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:54.906+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567674-14284 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:54.906+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:55.405+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567675-9196 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:55.406+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:55.417+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567675-9196 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:55.417+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:56.921+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567676-18920 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:56.921+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:56.944+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567676-18920 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:56.945+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:58.937+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567678-6183 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:58.937+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:58.951+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567678-6183 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:58.951+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:07:59.453+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567679-28670 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:07:59.454+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:07:59.465+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567679-28670 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:07:59.465+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:00.970+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567680-2995 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:08:00.970+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:00.996+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567680-2995 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:08:00.996+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:02.488+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567682-9930 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:08:02.488+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:02.499+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567682-9930 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:08:02.499+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:03.037+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567683-27962 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:08:03.037+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:03.047+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567683-27962 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:08:03.047+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:04.554+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567684-13590 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:08:04.554+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:04.580+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567684-13590 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:08:04.580+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:22.774+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567702-15243 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:08:22.774+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:22.775+01:00 level=WARN msg="failed to create command" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567702-15243 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session_id 389ca314-2507-4dd7-afb8-587e57b808c1 does not exist"
+time=2026-02-20T07:08:22.775+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:08:23.201+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=9
+time=2026-02-20T07:08:23.219+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:08:23.231+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:08:23.233+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:23.244+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:24.250+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:24.265+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:24.778+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:24.820+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:25.788+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:25.801+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:26.299+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:26.309+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:27.808+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:27.836+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:29.826+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:29.839+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:30.343+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:30.366+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:32.359+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:32.372+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:32.886+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:32.910+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:55.579+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:55.594+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:56.098+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:56.123+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:58.107+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:58.120+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:08:58.623+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:08:58.631+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:00.134+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:00.141+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:01.650+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:01.665+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:02.162+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:02.188+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:04.175+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:04.188+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:04.684+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:04.695+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:06.193+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:06.217+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:08.210+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:08.223+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:08.724+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:09:08.732+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:10.238+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:10.263+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:12.254+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:12.265+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:12.767+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:12.776+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:14.280+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:14.289+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:15.794+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:15.818+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:17.810+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:17.822+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:18.322+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:18.331+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:19.846+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:19.863+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:21.351+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:21.376+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:49.236+01:00 level=WARN msg="failed to update command end" command_id=389ca314-2507-4dd7-afb8-587e57b808c1-1771567789-20710 session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="command not found"
+time=2026-02-20T07:09:49.236+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:49.238+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:09:50.711+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:50.721+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:09:52.232+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:09:52.241+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:33.797+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:33.797+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:33.812+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:33.823+01:00 level=INFO msg="imported shell history" shell=bash count=91
+time=2026-02-20T07:10:33.830+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=8
+time=2026-02-20T07:10:34.319+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:34.329+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:34.679+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:34.688+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:34.948+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:34.965+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:35.869+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:35.869+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:35.885+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:35.896+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:36.340+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:36.350+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:36.640+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:36.650+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:36.944+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:36.954+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:37.241+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:37.278+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:38.355+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:38.355+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:38.372+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:10:38.384+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:38.818+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:38.829+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:39.124+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:39.135+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:39.461+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:39.472+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:40.244+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:40.247+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=3
+time=2026-02-20T07:10:40.262+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:10:40.272+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:40.759+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:40.767+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:41.577+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:41.587+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:41.983+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:41.984+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:41.999+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:42.008+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:43.198+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:43.198+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:43.213+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:43.222+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:44.294+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:44.294+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:44.310+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:44.319+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:44.885+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:44.893+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:45.645+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:45.645+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:45.660+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:45.670+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:46.189+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:46.197+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:47.255+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:47.255+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:47.270+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:47.280+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:48.297+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:48.306+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:49.428+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:49.428+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:49.444+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:10:49.454+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:50.371+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:10:50.380+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:51.319+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:51.329+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:51.787+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:51.787+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:51.803+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:51.813+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:52.607+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:52.617+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:54.288+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:54.288+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:54.303+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:54.313+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:54.852+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:54.860+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:56.034+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:56.034+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:56.050+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:56.059+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:56.561+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:56.569+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:57.234+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:57.234+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:57.249+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:57.258+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:57.695+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:57.704+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:57.990+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:57.999+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:58.285+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:58.294+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:58.582+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:10:58.614+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:10:59.258+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:10:59.258+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:10:59.274+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:10:59.284+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:10:59.927+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:00.985+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:03.098+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:03.098+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:03.113+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:03.122+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:03.784+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:04.837+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:06.883+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:06.906+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:07.548+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:07.548+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:07.563+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:07.573+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:08.171+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:09.032+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:13.427+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:13.427+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:13.446+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=7
+time=2026-02-20T07:11:13.460+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:14.180+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:15.074+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:19.345+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:19.345+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:19.361+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:11:19.370+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:19.818+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:19.845+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:20.494+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:20.494+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:20.509+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:20.518+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:21.015+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:21.023+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:21.385+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:21.393+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:21.844+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:21.867+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:22.519+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:22.519+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:22.534+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:22.544+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:23.110+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:23.134+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:23.781+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:23.781+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:23.797+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:11:23.806+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:24.340+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:24.351+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:24.719+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=2
+time=2026-02-20T07:11:24.725+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:25.154+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:11:25.177+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:25.860+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:25.860+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:25.876+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:11:25.885+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:26.381+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:26.390+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:26.655+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:26.663+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:27.110+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:27.135+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:27.825+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:27.825+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:27.840+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:27.850+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:28.321+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:28.330+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:28.588+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:28.596+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:29.044+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:29.067+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:29.761+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:29.761+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:29.777+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:11:29.787+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:30.226+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:11:30.901+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:30.901+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:30.916+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:30.926+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:31.354+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:32.320+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:32.320+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:32.336+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:11:32.345+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:32.826+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:32.836+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:33.497+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:33.498+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:33.513+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:33.523+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:34.012+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:34.022+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:34.677+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:34.677+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:34.692+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:34.702+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:35.149+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:35.658+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:36.345+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:36.345+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:36.362+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=7
+time=2026-02-20T07:11:36.371+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:39.140+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:39.140+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:39.161+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:11:39.170+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:39.881+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:39.881+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:39.898+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=7
+time=2026-02-20T07:11:39.909+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:41.089+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:41.095+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:41.755+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:41.755+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:41.771+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:41.781+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:42.318+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:42.327+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:42.992+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:42.992+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:43.007+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:43.017+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:43.589+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:43.601+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:43.979+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:43.987+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:44.365+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:44.374+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:44.642+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:44.658+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:45.721+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:45.721+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:45.738+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:11:45.749+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:46.289+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:46.302+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:46.664+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:46.674+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:47.042+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:11:47.052+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:48.281+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:48.281+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:48.298+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:48.309+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:48.822+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:48.844+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:49.491+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:49.491+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:49.507+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:49.516+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:50.007+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:50.030+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:50.460+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:11:50.469+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:51.099+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:51.121+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:51.877+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:51.906+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:52.610+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:52.610+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:52.626+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:52.635+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:53.117+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:53.141+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:53.478+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:53.500+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:54.147+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:54.147+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:54.162+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:11:54.171+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:55.074+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:55.081+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:56.183+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:56.210+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:56.892+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:56.892+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:56.907+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:56.917+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:57.353+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:57.361+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:58.186+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:58.209+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:11:58.909+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:11:58.909+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:11:58.926+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:11:58.935+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:11:59.377+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:11:59.386+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:00.210+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:00.234+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:00.935+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:00.935+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:00.952+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:12:00.966+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:01.542+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:01.551+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:02.263+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:02.289+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:02.944+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:02.945+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:02.960+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:12:02.970+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:03.602+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:03.610+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:04.343+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:04.367+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:05.015+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:05.015+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:05.031+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:12:05.040+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:05.586+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:05.596+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:06.321+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:06.345+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:06.993+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:06.993+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:07.009+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:12:07.019+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:07.509+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:07.533+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:08.186+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:08.186+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:08.202+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:12:08.211+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:08.692+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:08.715+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:10.816+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:10.838+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:11.484+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:11.484+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:11.499+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:12:11.509+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:11.976+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:11.998+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:12.317+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:12.321+01:00 level=INFO msg="received shutdown signal" signal=terminated
+time=2026-02-20T07:12:12.321+01:00 level=INFO msg="daemon shutting down"
+time=2026-02-20T07:12:12.321+01:00 level=INFO msg="maintenance runner stopping (shutdown signal)"
+time=2026-02-20T07:12:12.321+01:00 level=INFO msg="daemon stopped"
+time=2026-02-20T07:12:12.469+01:00 level=WARN msg="v2 scorer: discovery service unavailable" error="SQL logic error: no such table: project_task (1)"
+time=2026-02-20T07:12:12.469+01:00 level=INFO msg="v2 scorer initialized"
+time=2026-02-20T07:12:12.471+01:00 level=INFO msg="diagnostics api listening" addr=127.0.0.1:63426
+time=2026-02-20T07:12:12.471+01:00 level=INFO msg="daemon starting" socket=/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/clai/clai.sock pid=15395 version=dev
+time=2026-02-20T07:12:12.471+01:00 level=INFO msg="maintenance runner started" interval=5m0s retention_days=90 batch_size=1000
+time=2026-02-20T07:12:14.457+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=1
+time=2026-02-20T07:12:14.478+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:15.125+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:15.125+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:15.140+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=5
+time=2026-02-20T07:12:15.149+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:15.660+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:15.663+01:00 level=INFO msg="received shutdown signal" signal=terminated
+time=2026-02-20T07:12:15.663+01:00 level=INFO msg="daemon shutting down"
+time=2026-02-20T07:12:15.663+01:00 level=INFO msg="maintenance runner stopping (shutdown signal)"
+time=2026-02-20T07:12:15.664+01:00 level=INFO msg="daemon stopped"
+time=2026-02-20T07:12:15.797+01:00 level=WARN msg="v2 scorer: discovery service unavailable" error="SQL logic error: no such table: project_task (1)"
+time=2026-02-20T07:12:15.817+01:00 level=INFO msg="v2 scorer initialized"
+time=2026-02-20T07:12:15.820+01:00 level=INFO msg="diagnostics api listening" addr=127.0.0.1:63437
+time=2026-02-20T07:12:15.820+01:00 level=INFO msg="daemon starting" socket=/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-test-server/clai/clai.sock pid=15442 version=dev
+time=2026-02-20T07:12:15.820+01:00 level=INFO msg="maintenance runner started" interval=5m0s retention_days=90 batch_size=1000
+time=2026-02-20T07:12:15.856+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:18.797+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=2
+time=2026-02-20T07:12:18.818+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:19.478+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:19.478+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:19.494+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:12:19.504+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:19.956+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:19.963+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:20.242+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:20.281+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:20.541+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:21.782+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:21.782+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:21.807+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=7
+time=2026-02-20T07:12:21.819+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:22.232+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:22.582+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:22.635+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:22.668+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:23.319+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:23.319+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:23.337+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:12:23.347+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:23.789+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:23.816+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:24.193+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:24.220+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:24.902+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:24.902+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:24.920+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=7
+time=2026-02-20T07:12:24.930+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:25.334+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:25.346+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:25.589+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:25.601+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:25.847+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:25.856+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:26.232+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:26.286+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:26.893+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:26.893+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:26.909+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:12:26.919+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:27.350+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:27.379+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:27.683+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:27.720+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:27.968+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:28.138+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandEnded code=OK duration_ms=0
+time=2026-02-20T07:12:28.258+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0
+time=2026-02-20T07:12:29.349+01:00 level=WARN msg="failed to create session" session_id=389ca314-2507-4dd7-afb8-587e57b808c1 error="session with id 389ca314-2507-4dd7-afb8-587e57b808c1 already exists"
+time=2026-02-20T07:12:29.349+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/SessionStart code=OK duration_ms=0
+time=2026-02-20T07:12:29.366+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/AliasSync code=OK duration_ms=6
+time=2026-02-20T07:12:29.376+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/ImportHistory code=OK duration_ms=0
+time=2026-02-20T07:12:29.816+01:00 level=INFO msg=rpc method=/clai.v1.ClaiService/CommandStarted code=OK duration_ms=0

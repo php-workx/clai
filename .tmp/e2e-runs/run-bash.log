@@ -1,0 +1,107 @@
+[bash] 1/97 History picker opens with Alt+H
+  -> PASS
+[bash] 2/97 History picker fuzzy search filters results
+  -> FAIL: expected screen not to contain: banana | expected screen not to contain: git status
+[bash] 3/97 History picker navigation with arrow keys
+  -> FAIL: expected visible element: picker-selection
+[bash] 4/97 History picker Enter inserts command
+  -> FAIL: expected screen not to contain: history
+[bash] 5/97 History picker Escape cancels
+  -> FAIL: expected screen not to contain: history
+[bash] 6/97 History scope switching with Tab
+  -> FAIL: expected screen to contain: Global
+[bash] 7/97 Session history is isolated from global
+  -> FAIL: expected screen to contain: Session
+[bash] 8/97 Global history contains cross-session commands
+  -> FAIL: expected screen to contain: Global
+[bash] 9/97 Long command shows truncation indicator
+  -> FAIL: expected screen to contain: …
+[bash] 10/97 Enter inserts full untruncated command
+  -> PASS
+[bash] 11/97 Ctrl+C copies full untruncated command
+  -> FAIL: expected screen to contain: Copied!
+[bash] 12/97 clai loads successfully in bash
+  -> PASS
+[bash] 13/97 Session ID is set
+  -> PASS
+[bash] 14/97 History command shows session history
+  -> PASS
+[bash] 15/97 clai cmd converts natural language to command
+  -> PASS
+[bash] 16/97 clai cmd caches suggestion for completion
+  -> PASS
+[bash] 17/97 clai ask answers terminal questions
+  -> PASS
+[bash] 18/97 clai ask with context flag
+  -> PASS
+[bash] 19/97 clai status shows session info
+  -> PASS
+[bash] 20/97 clai history with session flag
+  -> PASS
+[bash] 21/97 clai history with global flag
+  -> PASS
+[bash] 22/97 clai history filters by CWD
+  -> FAIL: expected screen not to contain: from_home_dir
+[bash] 23/97 clai history filters successful commands
+  -> FAIL: expected screen not to contain: false
+[bash] 24/97 clai history filters failed commands
+  -> FAIL: expected screen not to contain: will_succeed
+[bash] 25/97 clai off disables integration
+  -> PASS
+[bash] 26/97 clai on re-enables integration
+  -> PASS
+[bash] 27/97 PTY wrapper captures stdout
+  -> PASS
+[bash] 28/97 PTY wrapper handles colors
+  -> PASS
+[bash] 29/97 PTY wrapper Ctrl+C handling
+  -> PASS
+[bash] 30/97 Voice mode converts natural language
+  -> PASS
+[bash] 31/97 Empty command line doesn't crash
+  -> PASS
+[bash] 32/97 Very long command doesn't overflow
+  -> PASS
+[bash] 33/97 Special characters handled correctly
+  -> PASS
+[bash] 34/97 CWD scope works with paths containing spaces
+  -> FAIL: expected screen to contain: CWD
+[bash] 35/97 History args handle special path characters
+  -> PASS
+[bash] 36/97 Incognito mode can be enabled
+  -> PASS
+[bash] 37/97 Commands in incognito mode not persisted
+  -> FAIL: expected screen not to contain: SECRET_INCOGNITO_COMMAND_12345
+[bash] 38/97 Incognito mode can be disabled
+  -> PASS
+[bash] 39/97 CLAI_NO_RECORD prevents all ingestion
+  -> FAIL: expected screen not to contain: NO_RECORD_TEST_CMD
+[bash] 40/97 Command ingestion captures exit code success
+  -> FAIL: expected screen to contain: exit_code
+[bash] 41/97 Command ingestion captures exit code failure
+  -> FAIL: expected screen to contain: exit_code
+[bash] 42/97 Command ingestion captures CWD
+  -> PASS
+[bash] 43/97 Command with special characters ingested
+  -> PASS
+[bash] 44/97 Command with unicode characters ingested
+  -> PASS
+[bash] 45/97 clai daemon status shows state
+  -> PASS
+[bash] 46/97 clai daemon start works
+  -> PASS
+[bash] 47/97 clai daemon stop graceful shutdown
+  -> PASS
+[bash] 48/97 clai daemon restart sequence
+  -> PASS
+[bash] 49/97 clai suggest text format
+  -> PASS
+[bash] 50/97 clai suggest JSON format
+  -> PASS
+[bash] 51/97 clai suggest fzf format
+  -> FAIL: expected screen not to contain: (
+[bash] 52/97 clai suggest with limit
+  -> PASS
+[bash] 53/97 clai suggest with prefix filters results
+  -> FAIL: expected screen not to contain: npm | expected screen not to contain: make
+[bash] 54/97 Suggestion shows transition reason
