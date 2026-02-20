@@ -2,31 +2,31 @@
   "summary": {
     "shell": "zsh",
     "total": 40,
-    "passed": 28,
-    "failed": 12,
+    "passed": 29,
+    "failed": 11,
     "skipped": 14,
-    "duration_ms": 76125,
+    "duration_ms": 84185,
     "failures": [
-      {
-        "ok": false,
-        "name": "clai loads successfully in zsh",
-        "reason": "expected screen not to contain: Error",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/001-clai_loads_successfully_in_zsh.png",
-        "plan": "example-test-plan.yaml"
-      },
-      {
-        "ok": false,
-        "name": "clai status in zsh",
-        "reason": "expected screen to contain: zsh",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/002-clai_status_in_zsh.png",
-        "plan": "example-test-plan.yaml"
-      },
       {
         "ok": false,
         "name": "CWD scope filters correctly with spaces in path",
         "reason": "expected screen to contain: in my project",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/004-CWD_scope_filters_correctly_with_spaces_in_path.png",
         "plan": "example-test-plan.yaml"
+      },
+      {
+        "ok": false,
+        "name": "clai suggest text format",
+        "reason": "expected screen to match: \\d+\\.",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/006-clai_suggest_text_format.png",
+        "plan": "suggestions-tests.yaml"
+      },
+      {
+        "ok": false,
+        "name": "clai suggest JSON format",
+        "reason": "expected screen to contain: {",
+        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/007-clai_suggest_JSON_format.png",
+        "plan": "suggestions-tests.yaml"
       },
       {
         "ok": false,
@@ -79,15 +79,8 @@
       },
       {
         "ok": false,
-        "name": "CLAI_EPHEMERAL affects suggestions",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-        "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/051-CLAI_EPHEMERAL_affects_suggestions.png",
-        "plan": "suggestions-tests.yaml"
-      },
-      {
-        "ok": false,
         "name": "Suggest API returns expected JSON structure",
-        "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
+        "reason": "expected screen to match: (reason|reasons)",
         "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/052-Suggest_API_returns_expected_JSON_structure.png",
         "plan": "suggestions-tests.yaml"
       }
@@ -95,17 +88,13 @@
   },
   "results": [
     {
-      "ok": false,
+      "ok": true,
       "name": "clai loads successfully in zsh",
-      "reason": "expected screen not to contain: Error",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/001-clai_loads_successfully_in_zsh.png",
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "clai status in zsh",
-      "reason": "expected screen to contain: zsh",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/002-clai_status_in_zsh.png",
       "plan": "example-test-plan.yaml"
     },
     {
@@ -126,13 +115,17 @@
       "plan": "example-test-plan.yaml"
     },
     {
-      "ok": true,
+      "ok": false,
       "name": "clai suggest text format",
+      "reason": "expected screen to match: \\d+\\.",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/006-clai_suggest_text_format.png",
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": true,
+      "ok": false,
       "name": "clai suggest JSON format",
+      "reason": "expected screen to contain: {",
+      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/007-clai_suggest_JSON_format.png",
       "plan": "suggestions-tests.yaml"
     },
     {
@@ -389,16 +382,14 @@
       "plan": "suggestions-tests.yaml"
     },
     {
-      "ok": false,
+      "ok": true,
       "name": "CLAI_EPHEMERAL affects suggestions",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
-      "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/051-CLAI_EPHEMERAL_affects_suggestions.png",
       "plan": "suggestions-tests.yaml"
     },
     {
       "ok": false,
       "name": "Suggest API returns expected JSON structure",
-      "reason": "page.goto: net::ERR_CONNECTION_REFUSED at http://127.0.0.1:8080/\nCall log:\n\u001b[2m  - navigating to \"http://127.0.0.1:8080/\", waiting until \"domcontentloaded\"\u001b[22m\n",
+      "reason": "expected screen to match: (reason|reasons)",
       "screenshot": "/Users/runger/.claude-worktrees/clai/spec-reviews/.tmp/e2e-runs/artifacts-zsh/052-Suggest_API_returns_expected_JSON_structure.png",
       "plan": "suggestions-tests.yaml"
     },
