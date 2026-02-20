@@ -13,3 +13,7 @@
 [fish] 7/51 clai suggest with prefix filters results
   -> FAIL: expected screen not to contain: npm | expected screen not to contain: make
 [fish] 8/51 Suggestion shows transition reason
+  -> FAIL: expected screen to contain: transition
+[fish] 9/51 Suggestion shows freq_repo reason
+  -> FAIL: expected screen to match: (freq_repo|freq_global)
+[fish] 10/51 Suggestion includes confidence score

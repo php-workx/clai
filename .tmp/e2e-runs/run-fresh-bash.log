@@ -1,0 +1,5 @@
+test server already running (pid=9124)
+url: http://127.0.0.1:8080
+[bash] 1/97 History picker opens with Alt+H
+  -> PASS
+[bash] 2/97 History picker fuzzy search filters results

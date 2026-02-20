@@ -133,3 +133,64 @@
 2026/02/20 09:19:32 New client connected: 127.0.0.1:57037, connections: 12/0
 2026/02/20 09:19:32 New client connected: 127.0.0.1:57038, connections: 13/0
 2026/02/20 09:19:32 Connection closed by client: 127.0.0.1:56936, connections: 12/0
+2026/02/20 09:19:33 Connection closed by client: 127.0.0.1:56950, connections: 11/0
+2026/02/20 09:19:34 127.0.0.1:57041 200 GET /
+2026/02/20 09:19:34 127.0.0.1:57041 200 GET /css/index.css
+2026/02/20 09:19:34 127.0.0.1:57043 200 GET /css/xterm_customize.css
+2026/02/20 09:19:34 127.0.0.1:57044 200 GET /config.js
+2026/02/20 09:19:34 127.0.0.1:57041 200 GET /auth_token.js
+2026/02/20 09:19:34 127.0.0.1:57042 200 GET /css/xterm.css
+2026/02/20 09:19:34 127.0.0.1:57045 200 GET /js/gotty.js
+2026/02/20 09:19:34 New client connected: 127.0.0.1:57047, connections: 12/0
+2026/02/20 09:19:35 127.0.0.1:57048 200 GET /
+2026/02/20 09:19:35 127.0.0.1:57048 200 GET /css/index.css
+2026/02/20 09:19:35 127.0.0.1:57048 200 GET /auth_token.js
+2026/02/20 09:19:35 127.0.0.1:57051 200 GET /config.js
+2026/02/20 09:19:35 127.0.0.1:57050 200 GET /css/xterm_customize.css
+2026/02/20 09:19:35 127.0.0.1:57049 200 GET /css/xterm.css
+2026/02/20 09:19:35 127.0.0.1:57052 200 GET /js/gotty.js
+2026/02/20 09:19:35 New client connected: 127.0.0.1:57054, connections: 13/0
+2026/02/20 09:19:35 127.0.0.1:57055 200 GET /
+2026/02/20 09:19:35 127.0.0.1:57055 200 GET /css/index.css
+2026/02/20 09:19:35 127.0.0.1:57058 200 GET /config.js
+2026/02/20 09:19:35 127.0.0.1:57055 200 GET /auth_token.js
+2026/02/20 09:19:35 127.0.0.1:57057 200 GET /css/xterm_customize.css
+2026/02/20 09:19:35 127.0.0.1:57056 200 GET /css/xterm.css
+2026/02/20 09:19:36 127.0.0.1:57059 200 GET /js/gotty.js
+2026/02/20 09:19:36 Connection closed by client: 127.0.0.1:56975, connections: 12/0
+2026/02/20 09:19:36 New client connected: 127.0.0.1:57061, connections: 13/0
+2026/02/20 09:19:36 127.0.0.1:57062 200 GET /
+2026/02/20 09:19:36 127.0.0.1:57062 200 GET /css/index.css
+2026/02/20 09:19:36 127.0.0.1:57064 200 GET /css/xterm_customize.css
+2026/02/20 09:19:36 127.0.0.1:57065 200 GET /config.js
+2026/02/20 09:19:36 127.0.0.1:57062 200 GET /auth_token.js
+2026/02/20 09:19:36 127.0.0.1:57063 200 GET /css/xterm.css
+2026/02/20 09:19:36 127.0.0.1:57066 200 GET /js/gotty.js
+2026/02/20 09:19:36 New client connected: 127.0.0.1:57068, connections: 14/0
+2026/02/20 09:19:36 Connection closed by client: 127.0.0.1:56967, connections: 13/0
+2026/02/20 09:19:37 Connection closed by client: 127.0.0.1:56984, connections: 12/0
+2026/02/20 09:19:37 127.0.0.1:57072 200 GET /
+2026/02/20 09:19:37 127.0.0.1:57072 200 GET /css/index.css
+2026/02/20 09:19:37 127.0.0.1:57072 200 GET /auth_token.js
+2026/02/20 09:19:37 127.0.0.1:57074 200 GET /css/xterm_customize.css
+2026/02/20 09:19:37 127.0.0.1:57073 200 GET /css/xterm.css
+2026/02/20 09:19:37 127.0.0.1:57075 200 GET /config.js
+2026/02/20 09:19:37 127.0.0.1:57076 200 GET /js/gotty.js
+2026/02/20 09:19:37 New client connected: 127.0.0.1:57078, connections: 13/0
+2026/02/20 09:19:38 127.0.0.1:57079 200 GET /
+2026/02/20 09:19:38 127.0.0.1:57079 200 GET /css/index.css
+2026/02/20 09:19:38 127.0.0.1:57079 200 GET /auth_token.js
+2026/02/20 09:19:38 127.0.0.1:57082 200 GET /config.js
+2026/02/20 09:19:38 127.0.0.1:57081 200 GET /css/xterm_customize.css
+2026/02/20 09:19:38 127.0.0.1:57080 200 GET /css/xterm.css
+2026/02/20 09:19:38 127.0.0.1:57083 200 GET /js/gotty.js
+2026/02/20 09:19:38 New client connected: 127.0.0.1:57086, connections: 14/0
+2026/02/20 09:19:38 Connection closed by client: 127.0.0.1:56991, connections: 13/0
+2026/02/20 09:19:38 127.0.0.1:57087 200 GET /
+2026/02/20 09:19:38 127.0.0.1:57087 200 GET /css/index.css
+2026/02/20 09:19:38 127.0.0.1:57087 200 GET /config.js
+2026/02/20 09:19:38 127.0.0.1:57089 200 GET /css/xterm_customize.css
+2026/02/20 09:19:38 127.0.0.1:57090 200 GET /auth_token.js
+2026/02/20 09:19:38 127.0.0.1:57088 200 GET /css/xterm.css
+2026/02/20 09:19:38 127.0.0.1:57091 200 GET /js/gotty.js
+2026/02/20 09:19:38 New client connected: 127.0.0.1:57093, connections: 14/0

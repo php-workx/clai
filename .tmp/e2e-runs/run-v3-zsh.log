@@ -15,3 +15,9 @@ url: http://127.0.0.1:8080
 [zsh] 7/54 clai suggest JSON format
   -> PASS
 [zsh] 8/54 clai suggest fzf format
+  -> PASS
+[zsh] 9/54 clai suggest with limit
+  -> PASS
+[zsh] 10/54 clai suggest with prefix filters results
+  -> FAIL: expected screen not to contain: npm | expected screen not to contain: make
+[zsh] 11/54 Suggestion shows transition reason
