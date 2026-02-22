@@ -190,11 +190,11 @@ func shouldSuppressLastCmd(suggestion, lastCmd, lastCmdNorm string) bool {
 
 func filterSuppressedSuggestions(suggestions []suggestOutput, lastCmd, lastCmdNorm string) []suggestOutput {
 	out := suggestions[:0]
-	for _, s := range suggestions {
-		if shouldSuppressLastCmd(s.Text, lastCmd, lastCmdNorm) {
+	for i := range suggestions {
+		if shouldSuppressLastCmd(suggestions[i].Text, lastCmd, lastCmdNorm) {
 			continue
 		}
-		out = append(out, s)
+		out = append(out, suggestions[i])
 	}
 	if len(out) == 0 {
 		return nil
@@ -244,12 +244,12 @@ func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.
 		}
 	case "text":
 		// text format: numbered list with metadata
-		for i, s := range suggestions {
-			reasons := s.Source
-			if s.Risk != "" {
-				reasons += ", " + s.Risk
+		for i := range suggestions {
+			reasons := suggestions[i].Source
+			if suggestions[i].Risk != "" {
+				reasons += ", " + suggestions[i].Risk
 			}
-			fmt.Printf("%d. %s (%s)\n", i+1, s.Text, reasons)
+			fmt.Printf("%d. %s (%s)\n", i+1, suggestions[i].Text, reasons)
 		}
 	default:
 		// Unknown format, treat as fzf (plain output)
@@ -259,8 +259,8 @@ func outputSuggestions(suggestions []suggestOutput, format string, hint *timing.
 }
 
 func outputPlainSuggestions(suggestions []suggestOutput) {
-	for _, s := range suggestions {
-		fmt.Println(s.Text)
+	for i := range suggestions {
+		fmt.Println(suggestions[i].Text)
 	}
 }
 

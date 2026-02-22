@@ -71,6 +71,7 @@ type Server struct {
 	shutdownChan         chan struct{}
 	ingestionQueue       *IngestionQueue
 	lastSuggestSnapshots map[string]suggestSnapshot
+	weightsCache         map[string]cachedWeights
 	feedbackStore        *feedback.Store
 	dismissalStore       *dismissal.Store
 	maintenanceRunner    *maintenance.Runner
@@ -84,12 +85,11 @@ type Server struct {
 	workflowMiner        *workflow.Miner
 	learningStore        *learning.Store
 	scorerVersion        string
-	wg                   sync.WaitGroup
 	workflowMineInterval time.Duration
 	idleTimeout          time.Duration
 	commandsLogged       int64
+	wg                   sync.WaitGroup
 	weightsCacheMu       sync.RWMutex
-	weightsCache         map[string]cachedWeights
 	snapshotMu           sync.RWMutex
 	mu                   sync.RWMutex
 	shutdownOnce         sync.Once
