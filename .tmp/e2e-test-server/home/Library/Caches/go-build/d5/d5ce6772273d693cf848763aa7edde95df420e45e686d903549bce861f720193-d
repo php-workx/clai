@@ -1,5 +1,0 @@
-./config.go
-./paths.go
-./config_test.go
-./paths_test.go
-./suggestions_config_test.go

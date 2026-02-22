@@ -1,7 +1,0 @@
-./parse.go
-./utf8.go
-./validate.go
-./writepath.go
-./parse_test.go
-./utf8_test.go
-./writepath_test.go

@@ -1,5 +1,0 @@
-./main.go
-./tty_unix.go
-./integration_test.go
-./lock_test.go
-./main_test.go

@@ -1,7 +1,0 @@
-./alias.go
-./eventsize.go
-./normalize.go
-./pipeline.go
-./prenorm.go
-./tags.go
-./template.go

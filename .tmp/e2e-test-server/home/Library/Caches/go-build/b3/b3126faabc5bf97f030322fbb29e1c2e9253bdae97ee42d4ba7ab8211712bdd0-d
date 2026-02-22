@@ -1,6 +1,0 @@
-./patterns.go
-./risk.go
-./sanitizer.go
-./patterns_test.go
-./risk_test.go
-./sanitizer_test.go

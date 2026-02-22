@@ -22,6 +22,7 @@ coverage.html
 .scannerwork
 .sonarqube
 .sonarqube-autofix
+.tmp
 
 # Auto Claude data directory
 .auto-claude/

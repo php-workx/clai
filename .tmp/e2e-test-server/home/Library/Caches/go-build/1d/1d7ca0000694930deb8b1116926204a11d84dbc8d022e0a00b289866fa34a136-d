@@ -1,6 +1,0 @@
-./config.go
-./discovery.go
-./makefile.go
-./packagejson.go
-./parser.go
-./runner.go

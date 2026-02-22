@@ -1,6 +1,0 @@
-./normalize.go
-./ranker.go
-./sources.go
-./normalize_test.go
-./ranker_test.go
-./sources_test.go

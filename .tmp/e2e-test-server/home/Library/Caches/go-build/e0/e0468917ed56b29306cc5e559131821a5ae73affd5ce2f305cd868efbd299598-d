@@ -1,7 +1,0 @@
-./db.go
-./lock.go
-./migrations.go
-./recovery.go
-./schema.go
-./db_test.go
-./recovery_test.go

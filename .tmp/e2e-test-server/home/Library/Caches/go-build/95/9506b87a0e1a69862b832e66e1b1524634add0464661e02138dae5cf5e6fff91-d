@@ -1,6 +1,0 @@
-./event.go
-./persistent.go
-./ringbuf.go
-./event_test.go
-./persistent_test.go
-./ringbuf_test.go

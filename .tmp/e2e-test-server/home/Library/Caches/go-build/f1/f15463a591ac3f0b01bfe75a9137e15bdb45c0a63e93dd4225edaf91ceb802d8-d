@@ -1,7 +1,0 @@
-./client.go
-./dial.go
-./spawn.go
-./spawn_unix.go
-./client_test.go
-./dial_test.go
-./spawn_test.go

@@ -1,8 +1,0 @@
-./frequency.go
-./pipeline.go
-./slot.go
-./transition.go
-./frequency_test.go
-./pipeline_test.go
-./slot_test.go
-./transition_test.go

@@ -1,7 +1,0 @@
-./console.go
-./doc.go
-./expect.go
-./expect_opt.go
-./passthrough_pipe.go
-./reader_lease.go
-./test_log.go
