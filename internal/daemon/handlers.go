@@ -188,11 +188,18 @@ func (s *Server) AliasSync(ctx context.Context, req *pb.AliasSyncRequest) (*pb.A
 		return &pb.Ack{Ok: false, Error: "missing session_id"}, nil
 	}
 
+	shell := req.Shell
+	if shell == "" {
+		if info, ok := s.sessionManager.Get(req.SessionId); ok && info.Shell != "" {
+			shell = info.Shell
+		}
+	}
+
 	var aliases alias.AliasMap
 	if strings.TrimSpace(req.RawSnapshot) != "" {
-		aliases = alias.ParseSnapshot(req.Shell, req.RawSnapshot)
+		aliases = alias.ParseSnapshot(shell, req.RawSnapshot)
 	} else {
-		captured, err := alias.Capture(ctx, req.Shell)
+		captured, err := alias.Capture(ctx, shell)
 		if err != nil {
 			s.logger.Debug("alias sync capture failed", "session_id", req.SessionId, "error", err)
 			return &pb.Ack{Ok: false, Error: err.Error()}, nil
@@ -361,6 +368,7 @@ func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.Sugge
 	if s.scorerVersion == "v2" {
 		resp = s.suggestV2(ctx, req, maxResults)
 		if resp == nil || len(resp.Suggestions) == 0 {
+			s.clearSuggestSnapshot(req.SessionId)
 			resp = s.suggestV1(ctx, req, maxResults)
 			resp.CacheStatus = "miss"
 			resp.LatencyMs = time.Since(start).Milliseconds()
@@ -800,8 +808,13 @@ func (s *Server) applyFeedbackUpdates(ctx context.Context, req *pb.RecordFeedbac
 	if s.learner == nil {
 		return
 	}
-	if _, err := s.learner.LoadFromStore(ctx, scope); err != nil {
+	loaded, err := s.learner.LoadFromStore(ctx, scope)
+	if err != nil {
 		s.logger.Debug("failed to load learning profile", "scope", scope, "error", err)
+	}
+	if !loaded {
+		s.logger.Debug("no learning profile for scope, skipping update", "scope", scope)
+		return
 	}
 	pos, neg, ok := learningPairFromFeedback(snapshot.Suggestions, req)
 	if !ok {

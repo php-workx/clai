@@ -40,7 +40,7 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     env:
-      NOLINT_BUDGET: "138"
+      NOLINT_BUDGET: "137"
       NOSEC_BUDGET: "3"
     permissions:
       contents: read

@@ -140,8 +140,8 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 	bw := resolveBatchWriter(cfg.BatchWriter, cfg.V2DB)
 	v2scorer := resolveV2Scorer(cfg.V2Scorer, cfg.V2DB, logger)
 	scorerVersion := resolveScorerVersion(cfg.ScorerVersion, v2scorer, logger)
-	diagMux := resolveDiagnosticsMux(v2scorer, cfg.V2DB, logger)
 	v2SearchSvc := resolveV2SearchSvc(cfg.V2DB, logger)
+	diagMux := resolveDiagnosticsMux(v2scorer, v2SearchSvc, logger)
 	projectDetector := projecttype.NewDetector(projecttype.DetectorOptions{})
 	aliasStore := resolveAliasStore(cfg.V2DB)
 	feedbackStore := resolveFeedbackStore(cfg.FeedbackStore, cfg.V2DB, logger)
@@ -259,16 +259,9 @@ func resolveScorerVersion(requested string, v2scorer *suggest2.Scorer, logger *s
 	return version
 }
 
-func resolveDiagnosticsMux(v2scorer *suggest2.Scorer, v2db *suggestdb.DB, logger *slog.Logger) *http.ServeMux {
-	if v2scorer == nil || v2db == nil {
+func resolveDiagnosticsMux(v2scorer *suggest2.Scorer, searchSvc *search2.Service, logger *slog.Logger) *http.ServeMux {
+	if v2scorer == nil {
 		return nil
-	}
-	searchSvc, err := search2.NewService(v2db.DB(), search2.Config{
-		Logger:         logger,
-		EnableFallback: true,
-	})
-	if err != nil {
-		logger.Debug("diagnostics search service unavailable", "error", err)
 	}
 	handler := api.NewHandler(api.HandlerDependencies{
 		Scorer:    v2scorer,

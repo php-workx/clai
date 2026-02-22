@@ -104,6 +104,10 @@ func writeSearchJSON(results []searchOutput) error {
 }
 
 func searchCommands(ctx context.Context, query string, limit int) []searchOutput {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return nil
+	}
 	merged := make([]searchOutput, 0, limit)
 	seen := make(map[string]struct{}, limit)
 

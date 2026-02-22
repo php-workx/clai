@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"math"
 	"sync"
+	"time"
 )
 
 // Config holds tuning parameters for the online learner.
@@ -204,12 +205,16 @@ func (l *Learner) Update(ctx context.Context, scope string, fPos, fNeg *FeatureV
 	)
 
 	// Persist asynchronously if store is available.
+	// Use a detached context so the goroutine survives RPC cancellation
+	// (fire-and-forget clients cancel the request context quickly).
 	if l.store != nil {
 		wCopy := l.weights
 		sc := l.sampleCount
 		lr := eta
 		go func() {
-			if err := l.store.SaveWeights(ctx, scope, &wCopy, sc, lr); err != nil {
+			persistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := l.store.SaveWeights(persistCtx, scope, &wCopy, sc, lr); err != nil {
 				l.config.Logger.Error("learning: failed to persist weights",
 					"scope", scope, "error", err)
 			}
