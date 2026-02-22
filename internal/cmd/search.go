@@ -69,7 +69,11 @@ func runSearch(cmd *cobra.Command, args []string) error {
 
 	query := args[0]
 
-	results := searchCommands(query, searchLimit)
+	ctx := cmd.Context()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	results := searchCommands(ctx, query, searchLimit)
 
 	if searchJSON {
 		return writeSearchJSON(results)
@@ -99,7 +103,7 @@ func writeSearchJSON(results []searchOutput) error {
 	return enc.Encode(resp)
 }
 
-func searchCommands(query string, limit int) []searchOutput {
+func searchCommands(ctx context.Context, query string, limit int) []searchOutput {
 	merged := make([]searchOutput, 0, limit)
 	seen := make(map[string]struct{}, limit)
 
@@ -117,7 +121,7 @@ func searchCommands(query string, limit int) []searchOutput {
 
 	// Prefer DB-backed results first (freshly ingested runtime data),
 	// then fall back to shell history for backward compatibility.
-	if dbResults, err := searchCommandsFromDB(query, limit); err == nil {
+	if dbResults, err := searchCommandsFromDB(ctx, query, limit); err == nil {
 		for _, r := range dbResults {
 			if len(merged) >= limit {
 				break
@@ -135,7 +139,7 @@ func searchCommands(query string, limit int) []searchOutput {
 	return merged
 }
 
-func searchCommandsFromDB(query string, limit int) ([]searchOutput, error) {
+func searchCommandsFromDB(ctx context.Context, query string, limit int) ([]searchOutput, error) {
 	paths := config.DefaultPaths()
 	store, err := storage.NewSQLiteStore(paths.DatabaseFile())
 	if err != nil {
@@ -143,7 +147,7 @@ func searchCommandsFromDB(query string, limit int) ([]searchOutput, error) {
 	}
 	defer store.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	q := storage.CommandQuery{

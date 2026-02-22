@@ -12,6 +12,7 @@ const planPaths = plansEnv.split(",").map((p) => p.trim()).filter(Boolean).map((
 const selectedTests = [];
 for (const planPath of planPaths) {
 	const doc = yaml.load(fs.readFileSync(planPath, "utf8"));
+	if (!doc || typeof doc !== "object") continue;
 	for (const t of doc.tests || []) {
 		selectedTests.push({
 			plan: path.basename(planPath),

@@ -114,7 +114,7 @@ Usage: clai-shim <command> [flags...]
 
 Commands:
   --persistent                                Enter persistent NDJSON stdin mode
-  session-start, session-end, alias-sync, log-start, log-end, suggest, text-to-command
+  session-start, session-end, alias-sync (--stdin), log-start, log-end, suggest, text-to-command
   import-history, ping, status, version, help
 
 Environment:

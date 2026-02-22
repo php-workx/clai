@@ -245,7 +245,15 @@ func TestDescribeService_Search_Offset(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, page1, 2)
 	require.Len(t, page2, 2)
-	assert.NotEqual(t, page1[0].ID, page2[0].ID)
+	seen := map[int64]struct{}{}
+	for _, r := range page1 {
+		seen[r.ID] = struct{}{}
+	}
+	for _, r := range page2 {
+		if _, ok := seen[r.ID]; ok {
+			t.Fatalf("expected non-overlapping paged results, repeated id=%d", r.ID)
+		}
+	}
 }
 
 func TestComputeMatchedTags(t *testing.T) {

@@ -357,12 +357,17 @@ func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.Sugge
 		maxResults = 5
 	}
 
-	resp := s.suggestV2(ctx, req, maxResults)
-	if resp == nil {
-		fallback := s.suggestV1(ctx, req, maxResults)
-		fallback.CacheStatus = "miss"
-		fallback.LatencyMs = time.Since(start).Milliseconds()
-		return fallback, nil
+	var resp *pb.SuggestResponse
+	if s.scorerVersion == "v2" {
+		resp = s.suggestV2(ctx, req, maxResults)
+		if resp == nil || len(resp.Suggestions) == 0 {
+			resp = s.suggestV1(ctx, req, maxResults)
+			resp.CacheStatus = "miss"
+			resp.LatencyMs = time.Since(start).Milliseconds()
+			return resp, nil
+		}
+	} else {
+		resp = s.suggestV1(ctx, req, maxResults)
 	}
 	resp.CacheStatus = "miss"
 	resp.LatencyMs = time.Since(start).Milliseconds()
@@ -1018,7 +1023,6 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 			Command:     cmd,
 			TimestampMs: row.TimestampMs,
 			CmdNorm:     suggest.NormalizeCommand(cmd),
-			RepoKey:     req.RepoKey,
 		}
 	}
 
@@ -1050,21 +1054,17 @@ func (s *Server) fetchHistoryV2Search(
 		Offset:  int(req.Offset),
 	}
 
-	ftsSvc, err := search2.NewService(s.v2db.DB(), search2.Config{
-		Logger:         s.logger,
-		EnableFallback: true,
-	})
-	if err != nil {
-		s.logger.Debug("history search init failed", "error", err)
+	ftsSvc := s.v2SearchSvc
+	if ftsSvc == nil {
 		return nil, true, "storage", false
 	}
-	defer ftsSvc.Close()
 
 	describeSvc := search2.NewDescribeService(s.v2db.DB(), search2.DescribeConfig{Logger: s.logger})
 
 	var (
 		results []search2.SearchResult
 		backend string
+		err     error
 	)
 
 	switch req.Mode {

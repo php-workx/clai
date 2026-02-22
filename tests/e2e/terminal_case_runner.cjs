@@ -1,8 +1,11 @@
 const ms = (value) => {
 	if (typeof value === "number") return value;
 	const s = String(value || "").trim();
-	const m = s.match(/^(\d+)(ms|s)$/);
-	if (!m) return 0;
+	if (s === "") return 0;
+	const m = s.match(/^(\d+)(ms|s)?$/);
+	if (!m) {
+		throw new Error(`invalid duration: ${value}`);
+	}
 	const n = Number(m[1]);
 	return m[2] === "s" ? n * 1000 : n;
 };
@@ -57,7 +60,8 @@ const focusTerminal = async (page) => {
 	try {
 		await page.waitForSelector("textarea.xterm-helper-textarea", { timeout: 5000 });
 		await page.click("textarea.xterm-helper-textarea");
-	} catch {
+	} catch (e) {
+		// xterm helper not found, fall back to body focus
 		await page.click("body");
 	}
 };
@@ -101,6 +105,17 @@ const runStep = async (page, step) => {
 	if (step.press !== undefined) {
 		await focusTerminal(page);
 		await page.keyboard.press(pressSpec(step.press));
+		return;
+	}
+	if (step.wait_for !== undefined) {
+		const needle = String(step.wait_for);
+		await page.waitForFunction((n) => {
+			const rows = Array.from(document.querySelectorAll(".xterm-rows > div"));
+			const text = (rows.length > 0
+				? rows.map((r) => (r.textContent || "").replace(/\u00a0/g, " ")).join("\n")
+				: ((document.body && document.body.innerText) || "").replace(/\u00a0/g, " "));
+			return text.includes(n);
+		}, needle, { timeout: ms(step.timeout || "8s") });
 		return;
 	}
 	if (step.wait !== undefined) {

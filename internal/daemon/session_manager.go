@@ -184,7 +184,7 @@ func (m *SessionManager) List() []string {
 	return ids
 }
 
-// GetAll returns a copy of all session info.
+// GetAll returns a deep copy of all session info.
 func (m *SessionManager) GetAll() []*SessionInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -192,6 +192,12 @@ func (m *SessionManager) GetAll() []*SessionInfo {
 	infos := make([]*SessionInfo, 0, len(m.sessions))
 	for _, info := range m.sessions {
 		infoCopy := *info
+		if len(info.ProjectTypes) > 0 {
+			infoCopy.ProjectTypes = append([]string(nil), info.ProjectTypes...)
+		}
+		if info.Aliases != nil {
+			infoCopy.Aliases = maps.Clone(info.Aliases)
+		}
 		infos = append(infos, &infoCopy)
 	}
 	return infos

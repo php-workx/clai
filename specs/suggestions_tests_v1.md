@@ -214,7 +214,7 @@ Maintain fixture repos for:
 - Lane C required before merging major suggestions changes.
 
 ### 6.3 Nightly Gate
-- Lane D required nightly and for release branch.
+- Lane D required for nightly runs and the release branch.
 - Nightly failures create regression issues with category label: `unit`, `integration`, `expect`, `docker`, `e2e`.
 
 ## 7) Exit Criteria for This Test Plan

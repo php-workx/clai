@@ -53,6 +53,7 @@ run_shell_suite() {
 	: >"$log_path"
 	echo "=== $shell_name ===" | tee -a "$log_path"
 
+	trap 'make -C "$ROOT_DIR" test-server-stop >>"$log_path" 2>&1 || true; trap - EXIT INT TERM' EXIT INT TERM
 	make -C "$ROOT_DIR" test-server TEST_SHELL="$shell_name" >>"$log_path" 2>&1
 
 	local reporter="$E2E_REPORTER"

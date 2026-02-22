@@ -15,6 +15,13 @@ import (
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
+const weightsCacheTTL = 30 * time.Second
+
+type cachedWeights struct {
+	profile   *learning.WeightProfile
+	fetchedAt time.Time
+}
+
 // suggestV2 generates suggestions using only the V2 scorer.
 // Returns nil response if the V2 scorer is not available (caller should fall back).
 func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResults int) *pb.SuggestResponse {
@@ -66,17 +73,9 @@ func (s *Server) applyLearningProfile(
 			scope = "global"
 		}
 	}
-	profile, err := s.learningStore.LoadWeights(ctx, scope)
-	if err != nil {
-		s.logger.Debug("failed to load scope learning profile", "scope", scope, "error", err)
-		return
-	}
+	profile := s.cachedLoadWeights(ctx, scope)
 	if profile == nil && scope != "global" {
-		profile, err = s.learningStore.LoadWeights(ctx, "global")
-		if err != nil {
-			s.logger.Debug("failed to load global learning profile", "error", err)
-			return
-		}
+		profile = s.cachedLoadWeights(ctx, "global")
 	}
 	if profile == nil || profile.SampleCount < learning.DefaultConfig().MinSamples {
 		return
@@ -90,6 +89,31 @@ func (s *Server) applyLearningProfile(
 		}
 		return suggestions[i].Command < suggestions[j].Command
 	})
+}
+
+func (s *Server) cachedLoadWeights(ctx context.Context, scope string) *learning.WeightProfile {
+	now := time.Now()
+	s.weightsCacheMu.RLock()
+	if cached, ok := s.weightsCache[scope]; ok && now.Sub(cached.fetchedAt) < weightsCacheTTL {
+		s.weightsCacheMu.RUnlock()
+		return cached.profile
+	}
+	s.weightsCacheMu.RUnlock()
+
+	profile, err := s.learningStore.LoadWeights(ctx, scope)
+	if err != nil {
+		s.logger.Debug("failed to load learning profile", "scope", scope, "error", err)
+		return nil
+	}
+
+	s.weightsCacheMu.Lock()
+	if s.weightsCache == nil {
+		s.weightsCache = make(map[string]cachedWeights)
+	}
+	s.weightsCache[scope] = cachedWeights{profile: profile, fetchedAt: now}
+	s.weightsCacheMu.Unlock()
+
+	return profile
 }
 
 func learningDelta(sug *suggest2.Suggestion, prefix string, w *learning.Weights) float64 {
@@ -181,7 +205,7 @@ func (s *Server) buildV2SuggestContext(req *pb.SuggestRequest) suggest2.SuggestC
 		}
 		suggestCtx.LastTemplateID = info.LastTemplateID
 		suggestCtx.ProjectTypes = append([]string(nil), info.ProjectTypes...)
-		// Keep scope key format aligned with write-path dir scope.
+		// DirScopeKey: first 8 bytes (64 bits) of SHA-256 for collision resistance.
 		if req.Cwd != "" {
 			h := sha256.Sum256([]byte(req.Cwd))
 			suggestCtx.DirScopeKey = fmt.Sprintf("dir:%x", h[:8])

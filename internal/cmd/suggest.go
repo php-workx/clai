@@ -284,9 +284,9 @@ type suggestJSONContext struct {
 
 // suggestJSONResponse wraps suggestions with optional timing hint for JSON output.
 type suggestJSONResponse struct {
-	TimingHint  *timing.TimingHint `json:"timing_hint,omitempty"`
+	TimingHint  *timing.TimingHint  `json:"timing_hint,omitempty"`
 	Context     *suggestJSONContext `json:"context,omitempty"`
-	Suggestions []suggestOutput    `json:"suggestions"`
+	Suggestions []suggestOutput     `json:"suggestions"`
 }
 
 func riskFromText(text string) string {

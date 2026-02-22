@@ -177,7 +177,7 @@ func (c *Client) Suggest(ctx context.Context, sessionID, cwd, buffer string, cur
 		SessionId:  sessionID,
 		Cwd:        cwd,
 		Buffer:     buffer,
-		CursorPos:  int32(cursorPos), //nolint:gosec // G115: cursor pos is bounded by terminal width
+		CursorPos:  int32(cursorPos), //nolint:gosec // G115: bounded by terminal width
 		IncludeAi:  includeAI,
 		MaxResults: int32(maxResults),
 	}

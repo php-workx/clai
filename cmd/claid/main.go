@@ -41,7 +41,10 @@ func run() error {
 
 	// Load configuration
 	paths := config.DefaultPaths()
-	cfgObj, _ := config.Load()
+	cfgObj, cfgErr := config.Load()
+	if cfgErr != nil {
+		logger.Warn("failed to load config, using defaults", "error", cfgErr)
+	}
 
 	// Ensure directories exist
 	if err := paths.EnsureDirectories(); err != nil {
@@ -80,7 +83,7 @@ func run() error {
 			if ms := cfgObj.Suggestions.MaintenanceIntervalMs; ms > 0 {
 				mcfg.Interval = time.Duration(ms) * time.Millisecond
 			}
-			if days := cfgObj.Suggestions.RetentionDays; days >= 0 {
+			if days := cfgObj.Suggestions.RetentionDays; days > 0 {
 				mcfg.RetentionDays = days
 			}
 		}

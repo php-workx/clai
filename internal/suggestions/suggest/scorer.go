@@ -396,7 +396,7 @@ func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx *SuggestConte
 
 	s.collectProjectTasks(ctx, candidates, suggestCtx.RepoKey)
 	s.collectProjectTypeCandidates(ctx, candidates, suggestCtx.ProjectTypes, suggestCtx.LastTemplateID)
-	s.collectDiscoveryPriors(candidates, suggestCtx)
+	s.collectDiscoveryPriors(ctx, candidates, suggestCtx)
 }
 
 func (s *Scorer) collectTransitionCandidates(
@@ -604,7 +604,7 @@ func (s *Scorer) collectProjectTypeCandidates(
 	}
 }
 
-func (s *Scorer) collectDiscoveryPriors(candidates map[string]*Suggestion, suggestCtx *SuggestContext) {
+func (s *Scorer) collectDiscoveryPriors(ctx context.Context, candidates map[string]*Suggestion, suggestCtx *SuggestContext) {
 	if s.discoverEngine == nil {
 		return
 	}
@@ -613,7 +613,7 @@ func (s *Scorer) collectDiscoveryPriors(candidates map[string]*Suggestion, sugge
 		return
 	}
 
-	prior := s.discoverEngine.Discover(context.Background(), discover.DiscoverConfig{
+	prior := s.discoverEngine.Discover(ctx, discover.DiscoverConfig{
 		ProjectTypes: suggestCtx.ProjectTypes,
 		Limit:        5,
 		CooldownMs:   0,

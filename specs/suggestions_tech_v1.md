@@ -2,10 +2,10 @@
 
 This document is the consolidated baseline suggestions specification for clai. It merges and normalizes requirements from:
 
-- `/Users/runger/.claude-worktrees/clai/spec-reviews/specs/passed/tech_suggestions.md`
-- `/Users/runger/.claude-worktrees/clai/spec-reviews/specs/passed/tech_suggestions_v2.md`
-- `/Users/runger/.claude-worktrees/clai/spec-reviews/specs/tech_suggestions_ext_v1.md`
-- `/Users/runger/.claude-worktrees/clai/spec-reviews/specs/tech_suggestions_ext_v1_appendix.md`
+- `specs/passed/tech_suggestions.md`
+- `specs/passed/tech_suggestions_v2.md`
+- `specs/tech_suggestions_ext_v1.md`
+- `specs/tech_suggestions_ext_v1_appendix.md`
 
 ## 1. Purpose, Scope, and Exclusions
 

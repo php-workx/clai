@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 )
 
@@ -806,7 +807,7 @@ func TestHashCommand(t *testing.T) {
 }
 
 func generateTestCommandID(n int) string {
-	return "test-cmd-" + string(rune('A'+n))
+	return "test-cmd-" + strconv.Itoa(n)
 }
 
 func boolPtr(b bool) *bool {

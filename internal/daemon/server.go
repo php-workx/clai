@@ -77,6 +77,7 @@ type Server struct {
 	diagnosticsMux       *http.ServeMux
 	diagHTTPServer       *http.Server
 	v2Scorer             *suggest2.Scorer
+	v2SearchSvc          *search2.Service
 	learner              *learning.Learner
 	projectDetector      *projecttype.Detector
 	v2db                 *suggestdb.DB
@@ -87,6 +88,8 @@ type Server struct {
 	workflowMineInterval time.Duration
 	idleTimeout          time.Duration
 	commandsLogged       int64
+	weightsCacheMu       sync.RWMutex
+	weightsCache         map[string]cachedWeights
 	snapshotMu           sync.RWMutex
 	mu                   sync.RWMutex
 	shutdownOnce         sync.Once
@@ -138,6 +141,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 	v2scorer := resolveV2Scorer(cfg.V2Scorer, cfg.V2DB, logger)
 	scorerVersion := resolveScorerVersion(cfg.ScorerVersion, v2scorer, logger)
 	diagMux := resolveDiagnosticsMux(v2scorer, cfg.V2DB, logger)
+	v2SearchSvc := resolveV2SearchSvc(cfg.V2DB, logger)
 	projectDetector := projecttype.NewDetector(projecttype.DetectorOptions{})
 	aliasStore := resolveAliasStore(cfg.V2DB)
 	feedbackStore := resolveFeedbackStore(cfg.FeedbackStore, cfg.V2DB, logger)
@@ -166,6 +170,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		diagnosticsMux:       diagMux,
 		batchWriter:          bw,
 		v2Scorer:             v2scorer,
+		v2SearchSvc:          v2SearchSvc,
 		scorerVersion:        scorerVersion,
 		projectDetector:      projectDetector,
 		aliasStore:           aliasStore,
@@ -273,6 +278,21 @@ func resolveDiagnosticsMux(v2scorer *suggest2.Scorer, v2db *suggestdb.DB, logger
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	return mux
+}
+
+func resolveV2SearchSvc(v2db *suggestdb.DB, logger *slog.Logger) *search2.Service {
+	if v2db == nil {
+		return nil
+	}
+	svc, err := search2.NewService(v2db.DB(), search2.Config{
+		Logger:         logger,
+		EnableFallback: true,
+	})
+	if err != nil {
+		logger.Debug("v2 search service init failed", "error", err)
+		return nil
+	}
+	return svc
 }
 
 func resolveAliasStore(v2db *suggestdb.DB) *alias.Store {
@@ -477,6 +497,10 @@ func (s *Server) Shutdown() {
 			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			_ = s.diagHTTPServer.Shutdown(ctx)
 			cancel()
+		}
+
+		if s.v2SearchSvc != nil {
+			s.v2SearchSvc.Close()
 		}
 
 		// Stop gRPC server

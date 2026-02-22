@@ -35,8 +35,13 @@ fi
 if [[ -f "$PID_FILE" ]]; then
 	pid="$(cat "$PID_FILE" 2>/dev/null || true)"
 	if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+		url="http://$ADDRESS:$PORT"
+		if [[ -f "$RUNTIME_FILE" ]]; then
+			saved_url="$(grep -m1 '^URL=' "$RUNTIME_FILE" | cut -d= -f2- | tr -d '"' || true)"
+			url="${saved_url:-$url}"
+		fi
 		echo "test server already running (pid=$pid)"
-		echo "url: http://$ADDRESS:$PORT"
+		echo "url: $url"
 		exit 0
 	fi
 	rm -f "$PID_FILE"
@@ -135,18 +140,20 @@ done
 if [[ "$ready" -ne 1 ]]; then
 	echo "error: timed out waiting for test server on http://$ADDRESS:$PORT" >&2
 	echo "see $LOG_FILE for details" >&2
+	kill "$pid" 2>/dev/null || true
+	rm -f "$PID_FILE"
 	exit 1
 fi
 
 cat >"$RUNTIME_FILE" <<EOF
-PID=$pid
-TEST_SHELL=$TEST_SHELL
-ADDRESS=$ADDRESS
-PORT=$PORT
-URL=http://$ADDRESS:$PORT
-STATE_DIR=$STATE_DIR
-CLAI_HOME=$CLAI_HOME
-LOG_FILE=$LOG_FILE
+PID="$pid"
+TEST_SHELL="$TEST_SHELL"
+ADDRESS="$ADDRESS"
+PORT="$PORT"
+URL="http://$ADDRESS:$PORT"
+STATE_DIR="$STATE_DIR"
+CLAI_HOME="$CLAI_HOME"
+LOG_FILE="$LOG_FILE"
 EOF
 
 echo "test server started"

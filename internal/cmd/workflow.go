@@ -33,8 +33,8 @@ const (
 	ExitHumanReject       = 3
 	ExitCancelled         = 4
 	ExitNeedsHuman        = 5
-	ExitDaemonUnavailable = 6
-	ExitPolicyHalt        = 7
+	ExitDaemonUnavailable = 6 // reserved exit code per spec SS15
+	ExitPolicyHalt        = 7 // reserved exit code per spec SS15
 	ExitDependencyMissing = 8
 	ExitTimeout           = 124
 )
@@ -396,7 +396,7 @@ func runAdHocCommand(ctx context.Context, command, workDir string, env []string)
 
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
-		// #nosec G204 -- command is explicitly provided by the human reviewer at runtime.
+		//nolint:gosec // G204: command is explicitly provided by the human reviewer at runtime.
 		cmd = exec.CommandContext(ctx, "cmd.exe", "/C", command)
 	} else {
 		shellPath := os.Getenv("SHELL")
