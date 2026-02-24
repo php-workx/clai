@@ -273,6 +273,10 @@ zle -N expand-or-complete _ai_expand_or_complete
 _ai_up_line_or_history() {
     _clai_dismiss_picker
     zle .up-line-or-history
+    if [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
+        _ai_clear_ghost_text
+        return
+    fi
     _ai_update_suggestion
 }
 zle -N up-line-or-history _ai_up_line_or_history
@@ -280,6 +284,10 @@ zle -N up-line-or-history _ai_up_line_or_history
 _ai_down_line_or_history() {
     _clai_dismiss_picker
     zle .down-line-or-history
+    if [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
+        _ai_clear_ghost_text
+        return
+    fi
     _ai_update_suggestion
 }
 zle -N down-line-or-history _ai_down_line_or_history
@@ -288,6 +296,12 @@ zle -N down-line-or-history _ai_down_line_or_history
 _ai_backward_delete_char() {
     _clai_dismiss_picker
     zle .backward-delete-char
+    # When keys are queued (user holding backspace), skip the expensive
+    # suggest call and just clear stale ghost text.
+    if [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
+        _ai_clear_ghost_text
+        return
+    fi
     _ai_update_suggestion
 }
 zle -N backward-delete-char _ai_backward_delete_char

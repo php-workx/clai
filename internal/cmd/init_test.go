@@ -473,6 +473,31 @@ func TestZshScript_SelfInsertSkipsSuggestForQueuedInput(t *testing.T) {
 	}
 }
 
+// TestZshScript_RepeatableWidgetsSkipSuggestForQueuedInput verifies that
+// widgets triggered by held-down keys (backspace, up/down arrows) skip the
+// expensive clai suggest call when more keys are queued.
+func TestZshScript_RepeatableWidgetsSkipSuggestForQueuedInput(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	for _, fn := range []string{
+		"_ai_backward_delete_char",
+		"_ai_up_line_or_history",
+		"_ai_down_line_or_history",
+	} {
+		body := extractFunctionBody(script, fn)
+		if body == "" {
+			t.Fatalf("%s() not found", fn)
+		}
+		if !strings.Contains(body, "KEYS_QUEUED_COUNT") {
+			t.Errorf("%s() should guard on KEYS_QUEUED_COUNT to skip suggest during rapid repeat", fn)
+		}
+	}
+}
+
 // TestZshScript_DefaultCompletionAndHistoryClearGhostText verifies that
 // default Tab completion and history navigation clear ghost text state first.
 func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
