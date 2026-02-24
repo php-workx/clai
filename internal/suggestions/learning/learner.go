@@ -100,6 +100,16 @@ func NewLearner(initial *Weights, cfg Config, store *Store) *Learner {
 	}
 }
 
+// ResetToDefaults resets the learner to default weights and zero samples.
+// Used when switching scopes with no persisted profile to avoid carrying
+// stale weights from a previously loaded scope.
+func (l *Learner) ResetToDefaults() {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.weights = DefaultWeights()
+	l.sampleCount = 0
+}
+
 // Weights returns a snapshot of the current weight vector.
 func (l *Learner) Weights() Weights {
 	l.mu.RLock()

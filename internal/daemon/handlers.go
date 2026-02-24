@@ -813,8 +813,9 @@ func (s *Server) applyFeedbackUpdates(ctx context.Context, req *pb.RecordFeedbac
 		s.logger.Debug("failed to load learning profile", "scope", scope, "error", err)
 	}
 	if !loaded {
-		s.logger.Debug("no learning profile for scope, skipping update", "scope", scope)
-		return
+		// No persisted profile — reset to defaults so we don't carry
+		// stale weights from a previously loaded scope.
+		s.learner.ResetToDefaults()
 	}
 	pos, neg, ok := learningPairFromFeedback(snapshot.Suggestions, req)
 	if !ok {
@@ -964,7 +965,8 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 	}
 
 	usesSessionScope := strings.EqualFold(req.Scope, "session") || (!req.Global && req.SessionId != "")
-	isV2SearchMode := req.Mode == pb.SearchMode_SEARCH_MODE_FTS ||
+	isV2SearchMode := req.Mode == pb.SearchMode_SEARCH_MODE_UNSPECIFIED ||
+		req.Mode == pb.SearchMode_SEARCH_MODE_FTS ||
 		req.Mode == pb.SearchMode_SEARCH_MODE_DESCRIBE ||
 		req.Mode == pb.SearchMode_SEARCH_MODE_AUTO
 	if s.v2db != nil && req.Query != "" && !usesSessionScope && isV2SearchMode {
