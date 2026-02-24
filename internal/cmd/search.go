@@ -95,7 +95,7 @@ func writeSearchJSON(results []searchOutput) error {
 	resp := searchResponse{
 		Results:   results,
 		Total:     len(results),
-		Truncated: len(results) >= searchLimit,
+		Truncated: len(results) == searchLimit,
 	}
 
 	enc := json.NewEncoder(os.Stdout)

@@ -214,22 +214,7 @@ func (l *Learner) Update(ctx context.Context, scope string, fPos, fNeg *FeatureV
 		"sample_count", l.sampleCount,
 	)
 
-	// Persist asynchronously if store is available.
-	// Use a detached context so the goroutine survives RPC cancellation
-	// (fire-and-forget clients cancel the request context quickly).
-	if l.store != nil {
-		wCopy := l.weights
-		sc := l.sampleCount
-		lr := eta
-		go func() {
-			persistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-			if err := l.store.SaveWeights(persistCtx, scope, &wCopy, sc, lr); err != nil {
-				l.config.Logger.Error("learning: failed to persist weights",
-					"scope", scope, "error", err)
-			}
-		}()
-	}
+	l.persistAsync(scope)
 }
 
 // LoadFromStore loads persisted weights for the given scope, replacing
@@ -252,6 +237,105 @@ func (l *Learner) LoadFromStore(ctx context.Context, scope string) (bool, error)
 	l.weights = profile.Weights
 	l.sampleCount = profile.SampleCount
 	return true, nil
+}
+
+// LoadAndUpdate atomically loads the persisted profile for scope, then
+// applies a pairwise weight update. The entire load-update-persist
+// sequence runs under a single lock hold, preventing cross-scope
+// contamination when multiple goroutines call concurrently with
+// different scopes.
+//
+// If no persisted profile exists for scope, the learner resets to
+// defaults and still applies the update so that new scopes can
+// bootstrap (the low-sample freeze in Update will gate actual weight
+// changes until MinSamples is reached, but sampleCount accumulates).
+func (l *Learner) LoadAndUpdate(ctx context.Context, scope string, fPos, fNeg *FeatureVector) {
+	if fPos == nil || fNeg == nil {
+		return
+	}
+
+	// Load profile outside the learner lock (store has its own
+	// concurrency control) to avoid holding mu during I/O.
+	var profile *WeightProfile
+	if l.store != nil {
+		var err error
+		profile, err = l.store.LoadWeights(ctx, scope)
+		if err != nil {
+			l.config.Logger.Debug("learning: failed to load profile", "scope", scope, "error", err)
+		}
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// Apply loaded profile or reset to defaults.
+	if profile != nil {
+		l.weights = profile.Weights
+		l.sampleCount = profile.SampleCount
+	} else {
+		l.weights = DefaultWeights()
+		l.sampleCount = 0
+	}
+
+	// Inline the update logic (same as Update but already under lock).
+	l.sampleCount++
+
+	if l.sampleCount < l.config.MinSamples {
+		l.config.Logger.Debug("learning: low-sample freeze",
+			"scope", scope,
+			"sample_count", l.sampleCount,
+			"min_samples", l.config.MinSamples,
+		)
+		// Still persist the incremented sampleCount so it accumulates
+		// across requests and eventually crosses MinSamples.
+		l.persistAsync(scope)
+		return
+	}
+
+	eta := l.etaLocked()
+	w := &l.weights
+	nonPenaltySumBefore := nonPenaltySum(w)
+
+	w.Transition += eta * (fPos.Transition - fNeg.Transition)
+	w.Frequency += eta * (fPos.Frequency - fNeg.Frequency)
+	w.Success += eta * (fPos.Success - fNeg.Success)
+	w.Prefix += eta * (fPos.Prefix - fNeg.Prefix)
+	w.Affinity += eta * (fPos.Affinity - fNeg.Affinity)
+	w.Task += eta * (fPos.Task - fNeg.Task)
+	w.Feedback += eta * (fPos.Feedback - fNeg.Feedback)
+	w.ProjectTypeAffinity += eta * (fPos.ProjectTypeAffinity - fNeg.ProjectTypeAffinity)
+	w.FailureRecovery += eta * (fPos.FailureRecovery - fNeg.FailureRecovery)
+	w.RiskPenalty += eta * (fPos.RiskPenalty - fNeg.RiskPenalty)
+
+	l.clampWeights()
+	l.renormalize(nonPenaltySumBefore)
+
+	l.config.Logger.Debug("learning: weight update",
+		"scope", scope,
+		"eta", eta,
+		"sample_count", l.sampleCount,
+	)
+
+	l.persistAsync(scope)
+}
+
+// persistAsync fires a background goroutine to save the current weights.
+// Must be called with l.mu held (reads l.weights/sampleCount under lock).
+func (l *Learner) persistAsync(scope string) {
+	if l.store == nil {
+		return
+	}
+	wCopy := l.weights
+	sc := l.sampleCount
+	lr := l.etaLocked()
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := l.store.SaveWeights(ctx, scope, &wCopy, sc, lr); err != nil {
+			l.config.Logger.Error("learning: failed to persist weights",
+				"scope", scope, "error", err)
+		}
+	}()
 }
 
 // clampWeights clamps each weight to its configured range.

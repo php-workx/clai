@@ -194,6 +194,9 @@ func (s *Server) AliasSync(ctx context.Context, req *pb.AliasSyncRequest) (*pb.A
 			shell = info.Shell
 		}
 	}
+	if shell == "" {
+		return &pb.Ack{Ok: false, Error: "shell not specified and not available from session"}, nil
+	}
 
 	var aliases alias.AliasMap
 	if strings.TrimSpace(req.RawSnapshot) != "" {
@@ -808,20 +811,11 @@ func (s *Server) applyFeedbackUpdates(ctx context.Context, req *pb.RecordFeedbac
 	if s.learner == nil {
 		return
 	}
-	loaded, err := s.learner.LoadFromStore(ctx, scope)
-	if err != nil {
-		s.logger.Debug("failed to load learning profile", "scope", scope, "error", err)
-	}
-	if !loaded {
-		// No persisted profile — reset to defaults so we don't carry
-		// stale weights from a previously loaded scope.
-		s.learner.ResetToDefaults()
-	}
 	pos, neg, ok := learningPairFromFeedback(snapshot.Suggestions, req)
 	if !ok {
 		return
 	}
-	s.learner.Update(ctx, scope, featureVectorFromSuggestion(&pos, req), featureVectorFromSuggestion(&neg, req))
+	s.learner.LoadAndUpdate(ctx, scope, featureVectorFromSuggestion(&pos, req), featureVectorFromSuggestion(&neg, req))
 }
 
 func (s *Server) getSuggestSnapshot(sessionID string) (suggestSnapshot, bool) {
@@ -964,7 +958,8 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 		offset = 0
 	}
 
-	usesSessionScope := strings.EqualFold(req.Scope, "session") || (!req.Global && req.SessionId != "")
+	usesSessionScope := strings.EqualFold(req.Scope, "session") ||
+		(!req.Global && !strings.EqualFold(req.Scope, "global") && req.SessionId != "")
 	isV2SearchMode := req.Mode == pb.SearchMode_SEARCH_MODE_UNSPECIFIED ||
 		req.Mode == pb.SearchMode_SEARCH_MODE_FTS ||
 		req.Mode == pb.SearchMode_SEARCH_MODE_DESCRIBE ||
