@@ -330,15 +330,17 @@ zle -N bracketed-paste _ai_bracketed_paste
 # ZLE widget: Accept suggestion with right arrow
 _ai_forward_char() {
     if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} && "$_AI_CURRENT_SUGGESTION" == "$BUFFER"* ]]; then
-        # At end of buffer with valid suggestion prefix - accept it
+        # At end of buffer with valid suggestion prefix - accept it.
+        # Clear ghost state BEFORE updating BUFFER so any intermediate
+        # rendering triggered by the buffer change sees no POSTDISPLAY.
         local accepted="$_AI_CURRENT_SUGGESTION"
-        BUFFER="$_AI_CURRENT_SUGGESTION"
-        CURSOR=${#BUFFER}
         _AI_CURRENT_SUGGESTION=""
         _AI_GHOST_META=""
-        _AI_LAST_ACCEPTED="$accepted"
         POSTDISPLAY=""
         _ai_remove_ghost_highlight
+        BUFFER="$accepted"
+        CURSOR=${#BUFFER}
+        _AI_LAST_ACCEPTED="$accepted"
         # Clear AI suggestion file if we used it
         > "$_AI_SUGGEST_FILE"
         # Record accepted feedback (fire and forget)
