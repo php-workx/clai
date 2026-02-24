@@ -368,16 +368,17 @@ func (s *Scorer) normalizeSuggestContext(suggestCtx *SuggestContext) {
 }
 
 func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx *SuggestContext, candidates map[string]*Suggestion) {
-	s.collectTransitionCandidates(
-		ctx, candidates, suggestCtx.RepoKey, suggestCtx.LastTemplateID, suggestCtx.LastCmd,
+	tq := transitionQuery{
+		lastTemplateID: suggestCtx.LastTemplateID,
+		lastCmd:        suggestCtx.LastCmd,
+	}
+	s.collectTransitionCandidates(ctx, candidates, suggestCtx.RepoKey, tq,
 		ReasonRepoTransition, s.cfg.Weights.RepoTransition, "repo transitions query failed",
 	)
-	s.collectTransitionCandidates(
-		ctx, candidates, score.ScopeGlobal, suggestCtx.LastTemplateID, suggestCtx.LastCmd,
+	s.collectTransitionCandidates(ctx, candidates, score.ScopeGlobal, tq,
 		ReasonGlobalTransition, s.cfg.Weights.GlobalTransition, "global transitions query failed",
 	)
-	s.collectTransitionCandidates(
-		ctx, candidates, suggestCtx.DirScopeKey, suggestCtx.LastTemplateID, suggestCtx.LastCmd,
+	s.collectTransitionCandidates(ctx, candidates, suggestCtx.DirScopeKey, tq,
 		ReasonDirTransition, s.cfg.Weights.DirTransition, "dir transitions query failed",
 	)
 
@@ -399,16 +400,24 @@ func (s *Scorer) collectCandidates(ctx context.Context, suggestCtx *SuggestConte
 	s.collectDiscoveryPriors(ctx, candidates, suggestCtx)
 }
 
+// transitionQuery groups the per-session transition lookup parameters
+// that stay constant across all scope queries.
+type transitionQuery struct {
+	lastTemplateID string
+	lastCmd        string
+}
+
 func (s *Scorer) collectTransitionCandidates(
 	ctx context.Context,
 	candidates map[string]*Suggestion,
 	scope string,
-	lastTemplateID string,
-	lastCmd string,
+	tq transitionQuery,
 	reason string,
 	weight float64,
 	logMessage string,
 ) {
+	lastTemplateID := tq.lastTemplateID
+	lastCmd := tq.lastCmd
 	if scope == "" {
 		return
 	}

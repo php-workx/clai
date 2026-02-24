@@ -62,6 +62,7 @@ export TERM="$TERM_VALUE"
 eval "\$("$CLAI_CMD" init bash)"
 PS1='TEST> '
 EOF
+	return 0
 }
 
 write_zsh_rc() {
@@ -76,6 +77,7 @@ export TERM="$TERM_VALUE"
 eval "\$("$CLAI_CMD" init zsh)"
 PROMPT='TEST> '
 EOF
+	return 0
 }
 
 write_fish_config() {
@@ -93,6 +95,7 @@ function fish_prompt
     echo -n 'TEST> '
 end
 EOF
+	return 0
 }
 
 declare -a shell_cmd

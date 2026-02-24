@@ -22,6 +22,7 @@ require_cmd() {
 		echo "error: required command not found: $c" >&2
 		exit 1
 	fi
+	return 0
 }
 
 ensure_deps() {
@@ -210,6 +211,7 @@ console.log(`TOTAL: total=${aggregate.totals.total} pass=${aggregate.totals.pass
 console.log(`Wrote ${jsonOut}`);
 console.log(`Wrote ${mdOut}`);
 NODE
+	return 0
 }
 
 main() {
@@ -227,7 +229,8 @@ main() {
 	done
 
 	write_aggregate_reports
-	exit "$overall_rc"
+	return "$overall_rc"
 }
 
 main "$@"
+exit $?
