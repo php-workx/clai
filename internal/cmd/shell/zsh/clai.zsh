@@ -267,9 +267,11 @@ _ai_expand_or_complete() {
 zle -N expand-or-complete _ai_expand_or_complete
 
 # ZLE widget: History navigation keeps ghost text (re-generated for new buffer).
+# Uses prefix search: when the buffer has content, only matching history entries
+# are shown. When empty, cycles through all history (same as before).
 _ai_up_line_or_history() {
     _clai_dismiss_picker
-    zle .up-line-or-history
+    zle .history-beginning-search-backward
     if [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
         _ai_clear_ghost_text
         return
@@ -280,7 +282,7 @@ zle -N up-line-or-history _ai_up_line_or_history
 
 _ai_down_line_or_history() {
     _clai_dismiss_picker
-    zle .down-line-or-history
+    zle .history-beginning-search-forward
     if [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
         _ai_clear_ghost_text
         return
