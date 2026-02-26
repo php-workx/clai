@@ -69,6 +69,13 @@ _AI_IN_PASTE=false
 _AI_GHOST_HIGHLIGHT=""
 _AI_GHOST_META=""
 
+# History prefix search state
+_CLAI_HIST_ACTIVE=""
+_CLAI_HIST_PREFIX=""
+_CLAI_HIST_MATCH=""
+typeset -ga _CLAI_HIST_MATCHES
+_CLAI_HIST_IDX=0
+
 # Double-tap up-arrow detection
 _CLAI_DOUBLE_TAP_THRESHOLD=0.5
 _CLAI_LAST_UP_TIME=-1
@@ -114,8 +121,58 @@ _ai_remove_ghost_highlight() {
     _AI_GHOST_HIGHLIGHT=""
 }
 
+# Reset history prefix search state.
+_clai_hist_reset() {
+    _CLAI_HIST_ACTIVE=""
+    _CLAI_HIST_MATCH=""
+    _CLAI_HIST_MATCHES=()
+    _CLAI_HIST_IDX=0
+}
+
+# Search history for entries starting with the given prefix (most recent first).
+# Populates _CLAI_HIST_MATCHES with unique deduplicated results.
+_clai_hist_search() {
+    local prefix="$1"
+    _CLAI_HIST_MATCHES=()
+    local -A seen
+    local -i i start=$(( HISTCMD - 1 ))
+    local entry
+    for (( i = start; i >= 1 && ${#_CLAI_HIST_MATCHES} < 50; i-- )); do
+        entry="${history[$i]}"
+        [[ -n "$entry" && "$entry" == "${prefix}"* && "$entry" != "$prefix" && -z "${seen[$entry]}" ]] || continue
+        seen[$entry]=1
+        _CLAI_HIST_MATCHES+=("$entry")
+    done
+}
+
+# Apply ghost-text styling for the history remainder (portion after prefix).
+_clai_hist_apply_ghost() {
+    local prefix_len=${#_CLAI_HIST_PREFIX}
+    local remainder="${_CLAI_HIST_MATCH:$prefix_len}"
+    POSTDISPLAY="$remainder"
+    _ai_remove_ghost_highlight
+    if [[ -n "$remainder" ]]; then
+        _AI_GHOST_HIGHLIGHT="$prefix_len $((prefix_len + ${#remainder})) fg=242"
+        region_highlight+=("$_AI_GHOST_HIGHLIGHT")
+    fi
+}
+
+# Accept the current history match: set BUFFER to full entry, exit history mode.
+_clai_hist_accept() {
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" && -n "$_CLAI_HIST_MATCH" ]]; then
+        BUFFER="$_CLAI_HIST_MATCH"
+        CURSOR=${#BUFFER}
+    fi
+    POSTDISPLAY=""
+    _ai_remove_ghost_highlight
+    _clai_hist_reset
+}
+
 # Update suggestion based on current buffer
 _ai_update_suggestion() {
+    # Don't overwrite history prefix ghost text
+    [[ "$_CLAI_HIST_ACTIVE" == "1" ]] && return
+
     local suggestion=""
     local meta=""
 
@@ -168,6 +225,12 @@ _ai_update_suggestion() {
 
 # ZLE widget: Update suggestion after each character
 _ai_self_insert() {
+    # Exit history prefix mode — user is typing new content
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" ]]; then
+        POSTDISPLAY=""
+        _ai_remove_ghost_highlight
+        _clai_hist_reset
+    fi
     _clai_dismiss_picker
     zle .self-insert
     # During bracketed paste (or any queued bulk input), avoid running
@@ -208,10 +271,14 @@ _ai_clear_ghost_text() {
     _AI_GHOST_META=""
     POSTDISPLAY=""
     _ai_remove_ghost_highlight
+    _clai_hist_reset
 }
 
 # Safety net: keep ghost text consistent if BUFFER/CURSOR changes via an unwrapped ZLE widget.
 _ai_sync_ghost_text() {
+    # Don't interfere with history prefix ghost text
+    [[ "$_CLAI_HIST_ACTIVE" == "1" ]] && return
+
     # If POSTDISPLAY is somehow set without a suggestion, clear it.
     if [[ -z "$_AI_CURRENT_SUGGESTION" ]]; then
         if [[ -n "$POSTDISPLAY" ]]; then
@@ -266,33 +333,73 @@ _ai_expand_or_complete() {
 }
 zle -N expand-or-complete _ai_expand_or_complete
 
-# ZLE widget: History navigation keeps ghost text (re-generated for new buffer).
-# Uses prefix search: when the buffer has content, only matching history entries
-# are shown. When empty, cycles through all history (same as before).
+# ZLE widget: History navigation with prefix search.
+# When the buffer has content, shows matching history entries with the typed
+# portion as normal text and the remainder as ghost text (dim).
 _ai_up_line_or_history() {
     _clai_dismiss_picker
-    zle .history-beginning-search-backward
-    if [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
-        _ai_clear_ghost_text
+
+    # No prefix typed — fall back to plain history cycling
+    if [[ -z "$BUFFER" && "$_CLAI_HIST_ACTIVE" != "1" ]]; then
+        zle .up-line-or-history
         return
     fi
-    _ai_update_suggestion
+
+    # First press: save prefix, search history
+    if [[ "$_CLAI_HIST_ACTIVE" != "1" ]]; then
+        _ai_clear_ghost_text
+        _CLAI_HIST_PREFIX="$BUFFER"
+        _CLAI_HIST_ACTIVE=1
+        _CLAI_HIST_IDX=0
+        _clai_hist_search "$BUFFER"
+    fi
+
+    # Nothing found
+    (( ${#_CLAI_HIST_MATCHES} == 0 )) && return
+
+    # Cycle forward (older entries)
+    if (( _CLAI_HIST_IDX < ${#_CLAI_HIST_MATCHES} )); then
+        _CLAI_HIST_IDX=$(( _CLAI_HIST_IDX + 1 ))
+    fi
+    _CLAI_HIST_MATCH="${_CLAI_HIST_MATCHES[$_CLAI_HIST_IDX]}"
+    BUFFER="$_CLAI_HIST_PREFIX"
+    CURSOR=${#BUFFER}
+    _clai_hist_apply_ghost
 }
 zle -N up-line-or-history _ai_up_line_or_history
 
 _ai_down_line_or_history() {
     _clai_dismiss_picker
-    zle .history-beginning-search-forward
-    if [[ ${KEYS_QUEUED_COUNT:-0} -gt 0 ]]; then
-        _ai_clear_ghost_text
+
+    if [[ "$_CLAI_HIST_ACTIVE" != "1" ]]; then
+        zle .down-line-or-history
         return
     fi
-    _ai_update_suggestion
+
+    # Cycle backward (newer entries)
+    _CLAI_HIST_IDX=$(( _CLAI_HIST_IDX - 1 ))
+    if (( _CLAI_HIST_IDX < 1 )); then
+        # Back to the original input — exit history mode
+        POSTDISPLAY=""
+        _ai_remove_ghost_highlight
+        _clai_hist_reset
+        _ai_update_suggestion
+        return
+    fi
+    _CLAI_HIST_MATCH="${_CLAI_HIST_MATCHES[$_CLAI_HIST_IDX]}"
+    BUFFER="$_CLAI_HIST_PREFIX"
+    CURSOR=${#BUFFER}
+    _clai_hist_apply_ghost
 }
 zle -N down-line-or-history _ai_down_line_or_history
 
 # ZLE widget: Update suggestion after backspace
 _ai_backward_delete_char() {
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" ]]; then
+        POSTDISPLAY=""
+        _ai_remove_ghost_highlight
+        _clai_hist_reset
+    fi
     _clai_dismiss_picker
     zle .backward-delete-char
     # When keys are queued (user holding backspace), skip the expensive
@@ -342,6 +449,13 @@ zle -N bracketed-paste _ai_bracketed_paste
 
 # ZLE widget: Accept suggestion with right arrow
 _ai_forward_char() {
+    # Accept history prefix match
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" && -n "$_CLAI_HIST_MATCH" ]]; then
+        _clai_hist_accept
+        zle reset-prompt
+        return
+    fi
+
     if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} && "$_AI_CURRENT_SUGGESTION" == "$BUFFER"* ]]; then
         # At end of buffer with valid suggestion prefix - accept it.
         # Clear ghost state BEFORE updating BUFFER so any intermediate
@@ -372,6 +486,13 @@ zle -N forward-char _ai_forward_char
 
 # ZLE widget: Accept next token from ghost text (Alt+Right)
 _ai_accept_token() {
+    # Accept history prefix match
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" && -n "$_CLAI_HIST_MATCH" ]]; then
+        _clai_hist_accept
+        zle reset-prompt
+        return
+    fi
+
     if [[ -n "$_AI_CURRENT_SUGGESTION" && $CURSOR -eq ${#BUFFER} && "$_AI_CURRENT_SUGGESTION" == "$BUFFER"* ]]; then
         local remainder="${_AI_CURRENT_SUGGESTION:$CURSOR}"
         local leading="${remainder%%[![:space:]]*}"
@@ -434,6 +555,11 @@ zle -N _ai_enter_voice_mode
 
 # ZLE widget: Execute with voice conversion if in voice mode or ? prefix
 _ai_voice_accept_line() {
+    # Accept history prefix match before running the command
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" && -n "$_CLAI_HIST_MATCH" ]]; then
+        _clai_hist_accept
+    fi
+
     # Check for ? prefix (natural language marker)
     # Intercepted by ZLE before shell evaluation
     if [[ "$BUFFER" == '?'* && ${#BUFFER} -gt 1 ]]; then

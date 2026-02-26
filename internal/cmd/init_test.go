@@ -516,14 +516,16 @@ func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
 		t.Error("_ai_expand_or_complete() should call _ai_clear_ghost_text before delegating")
 	}
 
-	// History navigation should re-generate ghost text (not clear it).
+	// History navigation uses prefix search with ghost text for the remainder.
+	// _ai_up_line_or_history manages ghost text via _clai_hist_apply_ghost,
+	// _ai_down_line_or_history calls _ai_update_suggestion when exiting history mode.
 	for _, fn := range []string{"_ai_up_line_or_history", "_ai_down_line_or_history"} {
 		body := extractFunctionBody(script, fn)
 		if body == "" {
 			t.Fatalf("%s() not found", fn)
 		}
-		if !strings.Contains(body, "_ai_update_suggestion") {
-			t.Errorf("%s() should call _ai_update_suggestion to keep ghost text", fn)
+		if !strings.Contains(body, "_clai_hist") {
+			t.Errorf("%s() should use history prefix search (_clai_hist_*)", fn)
 		}
 	}
 
