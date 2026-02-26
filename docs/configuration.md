@@ -29,6 +29,9 @@ future daemon work.
 
 ## Configuration Reference
 
+> Note: suggestion daemon transport is Unix-only in the current release (`darwin`/`linux`).
+> Windows can still run CLI commands, but `claid` suggestion IPC is not supported yet.
+
 ### Daemon Settings
 
 | Key | Type | Default | Description |

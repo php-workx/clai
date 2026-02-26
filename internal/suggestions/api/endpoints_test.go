@@ -39,7 +39,7 @@ func createTestDB(t *testing.T) *sql.DB {
 		CREATE TABLE command_event (
 			id            INTEGER PRIMARY KEY AUTOINCREMENT,
 			session_id    TEXT NOT NULL,
-			ts            INTEGER NOT NULL,
+			ts_ms         INTEGER NOT NULL,
 			cmd_raw       TEXT NOT NULL,
 			cmd_norm      TEXT NOT NULL,
 			cwd           TEXT NOT NULL,
@@ -280,7 +280,7 @@ func TestHandler_HandleSearch_Success(t *testing.T) {
 
 	// Insert test data
 	_, err = db.Exec(`
-		INSERT INTO command_event (session_id, ts, cmd_raw, cmd_norm, cwd, repo_key, ephemeral)
+		INSERT INTO command_event (session_id, ts_ms, cmd_raw, cmd_norm, cwd, repo_key, ephemeral)
 		VALUES ('session1', 1000000, 'docker run nginx', 'docker run nginx', '/home/user', '/repo', 0)
 	`)
 	require.NoError(t, err)

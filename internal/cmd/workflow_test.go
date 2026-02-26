@@ -369,14 +369,7 @@ func TestRunAdHocCommand(t *testing.T) {
 	defer cancel()
 
 	t.Run("success", func(t *testing.T) {
-		var command string
-		if runtime.GOOS == "windows" {
-			command = "echo ok"
-		} else {
-			command = "echo ok"
-		}
-
-		err := runAdHocCommand(ctx, command, t.TempDir(), nil)
+		err := runAdHocCommand(ctx, "echo ok", t.TempDir(), nil)
 		assert.NoError(t, err)
 	})
 

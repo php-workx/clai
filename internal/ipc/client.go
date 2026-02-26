@@ -85,6 +85,21 @@ func (c *Client) SessionEnd(sessionID string) {
 	_, _ = c.client.SessionEnd(ctx, req)
 }
 
+// AliasSync sends an alias snapshot for a session.
+// Uses fire-and-forget semantics - errors are silently ignored.
+func (c *Client) AliasSync(sessionID, shell, rawSnapshot string) {
+	ctx, cancel := context.WithTimeout(context.Background(), FireAndForgetTimeout)
+	defer cancel()
+
+	req := &pb.AliasSyncRequest{
+		SessionId:   sessionID,
+		Shell:       shell,
+		RawSnapshot: rawSnapshot,
+	}
+
+	_, _ = c.client.AliasSync(ctx, req)
+}
+
 // --- Command Lifecycle (Fire-and-Forget) ---
 
 // CommandContext contains optional context for a command execution.
@@ -162,9 +177,9 @@ func (c *Client) Suggest(ctx context.Context, sessionID, cwd, buffer string, cur
 		SessionId:  sessionID,
 		Cwd:        cwd,
 		Buffer:     buffer,
-		CursorPos:  int32(cursorPos), //nolint:gosec // G115: cursor pos is bounded by terminal width
+		CursorPos:  int32(cursorPos), //nolint:gosec // G115: bounded by terminal width
 		IncludeAi:  includeAI,
-		MaxResults: int32(maxResults), //nolint:gosec // G115: max results is a small positive integer
+		MaxResults: int32(maxResults),
 	}
 
 	resp, err := c.client.Suggest(ctx, req)

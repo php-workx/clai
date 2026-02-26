@@ -58,6 +58,7 @@ linters:
     # Style & quality
     - gocritic
     - revive
+    - nolintlint
     # Security
     - gosec
     # Architecture
@@ -95,6 +96,11 @@ linters:
     # Revive settings
     revive:
       rules: []
+    # NOLINT hygiene
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
     # Security settings
     gosec:
       excludes:

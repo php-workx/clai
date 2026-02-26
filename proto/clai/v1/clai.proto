@@ -45,6 +45,12 @@ message SessionEndRequest {
   int64 ended_at_unix_ms = 2;
 }
 
+message AliasSyncRequest {
+  string session_id = 1;
+  string shell = 2;
+  string raw_snapshot = 3;  // Raw output from alias/abbr command.
+}
+
 // ---------------------------------------------------------
 // Command Lifecycle (Phase 1: No Output Capture)
 // ---------------------------------------------------------
@@ -342,6 +348,7 @@ service ClaiService {
   // Fire-and-Forget (Client ignores return)
   rpc SessionStart(SessionStartRequest) returns (Ack);
   rpc SessionEnd(SessionEndRequest) returns (Ack);
+  rpc AliasSync(AliasSyncRequest) returns (Ack);
   rpc CommandStarted(CommandStartRequest) returns (Ack);
   rpc CommandEnded(CommandEndRequest) returns (Ack);
 

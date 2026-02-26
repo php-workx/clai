@@ -38,18 +38,18 @@ func (b *ContextBuilder) BuildTextToCommandPrompt(userPrompt string) string {
 
 	sb.WriteString("You are a command-line assistant. Generate shell commands for the user's request.\n\n")
 	sb.WriteString(contextHeader)
-	fmt.Fprintf(&sb, fmtOS, b.os)
-	fmt.Fprintf(&sb, fmtShell, b.shell)
-	fmt.Fprintf(&sb, fmtWorkDir, b.cwd)
+	_, _ = fmt.Fprintf(&sb, fmtOS, b.os)
+	_, _ = fmt.Fprintf(&sb, fmtShell, b.shell)
+	_, _ = fmt.Fprintf(&sb, fmtWorkDir, b.cwd)
 
 	if len(b.recentCmds) > 0 {
 		sb.WriteString("\nRecent commands:\n")
 		for i, cmd := range b.recentCmds {
-			fmt.Fprintf(&sb, fmtCmdHistItem, i+1, cmd.Command, cmd.ExitCode)
+			_, _ = fmt.Fprintf(&sb, fmtCmdHistItem, i+1, cmd.Command, cmd.ExitCode)
 		}
 	}
 
-	fmt.Fprintf(&sb, "\nUser request: %s\n", userPrompt)
+	_, _ = fmt.Fprintf(&sb, "\nUser request: %s\n", userPrompt)
 	sb.WriteString("\nRespond with 1-3 shell commands, one per line. No explanations.")
 
 	return sb.String()
@@ -61,16 +61,16 @@ func (b *ContextBuilder) BuildNextStepPrompt(lastCommand string, exitCode int) s
 
 	sb.WriteString("You are a command-line assistant predicting the next command.\n\n")
 	sb.WriteString(contextHeader)
-	fmt.Fprintf(&sb, fmtOS, b.os)
-	fmt.Fprintf(&sb, fmtShell, b.shell)
-	fmt.Fprintf(&sb, fmtWorkDir, b.cwd)
-	fmt.Fprintf(&sb, "- Last command: %s\n", lastCommand)
-	fmt.Fprintf(&sb, "- Exit code: %d\n", exitCode)
+	_, _ = fmt.Fprintf(&sb, fmtOS, b.os)
+	_, _ = fmt.Fprintf(&sb, fmtShell, b.shell)
+	_, _ = fmt.Fprintf(&sb, fmtWorkDir, b.cwd)
+	_, _ = fmt.Fprintf(&sb, "- Last command: %s\n", lastCommand)
+	_, _ = fmt.Fprintf(&sb, "- Exit code: %d\n", exitCode)
 
 	if len(b.recentCmds) > 0 {
 		sb.WriteString("\nPrevious commands:\n")
 		for i, cmd := range b.recentCmds {
-			fmt.Fprintf(&sb, fmtCmdHistItem, i+1, cmd.Command, cmd.ExitCode)
+			_, _ = fmt.Fprintf(&sb, fmtCmdHistItem, i+1, cmd.Command, cmd.ExitCode)
 		}
 	}
 
@@ -85,20 +85,20 @@ func (b *ContextBuilder) BuildDiagnosePrompt(command string, exitCode int, stder
 
 	sb.WriteString("You are a command-line assistant diagnosing a failed command.\n\n")
 	sb.WriteString(contextHeader)
-	fmt.Fprintf(&sb, fmtOS, b.os)
-	fmt.Fprintf(&sb, fmtShell, b.shell)
-	fmt.Fprintf(&sb, fmtWorkDir, b.cwd)
-	fmt.Fprintf(&sb, "\nFailed command: %s\n", command)
-	fmt.Fprintf(&sb, "Exit code: %d\n", exitCode)
+	_, _ = fmt.Fprintf(&sb, fmtOS, b.os)
+	_, _ = fmt.Fprintf(&sb, fmtShell, b.shell)
+	_, _ = fmt.Fprintf(&sb, fmtWorkDir, b.cwd)
+	_, _ = fmt.Fprintf(&sb, "\nFailed command: %s\n", command)
+	_, _ = fmt.Fprintf(&sb, "Exit code: %d\n", exitCode)
 
 	if stderr != "" {
-		fmt.Fprintf(&sb, "\nError output:\n%s\n", truncateStderr(stderr))
+		_, _ = fmt.Fprintf(&sb, "\nError output:\n%s\n", truncateStderr(stderr))
 	}
 
 	if len(b.recentCmds) > 0 {
 		sb.WriteString("\nRecent command history:\n")
 		for i, cmd := range b.recentCmds {
-			fmt.Fprintf(&sb, fmtCmdHistItem, i+1, cmd.Command, cmd.ExitCode)
+			_, _ = fmt.Fprintf(&sb, fmtCmdHistItem, i+1, cmd.Command, cmd.ExitCode)
 		}
 	}
 

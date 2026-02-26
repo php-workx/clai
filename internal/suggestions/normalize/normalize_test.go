@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestNormalizer_Normalize(t *testing.T) { //nolint:funlen // table-driven test with many normalization cases
+func TestNormalizer_Normalize(t *testing.T) {
 	n := NewNormalizer()
 
 	tests := []struct {

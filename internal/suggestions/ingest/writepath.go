@@ -54,6 +54,7 @@ type WritePathContext struct {
 	Branch         string
 	PrevTemplateID string
 	Slots          []normalize.SlotValue
+	ProjectTypes   []string
 	PreNorm        normalize.PreNormResult
 	PrevExitCode   int
 	NowMs          int64
@@ -188,8 +189,12 @@ func runOptionalWritePathSteps(
 			return fmt.Errorf("step 6 (slot_correlation): %w", err)
 		}
 	}
-	if len(cfg.ProjectTypes) > 0 {
-		if err := updateProjectTypeStats(ctx, tx, wctx, cfg.ProjectTypes, tauMs); err != nil {
+	projectTypes := cfg.ProjectTypes
+	if len(wctx.ProjectTypes) > 0 {
+		projectTypes = wctx.ProjectTypes
+	}
+	if len(projectTypes) > 0 {
+		if err := updateProjectTypeStats(ctx, tx, wctx, projectTypes, tauMs); err != nil {
 			return fmt.Errorf("step 7 (project_type_stat): %w", err)
 		}
 	}
@@ -1011,6 +1016,9 @@ func PrepareWriteContext(
 	prevFailed bool,
 	aliases map[string]string,
 ) *WritePathContext {
+	if aliases == nil {
+		aliases = ev.Aliases
+	}
 	// Run pre-normalization pipeline
 	preNorm := normalize.PreNormalize(ev.CmdRaw, normalize.PreNormConfig{
 		Aliases: aliases,
@@ -1035,5 +1043,6 @@ func PrepareWriteContext(
 		PrevExitCode:   prevExitCode,
 		PrevFailed:     prevFailed,
 		NowMs:          nowMs,
+		ProjectTypes:   ev.ProjectTypes,
 	}
 }

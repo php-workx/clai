@@ -2,17 +2,25 @@ package daemon
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
-	"sync"
+	"sort"
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/sanitize"
-	"github.com/runger/clai/internal/suggestions/dirscope"
 	"github.com/runger/clai/internal/suggestions/explain"
+	"github.com/runger/clai/internal/suggestions/learning"
 	"github.com/runger/clai/internal/suggestions/normalize"
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
+
+const weightsCacheTTL = 30 * time.Second
+
+type cachedWeights struct {
+	profile   *learning.WeightProfile
+	fetchedAt time.Time
+}
 
 // suggestV2 generates suggestions using only the V2 scorer.
 // Returns nil response if the V2 scorer is not available (caller should fall back).
@@ -31,34 +39,98 @@ func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResul
 		s.logger.Warn("V2 scorer failed", "error", err)
 		return nil
 	}
+	s.applyLearningProfile(ctx, &suggestCtx, suggestions)
 
 	if maxResults > 0 && len(suggestions) > maxResults {
 		suggestions = suggestions[:maxResults]
+	}
+	if req.SessionId != "" {
+		s.snapshotMu.Lock()
+		s.lastSuggestSnapshots[req.SessionId] = suggestSnapshot{
+			Context:     suggestCtx,
+			Suggestions: append([]suggest2.Suggestion(nil), suggestions...),
+			ShownAtMs:   suggestCtx.NowMs,
+		}
+		s.snapshotMu.Unlock()
 	}
 
 	return s.v2SuggestionsToProto(suggestions, suggestCtx.LastCmd, suggestCtx.NowMs)
 }
 
-// suggestV2Blend generates suggestions by running V1 and V2 concurrently
-// and merging the results. V2 results are interleaved with V1, deduplicated
-// by command text, with V2 suggestions taking priority on conflicts.
-// If V2 is unavailable, falls back to V1 only.
-func (s *Server) suggestV2Blend(ctx context.Context, req *pb.SuggestRequest, maxResults int) *pb.SuggestResponse {
-	if s.v2Scorer == nil {
-		return s.suggestV1(ctx, req, maxResults)
+func (s *Server) applyLearningProfile(
+	ctx context.Context,
+	suggestCtx *suggest2.SuggestContext,
+	suggestions []suggest2.Suggestion,
+) {
+	if len(suggestions) == 0 || s.learningStore == nil {
+		return
+	}
+	scope := suggestCtx.Scope
+	if scope == "" {
+		if suggestCtx.RepoKey != "" {
+			scope = suggestCtx.RepoKey
+		} else {
+			scope = "global"
+		}
+	}
+	profile := s.cachedLoadWeights(ctx, scope)
+	if profile == nil && scope != "global" {
+		profile = s.cachedLoadWeights(ctx, "global")
+	}
+	if profile == nil || profile.SampleCount < learning.DefaultConfig().MinSamples {
+		return
+	}
+	for i := range suggestions {
+		suggestions[i].Score += learningDelta(&suggestions[i], suggestCtx.Prefix, &profile.Weights)
+	}
+	sort.SliceStable(suggestions, func(i, j int) bool {
+		if suggestions[i].Score != suggestions[j].Score {
+			return suggestions[i].Score > suggestions[j].Score
+		}
+		return suggestions[i].Command < suggestions[j].Command
+	})
+}
+
+func (s *Server) cachedLoadWeights(ctx context.Context, scope string) *learning.WeightProfile {
+	now := time.Now()
+	s.weightsCacheMu.RLock()
+	if cached, ok := s.weightsCache[scope]; ok && now.Sub(cached.fetchedAt) < weightsCacheTTL {
+		s.weightsCacheMu.RUnlock()
+		return cached.profile
+	}
+	s.weightsCacheMu.RUnlock()
+
+	profile, err := s.learningStore.LoadWeights(ctx, scope)
+	if err != nil {
+		s.logger.Debug("failed to load learning profile", "scope", scope, "error", err)
+		return nil
 	}
 
-	var v1Resp, v2Resp *pb.SuggestResponse
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() { defer wg.Done(); v1Resp = s.suggestV1(ctx, req, maxResults) }()
-	go func() { defer wg.Done(); v2Resp = s.suggestV2(ctx, req, maxResults) }()
-	wg.Wait()
-
-	if v2Resp == nil {
-		return v1Resp
+	s.weightsCacheMu.Lock()
+	if s.weightsCache == nil {
+		s.weightsCache = make(map[string]cachedWeights)
 	}
-	return mergeResponses(v1Resp, v2Resp, maxResults)
+	s.weightsCache[scope] = cachedWeights{profile: profile, fetchedAt: now}
+	s.weightsCacheMu.Unlock()
+
+	return profile
+}
+
+func learningDelta(sug *suggest2.Suggestion, prefix string, w *learning.Weights) float64 {
+	// Keep adaptive contribution bounded so learned weights nudge ordering
+	// without overpowering base score signals.
+	const learningScale = 25.0
+
+	fv := featureVectorFromSuggestion(sug, &pb.RecordFeedbackRequest{Prefix: prefix})
+	positive := w.Transition*fv.Transition +
+		w.Frequency*fv.Frequency +
+		w.Prefix*fv.Prefix +
+		w.Affinity*fv.Affinity +
+		w.Task*fv.Task +
+		w.ProjectTypeAffinity*fv.ProjectTypeAffinity +
+		w.FailureRecovery*fv.FailureRecovery
+	negative := w.RiskPenalty * fv.RiskPenalty
+	return (positive - negative) * learningScale
 }
 
 // mergeResponses merges V1 and V2 responses, deduplicating by command text.
@@ -120,15 +192,36 @@ func (s *Server) buildV2SuggestContext(req *pb.SuggestRequest) suggest2.SuggestC
 		SessionID: req.SessionId,
 		Prefix:    req.Buffer,
 		Cwd:       req.Cwd,
+		RepoKey:   req.RepoKey,
 	}
 
 	// Try to get the last command from session for transition scoring
 	if info, ok := s.sessionManager.Get(req.SessionId); ok {
-		// V2 scorer expects normalized command strings.
-		suggestCtx.LastCmd = normalize.NormalizeSimple(info.LastCmdRaw)
-		suggestCtx.RepoKey = info.LastGitRepo
-		// Directory scope key for cwd-scoped transitions/frequency (best-effort).
-		suggestCtx.DirScopeKey = dirscope.ComputeScopeKey(req.Cwd, info.LastGitRoot, dirscope.DefaultMaxDepth)
+		if suggestCtx.LastCmd == "" {
+			suggestCtx.LastCmd = normalize.NormalizeSimple(info.LastCmdRaw)
+		}
+		if suggestCtx.RepoKey == "" {
+			suggestCtx.RepoKey = info.LastGitRepo
+		}
+		suggestCtx.LastTemplateID = info.LastTemplateID
+		suggestCtx.ProjectTypes = append([]string(nil), info.ProjectTypes...)
+		// DirScopeKey: first 8 bytes (64 bits) of SHA-256 for collision resistance.
+		if req.Cwd != "" {
+			h := sha256.Sum256([]byte(req.Cwd))
+			suggestCtx.DirScopeKey = fmt.Sprintf("dir:%x", h[:8])
+		}
+	}
+	if req.LastCmdNorm != "" {
+		suggestCtx.LastCmd = normalize.NormalizeSimple(req.LastCmdNorm)
+	}
+	if req.LastCmdRaw != "" {
+		suggestCtx.LastCmd = normalize.NormalizeSimple(req.LastCmdRaw)
+		if suggestCtx.LastTemplateID == "" {
+			suggestCtx.LastTemplateID = normalize.PreNormalize(req.LastCmdRaw, normalize.PreNormConfig{}).TemplateID
+		}
+	}
+	if suggestCtx.LastTemplateID == "" && suggestCtx.LastCmd != "" {
+		suggestCtx.LastTemplateID = normalize.PreNormalize(suggestCtx.LastCmd, normalize.PreNormConfig{}).TemplateID
 	}
 
 	return suggestCtx
@@ -147,6 +240,11 @@ func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd
 	return &pb.SuggestResponse{
 		Suggestions: pbSuggestions,
 		FromCache:   false,
+		CacheStatus: "miss",
+		TimingHint: &pb.TimingHint{
+			UserSpeedClass:            "moderate",
+			SuggestedPauseThresholdMs: 250,
+		},
 	}
 }
 

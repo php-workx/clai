@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"sync"
 	"time"
@@ -20,12 +21,19 @@ import (
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	"github.com/runger/clai/internal/suggestions/alias"
+	"github.com/runger/clai/internal/suggestions/api"
 	"github.com/runger/clai/internal/suggestions/batch"
 	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/dismissal"
 	"github.com/runger/clai/internal/suggestions/feedback"
 	"github.com/runger/clai/internal/suggestions/ingest"
+	"github.com/runger/clai/internal/suggestions/learning"
 	"github.com/runger/clai/internal/suggestions/maintenance"
+	"github.com/runger/clai/internal/suggestions/projecttype"
+	search2 "github.com/runger/clai/internal/suggestions/search"
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
+	"github.com/runger/clai/internal/suggestions/workflow"
 )
 
 // Version is set at build time
@@ -36,34 +44,55 @@ type LLMQuerier interface {
 	Query(ctx context.Context, prompt string) (string, error)
 }
 
+type suggestSnapshot struct {
+	Suggestions []suggest2.Suggestion
+	Context     suggest2.SuggestContext
+	ShownAtMs   int64
+}
+
 // Server is the main daemon server that handles all gRPC requests.
 type Server struct {
 	pb.UnimplementedClaiServiceServer
-	lastActivity      time.Time
-	startTime         time.Time
-	listener          net.Listener
-	store             storage.Store
-	ranker            suggest.Ranker
-	llm               LLMQuerier
-	grpcServer        *grpc.Server
-	v2Scorer          *suggest2.Scorer
-	logger            *slog.Logger
-	sessionManager    *SessionManager
-	registry          *provider.Registry
-	v2db              *suggestdb.DB
-	circuitBreaker    *CircuitBreaker
-	shutdownChan      chan struct{}
-	ingestionQueue    *IngestionQueue
-	paths             *config.Paths
-	feedbackStore     *feedback.Store
-	maintenanceRunner *maintenance.Runner
-	batchWriter       *batch.Writer
-	scorerVersion     string
-	wg                sync.WaitGroup
-	idleTimeout       time.Duration
-	commandsLogged    int64
-	mu                sync.RWMutex
-	shutdownOnce      sync.Once
+	lastActivity         time.Time
+	startTime            time.Time
+	diagListener         net.Listener
+	store                storage.Store
+	ranker               suggest.Ranker
+	llm                  LLMQuerier
+	listener             net.Listener
+	aliasStore           *alias.Store
+	batchWriter          *batch.Writer
+	paths                *config.Paths
+	logger               *slog.Logger
+	sessionManager       *SessionManager
+	grpcServer           *grpc.Server
+	registry             *provider.Registry
+	circuitBreaker       *CircuitBreaker
+	shutdownChan         chan struct{}
+	ingestionQueue       *IngestionQueue
+	lastSuggestSnapshots map[string]suggestSnapshot
+	weightsCache         map[string]cachedWeights
+	feedbackStore        *feedback.Store
+	dismissalStore       *dismissal.Store
+	maintenanceRunner    *maintenance.Runner
+	diagnosticsMux       *http.ServeMux
+	diagHTTPServer       *http.Server
+	v2Scorer             *suggest2.Scorer
+	v2SearchSvc          *search2.Service
+	learner              *learning.Learner
+	projectDetector      *projecttype.Detector
+	v2db                 *suggestdb.DB
+	workflowMiner        *workflow.Miner
+	learningStore        *learning.Store
+	scorerVersion        string
+	workflowMineInterval time.Duration
+	idleTimeout          time.Duration
+	commandsLogged       int64
+	wg                   sync.WaitGroup
+	weightsCacheMu       sync.RWMutex
+	snapshotMu           sync.RWMutex
+	mu                   sync.RWMutex
+	shutdownOnce         sync.Once
 }
 
 // ServerConfig contains configuration options for the daemon server.
@@ -71,12 +100,13 @@ type ServerConfig struct {
 	LLM               LLMQuerier
 	Ranker            suggest.Ranker
 	Store             storage.Store
-	V2DB              *suggestdb.DB
+	MaintenanceRunner *maintenance.Runner
 	Paths             *config.Paths
 	Logger            *slog.Logger
 	FeedbackStore     *feedback.Store
-	MaintenanceRunner *maintenance.Runner
+	DismissalStore    *dismissal.Store
 	Registry          *provider.Registry
+	V2DB              *suggestdb.DB
 	BatchWriter       *batch.Writer
 	V2Scorer          *suggest2.Scorer
 	ReloadFn          ReloadFunc
@@ -110,28 +140,47 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 	bw := resolveBatchWriter(cfg.BatchWriter, cfg.V2DB)
 	v2scorer := resolveV2Scorer(cfg.V2Scorer, cfg.V2DB, logger)
 	scorerVersion := resolveScorerVersion(cfg.ScorerVersion, v2scorer, logger)
+	v2SearchSvc := resolveV2SearchSvc(cfg.V2DB, logger)
+	diagMux := resolveDiagnosticsMux(v2scorer, v2SearchSvc, logger)
+	projectDetector := projecttype.NewDetector(projecttype.DetectorOptions{})
+	aliasStore := resolveAliasStore(cfg.V2DB)
+	feedbackStore := resolveFeedbackStore(cfg.FeedbackStore, cfg.V2DB, logger)
+	dismissalStore := resolveDismissalStore(cfg.DismissalStore, cfg.V2DB, logger)
+	learningStore := resolveLearningStore(cfg.V2DB)
+	learner := resolveLearner(learningStore)
+	workflowMiner, workflowInterval := resolveWorkflowMiner(cfg.V2DB)
 
 	now := time.Now()
 	return &Server{
-		store:             cfg.Store,
-		v2db:              cfg.V2DB,
-		ranker:            ranker,
-		registry:          registry,
-		llm:               cfg.LLM,
-		paths:             paths,
-		logger:            logger,
-		sessionManager:    NewSessionManager(),
-		feedbackStore:     cfg.FeedbackStore,
-		startTime:         now,
-		lastActivity:      now,
-		idleTimeout:       idleTimeout,
-		shutdownChan:      make(chan struct{}),
-		maintenanceRunner: cfg.MaintenanceRunner,
-		batchWriter:       bw,
-		v2Scorer:          v2scorer,
-		scorerVersion:     scorerVersion,
-		ingestionQueue:    ingestQueue,
-		circuitBreaker:    cb,
+		store:                cfg.Store,
+		v2db:                 cfg.V2DB,
+		ranker:               ranker,
+		registry:             registry,
+		llm:                  cfg.LLM,
+		paths:                paths,
+		logger:               logger,
+		sessionManager:       NewSessionManager(),
+		feedbackStore:        feedbackStore,
+		dismissalStore:       dismissalStore,
+		startTime:            now,
+		lastActivity:         now,
+		idleTimeout:          idleTimeout,
+		shutdownChan:         make(chan struct{}),
+		maintenanceRunner:    cfg.MaintenanceRunner,
+		diagnosticsMux:       diagMux,
+		batchWriter:          bw,
+		v2Scorer:             v2scorer,
+		v2SearchSvc:          v2SearchSvc,
+		scorerVersion:        scorerVersion,
+		projectDetector:      projectDetector,
+		aliasStore:           aliasStore,
+		workflowMiner:        workflowMiner,
+		workflowMineInterval: workflowInterval,
+		learningStore:        learningStore,
+		learner:              learner,
+		lastSuggestSnapshots: make(map[string]suggestSnapshot),
+		ingestionQueue:       ingestQueue,
+		circuitBreaker:       cb,
 	}, nil
 }
 
@@ -210,6 +259,87 @@ func resolveScorerVersion(requested string, v2scorer *suggest2.Scorer, logger *s
 	return version
 }
 
+func resolveDiagnosticsMux(v2scorer *suggest2.Scorer, searchSvc *search2.Service, logger *slog.Logger) *http.ServeMux {
+	if v2scorer == nil {
+		return nil
+	}
+	handler := api.NewHandler(api.HandlerDependencies{
+		Scorer:    v2scorer,
+		SearchSvc: searchSvc,
+		Logger:    logger,
+	})
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+	return mux
+}
+
+func resolveV2SearchSvc(v2db *suggestdb.DB, logger *slog.Logger) *search2.Service {
+	if v2db == nil {
+		return nil
+	}
+	svc, err := search2.NewService(v2db.DB(), search2.Config{
+		Logger:         logger,
+		EnableFallback: true,
+	})
+	if err != nil {
+		logger.Debug("v2 search service init failed", "error", err)
+		return nil
+	}
+	return svc
+}
+
+func resolveAliasStore(v2db *suggestdb.DB) *alias.Store {
+	if v2db == nil {
+		return nil
+	}
+	return alias.NewStore(v2db.DB())
+}
+
+func resolveFeedbackStore(existing *feedback.Store, v2db *suggestdb.DB, logger *slog.Logger) *feedback.Store {
+	if existing != nil {
+		return existing
+	}
+	if v2db == nil {
+		return nil
+	}
+	return feedback.NewStore(v2db.DB(), feedback.DefaultConfig(), logger)
+}
+
+func resolveDismissalStore(existing *dismissal.Store, v2db *suggestdb.DB, logger *slog.Logger) *dismissal.Store {
+	if existing != nil {
+		return existing
+	}
+	if v2db == nil {
+		return nil
+	}
+	return dismissal.NewStore(v2db.DB(), dismissal.DefaultConfig(), logger)
+}
+
+func resolveLearningStore(v2db *suggestdb.DB) *learning.Store {
+	if v2db == nil {
+		return nil
+	}
+	return learning.NewStore(v2db.DB())
+}
+
+func resolveLearner(store *learning.Store) *learning.Learner {
+	if store == nil {
+		return nil
+	}
+	w := learning.DefaultWeights()
+	l := learning.NewLearner(&w, learning.DefaultConfig(), store)
+	_, _ = l.LoadFromStore(context.Background(), "global")
+	return l
+}
+
+func resolveWorkflowMiner(v2db *suggestdb.DB) (*workflow.Miner, time.Duration) {
+	if v2db == nil {
+		return nil, 0
+	}
+	cfg := workflow.DefaultMinerConfig()
+	return workflow.NewMiner(v2db.DB(), cfg), time.Duration(cfg.MineIntervalMs) * time.Millisecond
+}
+
 // Start starts the gRPC server and listens on the Unix socket.
 func (s *Server) Start(ctx context.Context) error {
 	// Ensure runtime directory exists
@@ -239,6 +369,27 @@ func (s *Server) Start(ctx context.Context) error {
 	// Create gRPC server
 	s.grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(s.accessLogUnaryInterceptor()))
 	pb.RegisterClaiServiceServer(s.grpcServer, s)
+
+	if s.diagnosticsMux != nil {
+		diagListener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			s.logger.Warn("failed to start diagnostics http listener", "error", err)
+		} else {
+			s.diagListener = diagListener
+			s.diagHTTPServer = &http.Server{
+				Handler:           s.diagnosticsMux,
+				ReadHeaderTimeout: 2 * time.Second,
+			}
+			s.wg.Add(1)
+			go func() {
+				defer s.wg.Done()
+				if serveErr := s.diagHTTPServer.Serve(diagListener); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+					s.logger.Warn("diagnostics http server failed", "error", serveErr)
+				}
+			}()
+			s.logger.Info("diagnostics api listening", "addr", diagListener.Addr().String())
+		}
+	}
 
 	// Write PID file
 	if err := s.writePIDFile(); err != nil {
@@ -272,6 +423,13 @@ func (s *Server) Start(ctx context.Context) error {
 	// Start V2 batch writer (if configured)
 	if s.batchWriter != nil {
 		s.batchWriter.Start()
+	}
+
+	// Start workflow miner and pattern refresher.
+	if s.workflowMiner != nil {
+		s.workflowMiner.Start()
+		s.wg.Add(1)
+		go s.refreshWorkflowPatternsLoop(ctx)
 	}
 
 	// Serve gRPC requests in a goroutine
@@ -325,6 +483,18 @@ func (s *Server) Shutdown() {
 		if s.batchWriter != nil {
 			s.batchWriter.Stop()
 		}
+		if s.workflowMiner != nil {
+			s.workflowMiner.Stop()
+		}
+		if s.diagHTTPServer != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			_ = s.diagHTTPServer.Shutdown(ctx)
+			cancel()
+		}
+
+		if s.v2SearchSvc != nil {
+			s.v2SearchSvc.Close()
+		}
 
 		// Stop gRPC server
 		if s.grpcServer != nil {
@@ -337,6 +507,9 @@ func (s *Server) Shutdown() {
 		// Close listener
 		if s.listener != nil {
 			s.listener.Close()
+		}
+		if s.diagListener != nil {
+			s.diagListener.Close()
 		}
 
 		// Cleanup PID file and socket
@@ -357,6 +530,40 @@ func (s *Server) cleanup() {
 
 	if err := os.Remove(pidPath); err != nil && !os.IsNotExist(err) {
 		s.logger.Warn("failed to remove PID file", "path", pidPath, "error", err)
+	}
+}
+
+func (s *Server) refreshWorkflowPatternsLoop(ctx context.Context) {
+	defer s.wg.Done()
+	interval := s.workflowMineInterval
+	if interval <= 0 {
+		interval = 10 * time.Minute
+	}
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	load := func() {
+		if s.v2db == nil || s.v2Scorer == nil {
+			return
+		}
+		patterns, err := workflow.LoadPromotedPatterns(ctx, s.v2db.DB(), workflow.DefaultMinerConfig().MinOccurrences)
+		if err != nil {
+			s.logger.Warn("failed to refresh workflow patterns", "error", err)
+			return
+		}
+		s.v2Scorer.SetWorkflowPatterns(patterns)
+	}
+
+	load()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.shutdownChan:
+			return
+		case <-ticker.C:
+			load()
+		}
 	}
 }
 

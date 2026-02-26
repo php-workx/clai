@@ -215,7 +215,8 @@ func findDaemonBinary() (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("failed to resolve CLAI_DAEMON_PATH: %w", err)
 		}
-		if _, err := os.Stat(absPath); err == nil { //nolint:gosec // G703: daemon binary path from user env config
+		//nolint:gosec // path comes from explicit CLAI_DAEMON_PATH override.
+		if _, err := os.Stat(absPath); err == nil {
 			return absPath, nil
 		}
 	}
@@ -231,7 +232,7 @@ func findDaemonBinary() (string, error) {
 
 	// Check PATH
 	if path, err := exec.LookPath(DaemonBinaryName); err == nil {
-		absPath, absErr := filepath.Abs(path) //nolint:gosec // G703: daemon binary path resolved from user's PATH
+		absPath, absErr := filepath.Abs(path)
 		if absErr == nil {
 			return absPath, nil
 		}

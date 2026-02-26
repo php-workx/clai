@@ -116,7 +116,7 @@ func dockerFingerprint() (string, bool) {
 	if _, err := os.Stat("/.dockerenv"); err != nil {
 		return "", false
 	}
-	if data, err := os.ReadFile("/proc/self/cgroup"); err == nil { //nolint:gosec // reads user-specified path
+	if data, err := os.ReadFile("/proc/self/cgroup"); err == nil {
 		if id := extractContainerIDFromCgroup(string(data)); id != "" {
 			return "docker:" + id, true
 		}

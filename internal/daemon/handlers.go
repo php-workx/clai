@@ -3,6 +3,7 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"math"
 	"regexp"
 	"runtime"
 	"strings"
@@ -14,9 +15,14 @@ import (
 	"github.com/runger/clai/internal/sanitize"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	"github.com/runger/clai/internal/suggestions/alias"
 	"github.com/runger/clai/internal/suggestions/backfill"
 	"github.com/runger/clai/internal/suggestions/event"
 	"github.com/runger/clai/internal/suggestions/feedback"
+	"github.com/runger/clai/internal/suggestions/learning"
+	snormalize "github.com/runger/clai/internal/suggestions/normalize"
+	search2 "github.com/runger/clai/internal/suggestions/search"
+	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
 // Common string constants to avoid duplication
@@ -24,6 +30,8 @@ const (
 	errNoAIProvider = "no AI provider available"
 	sourceAI        = "ai"
 	riskDestructive = "destructive"
+	// Expire per-session suggestion snapshots so stale feedback cannot update learning state.
+	maxSuggestSnapshotAge = 15 * time.Minute
 )
 
 func v1WhyNarrative(sug *suggest.Suggestion, lastCmd string) string {
@@ -45,6 +53,8 @@ func v1WhyNarrative(sug *suggest.Suggestion, lastCmd string) string {
 		base = "Often used in this directory."
 	case "global":
 		base = "From your global history."
+	default:
+		// Unknown source; leave base empty.
 	}
 
 	total := sug.SuccessCount + sug.FailureCount
@@ -56,6 +66,8 @@ func v1WhyNarrative(sug *suggest.Suggestion, lastCmd string) string {
 			reliability = "It has been reliable."
 		case rate >= 0.60:
 			reliability = "It usually works."
+		default:
+			// Low reliability; no label.
 		}
 
 		if reliability != "" {
@@ -122,6 +134,15 @@ func (s *Server) SessionStart(ctx context.Context, req *pb.SessionStartRequest) 
 
 	// Register with session manager
 	s.sessionManager.Start(req.SessionId, shell, osName, hostname, username, req.Cwd, startedAt)
+	if s.projectDetector != nil {
+		s.sessionManager.SetProjectTypes(req.SessionId, s.projectDetector.Detect(req.Cwd))
+	}
+	if aliases, err := alias.Capture(ctx, shell); err == nil {
+		s.sessionManager.SetAliases(req.SessionId, aliases)
+		if s.aliasStore != nil {
+			_ = s.aliasStore.SaveAliases(ctx, req.SessionId, aliases)
+		}
+	}
 
 	s.logger.Debug("session started",
 		"session_id", req.SessionId,
@@ -153,9 +174,48 @@ func (s *Server) SessionEnd(ctx context.Context, req *pb.SessionEndRequest) (*pb
 
 	// Remove from session manager
 	s.sessionManager.End(req.SessionId)
+	s.clearSuggestSnapshot(req.SessionId)
 
 	s.logger.Debug("session ended", "session_id", req.SessionId)
 
+	return &pb.Ack{Ok: true}, nil
+}
+
+// AliasSync handles alias snapshot sync from shell integrations.
+func (s *Server) AliasSync(ctx context.Context, req *pb.AliasSyncRequest) (*pb.Ack, error) {
+	s.touchActivity()
+	if req.SessionId == "" {
+		return &pb.Ack{Ok: false, Error: "missing session_id"}, nil
+	}
+
+	shell := req.Shell
+	if shell == "" {
+		if info, ok := s.sessionManager.Get(req.SessionId); ok && info.Shell != "" {
+			shell = info.Shell
+		}
+	}
+	if shell == "" {
+		return &pb.Ack{Ok: false, Error: "shell not specified and not available from session"}, nil
+	}
+
+	var aliases alias.AliasMap
+	if strings.TrimSpace(req.RawSnapshot) != "" {
+		aliases = alias.ParseSnapshot(shell, req.RawSnapshot)
+	} else {
+		captured, err := alias.Capture(ctx, shell)
+		if err != nil {
+			s.logger.Debug("alias sync capture failed", "session_id", req.SessionId, "error", err)
+			return &pb.Ack{Ok: false, Error: err.Error()}, nil
+		}
+		aliases = captured
+	}
+
+	s.sessionManager.SetAliases(req.SessionId, aliases)
+	if s.aliasStore != nil {
+		if err := s.aliasStore.SaveAliases(ctx, req.SessionId, aliases); err != nil {
+			s.logger.Debug("alias sync persist failed", "session_id", req.SessionId, "error", err)
+		}
+	}
 	return &pb.Ack{Ok: true}, nil
 }
 
@@ -168,6 +228,9 @@ func (s *Server) CommandStarted(ctx context.Context, req *pb.CommandStartRequest
 	// Update CWD if provided
 	if req.Cwd != "" {
 		s.sessionManager.UpdateCWD(req.SessionId, req.Cwd)
+		if s.projectDetector != nil {
+			s.sessionManager.SetProjectTypes(req.SessionId, s.projectDetector.Detect(req.Cwd))
+		}
 	}
 
 	tsStart := time.Now()
@@ -212,6 +275,16 @@ func (s *Server) CommandStarted(ctx context.Context, req *pb.CommandStartRequest
 
 	// Stash command data in session for V2 pipeline (CommandEnded reads it back)
 	s.sessionManager.StashCommand(req.SessionId, req.CommandId, req.Command, req.Cwd, req.GitRepoName, req.GitRepoRoot, req.GitBranch)
+	if alias.ShouldResnapshot(req.Command) {
+		if info, ok := s.sessionManager.Get(req.SessionId); ok {
+			if aliases, err := alias.Capture(ctx, info.Shell); err == nil {
+				s.sessionManager.SetAliases(req.SessionId, aliases)
+				if s.aliasStore != nil {
+					_ = s.aliasStore.SaveAliases(ctx, req.SessionId, aliases)
+				}
+			}
+		}
+	}
 
 	s.logger.Debug("command started",
 		"command_id", req.CommandId,
@@ -248,19 +321,25 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 	// Feed V2 batch writer (async, non-blocking)
 	if s.batchWriter != nil {
 		if info, ok := s.sessionManager.Get(req.SessionId); ok {
+			pre := snormalize.PreNormalize(info.LastCmdRaw, snormalize.PreNormConfig{
+				Aliases: info.Aliases,
+			})
+			s.sessionManager.SetLastTemplateID(req.SessionId, pre.TemplateID)
 			durationMs := req.DurationMs
 			ev := &event.CommandEvent{
-				Version:    event.EventVersion,
-				Type:       event.EventTypeCommandEnd,
-				SessionID:  req.SessionId,
-				Shell:      event.Shell(info.Shell),
-				Cwd:        info.LastCmdCWD,
-				CmdRaw:     info.LastCmdRaw,
-				RepoKey:    info.LastGitRepo,
-				Branch:     info.LastGitBranch,
-				ExitCode:   int(req.ExitCode),
-				DurationMs: &durationMs,
-				TS:         tsEnd.UnixMilli(),
+				Version:      event.EventVersion,
+				Type:         event.EventTypeCommandEnd,
+				SessionID:    req.SessionId,
+				Shell:        event.Shell(info.Shell),
+				Cwd:          info.LastCmdCWD,
+				CmdRaw:       info.LastCmdRaw,
+				RepoKey:      info.LastGitRepo,
+				Branch:       info.LastGitBranch,
+				ProjectTypes: append([]string(nil), info.ProjectTypes...),
+				Aliases:      info.Aliases,
+				ExitCode:     int(req.ExitCode),
+				DurationMs:   &durationMs,
+				TS:           tsEnd.UnixMilli(),
 			}
 			s.batchWriter.Enqueue(ev)
 		}
@@ -281,17 +360,29 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 // The scorer version (v1/v2) determines which scoring engine is used.
 func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.SuggestResponse, error) {
 	s.touchActivity()
+	start := time.Now()
 
 	maxResults := int(req.MaxResults)
 	if maxResults <= 0 {
 		maxResults = 5
 	}
 
+	var resp *pb.SuggestResponse
 	if s.scorerVersion == "v2" {
-		return s.suggestV2Blend(ctx, req, maxResults), nil
+		resp = s.suggestV2(ctx, req, maxResults)
+		if resp == nil || len(resp.Suggestions) == 0 {
+			s.clearSuggestSnapshot(req.SessionId)
+			resp = s.suggestV1(ctx, req, maxResults)
+			resp.CacheStatus = "miss"
+			resp.LatencyMs = time.Since(start).Milliseconds()
+			return resp, nil
+		}
+	} else {
+		resp = s.suggestV1(ctx, req, maxResults)
 	}
-
-	return s.suggestV1(ctx, req, maxResults), nil
+	resp.CacheStatus = "miss"
+	resp.LatencyMs = time.Since(start).Milliseconds()
+	return resp, nil
 }
 
 // suggestV1 generates suggestions using the V1 ranker (history-based).
@@ -674,8 +765,149 @@ func (s *Server) handleRecordFeedback(ctx context.Context, req *pb.RecordFeedbac
 		"session_id", req.SessionId,
 		"action", req.Action,
 	)
+	s.applyFeedbackUpdates(ctx, req)
 
 	return &pb.RecordFeedbackResponse{Ok: true}, nil
+}
+
+func (s *Server) applyFeedbackUpdates(ctx context.Context, req *pb.RecordFeedbackRequest) {
+	snapshot, ok := s.getSuggestSnapshot(req.SessionId)
+	if !ok {
+		return
+	}
+	nowMs := time.Now().UnixMilli()
+	if snapshot.ShownAtMs > 0 && nowMs-snapshot.ShownAtMs > int64(maxSuggestSnapshotAge/time.Millisecond) {
+		s.clearSuggestSnapshot(req.SessionId)
+		return
+	}
+	scope := snapshot.Context.Scope
+	if scope == "" {
+		if snapshot.Context.RepoKey != "" {
+			scope = snapshot.Context.RepoKey
+		} else {
+			scope = "global"
+		}
+	}
+
+	if s.dismissalStore != nil && snapshot.Context.LastTemplateID != "" {
+		dismissedTemplateID := req.SuggestedText
+		if sug, found := findSnapshotSuggestion(snapshot.Suggestions, req.SuggestedText); found && sug.TemplateID != "" {
+			dismissedTemplateID = sug.TemplateID
+		}
+		switch req.Action {
+		case "dismissed":
+			_ = s.dismissalStore.RecordDismissal(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID, nowMs)
+		case "accepted", "edited":
+			_ = s.dismissalStore.RecordAcceptance(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID)
+		case "never":
+			_ = s.dismissalStore.RecordNever(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID, nowMs)
+		case "unblock":
+			_ = s.dismissalStore.RecordUnblock(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID)
+		default:
+			// Unknown action; no dismissal update.
+		}
+	}
+
+	if s.learner == nil {
+		return
+	}
+	pos, neg, ok := learningPairFromFeedback(snapshot.Suggestions, req)
+	if !ok {
+		return
+	}
+	s.learner.LoadAndUpdate(ctx, scope, featureVectorFromSuggestion(&pos, req), featureVectorFromSuggestion(&neg, req))
+}
+
+func (s *Server) getSuggestSnapshot(sessionID string) (suggestSnapshot, bool) {
+	s.snapshotMu.RLock()
+	defer s.snapshotMu.RUnlock()
+	snap, ok := s.lastSuggestSnapshots[sessionID]
+	return snap, ok
+}
+
+func (s *Server) clearSuggestSnapshot(sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	s.snapshotMu.Lock()
+	defer s.snapshotMu.Unlock()
+	delete(s.lastSuggestSnapshots, sessionID)
+}
+
+func findSnapshotSuggestion(suggestions []suggest2.Suggestion, text string) (suggest2.Suggestion, bool) {
+	for i := range suggestions {
+		if suggestions[i].Command == text {
+			return suggestions[i], true
+		}
+	}
+	return suggest2.Suggestion{}, false
+}
+
+func learningPairFromFeedback(suggestions []suggest2.Suggestion, req *pb.RecordFeedbackRequest) (pos, neg suggest2.Suggestion, ok bool) {
+	target, found := findSnapshotSuggestion(suggestions, req.SuggestedText)
+	if !found || len(suggestions) == 0 {
+		return suggest2.Suggestion{}, suggest2.Suggestion{}, false
+	}
+	var bestOther suggest2.Suggestion
+	hasOther := false
+	for i := range suggestions {
+		if suggestions[i].Command == req.SuggestedText {
+			continue
+		}
+		if !hasOther || suggestions[i].Score > bestOther.Score {
+			bestOther = suggestions[i]
+			hasOther = true
+		}
+	}
+	if !hasOther {
+		return suggest2.Suggestion{}, suggest2.Suggestion{}, false
+	}
+
+	switch req.Action {
+	case "accepted", "edited":
+		return target, bestOther, true
+	case "dismissed", "never":
+		return bestOther, target, true
+	default:
+		return suggest2.Suggestion{}, suggest2.Suggestion{}, false
+	}
+}
+
+func featureVectorFromSuggestion(sug *suggest2.Suggestion, req *pb.RecordFeedbackRequest) *learning.FeatureVector {
+	b := sug.ScoreBreakdown()
+	prefix := 0.0
+	if req.Prefix != "" && strings.HasPrefix(sug.Command, req.Prefix) {
+		prefix = 1.0
+	}
+	riskPenalty := 0.0
+	if sanitize.IsDestructive(sug.Command) {
+		riskPenalty = 1.0
+	}
+	return &learning.FeatureVector{
+		Transition:          clamp01((b.RepoTransition + b.GlobalTransition + b.DirTransition) / 100.0),
+		Frequency:           clamp01((b.RepoFrequency + b.GlobalFrequency + b.DirFrequency) / 100.0),
+		Success:             0.5,
+		Prefix:              prefix,
+		Affinity:            clamp01((b.DirTransition + b.DirFrequency) / 100.0),
+		Task:                clamp01(b.ProjectTask / 50.0),
+		Feedback:            1.0,
+		ProjectTypeAffinity: clamp01(b.ProjectTask / 50.0),
+		FailureRecovery:     clamp01(b.RecoveryBoost / 50.0),
+		RiskPenalty:         riskPenalty,
+	}
+}
+
+func clamp01(v float64) float64 {
+	if math.IsNaN(v) || math.IsInf(v, 0) {
+		return 0
+	}
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
 }
 
 // Ping handles the Ping RPC.
@@ -710,8 +942,11 @@ func stripANSI(s string) string {
 
 // FetchHistory handles the FetchHistory RPC.
 // It returns paginated, deduplicated command history with optional substring filtering.
+//
+//nolint:cyclop // Handler combines mode routing and legacy fallback paths.
 func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) (*pb.HistoryFetchResponse, error) {
 	s.touchActivity()
+	start := time.Now()
 
 	limit := int(req.Limit)
 	if limit <= 0 {
@@ -723,6 +958,24 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 		offset = 0
 	}
 
+	usesSessionScope := strings.EqualFold(req.Scope, "session") ||
+		(!req.Global && !strings.EqualFold(req.Scope, "global") && req.SessionId != "")
+	isV2SearchMode := req.Mode == pb.SearchMode_SEARCH_MODE_UNSPECIFIED ||
+		req.Mode == pb.SearchMode_SEARCH_MODE_FTS ||
+		req.Mode == pb.SearchMode_SEARCH_MODE_DESCRIBE ||
+		req.Mode == pb.SearchMode_SEARCH_MODE_AUTO
+	if s.v2db != nil && req.Query != "" && !usesSessionScope && isV2SearchMode {
+		items, atEnd, backend, ok := s.fetchHistoryV2Search(ctx, req, limit)
+		if ok {
+			return &pb.HistoryFetchResponse{
+				Items:     items,
+				AtEnd:     atEnd,
+				LatencyMs: time.Since(start).Milliseconds(),
+				Backend:   backend,
+			}, nil
+		}
+	}
+
 	q := storage.CommandQuery{
 		Limit:  limit + 1, // Fetch one extra to determine at_end
 		Offset: offset,
@@ -730,14 +983,31 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 		Deduplicate: true,
 	}
 
-	// Apply substring filter (normalize to lowercase for command_norm matching)
-	if req.Query != "" {
-		q.Substring = strings.ToLower(req.Query)
+	switch req.Mode {
+	case pb.SearchMode_SEARCH_MODE_PREFIX:
+		if req.Query != "" {
+			q.Prefix = strings.ToLower(req.Query)
+		}
+	default:
+		// Apply substring filter (normalize to lowercase for command_norm matching)
+		if req.Query != "" {
+			q.Substring = strings.ToLower(req.Query)
+		}
 	}
 
-	// Apply session scoping
-	if !req.Global && req.SessionId != "" {
-		q.SessionID = &req.SessionId
+	// Scope handling: explicit scope overrides legacy global/session behavior.
+	switch strings.ToLower(req.Scope) {
+	case "session":
+		if req.SessionId != "" {
+			q.SessionID = &req.SessionId
+		}
+	case "global":
+		// no filter
+	default:
+		// Apply session scoping
+		if !req.Global && req.SessionId != "" {
+			q.SessionID = &req.SessionId
+		}
 	}
 
 	rows, err := s.store.QueryHistoryCommands(ctx, q)
@@ -745,7 +1015,10 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 		s.logger.Warn("failed to query history",
 			"error", err,
 		)
-		return &pb.HistoryFetchResponse{}, nil
+		return &pb.HistoryFetchResponse{
+			LatencyMs: time.Since(start).Milliseconds(),
+			Backend:   "storage",
+		}, nil
 	}
 
 	atEnd := len(rows) <= limit
@@ -755,16 +1028,91 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 
 	items := make([]*pb.HistoryItem, len(rows))
 	for i, row := range rows {
+		cmd := stripANSI(row.Command)
 		items[i] = &pb.HistoryItem{
-			Command:     stripANSI(row.Command),
+			Command:     cmd,
 			TimestampMs: row.TimestampMs,
+			CmdNorm:     suggest.NormalizeCommand(cmd),
 		}
 	}
 
+	backend := "storage"
+	if req.Mode == pb.SearchMode_SEARCH_MODE_PREFIX {
+		backend = "prefix"
+	}
+
 	return &pb.HistoryFetchResponse{
-		Items: items,
-		AtEnd: atEnd,
+		Items:     items,
+		AtEnd:     atEnd,
+		LatencyMs: time.Since(start).Milliseconds(),
+		Backend:   backend,
 	}, nil
+}
+
+func (s *Server) fetchHistoryV2Search(
+	ctx context.Context,
+	req *pb.HistoryFetchRequest,
+	limit int,
+) (histItems []*pb.HistoryItem, done bool, source string, used bool) {
+	if s.v2db == nil || limit <= 0 {
+		return nil, true, "storage", false
+	}
+
+	opts := search2.SearchOptions{
+		RepoKey: req.RepoKey,
+		Limit:   limit + 1,
+		Offset:  int(req.Offset),
+	}
+
+	ftsSvc := s.v2SearchSvc
+	if ftsSvc == nil {
+		return nil, true, "storage", false
+	}
+
+	describeSvc := search2.NewDescribeService(s.v2db.DB(), search2.DescribeConfig{Logger: s.logger})
+
+	var (
+		results []search2.SearchResult
+		backend string
+		err     error
+	)
+
+	switch req.Mode {
+	case pb.SearchMode_SEARCH_MODE_FTS:
+		results, err = ftsSvc.Search(ctx, req.Query, opts)
+		backend = "fts5"
+	case pb.SearchMode_SEARCH_MODE_DESCRIBE:
+		results, err = describeSvc.Search(ctx, req.Query, opts)
+		backend = "describe"
+	default:
+		autoSvc := search2.NewAutoService(ftsSvc, describeSvc, search2.DefaultAutoConfig())
+		results, err = autoSvc.Search(ctx, req.Query, opts)
+		backend = "auto"
+	}
+	if err != nil {
+		s.logger.Debug("history search failed", "error", err, "mode", req.Mode.String())
+		return nil, true, "storage", false
+	}
+
+	atEnd := len(results) <= limit
+	if !atEnd {
+		results = results[:limit]
+	}
+
+	items := make([]*pb.HistoryItem, 0, len(results))
+	for i := range results {
+		r := results[i]
+		items = append(items, &pb.HistoryItem{
+			Command:     stripANSI(r.CmdRaw),
+			TimestampMs: r.Timestamp,
+			CmdNorm:     r.CmdNorm,
+			RepoKey:     r.RepoKey,
+			RankScore:   r.Score,
+			Tags:        append([]string(nil), r.Tags...),
+			MatchedTags: append([]string(nil), r.MatchedTags...),
+		})
+	}
+	return items, atEnd, backend, true
 }
 
 // ImportHistory handles the ImportHistory RPC.

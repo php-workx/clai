@@ -473,6 +473,31 @@ func TestZshScript_SelfInsertSkipsSuggestForQueuedInput(t *testing.T) {
 	}
 }
 
+// TestZshScript_RepeatableWidgetsSkipSuggestForQueuedInput verifies that
+// widgets triggered by held-down keys (backspace) skip the expensive clai
+// suggest call when more keys are queued.
+// Note: up/down history widgets use manual history cycling with ghost text
+// and don't call _ai_update_suggestion during history mode.
+func TestZshScript_RepeatableWidgetsSkipSuggestForQueuedInput(t *testing.T) {
+	content, err := shellScripts.ReadFile("shell/zsh/clai.zsh")
+	if err != nil {
+		t.Fatalf("Failed to read zsh script: %v", err)
+	}
+	script := string(content)
+
+	for _, fn := range []string{
+		"_ai_backward_delete_char",
+	} {
+		body := extractFunctionBody(script, fn)
+		if body == "" {
+			t.Fatalf("%s() not found", fn)
+		}
+		if !strings.Contains(body, "KEYS_QUEUED_COUNT") {
+			t.Errorf("%s() should guard on KEYS_QUEUED_COUNT to skip suggest during rapid repeat", fn)
+		}
+	}
+}
+
 // TestZshScript_DefaultCompletionAndHistoryClearGhostText verifies that
 // default Tab completion and history navigation clear ghost text state first.
 func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
@@ -491,14 +516,16 @@ func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
 		t.Error("_ai_expand_or_complete() should call _ai_clear_ghost_text before delegating")
 	}
 
-	// History navigation should re-generate ghost text (not clear it).
+	// History navigation uses prefix search with ghost text for the remainder.
+	// _ai_up_line_or_history manages ghost text via _clai_hist_apply_ghost,
+	// _ai_down_line_or_history calls _ai_update_suggestion when exiting history mode.
 	for _, fn := range []string{"_ai_up_line_or_history", "_ai_down_line_or_history"} {
 		body := extractFunctionBody(script, fn)
 		if body == "" {
 			t.Fatalf("%s() not found", fn)
 		}
-		if !strings.Contains(body, "_ai_update_suggestion") {
-			t.Errorf("%s() should call _ai_update_suggestion to keep ghost text", fn)
+		if !strings.Contains(body, "_clai_hist") {
+			t.Errorf("%s() should use history prefix search (_clai_hist_*)", fn)
 		}
 	}
 
