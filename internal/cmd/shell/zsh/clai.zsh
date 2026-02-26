@@ -102,13 +102,10 @@ _clai_session_off() {
 }
 
 _ai_remove_ghost_highlight() {
-    if [[ -z "$_AI_GHOST_HIGHLIGHT" ]]; then
-        return
-    fi
     local kept=()
     local h
     for h in "${region_highlight[@]}"; do
-        if [[ "$h" == "$_AI_GHOST_HIGHLIGHT" ]]; then
+        if [[ "$h" == *fg=242 ]]; then
             continue
         fi
         kept+=("$h")
@@ -483,7 +480,6 @@ _ai_voice_accept_line() {
     fi
     _AI_LAST_ACCEPTED=""
     _AI_CURRENT_SUGGESTION=""
-    _AI_GHOST_HIGHLIGHT=""
     POSTDISPLAY=""
     _ai_remove_ghost_highlight
     zle accept-line
