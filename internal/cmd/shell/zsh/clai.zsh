@@ -69,12 +69,13 @@ _AI_IN_PASTE=false
 _AI_GHOST_HIGHLIGHT=""
 _AI_GHOST_META=""
 
-# History prefix search state
+# History cycling state
 _CLAI_HIST_ACTIVE=""
 _CLAI_HIST_PREFIX=""
 _CLAI_HIST_MATCH=""
 typeset -ga _CLAI_HIST_MATCHES
 _CLAI_HIST_IDX=0
+_CLAI_HIST_SCOPE=""  # "session" or "global" — tracks which source we're on
 
 # Double-tap up-arrow detection
 _CLAI_DOUBLE_TAP_THRESHOLD=0.5
@@ -127,22 +128,50 @@ _clai_hist_reset() {
     _CLAI_HIST_MATCH=""
     _CLAI_HIST_MATCHES=()
     _CLAI_HIST_IDX=0
+    _CLAI_HIST_SCOPE=""
 }
 
-# Search history for entries starting with the given prefix (most recent first).
+# Fetch history from clai daemon — session first, then global.
 # Populates _CLAI_HIST_MATCHES with unique deduplicated results.
-_clai_hist_search() {
+# Args: $1 = prefix (may be empty for full history cycling)
+_clai_hist_fetch() {
     local prefix="$1"
     _CLAI_HIST_MATCHES=()
+    _CLAI_HIST_SCOPE="session"
+
     local -A seen
-    local -i i start=$(( HISTCMD - 1 ))
     local entry
-    for (( i = start; i >= 1 && ${#_CLAI_HIST_MATCHES} < 50; i-- )); do
-        entry="${history[$i]}"
-        [[ -n "$entry" && "$entry" == "${prefix}"* && "$entry" != "$prefix" && -z "${seen[$entry]}" ]] || continue
+
+    # 1) Session history
+    local session_args=(--session="$CLAI_SESSION_ID" --limit 50)
+    [[ -n "$prefix" ]] && session_args+=("$prefix")
+    local session_out
+    session_out=$(clai history "${session_args[@]}" 2>/dev/null)
+    while IFS= read -r entry; do
+        [[ -z "$entry" || "$entry" == "$prefix" ]] && continue
+        if [[ -n "$prefix" && "$entry" != "${prefix}"* ]]; then
+            continue
+        fi
+        [[ -n "${seen[$entry]}" ]] && continue
         seen[$entry]=1
         _CLAI_HIST_MATCHES+=("$entry")
-    done
+    done <<< "$session_out"
+
+    # 2) Global history (deduped against session)
+    _CLAI_HIST_SCOPE="global"
+    local global_args=(--global --limit 50)
+    [[ -n "$prefix" ]] && global_args+=("$prefix")
+    local global_out
+    global_out=$(clai history "${global_args[@]}" 2>/dev/null)
+    while IFS= read -r entry; do
+        [[ -z "$entry" || "$entry" == "$prefix" ]] && continue
+        if [[ -n "$prefix" && "$entry" != "${prefix}"* ]]; then
+            continue
+        fi
+        [[ -n "${seen[$entry]}" ]] && continue
+        seen[$entry]=1
+        _CLAI_HIST_MATCHES+=("$entry")
+    done <<< "$global_out"
 }
 
 # Apply ghost-text styling for the history remainder (portion after prefix).
@@ -225,7 +254,7 @@ _ai_update_suggestion() {
 
 # ZLE widget: Update suggestion after each character
 _ai_self_insert() {
-    # Exit history prefix mode — user is typing new content
+    # Exit history mode — user is typing new content
     if [[ "$_CLAI_HIST_ACTIVE" == "1" ]]; then
         POSTDISPLAY=""
         _ai_remove_ghost_highlight
@@ -333,25 +362,19 @@ _ai_expand_or_complete() {
 }
 zle -N expand-or-complete _ai_expand_or_complete
 
-# ZLE widget: History navigation with prefix search.
-# When the buffer has content, shows matching history entries with the typed
-# portion as normal text and the remainder as ghost text (dim).
+# ZLE widget: History navigation using clai session+global history.
+# With a prefix: shows typed portion as normal text, remainder as ghost text.
+# Without a prefix: shows full command as regular text in BUFFER.
 _ai_up_line_or_history() {
     _clai_dismiss_picker
 
-    # No prefix typed — fall back to plain history cycling
-    if [[ -z "$BUFFER" && "$_CLAI_HIST_ACTIVE" != "1" ]]; then
-        zle .up-line-or-history
-        return
-    fi
-
-    # First press: save prefix, search history
+    # First press: enter history mode, fetch from clai
     if [[ "$_CLAI_HIST_ACTIVE" != "1" ]]; then
         _ai_clear_ghost_text
         _CLAI_HIST_PREFIX="$BUFFER"
         _CLAI_HIST_ACTIVE=1
         _CLAI_HIST_IDX=0
-        _clai_hist_search "$BUFFER"
+        _clai_hist_fetch "$BUFFER"
     fi
 
     # Nothing found
@@ -362,9 +385,19 @@ _ai_up_line_or_history() {
         _CLAI_HIST_IDX=$(( _CLAI_HIST_IDX + 1 ))
     fi
     _CLAI_HIST_MATCH="${_CLAI_HIST_MATCHES[$_CLAI_HIST_IDX]}"
-    BUFFER="$_CLAI_HIST_PREFIX"
-    CURSOR=${#BUFFER}
-    _clai_hist_apply_ghost
+
+    if [[ -n "$_CLAI_HIST_PREFIX" ]]; then
+        # Prefix mode: show prefix as regular text, remainder as ghost
+        BUFFER="$_CLAI_HIST_PREFIX"
+        CURSOR=${#BUFFER}
+        _clai_hist_apply_ghost
+    else
+        # No prefix: show full command as regular text
+        POSTDISPLAY=""
+        _ai_remove_ghost_highlight
+        BUFFER="$_CLAI_HIST_MATCH"
+        CURSOR=${#BUFFER}
+    fi
 }
 zle -N up-line-or-history _ai_up_line_or_history
 
@@ -382,14 +415,24 @@ _ai_down_line_or_history() {
         # Back to the original input — exit history mode
         POSTDISPLAY=""
         _ai_remove_ghost_highlight
+        BUFFER="$_CLAI_HIST_PREFIX"
+        CURSOR=${#BUFFER}
         _clai_hist_reset
         _ai_update_suggestion
         return
     fi
     _CLAI_HIST_MATCH="${_CLAI_HIST_MATCHES[$_CLAI_HIST_IDX]}"
-    BUFFER="$_CLAI_HIST_PREFIX"
-    CURSOR=${#BUFFER}
-    _clai_hist_apply_ghost
+
+    if [[ -n "$_CLAI_HIST_PREFIX" ]]; then
+        BUFFER="$_CLAI_HIST_PREFIX"
+        CURSOR=${#BUFFER}
+        _clai_hist_apply_ghost
+    else
+        POSTDISPLAY=""
+        _ai_remove_ghost_highlight
+        BUFFER="$_CLAI_HIST_MATCH"
+        CURSOR=${#BUFFER}
+    fi
 }
 zle -N down-line-or-history _ai_down_line_or_history
 
