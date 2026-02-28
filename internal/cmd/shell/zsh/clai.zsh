@@ -75,7 +75,15 @@ _CLAI_HIST_PREFIX=""
 _CLAI_HIST_MATCH=""
 typeset -ga _CLAI_HIST_MATCHES
 _CLAI_HIST_IDX=0
-_CLAI_HIST_SCOPE=""  # "session" or "global" — tracks which source we're on
+
+# Lazy pagination state
+_CLAI_HIST_SCOPE="session"        # current fetch scope: "session" or "global"
+_CLAI_HIST_SESS_OFFSET=0          # next offset for session fetch
+_CLAI_HIST_GLOB_OFFSET=0          # next offset for global fetch
+_CLAI_HIST_SESS_DONE=""           # "1" when session history exhausted
+_CLAI_HIST_GLOB_DONE=""           # "1" when global history exhausted
+_CLAI_HIST_PAGE_SIZE=20           # entries per fetch
+typeset -gA _CLAI_HIST_SEEN       # cross-scope dedup map
 
 # Double-tap up-arrow detection
 _CLAI_DOUBLE_TAP_THRESHOLD=0.5
@@ -128,50 +136,81 @@ _clai_hist_reset() {
     _CLAI_HIST_MATCH=""
     _CLAI_HIST_MATCHES=()
     _CLAI_HIST_IDX=0
-    _CLAI_HIST_SCOPE=""
+    _CLAI_HIST_SCOPE="session"
+    _CLAI_HIST_SESS_OFFSET=0
+    _CLAI_HIST_GLOB_OFFSET=0
+    _CLAI_HIST_SESS_DONE=""
+    _CLAI_HIST_GLOB_DONE=""
+    _CLAI_HIST_SEEN=()
 }
 
-# Fetch history from clai daemon — session first, then global.
-# Populates _CLAI_HIST_MATCHES with unique deduplicated results.
-# Args: $1 = prefix (may be empty for full history cycling)
-_clai_hist_fetch() {
-    local prefix="$1"
-    _CLAI_HIST_MATCHES=()
-    _CLAI_HIST_SCOPE="session"
+# Fetch one page of history from clai — session first, then global.
+# Appends new unique entries to _CLAI_HIST_MATCHES.
+# Returns 0 if new entries were added, 1 if exhausted.
+_clai_hist_fetch_page() {
+    local prefix="$_CLAI_HIST_PREFIX"
+    local added=0
 
-    local -A seen
-    local entry
-
-    # 1) Session history
-    local session_args=(--session="$CLAI_SESSION_ID" --limit 50)
-    [[ -n "$prefix" ]] && session_args+=("$prefix")
-    local session_out
-    session_out=$(clai history "${session_args[@]}" 2>/dev/null)
-    while IFS= read -r entry; do
-        [[ -z "$entry" || "$entry" == "$prefix" ]] && continue
-        if [[ -n "$prefix" && "$entry" != "${prefix}"* ]]; then
-            continue
+    # Try session history first
+    if [[ "$_CLAI_HIST_SESS_DONE" != "1" ]]; then
+        _CLAI_HIST_SCOPE="session"
+        local sess_args=(--session="$CLAI_SESSION_ID" --limit "$_CLAI_HIST_PAGE_SIZE" --offset "$_CLAI_HIST_SESS_OFFSET")
+        [[ -n "$prefix" ]] && sess_args+=("$prefix")
+        local raw_count=0 entry
+        local sess_out
+        sess_out=$(clai history "${sess_args[@]}" 2>/dev/null)
+        while IFS= read -r entry; do
+            [[ -z "$entry" ]] && continue
+            raw_count=$(( raw_count + 1 ))
+            [[ "$entry" == "$prefix" ]] && continue
+            [[ -n "${_CLAI_HIST_SEEN[$entry]}" ]] && continue
+            _CLAI_HIST_SEEN[$entry]=1
+            _CLAI_HIST_MATCHES+=("$entry")
+            added=$(( added + 1 ))
+        done <<< "$sess_out"
+        _CLAI_HIST_SESS_OFFSET=$(( _CLAI_HIST_SESS_OFFSET + raw_count ))
+        if (( raw_count < _CLAI_HIST_PAGE_SIZE )); then
+            _CLAI_HIST_SESS_DONE=1
         fi
-        [[ -n "${seen[$entry]}" ]] && continue
-        seen[$entry]=1
-        _CLAI_HIST_MATCHES+=("$entry")
-    done <<< "$session_out"
-
-    # 2) Global history (deduped against session)
-    _CLAI_HIST_SCOPE="global"
-    local global_args=(--global --limit 50)
-    [[ -n "$prefix" ]] && global_args+=("$prefix")
-    local global_out
-    global_out=$(clai history "${global_args[@]}" 2>/dev/null)
-    while IFS= read -r entry; do
-        [[ -z "$entry" || "$entry" == "$prefix" ]] && continue
-        if [[ -n "$prefix" && "$entry" != "${prefix}"* ]]; then
-            continue
+        if (( added > 0 )); then
+            return 0
         fi
-        [[ -n "${seen[$entry]}" ]] && continue
-        seen[$entry]=1
-        _CLAI_HIST_MATCHES+=("$entry")
-    done <<< "$global_out"
+        # Session page was all dupes but not exhausted — fall through to try global
+    fi
+
+    # Then try global history
+    if [[ "$_CLAI_HIST_GLOB_DONE" != "1" ]]; then
+        _CLAI_HIST_SCOPE="global"
+        local glob_args=(--global --limit "$_CLAI_HIST_PAGE_SIZE" --offset "$_CLAI_HIST_GLOB_OFFSET")
+        [[ -n "$prefix" ]] && glob_args+=("$prefix")
+        local raw_count=0 entry
+        local glob_out
+        glob_out=$(clai history "${glob_args[@]}" 2>/dev/null)
+        while IFS= read -r entry; do
+            [[ -z "$entry" ]] && continue
+            raw_count=$(( raw_count + 1 ))
+            [[ "$entry" == "$prefix" ]] && continue
+            [[ -n "${_CLAI_HIST_SEEN[$entry]}" ]] && continue
+            _CLAI_HIST_SEEN[$entry]=1
+            _CLAI_HIST_MATCHES+=("$entry")
+            added=$(( added + 1 ))
+        done <<< "$glob_out"
+        _CLAI_HIST_GLOB_OFFSET=$(( _CLAI_HIST_GLOB_OFFSET + raw_count ))
+        if (( raw_count < _CLAI_HIST_PAGE_SIZE )); then
+            _CLAI_HIST_GLOB_DONE=1
+        fi
+        if (( added > 0 )); then
+            return 0
+        fi
+        # Entire global page was dupes but not exhausted — retry once
+        if [[ "$_CLAI_HIST_GLOB_DONE" != "1" ]]; then
+            _clai_hist_fetch_page
+            return $?
+        fi
+    fi
+
+    # Both sources exhausted with no new entries
+    return 1
 }
 
 # Apply ghost-text styling for the history remainder (portion after prefix).
@@ -368,13 +407,13 @@ zle -N expand-or-complete _ai_expand_or_complete
 _ai_up_line_or_history() {
     _clai_dismiss_picker
 
-    # First press: enter history mode, fetch from clai
+    # First press: enter history mode, fetch first page
     if [[ "$_CLAI_HIST_ACTIVE" != "1" ]]; then
         _ai_clear_ghost_text
         _CLAI_HIST_PREFIX="$BUFFER"
         _CLAI_HIST_ACTIVE=1
         _CLAI_HIST_IDX=0
-        _clai_hist_fetch "$BUFFER"
+        _clai_hist_fetch_page
     fi
 
     # Nothing found
@@ -383,6 +422,13 @@ _ai_up_line_or_history() {
     # Cycle forward (older entries)
     if (( _CLAI_HIST_IDX < ${#_CLAI_HIST_MATCHES} )); then
         _CLAI_HIST_IDX=$(( _CLAI_HIST_IDX + 1 ))
+    elif (( _CLAI_HIST_IDX >= ${#_CLAI_HIST_MATCHES} )); then
+        # At end of loaded results — try to fetch another page
+        if _clai_hist_fetch_page; then
+            _CLAI_HIST_IDX=$(( _CLAI_HIST_IDX + 1 ))
+        else
+            return  # exhausted, stay at current position
+        fi
     fi
     _CLAI_HIST_MATCH="${_CLAI_HIST_MATCHES[$_CLAI_HIST_IDX]}"
 
