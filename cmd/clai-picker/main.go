@@ -499,14 +499,12 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
-			//nolint:gosec // UI fallback text is intentional terminal output.
 			fmt.Fprintln(os.Stderr, result)
 		}
 		return code
 	}
 
 	if result != "" {
-		//nolint:gosec // UI selection text is intentional terminal output.
 		fmt.Fprintln(os.Stdout, result)
 	}
 
@@ -519,14 +517,12 @@ func dispatchSuggest(cfg *config.Config, opts *pickerOpts) int {
 	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
-			//nolint:gosec // UI fallback text is intentional terminal output.
 			fmt.Fprintln(os.Stderr, result)
 		}
 		return code
 	}
 
 	if result != "" {
-		//nolint:gosec // UI selection text is intentional terminal output.
 		fmt.Fprintln(os.Stdout, result)
 	}
 	return exitSuccess
@@ -580,7 +576,6 @@ func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 	if result == "" {
 		return exitCancelled
 	}
-	//nolint:gosec // selected value is intentional terminal output.
 	fmt.Fprintln(os.Stdout, result)
 
 	return exitSuccess

@@ -724,7 +724,7 @@ func bottomAlignLines(lines []string, maxItems int) []string {
 	if pad <= 0 {
 		return lines
 	}
-	padding := make([]string, pad)
+	padding := make([]string, pad, pad+len(lines))
 	return append(padding, lines...)
 }
 
