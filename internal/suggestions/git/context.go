@@ -193,7 +193,8 @@ func isRepoDirty(cwd string) bool {
 
 // runGitCommand runs a git command in the specified directory.
 func runGitCommand(cwd string, args ...string) (string, error) {
-	cmd := exec.Command("git", args...) //nolint:gosec // git args are controlled by caller
+	//nolint:gosec // executes fixed git binary with vetted argument lists.
+	cmd := exec.Command("git", args...)
 	cmd.Dir = cwd
 
 	var stdout, stderr bytes.Buffer

@@ -214,7 +214,7 @@ func ValidateSuggestRequest(req *pb.SuggestRequest) *ValidationResult {
 	if req.CursorPos < 0 {
 		result.addWarning("cursor_pos", fmt.Sprintf("must be non-negative, got %d; clamping to 0", req.CursorPos))
 		req.CursorPos = 0
-	} else if req.Buffer != "" && int(req.CursorPos) > len(req.Buffer) { //nolint:gosec // cursor pos bounded by buffer length
+	} else if req.Buffer != "" && int(req.CursorPos) > len(req.Buffer) {
 		result.addWarning("cursor_pos", fmt.Sprintf("exceeds buffer length %d, got %d; clamping", len(req.Buffer), req.CursorPos))
 		req.CursorPos = int32(len(req.Buffer)) //nolint:gosec // buffer length bounded by MaxCommandLen (10KB)
 	}

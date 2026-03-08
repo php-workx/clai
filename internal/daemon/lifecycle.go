@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -23,6 +24,10 @@ type ReloadFunc func() error
 //   - SIGUSR1: graceful re-exec (exec self with same args after cleanup)
 //   - SIGPIPE: ignore (prevent crashes on broken pipe)
 func Run(ctx context.Context, cfg *ServerConfig) error {
+	if runtime.GOOS == "windows" {
+		return fmt.Errorf("suggestions daemon is unix-only in this release")
+	}
+
 	// Check privilege safety
 	if err := CheckNotRoot(); err != nil {
 		return err

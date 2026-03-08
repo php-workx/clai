@@ -24,6 +24,7 @@ var (
 	historyGlobal  bool
 	historyStatus  string
 	historyFormat  string
+	historyJSON    bool
 )
 
 var historyCmd = &cobra.Command{
@@ -59,9 +60,14 @@ func init() {
 	historyCmd.Flags().BoolVarP(&historyGlobal, "global", "g", false, "Show history across all sessions")
 	historyCmd.Flags().StringVarP(&historyStatus, "status", "s", "", "Filter by status: 'success' or 'failure'")
 	historyCmd.Flags().StringVar(&historyFormat, "format", "raw", "Output format: raw or json")
+	historyCmd.Flags().BoolVar(&historyJSON, "json", false, "Output format as JSON (alias for --format json)")
 }
 
 func runHistory(cmd *cobra.Command, args []string) error {
+	if historyJSON {
+		historyFormat = "json"
+	}
+
 	paths := config.DefaultPaths()
 
 	store, err := storage.NewSQLiteStore(paths.DatabaseFile())

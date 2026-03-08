@@ -102,7 +102,7 @@ func NewRunArtifact(runID string) (*RunArtifact, error) {
 // NewRunArtifactWithDir creates a new artifact writer with a custom log directory.
 // Useful for testing.
 func NewRunArtifactWithDir(runID, logDir string) (*RunArtifact, error) {
-	if err := os.MkdirAll(logDir, 0o750); err != nil { //nolint:gosec // G301: log dir needs group access for workflow artifacts
+	if err := os.MkdirAll(logDir, 0o750); err != nil {
 		return nil, fmt.Errorf("create log dir: %w", err)
 	}
 
@@ -153,7 +153,7 @@ func (a *RunArtifact) WriteStepLog(stepID, stdout, stderr string) {
 	}
 
 	stepsDir := filepath.Join(a.logDir, sanitizePathComponent(a.runID)+"-steps")
-	if err := os.MkdirAll(stepsDir, 0o750); err != nil { //nolint:gosec // G301: steps dir needs group access for workflow artifacts
+	if err := os.MkdirAll(stepsDir, 0o750); err != nil {
 		slog.Warn("artifact: create steps dir", "error", err)
 		return
 	}

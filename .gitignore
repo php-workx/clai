@@ -22,7 +22,9 @@ coverage.html
 .scannerwork
 .sonarqube
 .sonarqube-autofix
+.tmp
 
 # Auto Claude data directory
 .auto-claude/
 /tests/integration/.agents/
+/tests/e2e/node_modules/

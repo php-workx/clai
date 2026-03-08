@@ -48,7 +48,8 @@ var (
 	}
 
 	runFzfCommandOutputFn = func(args []string, input string) ([]byte, error) {
-		cmd := exec.Command("fzf", args...) //nolint:gosec // G204: fzf is a trusted binary; args are constructed internally
+		//nolint:gosec // args are built by this program for fzf invocation.
+		cmd := exec.Command("fzf", args...)
 		cmd.Stdin = strings.NewReader(input)
 		cmd.Stderr = os.Stderr // Let fzf render its TUI on stderr/tty.
 		return cmd.Output()
@@ -224,6 +225,8 @@ func applyRunDefaults(cmd subcommand, cfg *config.Config, opts *pickerOpts) {
 		if opts.limit == 0 {
 			opts.limit = cfg.Suggestions.MaxResults
 		}
+	default:
+		// No defaults to apply for other subcommands.
 	}
 }
 
@@ -496,13 +499,15 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
-			fmt.Fprintln(os.Stderr, result) //nolint:gosec // G705: CLI tool, not web context
+			//nolint:gosec // UI fallback text is intentional terminal output.
+			fmt.Fprintln(os.Stderr, result)
 		}
 		return code
 	}
 
 	if result != "" {
-		fmt.Fprintln(os.Stdout, result) //nolint:gosec // G705: CLI tool, not web context
+		//nolint:gosec // UI selection text is intentional terminal output.
+		fmt.Fprintln(os.Stdout, result)
 	}
 
 	return exitSuccess
@@ -514,13 +519,15 @@ func dispatchSuggest(cfg *config.Config, opts *pickerOpts) int {
 	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
-			fmt.Fprintln(os.Stderr, result) //nolint:gosec // G705: CLI tool, not web context
+			//nolint:gosec // UI fallback text is intentional terminal output.
+			fmt.Fprintln(os.Stderr, result)
 		}
 		return code
 	}
 
 	if result != "" {
-		fmt.Fprintln(os.Stdout, result) //nolint:gosec // G705: CLI tool, not web context
+		//nolint:gosec // UI selection text is intentional terminal output.
+		fmt.Fprintln(os.Stdout, result)
 	}
 	return exitSuccess
 }
@@ -573,7 +580,8 @@ func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 	if result == "" {
 		return exitCancelled
 	}
-	fmt.Fprintln(os.Stdout, result) //nolint:gosec // G705: CLI tool, not web context
+	//nolint:gosec // selected value is intentional terminal output.
+	fmt.Fprintln(os.Stdout, result)
 
 	return exitSuccess
 }

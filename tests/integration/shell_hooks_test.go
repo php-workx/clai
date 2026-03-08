@@ -57,7 +57,7 @@ func TestShellHooks_ZshSyntaxValid(t *testing.T) {
 	}
 
 	// Run syntax check
-	cmd := exec.Command(zshPath, "-n", hookPath) //nolint:gosec // G204: hookPath from findHookFile, not user input
+	cmd := exec.Command(zshPath, "-n", hookPath)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
@@ -94,7 +94,7 @@ func TestShellHooks_ZshRequiredFunctions(t *testing.T) {
 		t.Skip("zsh hook file not found")
 	}
 
-	content, err := os.ReadFile(hookPath) //nolint:gosec // G304: hookPath from findHookFile, not user input
+	content, err := os.ReadFile(hookPath)
 	if err != nil {
 		t.Fatalf("failed to read hook file: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestShellHooks_BashRequiredFunctions(t *testing.T) {
 		t.Skip("bash hook file not found")
 	}
 
-	content, err := os.ReadFile(hookPath) //nolint:gosec // G304: hookPath from findHookFile, not user input
+	content, err := os.ReadFile(hookPath)
 	if err != nil {
 		t.Fatalf("failed to read hook file: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestShellHooks_HistoryInterception(t *testing.T) {
 				t.Skipf("%s hook file not found", tt.shell)
 			}
 
-			content, err := os.ReadFile(hookPath) //nolint:gosec // G304: hookPath from findHookFile, not user input
+			content, err := os.ReadFile(hookPath)
 			if err != nil {
 				t.Fatalf("failed to read hook file: %v", err)
 			}

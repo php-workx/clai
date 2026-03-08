@@ -31,12 +31,12 @@ func createTestDB(t *testing.T) *sql.DB {
 		CREATE TABLE command_event (
 			id            INTEGER PRIMARY KEY AUTOINCREMENT,
 			session_id    TEXT NOT NULL,
-			ts            INTEGER NOT NULL,
+			ts_ms         INTEGER NOT NULL,
 			cmd_raw       TEXT NOT NULL,
 			cmd_norm      TEXT NOT NULL,
 			cwd           TEXT NOT NULL
 		);
-		CREATE INDEX idx_event_ts ON command_event(ts);
+		CREATE INDEX idx_event_ts ON command_event(ts_ms);
 	`)
 	require.NoError(t, err)
 
@@ -47,7 +47,7 @@ func createTestDB(t *testing.T) *sql.DB {
 func insertEvent(t *testing.T, db *sql.DB, ts int64) {
 	t.Helper()
 	_, err := db.Exec(`
-		INSERT INTO command_event (session_id, ts, cmd_raw, cmd_norm, cwd)
+		INSERT INTO command_event (session_id, ts_ms, cmd_raw, cmd_norm, cwd)
 		VALUES ('session1', ?, 'test command', 'test command', '/home/user')
 	`, ts)
 	require.NoError(t, err)

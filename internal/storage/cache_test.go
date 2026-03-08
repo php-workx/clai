@@ -472,5 +472,5 @@ func TestSQLiteStore_GetCacheStats(t *testing.T) {
 }
 
 func generateTestCacheKey(n int) string {
-	return "cache-key-" + string(rune('A'+n)) //nolint:gosec // G115: test helper, n is small and bounded
+	return "cache-key-" + string(rune('A'+n))
 }

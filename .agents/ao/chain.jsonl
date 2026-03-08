@@ -3,3 +3,4 @@
 {"step":"crank","timestamp":"2026-02-03T15:23:40.087438+01:00","output":"epic:ai-terminal-b0k","locked":true}
 {"step":"vibe","timestamp":"2026-02-03T15:23:48.825878+01:00","output":".agents/vibe/2026-02-03-recent.md","locked":true}
 {"step":"vibe","timestamp":"2026-02-11T21:34:00.616302+01:00","output":".agents/vibe/2026-02-11-workflow-tier0.md","locked":true}
+{"step":"post-mortem","timestamp":"2026-02-22T10:54:12.496878+01:00","output":"","locked":true,"skipped":true,"reason":"Continuation of same review session, already skipped"}

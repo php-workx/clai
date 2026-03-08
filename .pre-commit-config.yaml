@@ -1,7 +1,7 @@
 # Pre-commit hooks: https://pre-commit.com
 # Install: make install-dev
 
-exclude: ^(\.agents/|\.beads/|\.roam/)
+exclude: ^(\.beads/|\.roam/)
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -36,22 +36,22 @@ repos:
         entry: go test -race -short ./...
         language: system
         pass_filenames: false
-        types: [go]
+        files: '(^|/)(.*\.go|go\.mod|go\.sum|go\.work|go\.work\.sum|\.golangci\.yml|Makefile)$'
       - id: golangci-lint
         name: golangci-lint
         entry: golangci-lint run
         language: system
         pass_filenames: false
-        types: [go]
+        files: '(^|/)(.*\.go|go\.mod|go\.sum|go\.work|go\.work\.sum|\.golangci\.yml|Makefile)$'
       - id: govulncheck
         name: govulncheck
         entry: govulncheck ./...
         language: system
         pass_filenames: false
-        types: [go]
+        files: '(^|/)(.*\.go|go\.mod|go\.sum|go\.work|go\.work\.sum|\.golangci\.yml|Makefile)$'
       - id: deadcode
         name: deadcode
         entry: deadcode ./...
         language: system
         pass_filenames: false
-        types: [go]
+        files: '(^|/)(.*\.go|go\.mod|go\.sum|go\.work|go\.work\.sum|\.golangci\.yml|Makefile)$'

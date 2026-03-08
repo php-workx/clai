@@ -183,7 +183,6 @@ func (t *AnalysisTransport) analyzeViaDirect(ctx context.Context, req *AnalysisR
 		return ParseAnalysisResponse(response), nil
 	}
 
-	//nolint:nilerr // Intentional: error is captured in AnalysisResult, not propagated as Go error.
 	reason := "all analysis paths failed"
 	if lastErr != nil {
 		reason += ": " + lastErr.Error()

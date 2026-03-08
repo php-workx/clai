@@ -22,7 +22,7 @@ func TestInitIsFast(t *testing.T) {
 
 	// Test init timing - should complete in <50ms even in worst case
 	start := time.Now()
-	cmd := exec.Command(claiPath, "init", "zsh") //nolint:gosec // G204: test launches known binary
+	cmd := exec.Command(claiPath, "init", "zsh")
 	output, err := cmd.Output()
 	elapsed := time.Since(start)
 
@@ -80,7 +80,7 @@ func TestDaemonStartsViaShim(t *testing.T) {
 	}()
 
 	// Call clai-shim with isolated CLAI_HOME
-	cmd := exec.Command(shimPath, "suggest", //nolint:gosec // G204: test launches known binary
+	cmd := exec.Command(shimPath, "suggest",
 		"--session-id=test-session",
 		"--cwd=/tmp",
 		"--buffer=git",
@@ -122,7 +122,7 @@ func TestInitOutputsShellScript(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.shell, func(t *testing.T) {
-			cmd := exec.Command(claiPath, "init", tc.shell) //nolint:gosec // G204: test launches known binary
+			cmd := exec.Command(claiPath, "init", tc.shell)
 			output, err := cmd.Output()
 			if err != nil {
 				t.Fatalf("clai init %s failed: %v", tc.shell, err)

@@ -67,7 +67,7 @@ func runInstall(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("could not determine rc file for %s", shell)
 	}
 
-	sourceLine := fmt.Sprintf(`source "%s"`, hookFile) //nolint:gocritic // shell syntax, not Go string
+	sourceLine := fmt.Sprintf("source %q", hookFile)
 	allInstalled := true
 	addedFiles := make([]string, 0, len(rcFiles))
 	for _, rcFile := range rcFiles {
@@ -261,8 +261,8 @@ func isInstalled(rcFile, hookFile, shell string) (installed bool, reason string,
 
 	// Patterns to look for (shell syntax, not Go strings)
 	patterns := []string{
-		fmt.Sprintf(`source "%s"`, hookFile), //nolint:gocritic // shell syntax
-		fmt.Sprintf(`source '%s'`, hookFile), //nolint:gocritic // shell syntax
+		fmt.Sprintf("source %q", hookFile),
+		fmt.Sprintf(`source '%s'`, hookFile),
 		fmt.Sprintf(". %s", hookFile),
 		"clai init " + shell,
 	}

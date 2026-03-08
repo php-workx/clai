@@ -94,7 +94,8 @@ func (r *Runner) Run(ctx context.Context, command string, args ...string) (*Runn
 	defer cancel()
 
 	// Create command
-	cmd := exec.CommandContext(runCtx, command, args...) //nolint:gosec // command and args are controlled by caller
+	//nolint:gosec // command/args are built from fixed discovery adapters.
+	cmd := exec.CommandContext(runCtx, command, args...)
 
 	// Set working directory
 	if r.cfg.WorkingDir != "" {

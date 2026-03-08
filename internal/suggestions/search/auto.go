@@ -90,9 +90,11 @@ func (s *AutoService) Search(ctx context.Context, query string, opts SearchOptio
 	if limit > MaxLimit {
 		limit = MaxLimit
 	}
+	offset := normalizeOffset(opts.Offset)
 
 	internalOpts := opts
-	internalOpts.Limit = limit * 3
+	internalOpts.Offset = 0
+	internalOpts.Limit = (limit + offset) * 3
 	if internalOpts.Limit > MaxLimit {
 		internalOpts.Limit = MaxLimit
 	}
@@ -123,6 +125,12 @@ func (s *AutoService) Search(ctx context.Context, query string, opts SearchOptio
 
 	merged := s.mergeResults(ftsResults, descResults)
 
+	if offset >= len(merged) {
+		return nil, nil
+	}
+	if offset > 0 {
+		merged = merged[offset:]
+	}
 	if len(merged) > limit {
 		merged = merged[:limit]
 	}

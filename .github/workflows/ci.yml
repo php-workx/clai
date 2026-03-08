@@ -39,6 +39,9 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    env:
+      NOLINT_BUDGET: "139"
+      NOSEC_BUDGET: "3"
     permissions:
       contents: read
     steps:
@@ -48,6 +51,26 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+      - name: Enforce suppression budgets
+        run: |
+          set -euo pipefail
+
+          nolint_count="$( (git grep -n '//nolint' -- '*.go' || true) | wc -l | tr -d '[:space:]' )"
+          nosec_count="$( (git grep -n '#nosec' -- '*.go' || true) | wc -l | tr -d '[:space:]' )"
+
+          echo "Current //nolint count: ${nolint_count} (budget: ${NOLINT_BUDGET})"
+          echo "Current #nosec count: ${nosec_count} (budget: ${NOSEC_BUDGET})"
+
+          if [ "${nolint_count}" -gt "${NOLINT_BUDGET}" ]; then
+            echo "Error: //nolint count exceeded budget."
+            exit 1
+          fi
+
+          if [ "${nosec_count}" -gt "${NOSEC_BUDGET}" ]; then
+            echo "Error: #nosec count exceeded budget."
+            exit 1
+          fi
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7

@@ -97,7 +97,7 @@ func TestCP2_SessionFlow(t *testing.T) {
 
 // TestCP3_CommandLogging verifies commands are logged with exit codes.
 // Checkpoint 3: Command Logging - Commands logged with exit codes
-func TestCP3_CommandLogging(t *testing.T) { //nolint:funlen // table-driven test with command verification
+func TestCP3_CommandLogging(t *testing.T) {
 	env := SetupTestEnv(t)
 	defer env.Teardown()
 
@@ -158,7 +158,7 @@ func TestCP3_CommandLogging(t *testing.T) { //nolint:funlen // table-driven test
 		endResp, err = env.Client.CommandEnded(ctx, &pb.CommandEndRequest{
 			SessionId:  sessionID,
 			CommandId:  commandID,
-			ExitCode:   int32(tc.exitCode), //nolint:gosec // G115: test data, exit codes are small bounded values
+			ExitCode:   int32(tc.exitCode),
 			DurationMs: durationMs,
 			TsUnixMs:   endTime.UnixMilli(),
 		})
@@ -358,7 +358,7 @@ func TestSession_MultipleSessions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetStatus failed: %v", err)
 	}
-	if status.ActiveSessions != int32(len(sessions)) { //nolint:gosec // G115: test data, session count is small
+	if status.ActiveSessions != int32(len(sessions)) {
 		t.Errorf("expected %d active sessions, got %d", len(sessions), status.ActiveSessions)
 	}
 
@@ -395,7 +395,7 @@ func TestSession_MultipleSessions(t *testing.T) {
 			t.Fatalf("GetStatus failed: %v", err)
 		}
 		expectedActive := len(sessions) - (i + 1)
-		if status.ActiveSessions != int32(expectedActive) { //nolint:gosec // G115: test data, session count is small
+		if status.ActiveSessions != int32(expectedActive) {
 			t.Errorf("after ending session %d, expected %d active sessions, got %d", i, expectedActive, status.ActiveSessions)
 		}
 	}

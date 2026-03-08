@@ -31,14 +31,14 @@ func createTestDB(t *testing.T) *sql.DB {
 		CREATE TABLE command_event (
 			id            INTEGER PRIMARY KEY AUTOINCREMENT,
 			session_id    TEXT NOT NULL,
-			ts            INTEGER NOT NULL,
+			ts_ms         INTEGER NOT NULL,
 			cmd_raw       TEXT NOT NULL,
 			cmd_norm      TEXT NOT NULL,
 			cwd           TEXT NOT NULL,
 			repo_key      TEXT,
 			ephemeral     INTEGER NOT NULL DEFAULT 0
 		);
-		CREATE INDEX idx_event_ts ON command_event(ts);
+		CREATE INDEX idx_event_ts ON command_event(ts_ms);
 	`)
 	require.NoError(t, err)
 
@@ -55,7 +55,7 @@ func insertTestEvent(t *testing.T, db *sql.DB, cmdRaw, repoKey, cwd string, ephe
 	}
 
 	result, err := db.Exec(`
-		INSERT INTO command_event (session_id, ts, cmd_raw, cmd_norm, cwd, repo_key, ephemeral)
+		INSERT INTO command_event (session_id, ts_ms, cmd_raw, cmd_norm, cwd, repo_key, ephemeral)
 		VALUES ('session1', ?, ?, ?, ?, ?, ?)
 	`, 1000000, cmdRaw, cmdRaw, cwd, repoKey, ephInt)
 	require.NoError(t, err)
@@ -243,6 +243,38 @@ func TestService_Search_Limit(t *testing.T) {
 	results, err = svc.Search(ctx, "test", SearchOptions{Limit: 200})
 	require.NoError(t, err)
 	assert.Len(t, results, 30) // Only 30 events exist
+}
+
+func TestService_Search_Offset(t *testing.T) {
+	t.Parallel()
+
+	db := createTestDB(t)
+	svc, err := NewService(db, DefaultConfig())
+	require.NoError(t, err)
+	defer svc.Close()
+
+	ctx := context.Background()
+	for i := 0; i < 6; i++ {
+		id := insertTestEvent(t, db, "offset command", "", "/home/user", false)
+		require.NoError(t, svc.IndexEvent(ctx, id))
+	}
+
+	page1, err := svc.Search(ctx, "offset", SearchOptions{Limit: 2, Offset: 0})
+	require.NoError(t, err)
+	page2, err := svc.Search(ctx, "offset", SearchOptions{Limit: 2, Offset: 2})
+	require.NoError(t, err)
+	require.Len(t, page1, 2)
+	require.Len(t, page2, 2)
+
+	seen := map[int64]struct{}{}
+	for _, r := range page1 {
+		seen[r.ID] = struct{}{}
+	}
+	for _, r := range page2 {
+		if _, ok := seen[r.ID]; ok {
+			t.Fatalf("expected non-overlapping paged results, repeated id=%d", r.ID)
+		}
+	}
 }
 
 func TestService_Search_EmptyQuery(t *testing.T) {

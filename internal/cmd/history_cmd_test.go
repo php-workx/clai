@@ -48,6 +48,7 @@ func TestHistoryCmd_Flags(t *testing.T) {
 		{"global", "g"},
 		{"status", "s"},
 		{"format", ""},
+		{"json", ""},
 	}
 
 	for _, f := range expectedFlags {
@@ -102,6 +103,16 @@ func TestHistoryCmd_FormatDefault(t *testing.T) {
 	}
 	if flag.DefValue != "raw" {
 		t.Errorf("Expected default format=raw, got %s", flag.DefValue)
+	}
+}
+
+func TestHistoryCmd_JSONFlagDefault(t *testing.T) {
+	flag := historyCmd.Flags().Lookup("json")
+	if flag == nil {
+		t.Fatal("json flag not found")
+	}
+	if flag.DefValue != "false" {
+		t.Errorf("Expected default json=false, got %s", flag.DefValue)
 	}
 }
 

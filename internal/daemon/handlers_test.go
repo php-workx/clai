@@ -16,6 +16,8 @@ import (
 	"github.com/runger/clai/internal/suggest"
 	suggestdb "github.com/runger/clai/internal/suggestions/db"
 	"github.com/runger/clai/internal/suggestions/feedback"
+	"github.com/runger/clai/internal/suggestions/learning"
+	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
 // mockStore implements storage.Store for testing.
@@ -384,6 +386,34 @@ func TestHandler_SessionEnd_Success(t *testing.T) {
 	}
 }
 
+func TestHandler_SessionEnd_ClearsSuggestSnapshot(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	_, _ = server.SessionStart(ctx, &pb.SessionStartRequest{
+		SessionId: "snapshot-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "zsh"},
+	})
+
+	server.snapshotMu.Lock()
+	server.lastSuggestSnapshots["snapshot-session"] = suggestSnapshot{
+		ShownAtMs: time.Now().UnixMilli(),
+	}
+	server.snapshotMu.Unlock()
+
+	_, _ = server.SessionEnd(ctx, &pb.SessionEndRequest{
+		SessionId: "snapshot-session",
+	})
+
+	_, ok := server.getSuggestSnapshot("snapshot-session")
+	if ok {
+		t.Fatal("expected session-end to clear suggest snapshot")
+	}
+}
+
 func TestHandler_CommandStarted_Success(t *testing.T) {
 	t.Parallel()
 
@@ -628,6 +658,117 @@ func TestHandler_RecordFeedback_StoreError(t *testing.T) {
 	}
 	if resp.Error == nil || resp.Error.Code != "E_STORE_ERROR" {
 		t.Fatalf("expected E_STORE_ERROR, got %+v", resp.Error)
+	}
+}
+
+func TestHandler_RecordFeedback_StaleSnapshotIgnored(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "stale_snapshot.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 DB: %v", err)
+	}
+	defer v2db.Close()
+
+	server, err := NewServer(&ServerConfig{
+		Store: newMockStore(),
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	server.snapshotMu.Lock()
+	server.lastSuggestSnapshots["sess-stale"] = suggestSnapshot{
+		Context: suggest2.SuggestContext{
+			Scope:          "global",
+			LastTemplateID: "tmpl:last",
+		},
+		Suggestions: []suggest2.Suggestion{
+			{Command: "git status", TemplateID: "tmpl:git-status", Score: 10},
+			{Command: "ls -la", TemplateID: "tmpl:ls", Score: 9},
+		},
+		ShownAtMs: time.Now().Add(-maxSuggestSnapshotAge - time.Minute).UnixMilli(),
+	}
+	server.snapshotMu.Unlock()
+
+	before := int64(0)
+	if server.learner != nil {
+		before = server.learner.SampleCount()
+	}
+
+	resp, err := server.RecordFeedback(ctx, &pb.RecordFeedbackRequest{
+		SessionId:     "sess-stale",
+		SuggestedText: "git status",
+		Action:        "accepted",
+		Prefix:        "git",
+	})
+	if err != nil {
+		t.Fatalf("RecordFeedback failed: %v", err)
+	}
+	if !resp.Ok {
+		t.Fatalf("RecordFeedback returned ok=false: %+v", resp.Error)
+	}
+
+	if server.learner != nil && server.learner.SampleCount() != before {
+		t.Fatalf("expected stale snapshot to skip learner update")
+	}
+	if _, ok := server.getSuggestSnapshot("sess-stale"); ok {
+		t.Fatalf("expected stale snapshot to be evicted")
+	}
+}
+
+func TestServer_ApplyLearningProfile_ReordersSuggestions(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "learning_profile.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 DB: %v", err)
+	}
+	defer v2db.Close()
+
+	server, err := NewServer(&ServerConfig{
+		Store: newMockStore(),
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+	if server.learningStore == nil {
+		t.Fatal("expected learning store to be configured")
+	}
+
+	w := learning.DefaultWeights()
+	w.Prefix = 0.60
+	w.RiskPenalty = 0.20
+	if err := server.learningStore.SaveWeights(ctx, "repo:demo", &w, 80, 0.01); err != nil {
+		t.Fatalf("failed to save weights: %v", err)
+	}
+
+	suggestions := []suggest2.Suggestion{
+		{Command: "ls -la", Score: 10.5},
+		{Command: "git status", Score: 10.0},
+	}
+
+	server.applyLearningProfile(ctx, &suggest2.SuggestContext{
+		Scope:  "repo:demo",
+		Prefix: "git",
+	}, suggestions)
+
+	if suggestions[0].Command != "git status" {
+		t.Fatalf("expected learning profile to reorder prefix match first, got %q", suggestions[0].Command)
 	}
 }
 
@@ -2750,6 +2891,147 @@ func TestHandler_FetchHistory_EmptyResult(t *testing.T) {
 
 	if !resp.AtEnd {
 		t.Error("expected at_end=true for empty result")
+	}
+}
+
+func TestHandler_FetchHistory_V2SearchPaginationOffset(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "history_v2_offset.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 DB: %v", err)
+	}
+	defer v2db.Close()
+	if _, ftsErr := v2db.DB().ExecContext(ctx, `
+		CREATE VIRTUAL TABLE IF NOT EXISTS command_fts USING fts5(cmd_raw, repo_key, cwd)
+	`); ftsErr != nil {
+		t.Fatalf("failed to create command_fts: %v", ftsErr)
+	}
+
+	for i := 1; i <= 4; i++ {
+		cmd := fmt.Sprintf("git cmd %d", i)
+		res, insertErr := v2db.DB().ExecContext(ctx, `
+			INSERT INTO command_event (session_id, ts_ms, cwd, repo_key, cmd_raw, cmd_norm, ephemeral)
+			VALUES (?, ?, ?, ?, ?, ?, 0)
+		`, "sess-v2", int64(1000+i), "/tmp", "repo-a", cmd, cmd)
+		if insertErr != nil {
+			t.Fatalf("insert command_event failed: %v", insertErr)
+		}
+		id, idErr := res.LastInsertId()
+		if idErr != nil {
+			t.Fatalf("last insert id failed: %v", idErr)
+		}
+		if _, ftsInsertErr := v2db.DB().ExecContext(ctx, `
+			INSERT INTO command_fts(rowid, cmd_raw, repo_key, cwd)
+			VALUES (?, ?, ?, ?)
+		`, id, cmd, "repo-a", "/tmp"); ftsInsertErr != nil {
+			t.Fatalf("insert command_fts failed: %v", ftsInsertErr)
+		}
+	}
+
+	server, err := NewServer(&ServerConfig{
+		Store: newMockStore(),
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	page1, err := server.FetchHistory(ctx, &pb.HistoryFetchRequest{
+		Global:  true,
+		Query:   "git",
+		RepoKey: "repo-a",
+		Mode:    pb.SearchMode_SEARCH_MODE_FTS,
+		Scope:   "global",
+		Limit:   2,
+		Offset:  0,
+	})
+	if err != nil {
+		t.Fatalf("FetchHistory page1 failed: %v", err)
+	}
+	page2, err := server.FetchHistory(ctx, &pb.HistoryFetchRequest{
+		Global:  true,
+		Query:   "git",
+		RepoKey: "repo-a",
+		Mode:    pb.SearchMode_SEARCH_MODE_FTS,
+		Scope:   "global",
+		Limit:   2,
+		Offset:  2,
+	})
+	if err != nil {
+		t.Fatalf("FetchHistory page2 failed: %v", err)
+	}
+
+	if len(page1.Items) != 2 || len(page2.Items) != 2 {
+		t.Fatalf("expected two items per page, got page1=%d page2=%d", len(page1.Items), len(page2.Items))
+	}
+
+	seen := make(map[string]struct{}, len(page1.Items))
+	for _, it := range page1.Items {
+		seen[it.Command] = struct{}{}
+	}
+	for _, it := range page2.Items {
+		if _, ok := seen[it.Command]; ok {
+			t.Fatalf("expected non-overlapping pages, found duplicate command %q", it.Command)
+		}
+	}
+}
+
+func TestHandler_FetchHistory_V2SearchErrorFallsBackToStorage(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "history_v2_fallback.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 DB: %v", err)
+	}
+	// Force V2 search init/query failures.
+	_ = v2db.Close()
+
+	store := newMockStore()
+	store.commands["cmd-fallback-1"] = &storage.Command{
+		CommandID:     "cmd-fallback-1",
+		SessionID:     "sess-fallback",
+		Command:       "git status",
+		CommandNorm:   "git status",
+		TSStartUnixMs: 1000,
+		CWD:           "/tmp",
+	}
+
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	resp, err := server.FetchHistory(ctx, &pb.HistoryFetchRequest{
+		Global: true,
+		Query:  "git",
+		Mode:   pb.SearchMode_SEARCH_MODE_FTS,
+		Limit:  10,
+		Offset: 0,
+	})
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+	if len(resp.Items) == 0 {
+		t.Fatal("expected storage fallback to return history results")
+	}
+	if resp.Backend != "storage" {
+		t.Fatalf("expected backend=storage on fallback, got %q", resp.Backend)
 	}
 }
 

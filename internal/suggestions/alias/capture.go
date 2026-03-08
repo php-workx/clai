@@ -24,6 +24,21 @@ const CaptureTimeout = 5 * time.Second
 // AliasMap is a mapping from alias name to its expansion.
 type AliasMap map[string]string
 
+// ParseSnapshot parses shell-provided alias output into an AliasMap.
+// Supported shells: bash, zsh, fish.
+func ParseSnapshot(shell, raw string) AliasMap {
+	switch shell {
+	case "bash":
+		return parseBashAliases(raw)
+	case "zsh":
+		return parseZshAliases(raw)
+	case "fish":
+		return parseFishAbbreviations(raw)
+	default:
+		return make(AliasMap)
+	}
+}
+
 // Capture captures the current alias map from the given shell.
 // Supported shells: bash, zsh, fish.
 // Returns an empty map (not nil) if no aliases are found or the shell is unsupported.
@@ -75,7 +90,8 @@ func captureFish(ctx context.Context) (AliasMap, error) {
 
 // runShellCommand executes a command and returns its stdout output.
 func runShellCommand(ctx context.Context, name string, args ...string) (string, error) {
-	cmd := exec.CommandContext(ctx, name, args...) //nolint:gosec // shell and args are controlled by caller
+	//nolint:gosec // shell binary/args are selected from a fixed allowlist by caller.
+	cmd := exec.CommandContext(ctx, name, args...)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -232,8 +248,9 @@ func ShouldResnapshot(cmd string) bool {
 	switch first {
 	case "alias", "unalias", "abbr":
 		return true
+	default:
+		return false
 	}
-	return false
 }
 
 // ReverseEntry is a reverse mapping from expansion to alias name.

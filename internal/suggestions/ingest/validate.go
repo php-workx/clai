@@ -1,5 +1,5 @@
 // Package ingest provides NDJSON parsing and validation for command events.
-// It handles event ingestion from shell hooks via clai-hook.
+// It handles event ingestion from shell hooks via clai-shim.
 package ingest
 
 import (

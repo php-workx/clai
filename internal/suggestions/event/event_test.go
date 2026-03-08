@@ -47,7 +47,7 @@ func TestNewCommandEvent(t *testing.T) {
 	assert.False(t, ev.Ephemeral)
 }
 
-func TestCommandEventJSONSerialization(t *testing.T) { //nolint:funlen // roundtrip serialization subtests
+func TestCommandEventJSONSerialization(t *testing.T) {
 	t.Run("minimal event", func(t *testing.T) {
 		ev := &CommandEvent{
 			Version:   1,

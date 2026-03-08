@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	ClaiService_SessionStart_FullMethodName       = "/clai.v1.ClaiService/SessionStart"
 	ClaiService_SessionEnd_FullMethodName         = "/clai.v1.ClaiService/SessionEnd"
+	ClaiService_AliasSync_FullMethodName          = "/clai.v1.ClaiService/AliasSync"
 	ClaiService_CommandStarted_FullMethodName     = "/clai.v1.ClaiService/CommandStarted"
 	ClaiService_CommandEnded_FullMethodName       = "/clai.v1.ClaiService/CommandEnded"
 	ClaiService_Suggest_FullMethodName            = "/clai.v1.ClaiService/Suggest"
@@ -47,6 +48,7 @@ type ClaiServiceClient interface {
 	// Fire-and-Forget (Client ignores return)
 	SessionStart(ctx context.Context, in *SessionStartRequest, opts ...grpc.CallOption) (*Ack, error)
 	SessionEnd(ctx context.Context, in *SessionEndRequest, opts ...grpc.CallOption) (*Ack, error)
+	AliasSync(ctx context.Context, in *AliasSyncRequest, opts ...grpc.CallOption) (*Ack, error)
 	CommandStarted(ctx context.Context, in *CommandStartRequest, opts ...grpc.CallOption) (*Ack, error)
 	CommandEnded(ctx context.Context, in *CommandEndRequest, opts ...grpc.CallOption) (*Ack, error)
 	// Interactive (Client waits with timeout)
@@ -92,6 +94,16 @@ func (c *claiServiceClient) SessionEnd(ctx context.Context, in *SessionEndReques
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Ack)
 	err := c.cc.Invoke(ctx, ClaiService_SessionEnd_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *claiServiceClient) AliasSync(ctx context.Context, in *AliasSyncRequest, opts ...grpc.CallOption) (*Ack, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, ClaiService_AliasSync_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -265,6 +277,7 @@ type ClaiServiceServer interface {
 	// Fire-and-Forget (Client ignores return)
 	SessionStart(context.Context, *SessionStartRequest) (*Ack, error)
 	SessionEnd(context.Context, *SessionEndRequest) (*Ack, error)
+	AliasSync(context.Context, *AliasSyncRequest) (*Ack, error)
 	CommandStarted(context.Context, *CommandStartRequest) (*Ack, error)
 	CommandEnded(context.Context, *CommandEndRequest) (*Ack, error)
 	// Interactive (Client waits with timeout)
@@ -301,6 +314,9 @@ func (UnimplementedClaiServiceServer) SessionStart(context.Context, *SessionStar
 }
 func (UnimplementedClaiServiceServer) SessionEnd(context.Context, *SessionEndRequest) (*Ack, error) {
 	return nil, status.Error(codes.Unimplemented, "method SessionEnd not implemented")
+}
+func (UnimplementedClaiServiceServer) AliasSync(context.Context, *AliasSyncRequest) (*Ack, error) {
+	return nil, status.Error(codes.Unimplemented, "method AliasSync not implemented")
 }
 func (UnimplementedClaiServiceServer) CommandStarted(context.Context, *CommandStartRequest) (*Ack, error) {
 	return nil, status.Error(codes.Unimplemented, "method CommandStarted not implemented")
@@ -403,6 +419,24 @@ func _ClaiService_SessionEnd_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ClaiServiceServer).SessionEnd(ctx, req.(*SessionEndRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClaiService_AliasSync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AliasSyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).AliasSync(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_AliasSync_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).AliasSync(ctx, req.(*AliasSyncRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -709,6 +743,10 @@ var ClaiService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SessionEnd",
 			Handler:    _ClaiService_SessionEnd_Handler,
+		},
+		{
+			MethodName: "AliasSync",
+			Handler:    _ClaiService_AliasSync_Handler,
 		},
 		{
 			MethodName: "CommandStarted",

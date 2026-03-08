@@ -85,7 +85,7 @@ type PurgeResult struct {
 // Purge deletes old command_event data based on the retention policy.
 // Per spec Section 20.2:
 //
-//	DELETE FROM command_event WHERE ts < (now_ms - retention_days * 86400000)
+//	DELETE FROM command_event WHERE ts_ms < (now_ms - retention_days * 86400000)
 func (p *Purger) Purge(ctx context.Context) (*PurgeResult, error) {
 	return p.PurgeAt(ctx, time.Now().UnixMilli())
 }
@@ -107,7 +107,7 @@ func (p *Purger) PurgeAt(ctx context.Context, nowMs int64) (*PurgeResult, error)
 
 	// Delete old command_event rows
 	res, err := p.db.ExecContext(ctx, `
-		DELETE FROM command_event WHERE ts < ?
+		DELETE FROM command_event WHERE ts_ms < ?
 	`, cutoffMs)
 	if err != nil {
 		return nil, err
@@ -179,7 +179,7 @@ func (p *Purger) EstimatePurgeCountAt(ctx context.Context, nowMs int64) (int64, 
 
 	var count int64
 	err := p.db.QueryRowContext(ctx, `
-		SELECT COUNT(*) FROM command_event WHERE ts < ?
+		SELECT COUNT(*) FROM command_event WHERE ts_ms < ?
 	`, cutoffMs).Scan(&count)
 	if err != nil {
 		return 0, err

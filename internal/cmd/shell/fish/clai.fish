@@ -962,6 +962,10 @@ if status is-interactive; and not set -q _CLAI_REINIT
     clai-shim session-start --session-id="$CLAI_SESSION_ID" --cwd="$PWD" --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1 &
     disown %1 2>/dev/null
 
+    # Sync fish abbreviations as alias snapshot for V2 ingest.
+    abbr --show | clai-shim alias-sync --session-id="$CLAI_SESSION_ID" --shell="$CLAI_CURRENT_SHELL" --stdin >/dev/null 2>&1 &
+    disown %1 2>/dev/null
+
     # Import shell history on first init (fire and forget)
     # This is idempotent: --if-not-exists skips if already imported
     clai-shim import-history --shell="$CLAI_CURRENT_SHELL" --if-not-exists >/dev/null 2>&1 &

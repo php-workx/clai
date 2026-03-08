@@ -2,6 +2,7 @@ package search
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -83,6 +84,36 @@ func TestAutoService_Search_Limit(t *testing.T) {
 	results, err := autoSvc.Search(ctx, "version control", SearchOptions{Limit: 5})
 	require.NoError(t, err)
 	assert.LessOrEqual(t, len(results), 5)
+}
+
+func TestAutoService_Search_Offset(t *testing.T) {
+	t.Parallel()
+	db := createDescribeTestDB(t)
+	describeSvc := NewDescribeService(db, DescribeConfig{})
+	autoSvc := NewAutoService(nil, describeSvc, DefaultAutoConfig())
+	ctx := context.Background()
+
+	for i := 0; i < 8; i++ {
+		id := fmt.Sprintf("tmpl-auto-offset-%d", i)
+		insertDescribeTestData(t, db, id, "git status", "git status",
+			[]string{"vcs", "git"}, "", "/home/user", int64(1000+i))
+	}
+
+	page1, err := autoSvc.Search(ctx, "version control", SearchOptions{Limit: 3, Offset: 0})
+	require.NoError(t, err)
+	page2, err := autoSvc.Search(ctx, "version control", SearchOptions{Limit: 3, Offset: 3})
+	require.NoError(t, err)
+	require.Len(t, page1, 3)
+	require.Len(t, page2, 3)
+	seen := map[int64]struct{}{}
+	for _, r := range page1 {
+		seen[r.ID] = struct{}{}
+	}
+	for _, r := range page2 {
+		if _, ok := seen[r.ID]; ok {
+			t.Fatalf("expected non-overlapping paged results, repeated id=%d", r.ID)
+		}
+	}
 }
 
 func TestAutoConfig_Defaults(t *testing.T) {
