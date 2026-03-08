@@ -254,8 +254,11 @@ func (l *Learner) LoadAndUpdate(ctx context.Context, scope string, fPos, fNeg *F
 		return
 	}
 
-	// Load profile outside the learner lock (store has its own
-	// concurrency control) to avoid holding mu during I/O.
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// Load profile under lock to prevent concurrent LoadAndUpdate calls
+	// from reading the same baseline and stomping each other's updates.
 	var profile *WeightProfile
 	if l.store != nil {
 		var err error
@@ -264,9 +267,6 @@ func (l *Learner) LoadAndUpdate(ctx context.Context, scope string, fPos, fNeg *F
 			l.config.Logger.Debug("learning: failed to load profile", "scope", scope, "error", err)
 		}
 	}
-
-	l.mu.Lock()
-	defer l.mu.Unlock()
 
 	// Apply loaded profile or reset to defaults.
 	if profile != nil {
