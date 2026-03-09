@@ -1,7 +1,4 @@
-.agents/reviews
-.agents/compaction-snapshots
-.agents/tooling
-.agents/ao
+.agents
 .claude/worktrees
 .idea
 .DS_Store
@@ -18,7 +15,7 @@ coverage.out
 coverage.html
 
 # Beads export state (machine-specific paths)
-/.beads/export-state/
+.beads/export-state/
 .beads/.jsonl.lock
 .scannerwork
 .sonarqube
