@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"unicode/utf8"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -413,6 +415,8 @@ func selectConfiguredTabs(allTabs []config.TabDef, tabsArg string) []config.TabD
 			selected = append(selected, t)
 		}
 	}
+	return selected
+}
 
 func substituteTabArgs(srcTabs []config.TabDef, session string) []config.TabDef {
 	tabs := make([]config.TabDef, len(srcTabs))
@@ -427,6 +431,7 @@ func substituteTabArgs(srcTabs []config.TabDef, session string) []config.TabDef 
 			if v == "$CLAI_SESSION_ID" && session != "" {
 				v = session
 			}
+			tabs[i].Args[k] = v
 		}
 	}
 	return tabs
