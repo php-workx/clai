@@ -19,6 +19,7 @@ type Config struct {
 	Suggestions SuggestionsConfig `yaml:"suggestions"`
 	Privacy     PrivacyConfig     `yaml:"privacy"`
 	History     HistoryConfig     `yaml:"history"`
+	PTY         PTYConfig         `yaml:"pty"`
 }
 
 // DaemonConfig holds daemon-related settings.
@@ -77,6 +78,11 @@ type HistoryConfig struct {
 	UpArrowOpensHistory bool     `yaml:"up_arrow_opens_history"` // Up arrow opens TUI picker (default: false)
 }
 
+// PTYConfig holds PTY wrapper behavior.
+type PTYConfig struct {
+	Enabled bool `yaml:"enabled"` // Auto-wrap interactive sessions with clai-wrap
+}
+
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *Config {
 	return &Config{
@@ -117,6 +123,9 @@ func DefaultConfig() *Config {
 				{ID: "session", Label: "Session", Provider: "history", Args: map[string]string{"session": "$CLAI_SESSION_ID"}},
 				{ID: "global", Label: "Global", Provider: "history", Args: map[string]string{"global": "true"}},
 			},
+		},
+		PTY: PTYConfig{
+			Enabled: true,
 		},
 	}
 }
@@ -200,6 +209,8 @@ func (c *Config) Get(key string) (string, error) {
 		return c.getPrivacyField(field)
 	case "history":
 		return c.getHistoryField(field)
+	case "pty":
+		return c.getPTYField(field)
 	default:
 		return "", fmt.Errorf("unknown section: %s", section)
 	}
@@ -227,6 +238,8 @@ func (c *Config) Set(key, value string) error {
 		return c.setPrivacyField(field, value)
 	case "history":
 		return c.setHistoryField(field, value)
+	case "pty":
+		return c.setPTYField(field, value)
 	default:
 		return fmt.Errorf("unknown section: %s", section)
 	}
@@ -515,6 +528,29 @@ func (c *Config) setHistoryField(field, value string) error {
 	return nil
 }
 
+func (c *Config) getPTYField(field string) (string, error) {
+	switch field {
+	case "enabled":
+		return strconv.FormatBool(c.PTY.Enabled), nil
+	default:
+		return "", fmt.Errorf("unknown field: pty.%s", field)
+	}
+}
+
+func (c *Config) setPTYField(field, value string) error {
+	switch field {
+	case "enabled":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for enabled: %w", err)
+		}
+		c.PTY.Enabled = v
+	default:
+		return fmt.Errorf("unknown field: pty.%s", field)
+	}
+	return nil
+}
+
 // Validate validates the configuration.
 func (c *Config) Validate() error {
 	if c.Daemon.IdleTimeoutMins < 0 {
@@ -602,5 +638,6 @@ func ListKeys() []string {
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
 		"history.picker_case_sensitive",
+		"pty.enabled",
 	}
 }

@@ -41,6 +41,9 @@ func TestDefaultConfig(t *testing.T) {
 	if !cfg.Privacy.SanitizeAICalls {
 		t.Error("Expected sanitize_ai_calls=true")
 	}
+	if !cfg.PTY.Enabled {
+		t.Error("Expected pty.enabled=true")
+	}
 }
 
 // ============================================================================
@@ -82,6 +85,8 @@ func TestConfigGet(t *testing.T) {
 		{"history.picker_open_on_empty", "false"},
 		{"history.picker_page_size", "100"},
 		{"history.picker_case_sensitive", "false"},
+		// PTY section
+		{"pty.enabled", "true"},
 	}
 
 	for _, tt := range tests {
@@ -144,6 +149,9 @@ func TestConfigSet(t *testing.T) {
 		{"history.picker_open_on_empty", "true", "true"},
 		{"history.picker_page_size", "50", "50"},
 		{"history.picker_case_sensitive", "true", "true"},
+		// PTY section
+		{"pty.enabled", "false", "false"},
+		{"pty.enabled", "true", "true"},
 	}
 
 	for _, tt := range tests {
@@ -187,6 +195,7 @@ func TestConfigGetWithCustomValues(t *testing.T) {
 	cfg.Suggestions.MaxAI = 5
 	cfg.Suggestions.ShowRiskWarning = false
 	cfg.Privacy.SanitizeAICalls = false
+	cfg.PTY.Enabled = false
 
 	tests := []struct {
 		key      string
@@ -209,6 +218,7 @@ func TestConfigGetWithCustomValues(t *testing.T) {
 		{"suggestions.max_ai", "5"},
 		{"suggestions.show_risk_warning", "false"},
 		{"privacy.sanitize_ai_calls", "false"},
+		{"pty.enabled", "false"},
 	}
 
 	for _, tt := range tests {
@@ -871,6 +881,7 @@ func TestListKeys(t *testing.T) {
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
 		"history.picker_case_sensitive",
+		"pty.enabled",
 	}
 
 	if len(keys) != len(expectedKeys) {
@@ -914,6 +925,7 @@ func TestListKeysAllSettable(t *testing.T) {
 		"history.picker_open_on_empty":  "true",
 		"history.picker_page_size":      "50",
 		"history.picker_case_sensitive": "true",
+		"pty.enabled":                   "false",
 	}
 
 	for _, key := range keys {

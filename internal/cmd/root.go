@@ -44,6 +44,7 @@ func init() {
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(uninstallCmd)
 	rootCmd.AddCommand(initCmd)
+	rootCmd.AddCommand(ptyCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	// Hidden commands (still functional but not shown in help)

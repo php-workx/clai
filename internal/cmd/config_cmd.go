@@ -22,13 +22,14 @@ With two arguments, sets the key to the value.
 Configuration is stored in ~/.clai/config.yaml.
 
 Keys are in the format: section.key
-Sections: daemon, client, ai, suggestions, privacy
+Sections: daemon, client, ai, suggestions, privacy, history, pty
 
 Examples:
   clai config                        # List all keys
   clai config ai.enabled             # Get ai.enabled value
   clai config ai.enabled true        # Enable AI features
-  clai config daemon.idle_timeout_mins 30`,
+  clai config daemon.idle_timeout_mins 30
+  clai config pty.enabled false`,
 	Args: cobra.MaximumNArgs(2),
 	RunE: runConfig,
 }
