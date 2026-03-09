@@ -3,6 +3,8 @@ package picker
 import (
 	"context"
 	"fmt"
+	"strings"
+	"sync"
 	"time"
 
 	"google.golang.org/grpc"
@@ -332,9 +334,8 @@ func (p *HistoryProvider) fetchCompositeGlobalPage(
 	want := globalOffset + req.Limit + 1
 	globalFiltered, globalAtEnd, err := p.fetchGlobalFiltered(ctx, client, req.Query, want, dedupe)
 	if err != nil {
-		return Response{}, fmt.Errorf("history provider: dial: %w", err)
+		return Response{}, fmt.Errorf("history provider: global fetch: %w", err)
 	}
-	defer conn.Close()
 
 	out := make([]Item, 0, req.Limit)
 	if globalOffset < len(globalFiltered) {

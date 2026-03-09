@@ -23,6 +23,7 @@ type Config struct {
 	Suggestions SuggestionsConfig `yaml:"suggestions"`
 	Client      ClientConfig      `yaml:"client"`
 	Privacy     PrivacyConfig     `yaml:"privacy"`
+	PTY         PTYConfig         `yaml:"pty"`
 }
 
 // DaemonConfig holds daemon-related settings.
@@ -504,6 +505,8 @@ func (c *Config) Get(key string) (string, error) {
 		return c.getHistoryField(field)
 	case "workflows":
 		return c.getWorkflowsField(field)
+	case "pty":
+		return c.getPTYField(field)
 	default:
 		return "", fmt.Errorf("unknown section: %s", section)
 	}
@@ -533,6 +536,8 @@ func (c *Config) Set(key, value string) error {
 		return c.setHistoryField(field, value)
 	case "workflows":
 		return c.setWorkflowsField(field, value)
+	case "pty":
+		return c.setPTYField(field, value)
 	default:
 		return fmt.Errorf("unknown section: %s", section)
 	}
@@ -1170,6 +1175,7 @@ func ListKeys() []string {
 		"history.picker_case_sensitive",
 		"history.up_arrow_trigger",
 		"history.up_arrow_double_window_ms",
+		"pty.enabled",
 	}
 }
 

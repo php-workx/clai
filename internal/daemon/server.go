@@ -378,6 +378,14 @@ func (s *Server) Start(ctx context.Context) error {
 	s.grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(s.accessLogUnaryInterceptor()))
 	pb.RegisterClaiServiceServer(s.grpcServer, s)
 
+	// Create JSON-RPC listener for clai-wrap phase-2 protocol.
+	jsonListener, err := s.startJSONRPCListener()
+	if err != nil {
+		listener.Close()
+		return err
+	}
+	s.jsonListener = jsonListener
+
 	if s.diagnosticsMux != nil {
 		diagListener, err := net.Listen("tcp", "127.0.0.1:0")
 		if err != nil {
@@ -519,6 +527,9 @@ func (s *Server) Shutdown() {
 		}
 		if s.diagListener != nil {
 			s.diagListener.Close()
+		}
+		if s.jsonListener != nil {
+			s.jsonListener.Close()
 		}
 
 		// Cleanup PID file and socket

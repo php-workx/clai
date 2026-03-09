@@ -3,6 +3,7 @@ package picker
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -379,10 +380,6 @@ func (m *Model) startFetch() tea.Cmd {
 	m.cancelFetch = cancel
 
 	tab := m.currentTab()
-	limit := m.listHeight()
-	if m.pageSize > 0 {
-		limit = m.pageSize
-	}
 	req := Request{
 		RequestID: reqID,
 		Query:     m.textInput.Value(),
