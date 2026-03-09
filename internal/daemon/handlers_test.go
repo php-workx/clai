@@ -20,6 +20,8 @@ type mockStore struct {
 	commands       map[string]*storage.Command
 	cache          map[string]*storage.CacheEntry
 	importedShells map[string]bool
+	commandEvents  map[string]*storage.CommandEvent
+	commandOutput  map[string]*storage.CommandOutput
 }
 
 func newMockStore() *mockStore {
@@ -28,6 +30,8 @@ func newMockStore() *mockStore {
 		commands:       make(map[string]*storage.Command),
 		cache:          make(map[string]*storage.CacheEntry),
 		importedShells: make(map[string]bool),
+		commandEvents:  make(map[string]*storage.CommandEvent),
+		commandOutput:  make(map[string]*storage.CommandOutput),
 	}
 }
 
@@ -136,6 +140,50 @@ func (m *mockStore) QueryHistoryCommands(ctx context.Context, q storage.CommandQ
 		result = result[:q.Limit]
 	}
 	return result, nil
+}
+
+func (m *mockStore) UpsertCommandEventStart(ctx context.Context, sessionID, commandID string, startTS int64) error {
+	m.commandEvents[commandID] = &storage.CommandEvent{
+		SessionID: sessionID,
+		CommandID: commandID,
+		StartTS:   &startTS,
+	}
+	return nil
+}
+
+func (m *mockStore) FinalizeCommandEvent(ctx context.Context, commandID string, exitCode int, endTS int64, isSensitive bool, capturedBytes int64) error {
+	event, ok := m.commandEvents[commandID]
+	if !ok {
+		return storage.ErrCommandNotFound
+	}
+	event.ExitCode = &exitCode
+	event.EndTS = &endTS
+	event.IsSensitive = isSensitive
+	event.CapturedBytes = capturedBytes
+	return nil
+}
+
+func (m *mockStore) AppendCommandOutputChunk(ctx context.Context, commandID string, chunk []byte, isStderr bool, createdAt, expiresAt int64) error {
+	out, ok := m.commandOutput[commandID]
+	if !ok {
+		out = &storage.CommandOutput{
+			CommandID: commandID,
+			CreatedAt: createdAt,
+			ExpiresAt: expiresAt,
+		}
+		m.commandOutput[commandID] = out
+	}
+	if isStderr {
+		out.StderrBlob = append(out.StderrBlob, chunk...)
+	} else {
+		out.StdoutBlob = append(out.StdoutBlob, chunk...)
+	}
+	out.ExpiresAt = expiresAt
+	return nil
+}
+
+func (m *mockStore) PruneExpiredCommandOutput(ctx context.Context) (int64, error) {
+	return 0, nil
 }
 
 func (m *mockStore) GetCached(ctx context.Context, key string) (*storage.CacheEntry, error) {

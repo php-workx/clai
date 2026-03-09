@@ -170,6 +170,10 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 			version: 2,
 			sql:     migrationV2,
 		},
+		{
+			version: 3,
+			sql:     migrationV3,
+		},
 	}
 
 	for _, m := range migrations {
@@ -296,4 +300,33 @@ ALTER TABLE commands ADD COLUMN word_count INTEGER DEFAULT 0;
 -- Indexes for common queries
 CREATE INDEX IF NOT EXISTS idx_commands_git_branch ON commands(git_branch);
 CREATE INDEX IF NOT EXISTS idx_commands_git_repo ON commands(git_repo_name);
+`
+
+// migrationV3 adds phase-2 PTY capture tables.
+const migrationV3 = `
+CREATE TABLE IF NOT EXISTS command_events (
+  id INTEGER PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  command_id TEXT NOT NULL UNIQUE,
+  exit_code INTEGER,
+  start_ts INTEGER,
+  end_ts INTEGER,
+  is_sensitive BOOLEAN DEFAULT 0,
+  captured_bytes INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_command_events_session ON command_events(session_id);
+CREATE INDEX IF NOT EXISTS idx_command_events_command_id ON command_events(command_id);
+
+CREATE TABLE IF NOT EXISTS command_output (
+  id INTEGER PRIMARY KEY,
+  command_id TEXT NOT NULL UNIQUE,
+  stdout_blob BLOB,
+  stderr_blob BLOB,
+  created_at INTEGER,
+  expires_at INTEGER
+);
+
+CREATE INDEX IF NOT EXISTS idx_command_output_command ON command_output(command_id);
+CREATE INDEX IF NOT EXISTS idx_command_output_expires ON command_output(expires_at);
 `

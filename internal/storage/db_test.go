@@ -53,7 +53,14 @@ func TestSQLiteStore_Migration_CreatesSchema(t *testing.T) {
 	defer store.Close()
 
 	// Verify tables exist by querying them
-	tables := []string{"schema_meta", "sessions", "commands", "ai_cache"}
+	tables := []string{
+		"schema_meta",
+		"sessions",
+		"commands",
+		"ai_cache",
+		"command_events",
+		"command_output",
+	}
 	for _, table := range tables {
 		_, err := store.DB().ExecContext(context.Background(),
 			"SELECT 1 FROM "+table+" LIMIT 1")

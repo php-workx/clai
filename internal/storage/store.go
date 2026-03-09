@@ -23,6 +23,12 @@ type Store interface {
 	QueryCommands(ctx context.Context, q CommandQuery) ([]Command, error)
 	QueryHistoryCommands(ctx context.Context, q CommandQuery) ([]HistoryRow, error)
 
+	// Phase 2 PTY capture
+	UpsertCommandEventStart(ctx context.Context, sessionID, commandID string, startTS int64) error
+	FinalizeCommandEvent(ctx context.Context, commandID string, exitCode int, endTS int64, isSensitive bool, capturedBytes int64) error
+	AppendCommandOutputChunk(ctx context.Context, commandID string, chunk []byte, isStderr bool, createdAt, expiresAt int64) error
+	PruneExpiredCommandOutput(ctx context.Context) (int64, error)
+
 	// AI Cache
 	GetCached(ctx context.Context, key string) (*CacheEntry, error)
 	SetCached(ctx context.Context, entry *CacheEntry) error
@@ -105,4 +111,26 @@ type CacheEntry struct {
 	CreatedAtUnixMs int64
 	ExpiresAtUnixMs int64
 	HitCount        int64
+}
+
+// CommandEvent represents a captured command lifecycle event from clai-wrap.
+type CommandEvent struct {
+	ID            int64
+	SessionID     string
+	CommandID     string
+	ExitCode      *int
+	StartTS       *int64
+	EndTS         *int64
+	IsSensitive   bool
+	CapturedBytes int64
+}
+
+// CommandOutput represents captured command output blobs.
+type CommandOutput struct {
+	ID         int64
+	CommandID  string
+	StdoutBlob []byte
+	StderrBlob []byte
+	CreatedAt  int64
+	ExpiresAt  int64
 }

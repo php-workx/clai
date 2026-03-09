@@ -36,6 +36,7 @@ type Server struct {
 	// Server state
 	grpcServer     *grpc.Server
 	listener       net.Listener
+	jsonListener   net.Listener
 	paths          *config.Paths
 	logger         *slog.Logger
 	sessionManager *SessionManager
@@ -51,6 +52,10 @@ type Server struct {
 	// Metrics
 	mu             sync.RWMutex
 	commandsLogged int64
+
+	// JSON-RPC capture accounting (command_id -> bytes seen).
+	captureMu    sync.Mutex
+	capturedSize map[string]int64
 }
 
 // ServerConfig contains configuration options for the daemon server.
@@ -122,6 +127,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		lastActivity:   now,
 		idleTimeout:    idleTimeout,
 		shutdownChan:   make(chan struct{}),
+		capturedSize:   make(map[string]int64),
 	}, nil
 }
 
@@ -155,9 +161,18 @@ func (s *Server) Start(ctx context.Context) error {
 	s.grpcServer = grpc.NewServer()
 	pb.RegisterClaiServiceServer(s.grpcServer, s)
 
+	// Create JSON-RPC listener for clai-wrap phase-2 protocol.
+	jsonListener, err := s.startJSONRPCListener()
+	if err != nil {
+		listener.Close()
+		return err
+	}
+	s.jsonListener = jsonListener
+
 	// Write PID file
 	if err := s.writePIDFile(); err != nil {
 		listener.Close()
+		jsonListener.Close()
 		return fmt.Errorf("failed to write PID file: %w", err)
 	}
 
@@ -176,23 +191,23 @@ func (s *Server) Start(ctx context.Context) error {
 	go s.pruneCacheLoop(ctx)
 
 	// Serve gRPC requests in a goroutine
-	errChan := make(chan error, 1)
+	errChan := make(chan error, 2)
 	go func() {
 		if err := s.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			errChan <- fmt.Errorf("gRPC server error: %w", err)
-		} else {
-			errChan <- nil
 		}
 	}()
+	go s.serveJSONRPC(ctx, jsonListener, errChan)
 
 	// Wait for context cancellation or server error
 	select {
 	case <-ctx.Done():
 		s.Shutdown()
-		// Wait for server to finish
-		<-errChan
+		return nil
+	case <-s.shutdownChan:
 		return nil
 	case err := <-errChan:
+		s.Shutdown()
 		return err
 	}
 }
@@ -217,6 +232,9 @@ func (s *Server) Shutdown() {
 		if s.listener != nil {
 			s.listener.Close()
 		}
+		if s.jsonListener != nil {
+			s.jsonListener.Close()
+		}
 
 		// Cleanup PID file and socket
 		s.cleanup()
@@ -228,10 +246,14 @@ func (s *Server) Shutdown() {
 // cleanup removes the socket and PID file.
 func (s *Server) cleanup() {
 	socketPath := s.paths.SocketFile()
+	jsonSocketPath := s.paths.JSONRPCSocketFile()
 	pidPath := s.paths.PIDFile()
 
 	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
 		s.logger.Warn("failed to remove socket", "path", socketPath, "error", err)
+	}
+	if err := os.Remove(jsonSocketPath); err != nil && !os.IsNotExist(err) {
+		s.logger.Warn("failed to remove json-rpc socket", "path", jsonSocketPath, "error", err)
 	}
 
 	if err := os.Remove(pidPath); err != nil && !os.IsNotExist(err) {
@@ -330,9 +352,34 @@ func (s *Server) pruneCache(ctx context.Context) {
 	pruned, err := s.store.PruneExpiredCache(ctx)
 	if err != nil {
 		s.logger.Warn("failed to prune cache", "error", err)
-		return
-	}
-	if pruned > 0 {
+	} else if pruned > 0 {
 		s.logger.Info("pruned expired cache entries", "count", pruned)
 	}
+
+	outputPruned, err := s.store.PruneExpiredCommandOutput(ctx)
+	if err != nil {
+		s.logger.Warn("failed to prune command output", "error", err)
+	} else if outputPruned > 0 {
+		s.logger.Info("pruned expired command output rows", "count", outputPruned)
+	}
+}
+
+func (s *Server) setCapturedBytes(commandID string, value int64) {
+	s.captureMu.Lock()
+	defer s.captureMu.Unlock()
+	s.capturedSize[commandID] = value
+}
+
+func (s *Server) addCapturedBytes(commandID string, delta int64) {
+	s.captureMu.Lock()
+	defer s.captureMu.Unlock()
+	s.capturedSize[commandID] += delta
+}
+
+func (s *Server) popCapturedBytes(commandID string) int64 {
+	s.captureMu.Lock()
+	defer s.captureMu.Unlock()
+	value := s.capturedSize[commandID]
+	delete(s.capturedSize, commandID)
+	return value
 }

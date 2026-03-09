@@ -146,6 +146,12 @@ func CleanupStaleWithPaths(paths *config.Paths) error {
 		return fmt.Errorf("failed to remove socket: %w", err)
 	}
 
+	// Remove JSON-RPC socket
+	jsonSocketPath := paths.JSONRPCSocketFile()
+	if err := os.Remove(jsonSocketPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove json-rpc socket: %w", err)
+	}
+
 	// Remove PID file
 	pidPath := paths.PIDFile()
 	if err := os.Remove(pidPath); err != nil && !os.IsNotExist(err) {
