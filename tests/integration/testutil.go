@@ -24,16 +24,16 @@ import (
 
 // TestEnv holds all resources for an integration test.
 type TestEnv struct {
+	Client     pb.ClaiServiceClient
+	Cancel     context.CancelFunc
 	T          *testing.T
+	Store      *storage.SQLiteStore
+	Server     *daemon.Server
+	Conn       *grpc.ClientConn
+	Paths      *config.Paths
 	TempDir    string
 	DBPath     string
 	SocketPath string
-	Store      *storage.SQLiteStore
-	Server     *daemon.Server
-	Client     pb.ClaiServiceClient
-	Conn       *grpc.ClientConn
-	Paths      *config.Paths
-	Cancel     context.CancelFunc
 }
 
 // SetupTestEnv creates a complete test environment with daemon, store, and client.
@@ -51,9 +51,9 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 	paths := &config.Paths{
 		BaseDir: tempDir,
 	}
-	if err := paths.EnsureDirectories(); err != nil {
+	if dirErr := paths.EnsureDirectories(); dirErr != nil {
 		os.RemoveAll(tempDir)
-		t.Fatalf("failed to create directories: %v", err)
+		t.Fatalf("failed to create directories: %v", dirErr)
 	}
 
 	// Create SQLite store
@@ -91,13 +91,13 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 	socketPath := paths.SocketFile()
 	errChan := make(chan error, 1)
 	go func() {
-		if err := server.Start(ctx); err != nil {
-			errChan <- err
+		if startErr := server.Start(ctx); startErr != nil {
+			errChan <- startErr
 		}
 	}()
 
 	// Wait for socket to be available or error
-	if err := waitForSocket(socketPath, 5*time.Second); err != nil {
+	if err = waitForSocket(socketPath, 5*time.Second); err != nil {
 		select {
 		case startErr := <-errChan:
 			cancel()
@@ -283,8 +283,8 @@ func dialSocket(path string) (*grpc.ClientConn, pb.ClaiServiceClient, error) {
 // mockProvider implements provider.Provider for testing.
 type mockProvider struct {
 	name       string
-	available  bool
 	suggestion string
+	available  bool
 }
 
 func newMockProvider(name string, available bool) *mockProvider {

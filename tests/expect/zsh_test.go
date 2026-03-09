@@ -1,6 +1,8 @@
 package expect
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -195,6 +197,110 @@ func TestZsh_RightArrowAcceptsSuggestion(t *testing.T) {
 
 	// The buffer should now contain the full suggestion
 	// Clear for cleanup
+	session.SendKey(KeyCtrlC)
+}
+
+func TestZsh_GhostTextPersistsAfterSpace(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "zsh")
+	SkipIfClaiMissing(t)
+
+	tmp := t.TempDir()
+	claiHome := filepath.Join(tmp, "clai-home")
+	histFile := filepath.Join(tmp, ".zsh_history")
+
+	// Deterministic history used by clai suggest history fallback and by clai-shim
+	// import-history on session start.
+	histContent := `: 1706000001:0;echo hello
+: 1706000002:0;echo world
+`
+	require.NoError(t, os.WriteFile(histFile, []byte(histContent), 0644))
+
+	session, err := NewSession("zsh",
+		WithTimeout(10*time.Second),
+		WithEnv("CLAI_HOME="+claiHome),
+		WithEnv("HISTFILE="+histFile),
+		WithClaiInit(),
+	)
+	require.NoError(t, err, "failed to create zsh session")
+	defer session.Close()
+
+	// Wait for loaded message
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
+	require.NoError(t, err)
+
+	// Type a prefix; the ghost should show the remainder in the ghost color (ANSI 256 fg=242).
+	require.NoError(t, session.Send("echo"))
+	_, err = session.ExpectTimeout("echo\x1b[38;5;242m world", 3*time.Second)
+	require.NoError(t, err)
+
+	// Insert a space; the ghost should remain colored, but without the leading space now.
+	require.NoError(t, session.Send(" "))
+	_, err = session.ExpectTimeout("echo \x1b[38;5;242mworld", 3*time.Second)
+	require.NoError(t, err)
+
+	session.SendKey(KeyCtrlC)
+}
+
+// TestZsh_AcceptGhostTextBecomesRegular verifies that pressing right-arrow to
+// accept a ghost text suggestion turns the dim ghost text into regular (normal
+// color) text in the buffer.
+func TestZsh_AcceptGhostTextBecomesRegular(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("skipping interactive test in short mode")
+	}
+	SkipIfShellMissing(t, "zsh")
+	SkipIfClaiMissing(t)
+
+	tmp := t.TempDir()
+	claiHome := filepath.Join(tmp, "clai-home")
+	histFile := filepath.Join(tmp, ".zsh_history")
+
+	histContent := `: 1706000001:0;echo hello
+: 1706000002:0;echo world
+`
+	require.NoError(t, os.WriteFile(histFile, []byte(histContent), 0644))
+
+	session, err := NewSession("zsh",
+		WithTimeout(10*time.Second),
+		WithEnv("CLAI_HOME="+claiHome),
+		WithEnv("HISTFILE="+histFile),
+		WithClaiInit(),
+	)
+	require.NoError(t, err, "failed to create zsh session")
+	defer session.Close()
+
+	// Wait for loaded message
+	_, err = session.ExpectTimeout("clai [", 5*time.Second)
+	require.NoError(t, err)
+
+	// Type a prefix; ghost text should appear in dim color
+	require.NoError(t, session.Send("echo"))
+	_, err = session.ExpectTimeout("echo\x1b[38;5;242m world", 3*time.Second)
+	require.NoError(t, err)
+
+	// Press right-arrow to accept the ghost text suggestion
+	require.NoError(t, session.SendKey(KeyRight))
+	time.Sleep(500 * time.Millisecond)
+
+	// After acceptance, type an extra char so zsh redraws the buffer fully.
+	// Then verify the buffer is "echo worldX" with no dim escape anywhere.
+	require.NoError(t, session.Send("X"))
+
+	// After the X, we expect "echo worldX" in normal text. If ghost text coloring
+	// persisted, the terminal would show \x1b[38;5;242m before "world".
+	output, err := session.ExpectTimeout("worldX", 3*time.Second)
+	require.NoError(t, err, "expected accepted text + 'X' in buffer")
+
+	// The output leading to "worldX" must not contain the ghost dim escape.
+	assert.NotContains(t, output, "\x1b[38;5;242m",
+		"ghost text dim coloring should not persist after right-arrow acceptance; "+
+			"got output: %q", output)
+
 	session.SendKey(KeyCtrlC)
 }
 

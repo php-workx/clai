@@ -389,7 +389,8 @@ fi
 echo "All functions defined"
 `
 
-	cmd := exec.Command(bashPath, "-c", script)
+	// Run bash in interactive mode so shell hooks initialize.
+	cmd := exec.Command(bashPath, "--norc", "--noprofile", "-i", "-c", script)
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

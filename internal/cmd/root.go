@@ -34,9 +34,11 @@ func init() {
 	rootCmd.AddCommand(askCmd)
 	rootCmd.AddCommand(cmdCmd)
 	rootCmd.AddCommand(suggestCmd)
+	rootCmd.AddCommand(suggestFeedbackCmd)
 	rootCmd.AddCommand(historyCmd)
 	rootCmd.AddCommand(onCmd)
 	rootCmd.AddCommand(offCmd)
+	rootCmd.AddCommand(workflowCmd)
 
 	// Setup commands
 	rootCmd.AddCommand(statusCmd)
@@ -52,4 +54,5 @@ func init() {
 	rootCmd.AddCommand(claudeDaemonCmd) // Claude CLI daemon
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(doctorCmd)
+	rootCmd.AddCommand(suggestDoctorCmd)
 }

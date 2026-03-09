@@ -74,124 +74,34 @@ func TestSuggestion_Backticks(t *testing.T) {
 	}
 }
 
-func TestSuggestion_InstallCommands(t *testing.T) {
-	tests := []struct {
-		name    string
-		input   string
-		want    string
-		wantPat string
-	}{
-		{
-			name:    "pip install",
-			input:   "ModuleNotFoundError: No module named 'requests'\npip install requests",
-			want:    "pip install requests",
-			wantPat: "install",
-		},
-		{
-			name:    "pip3 install",
-			input:   "pip3 install numpy pandas",
-			want:    "pip3 install numpy pandas",
-			wantPat: "install",
-		},
-		{
-			name:    "python -m pip install",
-			input:   "python -m pip install flask",
-			want:    "python -m pip install flask",
-			wantPat: "install",
-		},
-		{
-			name:    "python3 -m pip install",
-			input:   "python3 -m pip install django",
-			want:    "python3 -m pip install django",
-			wantPat: "install",
-		},
-		{
-			name:    "npm install",
-			input:   "npm install express",
-			want:    "npm install express",
-			wantPat: "install",
-		},
-		{
-			name:    "npm install scoped package",
-			input:   "npm install @types/node",
-			want:    "npm install @types/node",
-			wantPat: "install",
-		},
-		{
-			name:    "npm install with version",
-			input:   "npm install react@18.2.0",
-			want:    "npm install react@18.2.0",
-			wantPat: "install",
-		},
-		{
-			name:    "yarn install",
-			input:   "yarn install lodash",
-			want:    "yarn install lodash",
-			wantPat: "install",
-		},
-		{
-			name:    "pnpm install",
-			input:   "pnpm install axios",
-			want:    "pnpm install axios",
-			wantPat: "install",
-		},
-		{
-			name:    "brew install",
-			input:   "brew install wget",
-			want:    "brew install wget",
-			wantPat: "install",
-		},
-		{
-			name:    "cargo install",
-			input:   "cargo install ripgrep",
-			want:    "cargo install ripgrep",
-			wantPat: "install",
-		},
-		{
-			name:    "go install",
-			input:   "go install golang.org/x/tools/gopls@latest",
-			want:    "go install golang.org/x/tools/gopls@latest",
-			wantPat: "install",
-		},
-		{
-			name:    "apt-get install",
-			input:   "apt-get install build-essential",
-			want:    "apt-get install build-essential",
-			wantPat: "install",
-		},
-		{
-			name:    "apt install",
-			input:   "apt install vim",
-			want:    "apt install vim",
-			wantPat: "install",
-		},
-		{
-			name:    "dnf install",
-			input:   "dnf install nodejs",
-			want:    "dnf install nodejs",
-			wantPat: "install",
-		},
-		{
-			name:    "pacman -S install",
-			input:   "pacman -S install base-devel",
-			want:    "pacman -S install base-devel",
-			wantPat: "install",
-		},
-		{
-			name:    "install with multiple packages",
-			input:   "pip install requests beautifulsoup4 lxml",
-			want:    "pip install requests beautifulsoup4 lxml",
-			wantPat: "install",
-		},
-		{
-			name:    "case insensitive NPM",
-			input:   "NPM install express",
-			want:    "NPM install express",
-			wantPat: "install",
-		},
-	}
+var installCommandTests = []struct {
+	name    string
+	input   string
+	want    string
+	wantPat string
+}{
+	{"pip install", "ModuleNotFoundError: No module named 'requests'\npip install requests", "pip install requests", "install"},
+	{"pip3 install", "pip3 install numpy pandas", "pip3 install numpy pandas", "install"},
+	{"python -m pip install", "python -m pip install flask", "python -m pip install flask", "install"},
+	{"python3 -m pip install", "python3 -m pip install django", "python3 -m pip install django", "install"},
+	{"npm install", "npm install express", "npm install express", "install"},
+	{"npm install scoped package", "npm install @types/node", "npm install @types/node", "install"},
+	{"npm install with version", "npm install react@18.2.0", "npm install react@18.2.0", "install"},
+	{"yarn install", "yarn install lodash", "yarn install lodash", "install"},
+	{"pnpm install", "pnpm install axios", "pnpm install axios", "install"},
+	{"brew install", "brew install wget", "brew install wget", "install"},
+	{"cargo install", "cargo install ripgrep", "cargo install ripgrep", "install"},
+	{"go install", "go install golang.org/x/tools/gopls@latest", "go install golang.org/x/tools/gopls@latest", "install"},
+	{"apt-get install", "apt-get install build-essential", "apt-get install build-essential", "install"},
+	{"apt install", "apt install vim", "apt install vim", "install"},
+	{"dnf install", "dnf install nodejs", "dnf install nodejs", "install"},
+	{"pacman -S install", "pacman -S install base-devel", "pacman -S install base-devel", "install"},
+	{"install with multiple packages", "pip install requests beautifulsoup4 lxml", "pip install requests beautifulsoup4 lxml", "install"},
+	{"case insensitive NPM", "NPM install express", "NPM install express", "install"},
+}
 
-	for _, tt := range tests {
+func TestSuggestion_InstallCommands(t *testing.T) {
+	for _, tt := range installCommandTests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, pat := SuggestionWithPattern(tt.input)
 			if got != tt.want {

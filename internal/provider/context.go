@@ -5,6 +5,15 @@ import (
 	"strings"
 )
 
+// Prompt format fragments reused across multiple builder methods.
+const (
+	contextHeader  = "Context:\n"
+	fmtOS          = "- OS: %s\n"
+	fmtShell       = "- Shell: %s\n"
+	fmtWorkDir     = "- Working Directory: %s\n"
+	fmtCmdHistItem = "%d. %s (exit %d)\n"
+)
+
 // ContextBuilder constructs AI prompts with appropriate system context
 type ContextBuilder struct {
 	os         string
@@ -28,19 +37,19 @@ func (b *ContextBuilder) BuildTextToCommandPrompt(userPrompt string) string {
 	var sb strings.Builder
 
 	sb.WriteString("You are a command-line assistant. Generate shell commands for the user's request.\n\n")
-	sb.WriteString("Context:\n")
-	sb.WriteString(fmt.Sprintf("- OS: %s\n", b.os))
-	sb.WriteString(fmt.Sprintf("- Shell: %s\n", b.shell))
-	sb.WriteString(fmt.Sprintf("- Working Directory: %s\n", b.cwd))
+	sb.WriteString(contextHeader)
+	_, _ = fmt.Fprintf(&sb, fmtOS, b.os)
+	_, _ = fmt.Fprintf(&sb, fmtShell, b.shell)
+	_, _ = fmt.Fprintf(&sb, fmtWorkDir, b.cwd)
 
 	if len(b.recentCmds) > 0 {
 		sb.WriteString("\nRecent commands:\n")
 		for i, cmd := range b.recentCmds {
-			sb.WriteString(fmt.Sprintf("%d. %s (exit %d)\n", i+1, cmd.Command, cmd.ExitCode))
+			_, _ = fmt.Fprintf(&sb, fmtCmdHistItem, i+1, cmd.Command, cmd.ExitCode)
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf("\nUser request: %s\n", userPrompt))
+	_, _ = fmt.Fprintf(&sb, "\nUser request: %s\n", userPrompt)
 	sb.WriteString("\nRespond with 1-3 shell commands, one per line. No explanations.")
 
 	return sb.String()
@@ -51,17 +60,17 @@ func (b *ContextBuilder) BuildNextStepPrompt(lastCommand string, exitCode int) s
 	var sb strings.Builder
 
 	sb.WriteString("You are a command-line assistant predicting the next command.\n\n")
-	sb.WriteString("Context:\n")
-	sb.WriteString(fmt.Sprintf("- OS: %s\n", b.os))
-	sb.WriteString(fmt.Sprintf("- Shell: %s\n", b.shell))
-	sb.WriteString(fmt.Sprintf("- Working Directory: %s\n", b.cwd))
-	sb.WriteString(fmt.Sprintf("- Last command: %s\n", lastCommand))
-	sb.WriteString(fmt.Sprintf("- Exit code: %d\n", exitCode))
+	sb.WriteString(contextHeader)
+	_, _ = fmt.Fprintf(&sb, fmtOS, b.os)
+	_, _ = fmt.Fprintf(&sb, fmtShell, b.shell)
+	_, _ = fmt.Fprintf(&sb, fmtWorkDir, b.cwd)
+	_, _ = fmt.Fprintf(&sb, "- Last command: %s\n", lastCommand)
+	_, _ = fmt.Fprintf(&sb, "- Exit code: %d\n", exitCode)
 
 	if len(b.recentCmds) > 0 {
 		sb.WriteString("\nPrevious commands:\n")
 		for i, cmd := range b.recentCmds {
-			sb.WriteString(fmt.Sprintf("%d. %s (exit %d)\n", i+1, cmd.Command, cmd.ExitCode))
+			_, _ = fmt.Fprintf(&sb, fmtCmdHistItem, i+1, cmd.Command, cmd.ExitCode)
 		}
 	}
 
@@ -75,21 +84,21 @@ func (b *ContextBuilder) BuildDiagnosePrompt(command string, exitCode int, stder
 	var sb strings.Builder
 
 	sb.WriteString("You are a command-line assistant diagnosing a failed command.\n\n")
-	sb.WriteString("Context:\n")
-	sb.WriteString(fmt.Sprintf("- OS: %s\n", b.os))
-	sb.WriteString(fmt.Sprintf("- Shell: %s\n", b.shell))
-	sb.WriteString(fmt.Sprintf("- Working Directory: %s\n", b.cwd))
-	sb.WriteString(fmt.Sprintf("\nFailed command: %s\n", command))
-	sb.WriteString(fmt.Sprintf("Exit code: %d\n", exitCode))
+	sb.WriteString(contextHeader)
+	_, _ = fmt.Fprintf(&sb, fmtOS, b.os)
+	_, _ = fmt.Fprintf(&sb, fmtShell, b.shell)
+	_, _ = fmt.Fprintf(&sb, fmtWorkDir, b.cwd)
+	_, _ = fmt.Fprintf(&sb, "\nFailed command: %s\n", command)
+	_, _ = fmt.Fprintf(&sb, "Exit code: %d\n", exitCode)
 
 	if stderr != "" {
-		sb.WriteString(fmt.Sprintf("\nError output:\n%s\n", truncateStderr(stderr)))
+		_, _ = fmt.Fprintf(&sb, "\nError output:\n%s\n", truncateStderr(stderr))
 	}
 
 	if len(b.recentCmds) > 0 {
 		sb.WriteString("\nRecent command history:\n")
 		for i, cmd := range b.recentCmds {
-			sb.WriteString(fmt.Sprintf("%d. %s (exit %d)\n", i+1, cmd.Command, cmd.ExitCode))
+			_, _ = fmt.Fprintf(&sb, fmtCmdHistItem, i+1, cmd.Command, cmd.ExitCode)
 		}
 	}
 

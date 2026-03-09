@@ -1,0 +1,8 @@
+defaults:
+  mode: local
+  severity: high
+  scope: new
+  max_passes: 8
+
+scan:
+  base_ref: origin/main

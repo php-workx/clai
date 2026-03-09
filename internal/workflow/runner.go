@@ -1,0 +1,434 @@
+package workflow
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/exec"
+	"strings"
+	"time"
+)
+
+// DefaultBufferSize is the default limitedBuffer capacity (4KB).
+const DefaultBufferSize = 4096
+
+// StepResult holds the outcome of a single step execution.
+type StepResult struct {
+	Error          error
+	Outputs        map[string]string
+	Command        string
+	StepID         string
+	Name           string
+	Status         string
+	StdoutTail     string
+	StderrTail     string
+	RiskLevel      string
+	AnalysisPrompt string
+	ResolvedEnv    []string
+	DurationMs     int64
+	ExitCode       int
+}
+
+// RunResult holds the outcome of a complete job run.
+type RunResult struct {
+	Error      error
+	Status     string
+	Steps      []*StepResult
+	DurationMs int64
+}
+
+// StepCallback is called by the runner before and after each step.
+// The StepResult is nil on start and populated on end.
+// Returning a non-nil error from StepEventEnd halts execution of subsequent steps.
+type StepCallback func(event StepEvent, stepDef *StepDef, result *StepResult) error
+
+// StepEvent indicates whether a callback is for step start or end.
+type StepEvent int
+
+const (
+	// StepEventStart is emitted before a step begins execution.
+	StepEventStart StepEvent = iota
+	// StepEventEnd is emitted after a step completes.
+	StepEventEnd
+)
+
+// RunnerConfig configures the runner.
+type RunnerConfig struct {
+	Shell        ShellAdapter
+	Process      ProcessController
+	Env          map[string]string
+	JobEnv       map[string]string
+	MatrixVars   map[string]string
+	VarOverrides map[string]string
+	OnStep       StepCallback
+	WorkDir      string
+	Secrets      []SecretDef
+	BufferSize   int
+}
+
+// Runner executes a job's steps sequentially.
+type Runner struct {
+	shell   ShellAdapter
+	process ProcessController
+	masker  *SecretMasker
+	config  RunnerConfig
+}
+
+// NewRunner creates a runner with the given config.
+// If cfg.Shell or cfg.Process are nil, platform defaults are used.
+func NewRunner(cfg RunnerConfig) *Runner { //nolint:gocritic // hugeParam: cfg is intentionally copied into Runner
+	bufSize := cfg.BufferSize
+	if bufSize <= 0 {
+		bufSize = DefaultBufferSize
+	}
+	cfg.BufferSize = bufSize
+
+	shell := cfg.Shell
+	if shell == nil {
+		shell = NewShellAdapter()
+	}
+	process := cfg.Process
+	if process == nil {
+		process = NewProcessController()
+	}
+
+	return &Runner{
+		shell:   shell,
+		process: process,
+		masker:  NewSecretMasker(cfg.Secrets),
+		config:  cfg,
+	}
+}
+
+// Run executes all steps in sequence. Returns RunResult.
+// If any step fails (non-zero exit), remaining steps are skipped.
+// Uses context for Ctrl+C cancellation.
+func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
+	runStart := time.Now()
+	result := &RunResult{
+		Status: "passed",
+		Steps:  make([]*StepResult, 0, len(steps)),
+	}
+
+	// Track step outputs for expression resolution.
+	stepOutputs := make(map[string]map[string]string)
+	// Exported outputs are inherited as environment variables by later steps.
+	stepOutputEnv := make(map[string]string)
+	failed := false
+
+	for i, step := range steps {
+		// Check context cancellation.
+		select {
+		case <-ctx.Done():
+			// Mark remaining steps as skipped.
+			for j := i; j < len(steps); j++ {
+				result.Steps = append(result.Steps, &StepResult{
+					StepID: steps[j].ID,
+					Name:   steps[j].Name,
+					Status: "skipped",
+				})
+			}
+			result.Status = string(RunCancelled)
+			result.DurationMs = time.Since(runStart).Milliseconds()
+			result.Error = ctx.Err()
+			return result
+		default:
+		}
+
+		// Skip remaining steps if a previous step failed.
+		if failed {
+			result.Steps = append(result.Steps, &StepResult{
+				StepID: step.ID,
+				Name:   step.Name,
+				Status: "skipped",
+			})
+			continue
+		}
+
+		if r.config.OnStep != nil {
+			_ = r.config.OnStep(StepEventStart, step, nil)
+		}
+
+		stepResult := r.executeStep(ctx, step, stepOutputs, stepOutputEnv)
+		result.Steps = append(result.Steps, stepResult)
+
+		if r.config.OnStep != nil {
+			if cbErr := r.config.OnStep(StepEventEnd, step, stepResult); cbErr != nil {
+				failed = true
+				result.Status = string(RunFailed)
+				result.Error = cbErr
+			}
+		}
+
+		// Store outputs for expression resolution in subsequent steps.
+		if step.ID != "" && len(stepResult.Outputs) > 0 {
+			stepOutputs[step.ID] = stepResult.Outputs
+		}
+		// Export outputs to downstream process environment.
+		for k, v := range stepResult.Outputs {
+			stepOutputEnv[k] = v
+		}
+
+		if stepResult.Status == string(StepCancelled) {
+			failed = true
+			result.Status = string(RunCancelled)
+			result.Error = stepResult.Error
+			continue
+		}
+		if stepResult.Status == string(StepFailed) {
+			failed = true
+			result.Status = string(RunFailed)
+		}
+	}
+
+	result.DurationMs = time.Since(runStart).Milliseconds()
+	return result
+}
+
+// executeStep runs a single step and returns the result.
+//
+//nolint:funlen // Linear flow keeps failure handling explicit and easy to audit.
+func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map[string]map[string]string, stepOutputEnv map[string]string) *StepResult {
+	stepStart := time.Now()
+	sr := &StepResult{
+		StepID:  step.ID,
+		Name:    step.Name,
+		Outputs: map[string]string{},
+	}
+
+	// Create temp file for CLAI_OUTPUT.
+	outputFile, err := os.CreateTemp("", "clai-output-*")
+	if err != nil {
+		sr.Status = "failed"
+		sr.ExitCode = 1
+		sr.Error = fmt.Errorf("creating output temp file: %w", err)
+		sr.DurationMs = time.Since(stepStart).Milliseconds()
+		return sr
+	}
+	outputPath := outputFile.Name()
+	outputFile.Close()
+	defer os.Remove(outputPath)
+
+	// Build expression context for resolving ${{ }} expressions.
+	exprCtx := &ExpressionContext{
+		Env:    r.buildExprEnv(step, stepOutputEnv),
+		Matrix: r.config.MatrixVars,
+		Steps:  stepOutputs,
+	}
+
+	// Resolve expressions in the run command.
+	resolvedRun, err := ResolveExpressions(step.Run, exprCtx)
+	if err != nil {
+		sr.Status = "failed"
+		sr.ExitCode = 1
+		sr.Error = fmt.Errorf("resolving expressions in run: %w", err)
+		sr.DurationMs = time.Since(stepStart).Milliseconds()
+		return sr
+	}
+
+	// Resolve expressions in step env values.
+	resolvedStepEnv := make(map[string]string, len(step.Env))
+	for k, v := range step.Env {
+		resolved, resolveErr := ResolveExpressions(v, exprCtx)
+		if resolveErr != nil {
+			sr.Status = "failed"
+			sr.ExitCode = 1
+			sr.Error = fmt.Errorf("resolving expressions in env %s: %w", k, resolveErr)
+			sr.DurationMs = time.Since(stepStart).Milliseconds()
+			return sr
+		}
+		resolvedStepEnv[k] = resolved
+	}
+
+	// Resolve expressions in the step name (for display).
+	resolvedName, err := ResolveExpressions(step.Name, exprCtx)
+	if err == nil {
+		sr.Name = resolvedName
+	}
+
+	// Resolve expressions in risk_level (e.g. "${{ matrix.risk }}").
+	if step.RiskLevel != "" {
+		resolvedRL, rlErr := ResolveExpressions(step.RiskLevel, exprCtx)
+		if rlErr == nil {
+			sr.RiskLevel = resolvedRL
+		} else {
+			sr.RiskLevel = step.RiskLevel
+		}
+	}
+
+	// Resolve expressions in analysis_prompt.
+	if step.AnalysisPrompt != "" {
+		resolvedAP, apErr := ResolveExpressions(step.AnalysisPrompt, exprCtx)
+		if apErr == nil {
+			sr.AnalysisPrompt = resolvedAP
+		} else {
+			sr.AnalysisPrompt = step.AnalysisPrompt
+		}
+	}
+
+	// Create a modified step with the resolved command.
+	resolvedStep := *step
+	resolvedStep.Run = resolvedRun
+	sr.Command = resolvedRun
+
+	// Merge environment: OS -> output exports -> workflow -> job -> step -> matrix -> --var overrides.
+	env := mergeEnv(stepOutputEnv, r.config.Env, r.config.JobEnv, resolvedStepEnv, r.config.MatrixVars, r.config.VarOverrides)
+	sr.ResolvedEnv = append([]string(nil), env...)
+
+	// Build command via ShellAdapter.
+	cmd, err := r.shell.BuildCommand(ctx, &resolvedStep, r.config.WorkDir, env, outputPath)
+	if err != nil {
+		sr.Status = "failed"
+		sr.ExitCode = 1
+		sr.Error = fmt.Errorf("building command: %w", err)
+		sr.DurationMs = time.Since(stepStart).Milliseconds()
+		return sr
+	}
+
+	// Create limited buffers for stdout/stderr capture.
+	stdoutBuf := NewLimitedBuffer(r.config.BufferSize)
+	stderrBuf := NewLimitedBuffer(r.config.BufferSize)
+	cmd.Stdout = stdoutBuf
+	cmd.Stderr = stderrBuf
+
+	// Start the process.
+	if err := r.process.Start(cmd); err != nil {
+		sr.Status = "failed"
+		sr.ExitCode = 1
+		sr.Error = fmt.Errorf("starting process: %w", err)
+		sr.DurationMs = time.Since(stepStart).Milliseconds()
+		return sr
+	}
+
+	// Wait for completion with context cancellation support.
+	waitErr := r.process.Wait(ctx, cmd, DefaultGracePeriod)
+
+	sr.DurationMs = time.Since(stepStart).Milliseconds()
+
+	// Capture stdout/stderr tails, masking secrets.
+	sr.StdoutTail = r.masker.Mask(stdoutBuf.String())
+	sr.StderrTail = r.masker.Mask(stderrBuf.String())
+
+	// Parse the CLAI_OUTPUT file for step outputs.
+	outputs, parseErr := ParseOutputFile(outputPath)
+	if parseErr != nil {
+		slog.Warn("failed to parse step output file", "step", step.Name, "error", parseErr)
+		outputs = map[string]string{}
+	}
+	sr.Outputs = outputs
+
+	// Determine exit code and status.
+	switch {
+	case ctx.Err() != nil:
+		sr.ExitCode = exitCodeFromError(waitErr)
+		if sr.ExitCode == 0 {
+			// Conventional code for interrupted command.
+			sr.ExitCode = 130
+		}
+		sr.Status = string(StepCancelled)
+		sr.Error = ctx.Err()
+	case waitErr != nil:
+		sr.ExitCode = exitCodeFromError(waitErr)
+		sr.Status = string(StepFailed)
+		sr.Error = waitErr
+	default:
+		sr.ExitCode = 0
+		sr.Status = string(StepPassed)
+	}
+
+	return sr
+}
+
+// buildExprEnv builds the env map for expression resolution.
+// This includes all environment layers (workflow, job, step) merged with proper precedence.
+func (r *Runner) buildExprEnv(step *StepDef, outputEnv map[string]string) map[string]string {
+	env := make(map[string]string)
+
+	// Exported outputs from prior steps are inherited as env.
+	for k, v := range outputEnv {
+		env[k] = v
+	}
+	// Workflow env.
+	for k, v := range r.config.Env {
+		env[k] = v
+	}
+	// Job env overrides workflow.
+	for k, v := range r.config.JobEnv {
+		env[k] = v
+	}
+	// Step env overrides job.
+	for k, v := range step.Env {
+		env[k] = v
+	}
+	// Matrix vars.
+	for k, v := range r.config.MatrixVars {
+		env[k] = v
+	}
+	// --var CLI overrides (highest precedence).
+	for k, v := range r.config.VarOverrides {
+		env[k] = v
+	}
+
+	return env
+}
+
+// mergeEnv merges environment variables with proper precedence:
+// OS env < output exports < workflow < job < step < matrix < --var overrides.
+// Returns a []string in "KEY=value" format suitable for exec.Cmd.Env.
+func mergeEnv(outputs, workflow, job, step, matrix, varOverrides map[string]string) []string {
+	merged := make(map[string]string)
+
+	// Start with OS environment.
+	for _, kv := range os.Environ() {
+		idx := strings.IndexByte(kv, '=')
+		if idx >= 0 {
+			merged[kv[:idx]] = kv[idx+1:]
+		}
+	}
+
+	// Layer exported outputs from prior steps.
+	for k, v := range outputs {
+		merged[k] = v
+	}
+	// Layer workflow env.
+	for k, v := range workflow {
+		merged[k] = v
+	}
+	// Layer job env.
+	for k, v := range job {
+		merged[k] = v
+	}
+	// Layer step env.
+	for k, v := range step {
+		merged[k] = v
+	}
+	// Add matrix vars as environment variables.
+	for k, v := range matrix {
+		merged[k] = v
+	}
+	// --var CLI overrides (highest precedence).
+	for k, v := range varOverrides {
+		merged[k] = v
+	}
+
+	// Convert to []string.
+	result := make([]string, 0, len(merged))
+	for k, v := range merged {
+		result = append(result, k+"="+v)
+	}
+	return result
+}
+
+// exitCodeFromError extracts the exit code from an exec error.
+func exitCodeFromError(err error) int {
+	if err == nil {
+		return 0
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
+	}
+	return 1
+}

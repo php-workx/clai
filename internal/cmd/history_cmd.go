@@ -24,6 +24,7 @@ var (
 	historyGlobal  bool
 	historyStatus  string
 	historyFormat  string
+	historyJSON    bool
 )
 
 var historyCmd = &cobra.Command{
@@ -59,9 +60,14 @@ func init() {
 	historyCmd.Flags().BoolVarP(&historyGlobal, "global", "g", false, "Show history across all sessions")
 	historyCmd.Flags().StringVarP(&historyStatus, "status", "s", "", "Filter by status: 'success' or 'failure'")
 	historyCmd.Flags().StringVar(&historyFormat, "format", "raw", "Output format: raw or json")
+	historyCmd.Flags().BoolVar(&historyJSON, "json", false, "Output format as JSON (alias for --format json)")
 }
 
 func runHistory(cmd *cobra.Command, args []string) error {
+	if historyJSON {
+		historyFormat = "json"
+	}
+
 	paths := config.DefaultPaths()
 
 	store, err := storage.NewSQLiteStore(paths.DatabaseFile())
@@ -178,7 +184,7 @@ func outputHistory(commands []storage.Command) error {
 			entries = append(entries, historyOutput{
 				Text:     commands[i].Command,
 				Cwd:      commands[i].CWD,
-				TsUnixMs: commands[i].TsStartUnixMs,
+				TSUnixMs: commands[i].TSStartUnixMs,
 				ExitCode: commands[i].ExitCode,
 				Source:   source,
 			})
@@ -192,11 +198,11 @@ func outputHistory(commands []storage.Command) error {
 }
 
 type historyOutput struct {
+	ExitCode *int   `json:"exit_code"`
 	Text     string `json:"text"`
 	Cwd      string `json:"cwd"`
-	TsUnixMs int64  `json:"ts_unix_ms"`
-	ExitCode *int   `json:"exit_code"`
 	Source   string `json:"source"`
+	TSUnixMs int64  `json:"ts_unix_ms"`
 }
 
 func historySource(global bool, cwd, session string) string {

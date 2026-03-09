@@ -1,5 +1,8 @@
-.DS_Store
-.agents
+.agents/reviews
+.agents/compaction-snapshots
+.agents/tooling
+.agents/ao
+.claude/worktrees
 .idea
 .DS_Store
 firebase-debug.log
@@ -15,11 +18,14 @@ coverage.out
 coverage.html
 
 # Beads export state (machine-specific paths)
-.beads/export-state
+/.beads/export-state/
 .beads/.jsonl.lock
 .scannerwork
 .sonarqube
 .sonarqube-autofix
+.tmp
 
 # Auto Claude data directory
 .auto-claude/
+/tests/integration/.agents/
+/tests/e2e/node_modules/

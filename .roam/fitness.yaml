@@ -1,0 +1,34 @@
+# Architectural fitness functions for clai
+# Run with: roam fitness
+# Use in CI: roam fitness && echo "Architecture OK"
+
+rules:
+  # Dependency constraints
+  - name: "No test imports in production"
+    type: dependency
+    from: "{cmd,internal,gen}/**"
+    to: "tests/**"
+    allow: false
+    reason: "Production code must not depend on test infrastructure"
+
+  # Metric thresholds
+  - name: "No new cycles"
+    type: metric
+    metric: cycles
+    max: 2
+    reason: "Dependency cycles make the codebase harder to reason about (2 existing in storage/daemon)"
+
+  # Trend-based regression guards (requires snapshots)
+  - name: "Health must not regress"
+    type: trend
+    metric: health_score
+    max_decrease: 5
+    window: 3
+    reason: "Health score dropped significantly vs recent snapshots"
+
+  - name: "Complexity must not creep"
+    type: trend
+    metric: avg_complexity
+    max_increase: 2.0
+    window: 3
+    reason: "Average complexity is trending upward"

@@ -1,0 +1,376 @@
+package daemon
+
+import (
+	"context"
+	"crypto/sha256"
+	"fmt"
+	"sort"
+	"time"
+
+	pb "github.com/runger/clai/gen/clai/v1"
+	"github.com/runger/clai/internal/sanitize"
+	"github.com/runger/clai/internal/suggestions/explain"
+	"github.com/runger/clai/internal/suggestions/learning"
+	"github.com/runger/clai/internal/suggestions/normalize"
+	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
+)
+
+const weightsCacheTTL = 30 * time.Second
+
+type cachedWeights struct {
+	profile   *learning.WeightProfile
+	fetchedAt time.Time
+}
+
+// suggestV2 generates suggestions using only the V2 scorer.
+// Returns nil response if the V2 scorer is not available (caller should fall back).
+func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResults int) *pb.SuggestResponse {
+	if s.v2Scorer == nil {
+		return nil
+	}
+
+	suggestCtx := s.buildV2SuggestContext(req)
+	if suggestCtx.NowMs == 0 {
+		suggestCtx.NowMs = time.Now().UnixMilli()
+	}
+
+	suggestions, err := s.v2Scorer.Suggest(ctx, &suggestCtx)
+	if err != nil {
+		s.logger.Warn("V2 scorer failed", "error", err)
+		return nil
+	}
+	s.applyLearningProfile(ctx, &suggestCtx, suggestions)
+
+	if maxResults > 0 && len(suggestions) > maxResults {
+		suggestions = suggestions[:maxResults]
+	}
+	if req.SessionId != "" {
+		s.snapshotMu.Lock()
+		s.lastSuggestSnapshots[req.SessionId] = suggestSnapshot{
+			Context:     suggestCtx,
+			Suggestions: append([]suggest2.Suggestion(nil), suggestions...),
+			ShownAtMs:   suggestCtx.NowMs,
+		}
+		s.snapshotMu.Unlock()
+	}
+
+	return s.v2SuggestionsToProto(suggestions, suggestCtx.LastCmd, suggestCtx.NowMs)
+}
+
+func (s *Server) applyLearningProfile(
+	ctx context.Context,
+	suggestCtx *suggest2.SuggestContext,
+	suggestions []suggest2.Suggestion,
+) {
+	if len(suggestions) == 0 || s.learningStore == nil {
+		return
+	}
+	scope := suggestCtx.Scope
+	if scope == "" {
+		if suggestCtx.RepoKey != "" {
+			scope = suggestCtx.RepoKey
+		} else {
+			scope = "global"
+		}
+	}
+	profile := s.cachedLoadWeights(ctx, scope)
+	if profile == nil && scope != "global" {
+		profile = s.cachedLoadWeights(ctx, "global")
+	}
+	if profile == nil || profile.SampleCount < learning.DefaultConfig().MinSamples {
+		return
+	}
+	for i := range suggestions {
+		suggestions[i].Score += learningDelta(&suggestions[i], suggestCtx.Prefix, &profile.Weights)
+	}
+	sort.SliceStable(suggestions, func(i, j int) bool {
+		if suggestions[i].Score != suggestions[j].Score {
+			return suggestions[i].Score > suggestions[j].Score
+		}
+		return suggestions[i].Command < suggestions[j].Command
+	})
+}
+
+func (s *Server) cachedLoadWeights(ctx context.Context, scope string) *learning.WeightProfile {
+	now := time.Now()
+	s.weightsCacheMu.RLock()
+	if cached, ok := s.weightsCache[scope]; ok && now.Sub(cached.fetchedAt) < weightsCacheTTL {
+		s.weightsCacheMu.RUnlock()
+		return cached.profile
+	}
+	s.weightsCacheMu.RUnlock()
+
+	profile, err := s.learningStore.LoadWeights(ctx, scope)
+	if err != nil {
+		s.logger.Debug("failed to load learning profile", "scope", scope, "error", err)
+		return nil
+	}
+
+	s.weightsCacheMu.Lock()
+	if s.weightsCache == nil {
+		s.weightsCache = make(map[string]cachedWeights)
+	}
+	s.weightsCache[scope] = cachedWeights{profile: profile, fetchedAt: now}
+	s.weightsCacheMu.Unlock()
+
+	return profile
+}
+
+func learningDelta(sug *suggest2.Suggestion, prefix string, w *learning.Weights) float64 {
+	// Keep adaptive contribution bounded so learned weights nudge ordering
+	// without overpowering base score signals.
+	const learningScale = 25.0
+
+	fv := featureVectorFromSuggestion(sug, &pb.RecordFeedbackRequest{Prefix: prefix})
+	positive := w.Transition*fv.Transition +
+		w.Frequency*fv.Frequency +
+		w.Prefix*fv.Prefix +
+		w.Affinity*fv.Affinity +
+		w.Task*fv.Task +
+		w.ProjectTypeAffinity*fv.ProjectTypeAffinity +
+		w.FailureRecovery*fv.FailureRecovery
+	negative := w.RiskPenalty * fv.RiskPenalty
+	return (positive - negative) * learningScale
+}
+
+// mergeResponses merges V1 and V2 responses, deduplicating by command text.
+// V2 suggestions take priority on conflicts. Results are interleaved
+// (v2, v1, v2, v1, ...) and capped at maxResults.
+func mergeResponses(v1, v2 *pb.SuggestResponse, maxResults int) *pb.SuggestResponse {
+	if v2 == nil || len(v2.Suggestions) == 0 {
+		return v1
+	}
+	if v1 == nil || len(v1.Suggestions) == 0 {
+		return v2
+	}
+	merged := interleaveUniqueSuggestions(v2.Suggestions, v1.Suggestions, maxResults)
+
+	return &pb.SuggestResponse{
+		Suggestions: merged,
+		FromCache:   v1.FromCache,
+	}
+}
+
+func interleaveUniqueSuggestions(primary, secondary []*pb.Suggestion, maxResults int) []*pb.Suggestion {
+	seen := make(map[string]struct{}, maxResults)
+	merged := make([]*pb.Suggestion, 0, maxResults)
+	pIdx, sIdx := 0, 0
+	for len(merged) < maxResults && (pIdx < len(primary) || sIdx < len(secondary)) {
+		merged, pIdx = appendUniqueSuggestion(merged, primary, pIdx, seen)
+		if len(merged) >= maxResults {
+			break
+		}
+		merged, sIdx = appendUniqueSuggestion(merged, secondary, sIdx, seen)
+	}
+	return merged
+}
+
+func appendUniqueSuggestion(
+	merged []*pb.Suggestion,
+	source []*pb.Suggestion,
+	idx int,
+	seen map[string]struct{},
+) (result []*pb.Suggestion, nextIdx int) {
+	if idx >= len(source) {
+		return merged, idx
+	}
+	sug := source[idx]
+	idx++
+	if sug == nil {
+		return merged, idx
+	}
+	if _, exists := seen[sug.Text]; exists {
+		return merged, idx
+	}
+	seen[sug.Text] = struct{}{}
+	return append(merged, sug), idx
+}
+
+// buildV2SuggestContext creates a V2 SuggestContext from a Suggest RPC request.
+func (s *Server) buildV2SuggestContext(req *pb.SuggestRequest) suggest2.SuggestContext {
+	suggestCtx := suggest2.SuggestContext{
+		SessionID: req.SessionId,
+		Prefix:    req.Buffer,
+		Cwd:       req.Cwd,
+		RepoKey:   req.RepoKey,
+	}
+
+	// Try to get the last command from session for transition scoring
+	if info, ok := s.sessionManager.Get(req.SessionId); ok {
+		if suggestCtx.LastCmd == "" {
+			suggestCtx.LastCmd = normalize.NormalizeSimple(info.LastCmdRaw)
+		}
+		if suggestCtx.RepoKey == "" {
+			suggestCtx.RepoKey = info.LastGitRepo
+		}
+		suggestCtx.LastTemplateID = info.LastTemplateID
+		suggestCtx.ProjectTypes = append([]string(nil), info.ProjectTypes...)
+		// DirScopeKey: first 8 bytes (64 bits) of SHA-256 for collision resistance.
+		if req.Cwd != "" {
+			h := sha256.Sum256([]byte(req.Cwd))
+			suggestCtx.DirScopeKey = fmt.Sprintf("dir:%x", h[:8])
+		}
+	}
+	if req.LastCmdNorm != "" {
+		suggestCtx.LastCmd = normalize.NormalizeSimple(req.LastCmdNorm)
+	}
+	if req.LastCmdRaw != "" {
+		suggestCtx.LastCmd = normalize.NormalizeSimple(req.LastCmdRaw)
+		if suggestCtx.LastTemplateID == "" {
+			suggestCtx.LastTemplateID = normalize.PreNormalize(req.LastCmdRaw, normalize.PreNormConfig{}).TemplateID
+		}
+	}
+	if suggestCtx.LastTemplateID == "" && suggestCtx.LastCmd != "" {
+		suggestCtx.LastTemplateID = normalize.PreNormalize(suggestCtx.LastCmd, normalize.PreNormConfig{}).TemplateID
+	}
+
+	return suggestCtx
+}
+
+// v2SuggestionsToProto converts V2 scorer suggestions to protobuf format.
+func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd string, nowMs int64) *pb.SuggestResponse {
+	// Use default explain config; CLI can request more, but the picker UI
+	// should always have a basic "why" available.
+	explainCfg := explain.DefaultConfig()
+
+	pbSuggestions := make([]*pb.Suggestion, len(suggestions))
+	for i := range suggestions {
+		pbSuggestions[i] = v2SuggestionToProto(&suggestions[i], prevCmd, nowMs, explainCfg)
+	}
+	return &pb.SuggestResponse{
+		Suggestions: pbSuggestions,
+		FromCache:   false,
+		CacheStatus: "miss",
+		TimingHint: &pb.TimingHint{
+			UserSpeedClass:            "moderate",
+			SuggestedPauseThresholdMs: 250,
+		},
+	}
+}
+
+func v2SuggestionToProto(
+	sug *suggest2.Suggestion,
+	prevCmd string,
+	nowMs int64,
+	explainCfg explain.Config,
+) *pb.Suggestion {
+	why := explain.Explain(sug, explainCfg, prevCmd)
+	return &pb.Suggestion{
+		Text:        sug.Command,
+		Description: v2SuggestionDescription(sug, why, prevCmd),
+		Source:      v2SuggestionSource(sug),
+		Score:       sug.Score,
+		Risk:        v2SuggestionRisk(sug.Command),
+		CmdNorm:     sug.Command,
+		Confidence:  sug.Confidence,
+		Reasons:     v2SuggestionReasons(sug, why, nowMs),
+	}
+}
+
+func v2SuggestionSource(sug *suggest2.Suggestion) string {
+	breakdown := sug.ScoreBreakdown()
+
+	cwdScore := breakdown.DirTransition + breakdown.DirFrequency
+	repoScore := breakdown.RepoTransition + breakdown.RepoFrequency + breakdown.ProjectTask
+	globalScore := breakdown.GlobalTransition + breakdown.GlobalFrequency
+	sessionScore := breakdown.WorkflowBoost + breakdown.PipelineConf + breakdown.RecoveryBoost
+
+	source := "global"
+	maxScore := globalScore
+
+	if repoScore > maxScore {
+		source = "repo"
+		maxScore = repoScore
+	}
+	if cwdScore > maxScore {
+		source = "cwd"
+		maxScore = cwdScore
+	}
+	if sessionScore > maxScore {
+		source = "session"
+		maxScore = sessionScore
+	}
+
+	if maxScore <= 0 {
+		return "global"
+	}
+	return source
+}
+
+func v2SuggestionRisk(command string) string {
+	if sanitize.IsDestructive(command) {
+		return riskDestructive
+	}
+	return ""
+}
+
+func v2SuggestionReasons(
+	sug *suggest2.Suggestion,
+	why []explain.Reason,
+	nowMs int64,
+) []*pb.SuggestionReason {
+	reasons := make([]*pb.SuggestionReason, 0, len(why)+3)
+	for _, r := range why {
+		reasons = append(reasons, &pb.SuggestionReason{
+			Type:         r.Tag,
+			Description:  r.Description,
+			Contribution: float32(r.Contribution),
+		})
+	}
+	if sugLast := sug.LastSeenMs(); sugLast > 0 {
+		reasons = append(reasons, &pb.SuggestionReason{
+			Type:        "recency",
+			Description: fmt.Sprintf("last %s ago", formatAgo(nowMs-sugLast)),
+		})
+	}
+	if fs := sug.MaxFreqScore(); fs > 0 {
+		reasons = append(reasons, &pb.SuggestionReason{
+			Type:        "frequency",
+			Description: fmt.Sprintf("freq %.2f", fs),
+		})
+	}
+	if tc := sug.MaxTransitionCount(); tc > 0 {
+		reasons = append(reasons, &pb.SuggestionReason{
+			Type:        "transition_count",
+			Description: fmt.Sprintf("trans %d", tc),
+		})
+	}
+	return reasons
+}
+
+func v2SuggestionDescription(sug *suggest2.Suggestion, why []explain.Reason, prevCmd string) string {
+	if len(why) > 0 {
+		return why[0].Description
+	}
+	displayCmd := prevCmd
+	if len(displayCmd) > 40 {
+		displayCmd = displayCmd[:37] + "..."
+	}
+	switch {
+	case prevCmd != "" && sug.MaxTransitionCount() > 0:
+		return fmt.Sprintf("Often run after '%s'.", displayCmd)
+	case sug.MaxFreqScore() > 0:
+		return "Frequently used command."
+	case sug.LastSeenMs() > 0:
+		return "Used recently."
+	default:
+		return ""
+	}
+}
+
+func formatAgo(deltaMs int64) string {
+	if deltaMs <= 0 {
+		return "0s"
+	}
+	d := time.Duration(deltaMs) * time.Millisecond
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	default:
+		return fmt.Sprintf("%dd", int(d.Hours()/24))
+	}
+}

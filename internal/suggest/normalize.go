@@ -73,6 +73,7 @@ func DeduplicateKey(normalizedCmd string) string {
 var NormalizeCommand = cmdutil.NormalizeCommand
 
 // Normalize is an alias for NormalizeCommand for backward compatibility.
+//
 // Deprecated: Use NormalizeCommand instead.
 func Normalize(cmd string) string {
 	return cmdutil.NormalizeCommand(cmd)

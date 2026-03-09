@@ -1,0 +1,60 @@
+// Package event defines the command event types for the suggestions engine.
+// These events are ingested from shell hooks via clai-shim and processed by
+// the daemon for command suggestions.
+package event
+
+// Shell represents the supported shell types.
+type Shell string
+
+const (
+	ShellBash Shell = "bash"
+	ShellZsh  Shell = "zsh"
+	ShellFish Shell = "fish"
+)
+
+// ValidShell returns true if s is a valid shell type.
+func ValidShell(s string) bool {
+	switch Shell(s) {
+	case ShellBash, ShellZsh, ShellFish:
+		return true
+	default:
+		return false
+	}
+}
+
+// CommandEvent represents a command execution event captured from shell hooks.
+// This is serialized to NDJSON and sent to the daemon for ingestion.
+//
+// See spec Section 15.1 for the JSON format.
+type CommandEvent struct {
+	Aliases      map[string]string `json:"aliases,omitempty"`
+	DurationMs   *int64            `json:"duration_ms,omitempty"`
+	CmdRaw       string            `json:"cmd_raw"`
+	SessionID    string            `json:"session_id"`
+	Shell        Shell             `json:"shell"`
+	Cwd          string            `json:"cwd"`
+	RepoKey      string            `json:"repo_key,omitempty"`
+	Branch       string            `json:"branch,omitempty"`
+	Type         string            `json:"type"`
+	ProjectTypes []string          `json:"project_types,omitempty"`
+	Version      int               `json:"v"`
+	TS           int64             `json:"ts"`
+	ExitCode     int               `json:"exit_code"`
+	Ephemeral    bool              `json:"ephemeral"`
+}
+
+// EventType constants for the Type field.
+const (
+	EventTypeCommandEnd = "command_end"
+)
+
+// EventVersion is the current event format version.
+const EventVersion = 1
+
+// NewCommandEvent creates a new CommandEvent with default values.
+func NewCommandEvent() *CommandEvent {
+	return &CommandEvent{
+		Version: EventVersion,
+		Type:    EventTypeCommandEnd,
+	}
+}

@@ -64,7 +64,7 @@ func detectParentShell() string {
 
 	// Try reading from /proc (Linux)
 	commPath := fmt.Sprintf("/proc/%d/comm", ppid)
-	if data, err := os.ReadFile(commPath); err == nil {
+	if data, err := os.ReadFile(commPath); err == nil { //nolint:gosec // G304: /proc path constructed from trusted PID
 		name := strings.TrimSpace(string(data))
 		if shell := extractShellName(name); shell != "" {
 			return shell

@@ -19,7 +19,7 @@ func (m *MockProvider) Available() bool {
 	return m.available
 }
 
-func (m *MockProvider) TextToCommand(ctx context.Context, req *TextToCommandRequest) (*TextToCommandResponse, error) {
+func (m *MockProvider) TextToCommand(_ context.Context, req *TextToCommandRequest) (*TextToCommandResponse, error) {
 	return &TextToCommandResponse{
 		Suggestions:  []Suggestion{{Text: "mock command", Source: "ai", Score: 1.0, Risk: "safe"}},
 		ProviderName: m.name,
@@ -27,7 +27,7 @@ func (m *MockProvider) TextToCommand(ctx context.Context, req *TextToCommandRequ
 	}, nil
 }
 
-func (m *MockProvider) NextStep(ctx context.Context, req *NextStepRequest) (*NextStepResponse, error) {
+func (m *MockProvider) NextStep(_ context.Context, req *NextStepRequest) (*NextStepResponse, error) {
 	return &NextStepResponse{
 		Suggestions:  []Suggestion{{Text: "mock next step", Source: "ai", Score: 1.0, Risk: "safe"}},
 		ProviderName: m.name,
@@ -35,7 +35,7 @@ func (m *MockProvider) NextStep(ctx context.Context, req *NextStepRequest) (*Nex
 	}, nil
 }
 
-func (m *MockProvider) Diagnose(ctx context.Context, req *DiagnoseRequest) (*DiagnoseResponse, error) {
+func (m *MockProvider) Diagnose(_ context.Context, req *DiagnoseRequest) (*DiagnoseResponse, error) {
 	return &DiagnoseResponse{
 		Explanation:  "Mock explanation",
 		Fixes:        []Suggestion{{Text: "mock fix", Source: "ai", Score: 1.0, Risk: "safe"}},

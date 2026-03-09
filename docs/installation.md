@@ -53,8 +53,10 @@ sudo cp bin/clai bin/clai-shim /usr/local/bin/
 
 Session‑aware history and suggestions use a separate daemon binary named `claid`.
 `clai-shim` will try to spawn it automatically if it is on your `PATH` or pointed
-at via `CLAI_DAEMON_PATH`. If `claid` is not available, suggestions fall back to
-your shell history file.
+at via `CLAI_DAEMON_PATH`.
+
+`claid` suggestion transport is currently Unix-only (`darwin`/`linux`). On Windows,
+`clai` commands still work, but daemon-backed suggestions are not available yet.
 
 ## Shell Integration
 

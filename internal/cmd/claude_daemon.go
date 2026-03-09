@@ -42,7 +42,7 @@ var claudeDaemonRunCmd = &cobra.Command{
 	Use:    "run",
 	Short:  "Run the daemon (internal use)",
 	Hidden: true,
-	RunE: func(cmd *cobra.Command, args []string) error {
+	RunE: func(cmd *cobra.Command, _ []string) error {
 		return claude.RunDaemon(cmd.Context())
 	},
 }

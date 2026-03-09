@@ -15,11 +15,14 @@ func TestConfigCmd_List(t *testing.T) {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
+		"suggestions.scorer_version",
+		"suggestions.picker_view",
 		"history.picker_backend",
 		"history.picker_open_on_empty",
 		"history.picker_page_size",
 		"history.picker_case_sensitive",
-		"pty.enabled",
+		"history.up_arrow_trigger",
+		"history.up_arrow_double_window_ms",
 	}
 
 	if len(keys) != len(expectedKeys) {
@@ -42,15 +45,15 @@ func TestConfigCmd_List(t *testing.T) {
 
 func TestFormatSize(t *testing.T) {
 	tests := []struct {
-		bytes    int64
 		expected string
+		bytes    int64
 	}{
-		{0, "0 B"},
-		{100, "100 B"},
-		{1024, "1.0 KB"},
-		{1536, "1.5 KB"},
-		{1048576, "1.0 MB"},
-		{1073741824, "1.0 GB"},
+		{"0 B", 0},
+		{"100 B", 100},
+		{"1.0 KB", 1024},
+		{"1.5 KB", 1536},
+		{"1.0 MB", 1048576},
+		{"1.0 GB", 1073741824},
 	}
 
 	for _, tt := range tests {

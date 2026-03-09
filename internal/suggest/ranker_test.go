@@ -93,6 +93,45 @@ func TestDefaultRanker_Rank_OrderedByScore(t *testing.T) {
 	}
 }
 
+func TestDefaultRanker_Rank_DoesNotSuggestLastCommand(t *testing.T) {
+	t.Parallel()
+
+	store := newTestStore(t)
+	defer store.Close()
+
+	ctx := context.Background()
+	now := time.Now().UnixMilli()
+
+	createTestSession(t, store, "session-1")
+	createTestCommand(t, store, "session-1", "cmd-1", "/tmp", "make build", now-2000, true)
+	createTestCommand(t, store, "session-1", "cmd-2", "/tmp", "make install", now-1000, true)
+
+	ranker := NewRanker(store)
+	suggestions, err := ranker.Rank(ctx, &RankRequest{
+		SessionID:   "session-1",
+		CWD:         "/tmp",
+		Prefix:      "make",
+		LastCommand: "make install",
+		MaxResults:  10,
+	})
+	if err != nil {
+		t.Fatalf("Rank() error = %v", err)
+	}
+
+	foundBuild := false
+	for _, s := range suggestions {
+		if s.Text == "make install" {
+			t.Fatalf("suggestions should not include last command %q", s.Text)
+		}
+		if s.Text == "make build" {
+			foundBuild = true
+		}
+	}
+	if !foundBuild {
+		t.Fatalf("expected suggestions to include %q", "make build")
+	}
+}
+
 func TestDefaultRanker_Rank_SessionWeightHighest(t *testing.T) {
 	t.Parallel()
 
@@ -422,11 +461,11 @@ func TestCalculateScore(t *testing.T) {
 	tests := []struct {
 		name           string
 		source         Source
+		command        string
+		lastToolPrefix string
 		commandTime    int64
 		successCount   int
 		failureCount   int
-		command        string
-		lastToolPrefix string
 		wantMin        float64
 		wantMax        float64
 	}{
@@ -581,7 +620,7 @@ func benchmarkStore(b *testing.B, commandCount int) *storage.SQLiteStore {
 		cmd := &storage.Command{
 			CommandID:     "cmd-" + string(rune('a'+i/1000)) + string(rune('a'+(i/100)%10)) + string(rune('a'+(i/10)%10)) + string(rune('a'+i%10)),
 			SessionID:     "session-" + string(rune('0'+sessionIdx)),
-			TsStartUnixMs: 1700000000000 + int64(i*1000),
+			TSStartUnixMs: 1700000000000 + int64(i*1000),
 			CWD:           "/tmp",
 			Command:       commands[cmdIdx],
 			IsSuccess:     &isSuccess,
@@ -626,8 +665,8 @@ func TestRanker_Performance_10KCommands_Under50ms(t *testing.T) {
 			OS:              "darwin",
 			InitialCWD:      "/tmp",
 		}
-		if err := store.CreateSession(ctx, session); err != nil {
-			t.Fatalf("CreateSession() error = %v", err)
+		if createErr := store.CreateSession(ctx, session); createErr != nil {
+			t.Fatalf("CreateSession() error = %v", createErr)
 		}
 	}
 
@@ -643,13 +682,13 @@ func TestRanker_Performance_10KCommands_Under50ms(t *testing.T) {
 		cmd := &storage.Command{
 			CommandID:     generateLargeCmdID(i),
 			SessionID:     "session-" + string(rune('0'+sessionIdx)),
-			TsStartUnixMs: 1700000000000 + int64(i*1000),
+			TSStartUnixMs: 1700000000000 + int64(i*1000),
 			CWD:           "/tmp",
 			Command:       commands[cmdIdx],
 			IsSuccess:     &isSuccess,
 		}
-		if err := store.CreateCommand(ctx, cmd); err != nil {
-			t.Fatalf("CreateCommand() error = %v", err)
+		if createErr := store.CreateCommand(ctx, cmd); createErr != nil {
+			t.Fatalf("CreateCommand() error = %v", createErr)
 		}
 	}
 

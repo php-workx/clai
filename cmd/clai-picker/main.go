@@ -23,6 +23,37 @@ var (
 	BuildDate = "unknown"
 )
 
+var (
+	checkTTYFn       = checkTTY
+	checkTERMFn      = checkTERM
+	checkTermWidthFn = checkTermWidth
+	mkdirAllFn       = os.MkdirAll
+	defaultPathsFn   = config.DefaultPaths
+	acquireLockFn    = acquireLock
+	releaseLockFn    = releaseLock
+	loadConfigFn     = config.Load
+
+	dispatchHistoryFn = dispatchHistory
+	dispatchSuggestFn = dispatchSuggest
+	dispatchBuiltinFn = dispatchBuiltin
+	dispatchFzfFn     = dispatchFzf
+	runTUIFn          = runTUI
+
+	lookPathFn = exec.LookPath
+
+	newHistoryProviderFn = func(socketPath string) picker.Provider {
+		return picker.NewHistoryProvider(socketPath)
+	}
+
+	runFzfCommandOutputFn = func(args []string, input string) ([]byte, error) {
+		//nolint:gosec // args are built by this program for fzf invocation.
+		cmd := exec.Command("fzf", args...)
+		cmd.Stdin = strings.NewReader(input)
+		cmd.Stderr = os.Stderr // Let fzf render its TUI on stderr/tty.
+		return cmd.Output()
+	}
+)
+
 // Exit codes.
 // These match the expectations of shell scripts:
 //
@@ -38,106 +69,175 @@ const (
 // maxQueryLen is the maximum length of a query string in bytes.
 const maxQueryLen = 4096
 
+const pickerErrorFmt = "clai-picker: %v\n"
+
 // pickerOpts holds the parsed command-line options for the history subcommand.
 type pickerOpts struct {
 	tabs    string
-	limit   int
 	query   string
 	session string
 	output  string
 	cwd     string
+	limit   int
 }
 
 func main() {
 	os.Exit(run(os.Args[1:]))
 }
 
+type subcommand string
+
+const (
+	cmdHistory subcommand = "history"
+	cmdSuggest subcommand = "suggest"
+	cmdUnknown subcommand = "unknown"
+)
+
 // run is the main entry point, returning an exit code.
 // It is separated from main() to enable testing.
 func run(args []string) int {
 	// Step 1: Check /dev/tty is openable.
-	if err := checkTTY(); err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+	if err := checkTTYFn(); err != nil {
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 
 	// Step 2: Check TERM != "dumb".
-	if err := checkTERM(); err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+	if err := checkTERMFn(); err != nil {
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 
 	// Step 3: Check terminal width >= 20 columns.
-	if err := checkTermWidth(); err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+	if err := checkTermWidthFn(); err != nil {
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
 
 	// Step 4: Ensure cache directory exists.
-	paths := config.DefaultPaths()
+	paths := defaultPathsFn()
 	cacheDir := paths.CacheDir()
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+	if err := mkdirAllFn(cacheDir, 0o755); err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: failed to create cache directory: %v\n", err)
 		return exitFallback
 	}
 
 	// Step 5: Acquire advisory file lock.
 	lockPath := cacheDir + "/picker.lock"
-	lockFd, err := acquireLock(lockPath)
+	lockFd, err := acquireLockFn(lockPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, err)
 		return exitFallback
 	}
-	defer releaseLock(lockFd)
+	defer releaseLockFn(lockFd)
 
 	// Step 6: Parse subcommand and flags.
-	if len(args) == 0 {
-		printUsage()
+	cmd, opts, exitCode, showUsage, parseErr := parseRunInputs(args)
+	if errors.Is(parseErr, flag.ErrHelp) {
+		if showUsage {
+			printUsage()
+		}
+		return exitSuccess
+	}
+	if parseErr != nil {
+		fmt.Fprintf(os.Stderr, pickerErrorFmt, parseErr)
+		if showUsage {
+			printUsage()
+		}
 		return exitFallback
 	}
-
-	switch args[0] {
-	case "history":
-		// continue below
-	case "--help", "-h":
-		printUsage()
+	if exitCode == exitSuccess && cmd == cmdUnknown {
 		return exitSuccess
-	case "--version", "-v":
-		printVersion()
-		return exitSuccess
-	default:
-		fmt.Fprintf(os.Stderr, "clai-picker: unknown command %q\n", args[0])
-		printUsage()
-		return exitFallback
 	}
-
-	opts, err := parseHistoryFlags(args[1:])
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: %v\n", err)
-		return exitFallback
+	if exitCode != 0 {
+		if showUsage {
+			printUsage()
+		}
+		return exitCode
 	}
 
 	// Step 7: Load config.
-	cfg, err := config.Load()
+	cfg, err := loadConfigFn()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "clai-picker: failed to load config: %v\n", err)
 		return exitFallback
 	}
 
 	// Apply config defaults for flags that weren't explicitly set.
-	if opts.limit == 0 {
-		opts.limit = cfg.History.PickerPageSize
-	}
-	if opts.tabs == "" {
-		tabIDs := make([]string, len(cfg.History.PickerTabs))
-		for i, t := range cfg.History.PickerTabs {
-			tabIDs[i] = t.ID
-		}
-		opts.tabs = strings.Join(tabIDs, ",")
-	}
+	applyRunDefaults(cmd, cfg, opts)
 
 	// Step 8: Dispatch to backend.
-	return dispatch(cfg, opts)
+	return dispatchRunCommand(cmd, cfg, opts)
+}
+
+func parseRunInputs(args []string) (cmd subcommand, opts *pickerOpts, exitCode int, fallback bool, err error) {
+	if len(args) == 0 {
+		return cmdUnknown, nil, exitFallback, true, nil
+	}
+
+	switch args[0] {
+	case "history":
+		cmd = cmdHistory
+	case "suggest":
+		cmd = cmdSuggest
+	case "--help", "-h":
+		printUsage()
+		return cmdUnknown, nil, exitSuccess, false, nil
+	case "--version", "-v":
+		printVersion()
+		return cmdUnknown, nil, exitSuccess, false, nil
+	default:
+		return cmdUnknown, nil, exitFallback, true, fmt.Errorf("unknown command %q", args[0])
+	}
+
+	var parseErr error
+	switch cmd {
+	case cmdHistory:
+		opts, parseErr = parseHistoryFlags(args[1:])
+	case cmdSuggest:
+		opts, parseErr = parseSuggestFlags(args[1:])
+	default:
+		parseErr = fmt.Errorf("unknown command %q", args[0])
+	}
+	if parseErr != nil {
+		return cmd, nil, exitFallback, false, parseErr
+	}
+
+	return cmd, opts, 0, false, nil
+}
+
+func applyRunDefaults(cmd subcommand, cfg *config.Config, opts *pickerOpts) {
+	switch cmd {
+	case cmdHistory:
+		if opts.limit == 0 {
+			opts.limit = cfg.History.PickerPageSize
+		}
+		if opts.tabs == "" {
+			tabIDs := make([]string, len(cfg.History.PickerTabs))
+			for i, t := range cfg.History.PickerTabs {
+				tabIDs[i] = t.ID
+			}
+			opts.tabs = strings.Join(tabIDs, ",")
+		}
+	case cmdSuggest:
+		if opts.limit == 0 {
+			opts.limit = cfg.Suggestions.MaxResults
+		}
+	default:
+		// No defaults to apply for other subcommands.
+	}
+}
+
+func dispatchRunCommand(cmd subcommand, cfg *config.Config, opts *pickerOpts) int {
+	switch cmd {
+	case cmdHistory:
+		return dispatchHistoryFn(cfg, opts)
+	case cmdSuggest:
+		return dispatchSuggestFn(cfg, opts)
+	default:
+		printUsage()
+		return exitFallback
+	}
 }
 
 // parseHistoryFlags parses flags for the "history" subcommand.
@@ -188,6 +288,46 @@ func parseHistoryFlags(args []string) (*pickerOpts, error) {
 	return opts, nil
 }
 
+// parseSuggestFlags parses flags for the "suggest" subcommand.
+func parseSuggestFlags(args []string) (*pickerOpts, error) {
+	fs := flag.NewFlagSet("suggest", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+
+	opts := &pickerOpts{}
+	fs.IntVar(&opts.limit, "limit", 0, "max results to request (positive integer)")
+	fs.StringVar(&opts.query, "query", "", "initial buffer/query (max 4096 bytes)")
+	fs.StringVar(&opts.session, "session", "", "session ID")
+	fs.StringVar(&opts.cwd, "cwd", "", "working directory")
+	fs.StringVar(&opts.output, "output", "", "output format (only \"plain\" accepted)")
+
+	fs.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: clai-picker suggest [flags]\n\nFlags:\n")
+		fs.PrintDefaults()
+	}
+
+	if err := fs.Parse(args); err != nil {
+		return nil, err
+	}
+	if fs.NArg() > 0 {
+		return nil, fmt.Errorf("unexpected argument: %s", fs.Arg(0))
+	}
+
+	if opts.limit < 0 {
+		return nil, fmt.Errorf("--limit must be a positive integer")
+	}
+	if opts.output != "" && opts.output != "plain" {
+		return nil, fmt.Errorf("--output must be \"plain\" (got %q)", opts.output)
+	}
+
+	sanitized, err := sanitizeQuery(opts.query)
+	if err != nil {
+		return nil, fmt.Errorf("--query: %w", err)
+	}
+	opts.query = sanitized
+
+	return opts, nil
+}
+
 // sanitizeQuery strips control characters and validates the query string.
 func sanitizeQuery(q string) (string, error) {
 	if q == "" {
@@ -212,14 +352,18 @@ func sanitizeQuery(q string) (string, error) {
 
 	// Truncate to maxQueryLen bytes.
 	if len(result) > maxQueryLen {
-		result = result[:maxQueryLen]
+		// Keep string valid UTF-8 by trimming to the last rune boundary.
+		end := maxQueryLen
+		for end > 0 && !utf8.RuneStart(result[end]) {
+			end--
+		}
+		result = result[:end]
 	}
 
 	return result, nil
 }
 
-// dispatch routes to the appropriate backend.
-func dispatch(cfg *config.Config, opts *pickerOpts) int {
+func dispatchHistory(cfg *config.Config, opts *pickerOpts) int {
 	backend := cfg.History.PickerBackend
 	if backend == "" {
 		backend = "builtin"
@@ -232,15 +376,15 @@ func dispatch(cfg *config.Config, opts *pickerOpts) int {
 func dispatchBackend(backend string, cfg *config.Config, opts *pickerOpts) int {
 	switch backend {
 	case "fzf":
-		return dispatchFzf(cfg, opts)
+		return dispatchFzfFn(cfg, opts)
 	case "clai":
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltinFn(cfg, opts)
 	case "builtin":
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltinFn(cfg, opts)
 	default:
 		// Unknown backend, fall back to builtin.
 		debugLog("unknown backend %q, falling back to builtin", backend)
-		return dispatchBuiltin(cfg, opts)
+		return dispatchBuiltinFn(cfg, opts)
 	}
 }
 
@@ -248,38 +392,40 @@ func dispatchBackend(backend string, cfg *config.Config, opts *pickerOpts) int {
 // If opts.tabs is empty, all configured tabs are returned.
 // Variable substitution is performed on tab Args values.
 func resolveTabs(cfg *config.Config, opts *pickerOpts) []config.TabDef {
-	var srcTabs []config.TabDef
-	if opts.tabs == "" {
-		srcTabs = cfg.History.PickerTabs
-	} else {
-		ids := strings.Split(opts.tabs, ",")
-		idSet := make(map[string]bool, len(ids))
-		for _, id := range ids {
-			idSet[strings.TrimSpace(id)] = true
-		}
-		for _, t := range cfg.History.PickerTabs {
-			if idSet[t.ID] {
-				srcTabs = append(srcTabs, t)
-			}
-		}
-		// If no matches, return all configured tabs as fallback.
-		if len(srcTabs) == 0 {
-			srcTabs = cfg.History.PickerTabs
+	srcTabs := selectConfiguredTabs(cfg.History.PickerTabs, opts.tabs)
+	return substituteTabArgs(srcTabs, opts.session)
+}
+
+func selectConfiguredTabs(allTabs []config.TabDef, tabsArg string) []config.TabDef {
+	if tabsArg == "" {
+		return allTabs
+	}
+
+	ids := strings.Split(tabsArg, ",")
+	idSet := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		idSet[strings.TrimSpace(id)] = true
+	}
+
+	var selected []config.TabDef
+	for _, t := range allTabs {
+		if idSet[t.ID] {
+			selected = append(selected, t)
 		}
 	}
 
-	// Substitute variables in tab Args.
+func substituteTabArgs(srcTabs []config.TabDef, session string) []config.TabDef {
 	tabs := make([]config.TabDef, len(srcTabs))
 	for i, t := range srcTabs {
 		tabs[i] = t
-		if len(t.Args) > 0 {
-			tabs[i].Args = make(map[string]string, len(t.Args))
-			for k, v := range t.Args {
-				// Replace $CLAI_SESSION_ID with the actual session ID.
-				if v == "$CLAI_SESSION_ID" && opts.session != "" {
-					v = opts.session
-				}
-				tabs[i].Args[k] = v
+		if len(t.Args) == 0 {
+			continue
+		}
+
+		tabs[i].Args = make(map[string]string, len(t.Args))
+		for k, v := range t.Args {
+			if v == "$CLAI_SESSION_ID" && session != "" {
+				v = session
 			}
 		}
 	}
@@ -294,24 +440,11 @@ func socketPath(cfg *config.Config) string {
 	return config.DefaultPaths().SocketFile()
 }
 
-// dispatchBuiltin runs the built-in Bubble Tea TUI.
-func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
-	tabs := resolveTabs(cfg, opts)
-	provider := picker.NewHistoryProvider(socketPath(cfg))
-
-	model := picker.NewModel(tabs, provider).WithLayout(picker.LayoutBottomUp)
-	if opts.limit > 0 {
-		model = model.WithPageSize(opts.limit)
-	}
-	if opts.query != "" {
-		model = model.WithQuery(opts.query)
-	}
-
+func runTUI(model picker.Model) (int, string) { //nolint:gocritic // bubbletea tea.Model interface requires value receiver
 	// Open /dev/tty for TUI input/output since stdin/stdout are used for data.
 	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: cannot open /dev/tty: %v\n", err)
-		return exitFallback
+		return exitFallback, fmt.Sprintf("clai-picker: cannot open /dev/tty: %v", err)
 	}
 	defer tty.Close()
 
@@ -330,40 +463,37 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 
 	finalModel, err := p.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "clai-picker: TUI error: %v\n", err)
-		return exitFallback
+		return exitFallback, fmt.Sprintf("clai-picker: TUI error: %v", err)
 	}
 
 	m, ok := finalModel.(picker.Model)
 	if !ok {
-		fmt.Fprintln(os.Stderr, "clai-picker: unexpected model type")
-		return exitFallback
+		return exitFallback, "clai-picker: unexpected model type"
 	}
 
 	if m.IsCancelled() {
-		return exitCancelled
+		return exitCancelled, ""
 	}
 
-	if result := m.Result(); result != "" {
-		fmt.Fprintln(os.Stdout, result)
-	}
-
-	return exitSuccess
+	return exitSuccess, m.Result()
 }
 
-// dispatchFzf checks for fzf on PATH and falls back to builtin if missing.
-func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
-	_, err := exec.LookPath("fzf")
-	if err != nil {
-		debugLog("fzf not found on PATH, falling back to builtin")
-		return dispatchBuiltin(cfg, opts)
+// dispatchBuiltin runs the built-in Bubble Tea TUI for history.
+func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
+	tabs := resolveTabs(cfg, opts)
+	provider := newHistoryProviderFn(socketPath(cfg))
+
+	model := picker.NewModel(tabs, provider).WithLayout(picker.LayoutBottomUp)
+	if opts.query != "" {
+		model = model.WithQuery(opts.query)
 	}
 
-	result, err := runFzfBackend(cfg, opts)
-	if err != nil {
-		// fzf exit code 130 = cancelled by user, exit code 1 = no match
-		debugLog("fzf backend error: %v", err)
-		return exitSuccess
+	code, result := runTUIFn(model)
+	if code != exitSuccess {
+		if code == exitFallback && result != "" {
+			fmt.Fprintln(os.Stderr, result)
+		}
+		return code
 	}
 
 	if result != "" {
@@ -373,9 +503,79 @@ func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 	return exitSuccess
 }
 
+func dispatchSuggest(cfg *config.Config, opts *pickerOpts) int {
+	model := newSuggestModel(cfg, opts)
+
+	code, result := runTUIFn(model)
+	if code != exitSuccess {
+		if code == exitFallback && result != "" {
+			fmt.Fprintln(os.Stderr, result)
+		}
+		return code
+	}
+
+	if result != "" {
+		fmt.Fprintln(os.Stdout, result)
+	}
+	return exitSuccess
+}
+
+func newSuggestModel(cfg *config.Config, opts *pickerOpts) picker.Model {
+	// Suggestions are always rendered using the builtin TUI.
+	tab := config.TabDef{
+		ID:       "suggestions",
+		Label:    "Suggestions",
+		Provider: "suggest",
+		Args: map[string]string{
+			"session_id": opts.session,
+			"cwd":        opts.cwd,
+		},
+	}
+
+	provider := picker.NewSuggestProvider(socketPath(cfg), cfg.Suggestions.PickerView)
+
+	// Bottom-up layout: best suggestion appears closest to the input line.
+	model := picker.NewModel([]config.TabDef{tab}, provider).WithLayout(picker.LayoutBottomUp)
+	if opts.query != "" {
+		model = model.WithQuery(opts.query)
+	}
+	return model
+}
+
+// dispatchFzf checks for fzf on PATH and falls back to builtin if missing.
+func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
+	_, err := lookPathFn("fzf")
+	if err != nil {
+		debugLog("fzf not found on PATH, falling back to builtin")
+		return dispatchBuiltinFn(cfg, opts)
+	}
+
+	result, err := runFzfBackend(cfg, opts)
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			// fzf exit code 130 = cancelled by user, exit code 1 = no match
+			// Keep the original input unchanged in both cases.
+			if code := exitErr.ExitCode(); code == 130 || code == 1 {
+				debugLog("fzf cancelled/no-match (exit=%d)", code)
+				return exitCancelled
+			}
+		}
+		debugLog("fzf backend error: %v", err)
+		return exitFallback
+	}
+
+	if result == "" {
+		return exitCancelled
+	}
+	fmt.Fprintln(os.Stdout, result)
+
+	return exitSuccess
+}
+
 // runFzfBackend fetches all history and pipes it through fzf.
 func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
-	provider := picker.NewHistoryProvider(socketPath(cfg))
+	provider := newHistoryProviderFn(socketPath(cfg))
 	tabs := resolveTabs(cfg, opts)
 
 	// Use the first tab for fzf (fzf doesn't support tabs).
@@ -407,7 +607,9 @@ func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
 			debugLog("fzf backend: fetch error: %v", err)
 			break
 		}
-		allItems = append(allItems, resp.Items...)
+		for _, it := range resp.Items {
+			allItems = append(allItems, it.Value)
+		}
 		if resp.AtEnd || len(resp.Items) == 0 {
 			break
 		}
@@ -424,11 +626,7 @@ func runFzfBackend(cfg *config.Config, opts *pickerOpts) (string, error) {
 		args = append(args, "--query", opts.query)
 	}
 
-	cmd := exec.Command("fzf", args...)
-	cmd.Stdin = strings.NewReader(strings.Join(allItems, "\n"))
-	cmd.Stderr = os.Stderr // Let fzf render its TUI on stderr/tty.
-
-	output, err := cmd.Output()
+	output, err := runFzfCommandOutputFn(args, strings.Join(allItems, "\n"))
 	if err != nil {
 		return "", err
 	}
@@ -449,6 +647,7 @@ func printUsage() {
 
 Commands:
   history    Browse and search shell history
+  suggest    Browse and search smart suggestions
 
 Flags:
   --help     Show this help message

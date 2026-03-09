@@ -92,7 +92,7 @@ func removeFromRCFile(rcFile, hooksDir string) (bool, error) {
 		return false, err
 	}
 
-	content, err := os.ReadFile(rcFile)
+	content, err := os.ReadFile(rcFile) //nolint:gosec // G304: rcFile is a known shell rc path
 	if err != nil {
 		return false, err
 	}

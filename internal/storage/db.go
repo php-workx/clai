@@ -22,10 +22,10 @@ const (
 // SQLiteStore implements the Store interface using SQLite.
 type SQLiteStore struct {
 	db        *sql.DB
+	closeErr  error         // stores the error from Close()
 	stopCh    chan struct{} // signals background goroutines to stop
 	stoppedCh chan struct{} // signals background goroutines have stopped
 	closeOnce sync.Once     // ensures Close() is idempotent
-	closeErr  error         // stores the error from Close()
 }
 
 // DefaultDBPath returns the default database path (~/.clai/state.db).
@@ -51,7 +51,7 @@ func NewSQLiteStore(dbPath string) (*SQLiteStore, error) {
 
 	// Ensure the directory exists
 	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
@@ -145,13 +145,14 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 		SELECT version FROM schema_meta ORDER BY version DESC LIMIT 1
 	`)
 	if err := row.Scan(&currentVersion); err != nil {
-		if err == sql.ErrNoRows {
+		switch {
+		case err == sql.ErrNoRows:
 			// No version recorded yet, start from 0
 			currentVersion = 0
-		} else if isTableNotFoundError(err) {
+		case isTableNotFoundError(err):
 			// Table doesn't exist yet, start from 0
 			currentVersion = 0
-		} else {
+		default:
 			// Propagate unexpected errors
 			return fmt.Errorf("failed to read schema version: %w", err)
 		}
@@ -159,8 +160,8 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 
 	// Run migrations in order
 	migrations := []struct {
-		version int
 		sql     string
+		version int
 	}{
 		{
 			version: 1,
@@ -302,31 +303,57 @@ CREATE INDEX IF NOT EXISTS idx_commands_git_branch ON commands(git_branch);
 CREATE INDEX IF NOT EXISTS idx_commands_git_repo ON commands(git_repo_name);
 `
 
-// migrationV3 adds phase-2 PTY capture tables.
+// migrationV3 adds workflow tables.
 const migrationV3 = `
-CREATE TABLE IF NOT EXISTS command_events (
-  id INTEGER PRIMARY KEY,
-  session_id TEXT NOT NULL,
-  command_id TEXT NOT NULL UNIQUE,
-  exit_code INTEGER,
-  start_ts INTEGER,
-  end_ts INTEGER,
-  is_sensitive BOOLEAN DEFAULT 0,
-  captured_bytes INTEGER
+-- Workflow runs
+CREATE TABLE IF NOT EXISTS workflow_runs (
+  run_id TEXT PRIMARY KEY,
+  workflow_name TEXT NOT NULL,
+  workflow_hash TEXT NOT NULL,
+  workflow_path TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'running',
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_command_events_session ON command_events(session_id);
-CREATE INDEX IF NOT EXISTS idx_command_events_command_id ON command_events(command_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_name ON workflow_runs(workflow_name);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_status ON workflow_runs(status);
+CREATE INDEX IF NOT EXISTS idx_workflow_runs_started ON workflow_runs(started_at DESC);
 
-CREATE TABLE IF NOT EXISTS command_output (
-  id INTEGER PRIMARY KEY,
-  command_id TEXT NOT NULL UNIQUE,
-  stdout_blob BLOB,
-  stderr_blob BLOB,
-  created_at INTEGER,
-  expires_at INTEGER
+-- Workflow steps
+CREATE TABLE IF NOT EXISTS workflow_steps (
+  run_id TEXT NOT NULL REFERENCES workflow_runs(run_id),
+  step_id TEXT NOT NULL,
+  matrix_key TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'running',
+  command TEXT NOT NULL DEFAULT '',
+  exit_code INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  stdout_tail TEXT NOT NULL DEFAULT '',
+  stderr_tail TEXT NOT NULL DEFAULT '',
+  outputs_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (run_id, step_id, matrix_key)
 );
 
-CREATE INDEX IF NOT EXISTS idx_command_output_command ON command_output(command_id);
-CREATE INDEX IF NOT EXISTS idx_command_output_expires ON command_output(expires_at);
+CREATE INDEX IF NOT EXISTS idx_workflow_steps_run ON workflow_steps(run_id);
+CREATE INDEX IF NOT EXISTS idx_workflow_steps_status ON workflow_steps(status);
+
+-- Workflow analyses
+CREATE TABLE IF NOT EXISTS workflow_analyses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id TEXT NOT NULL,
+  step_id TEXT NOT NULL,
+  matrix_key TEXT NOT NULL DEFAULT '',
+  decision TEXT NOT NULL,
+  reasoning TEXT NOT NULL DEFAULT '',
+  flags_json TEXT NOT NULL DEFAULT '{}',
+  prompt TEXT NOT NULL DEFAULT '',
+  raw_response TEXT NOT NULL DEFAULT '',
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  analyzed_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_analyses_step ON workflow_analyses(run_id, step_id, matrix_key);
+CREATE INDEX IF NOT EXISTS idx_workflow_analyses_decision ON workflow_analyses(decision);
 `

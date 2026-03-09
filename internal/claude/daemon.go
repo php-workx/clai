@@ -14,9 +14,16 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/execabs"
 )
 
 const defaultIdleTimeout = 2 * time.Hour
+
+const (
+	daemonSubcommand    = "claude-daemon"
+	daemonRunSubcommand = "run"
+)
 
 func idleTimeout() time.Duration {
 	if val := os.Getenv("CLAI_IDLE_TIMEOUT"); val != "" {
@@ -99,7 +106,7 @@ func StartDaemonProcess() error {
 	}
 
 	// Ensure directory exists
-	os.MkdirAll(daemonDir(), 0o755)
+	os.MkdirAll(daemonDir(), 0o750)
 
 	// Start daemon process
 	exe, err := os.Executable()
@@ -108,12 +115,12 @@ func StartDaemonProcess() error {
 	}
 
 	// Create log file for daemon output
-	logFile, err := os.OpenFile(logPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	logFile, err := os.OpenFile(logPath(), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
 	if err != nil {
 		logFile = nil
 	}
 
-	cmd := exec.Command(exe, "claude-daemon", "run") //nolint:gosec // G204: exe is our own binary path
+	cmd := newDaemonStartCommand(exe)
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
 	cmd.Stdin = nil
@@ -136,7 +143,7 @@ func StartDaemonProcess() error {
 	}
 
 	// Write PID file
-	os.WriteFile(pidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o644)
+	os.WriteFile(pidPath(), []byte(fmt.Sprintf("%d", cmd.Process.Pid)), 0o600)
 
 	// Wait for socket to be available (up to 90 seconds for Claude init with hooks)
 	for i := 0; i < 900; i++ {
@@ -147,6 +154,12 @@ func StartDaemonProcess() error {
 	}
 
 	return fmt.Errorf("daemon failed to start (check %s for details)", logPath())
+}
+
+func newDaemonStartCommand(exe string) *exec.Cmd {
+	// execabs prevents launching a relative-path executable unexpectedly.
+	// nosemgrep: go.lang.security.audit.os-exec.os-exec
+	return execabs.Command(exe, daemonSubcommand, daemonRunSubcommand)
 }
 
 // StopDaemon stops the running daemon
@@ -227,19 +240,18 @@ type claudeProcess struct {
 }
 
 // startClaudeProcess starts the Claude CLI and waits for initialization.
-// The provided context controls the lifetime of the subprocess: if the
-// context is cancelled the process is killed automatically via
-// exec.CommandContext.
+// The context enables cancellation (e.g. Ctrl+C) of the child process.
 func startClaudeProcess(ctx context.Context) (*claudeProcess, error) {
 	fmt.Println("Starting Claude process...")
 
 	cmd := exec.CommandContext(ctx, "claude",
 		"--print",
 		"--verbose",
-		"--model", "haiku",
+		"--model", "sonnet",
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
 	)
+	cmd.Env = FilterEnv(os.Environ(), "CLAUDECODE")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -384,8 +396,7 @@ func handleDaemonConn(ctx context.Context, c net.Conn, claude *claudeProcess, ac
 }
 
 // RunDaemon runs the daemon server (called by "daemon run" command).
-// The provided context controls the daemon lifetime: cancelling it will
-// stop the Claude subprocess and reject new connections.
+// The context enables cancellation of the child Claude process on shutdown.
 func RunDaemon(ctx context.Context) error {
 	os.Remove(socketPath())
 
@@ -420,11 +431,20 @@ func RunDaemon(ctx context.Context) error {
 		}
 	}()
 
+	// Close listener when context is cancelled so Accept() unblocks.
+	go func() {
+		<-ctx.Done()
+		listener.Close()
+	}()
+
 	fmt.Println("Daemon ready, accepting connections")
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			fmt.Printf("Accept error: %v\n", err)
 			return nil
 		}

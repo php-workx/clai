@@ -277,7 +277,7 @@ func TestE2E_MultipleSessionsConcurrent(t *testing.T) {
 	// Log commands in different sessions concurrently
 	for i, sessionID := range sessionIDs {
 		commandID := generateCommandID()
-		_, err := env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
+		_, err = env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
 			SessionId: sessionID,
 			CommandId: commandID,
 			Cwd:       "/home/test",
@@ -302,7 +302,8 @@ func TestE2E_MultipleSessionsConcurrent(t *testing.T) {
 
 	// End all sessions
 	for i, sessionID := range sessionIDs {
-		resp, err := env.Client.SessionEnd(ctx, &pb.SessionEndRequest{
+		var resp *pb.Ack
+		resp, err = env.Client.SessionEnd(ctx, &pb.SessionEndRequest{
 			SessionId:     sessionID,
 			EndedAtUnixMs: time.Now().UnixMilli(),
 		})
@@ -357,7 +358,7 @@ func TestE2E_CommandsLoggedCounter(t *testing.T) {
 	numCommands := 5
 	for i := 0; i < numCommands; i++ {
 		commandID := generateCommandID()
-		_, err := env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
+		_, err = env.Client.CommandStarted(ctx, &pb.CommandStartRequest{
 			SessionId: sessionID,
 			CommandId: commandID,
 			Cwd:       "/home/test",

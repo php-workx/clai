@@ -3,6 +3,8 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -12,26 +14,45 @@ import (
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/storage"
 	"github.com/runger/clai/internal/suggest"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/feedback"
+	"github.com/runger/clai/internal/suggestions/learning"
+	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
 // mockStore implements storage.Store for testing.
 type mockStore struct {
-	sessions       map[string]*storage.Session
-	commands       map[string]*storage.Command
-	cache          map[string]*storage.CacheEntry
-	importedShells map[string]bool
-	commandEvents  map[string]*storage.CommandEvent
-	commandOutput  map[string]*storage.CommandOutput
+	sessions map[string]*storage.Session
+	commands map[string]*storage.Command
+	cache    map[string]*storage.CacheEntry
+}
+
+type importStatusStore struct {
+	hasErr    error
+	importErr error
+	*mockStore
+	has bool
+}
+
+func (m *importStatusStore) HasImportedHistory(ctx context.Context, shell string) (bool, error) {
+	if m.hasErr != nil {
+		return false, m.hasErr
+	}
+	return m.has, nil
+}
+
+func (m *importStatusStore) ImportHistory(ctx context.Context, entries []history.ImportEntry, shell string) (int, error) {
+	if m.importErr != nil {
+		return 0, m.importErr
+	}
+	return len(entries), nil
 }
 
 func newMockStore() *mockStore {
 	return &mockStore{
-		sessions:       make(map[string]*storage.Session),
-		commands:       make(map[string]*storage.Command),
-		cache:          make(map[string]*storage.CacheEntry),
-		importedShells: make(map[string]bool),
-		commandEvents:  make(map[string]*storage.CommandEvent),
-		commandOutput:  make(map[string]*storage.CommandOutput),
+		sessions: make(map[string]*storage.Session),
+		commands: make(map[string]*storage.Command),
+		cache:    make(map[string]*storage.CacheEntry),
 	}
 }
 
@@ -80,7 +101,7 @@ func (m *mockStore) UpdateCommandEnd(ctx context.Context, commandID string, exit
 		ec := exitCode
 		isSuccess := exitCode == 0
 		c.ExitCode = &ec
-		c.TsEndUnixMs = &endTime
+		c.TSEndUnixMs = &endTime
 		c.DurationMs = &duration
 		c.IsSuccess = &isSuccess
 	}
@@ -96,23 +117,23 @@ func (m *mockStore) QueryCommands(ctx context.Context, q storage.CommandQuery) (
 }
 
 func (m *mockStore) QueryHistoryCommands(ctx context.Context, q storage.CommandQuery) ([]storage.HistoryRow, error) {
-	// Collect commands, dedup by command_norm
+	// Collect commands, dedup by exact command text.
 	seen := make(map[string]storage.HistoryRow)
 	for _, c := range m.commands {
-		norm := strings.ToLower(c.Command)
+		commandNorm := strings.ToLower(c.Command)
 		// Substring filter
-		if q.Substring != "" && !strings.Contains(norm, q.Substring) {
+		if q.Substring != "" && !strings.Contains(commandNorm, strings.ToLower(q.Substring)) {
 			continue
 		}
 		// Session filter
 		if q.SessionID != nil && c.SessionID != *q.SessionID {
 			continue
 		}
-		existing, ok := seen[norm]
-		if !ok || c.TsStartUnixMs > existing.TimestampMs {
-			seen[norm] = storage.HistoryRow{
+		existing, ok := seen[c.Command]
+		if !ok || c.TSStartUnixMs > existing.TimestampMs {
+			seen[c.Command] = storage.HistoryRow{
 				Command:     c.Command,
-				TimestampMs: c.TsStartUnixMs,
+				TimestampMs: c.TSStartUnixMs,
 			}
 		}
 	}
@@ -214,6 +235,42 @@ func (m *mockStore) Close() error {
 	return nil
 }
 
+func (m *mockStore) CreateWorkflowRun(ctx context.Context, run *storage.WorkflowRun) error {
+	return nil
+}
+
+func (m *mockStore) UpdateWorkflowRun(ctx context.Context, runID string, status string, endedAt int64, durationMs int64) error {
+	return nil
+}
+
+func (m *mockStore) GetWorkflowRun(ctx context.Context, runID string) (*storage.WorkflowRun, error) {
+	return nil, nil
+}
+
+func (m *mockStore) QueryWorkflowRuns(ctx context.Context, q storage.WorkflowRunQuery) ([]storage.WorkflowRun, error) {
+	return nil, nil
+}
+
+func (m *mockStore) CreateWorkflowStep(ctx context.Context, step *storage.WorkflowStep) error {
+	return nil
+}
+
+func (m *mockStore) UpdateWorkflowStep(ctx context.Context, update *storage.WorkflowStepUpdate) error {
+	return nil
+}
+
+func (m *mockStore) GetWorkflowStep(ctx context.Context, runID, stepID, matrixKey string) (*storage.WorkflowStep, error) {
+	return nil, nil
+}
+
+func (m *mockStore) CreateWorkflowAnalysis(ctx context.Context, analysis *storage.WorkflowAnalysis) error {
+	return nil
+}
+
+func (m *mockStore) GetWorkflowAnalyses(ctx context.Context, runID, stepID, matrixKey string) ([]storage.WorkflowAnalysisRecord, error) {
+	return nil, nil
+}
+
 // mockRanker implements suggest.Ranker for testing.
 type mockRanker struct {
 	suggestions []suggest.Suggestion
@@ -226,8 +283,8 @@ func (m *mockRanker) Rank(ctx context.Context, req *suggest.RankRequest) ([]sugg
 // mockProvider implements provider.Provider for testing.
 type mockProvider struct {
 	name       string
-	available  bool
 	suggestion string
+	available  bool
 }
 
 func (m *mockProvider) Name() string {
@@ -373,6 +430,34 @@ func TestHandler_SessionEnd_Success(t *testing.T) {
 	}
 }
 
+func TestHandler_SessionEnd_ClearsSuggestSnapshot(t *testing.T) {
+	t.Parallel()
+
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	_, _ = server.SessionStart(ctx, &pb.SessionStartRequest{
+		SessionId: "snapshot-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "zsh"},
+	})
+
+	server.snapshotMu.Lock()
+	server.lastSuggestSnapshots["snapshot-session"] = suggestSnapshot{
+		ShownAtMs: time.Now().UnixMilli(),
+	}
+	server.snapshotMu.Unlock()
+
+	_, _ = server.SessionEnd(ctx, &pb.SessionEndRequest{
+		SessionId: "snapshot-session",
+	})
+
+	_, ok := server.getSuggestSnapshot("snapshot-session")
+	if ok {
+		t.Fatal("expected session-end to clear suggest snapshot")
+	}
+}
+
 func TestHandler_CommandStarted_Success(t *testing.T) {
 	t.Parallel()
 
@@ -454,6 +539,372 @@ func TestHandler_CommandEnded_Success(t *testing.T) {
 	}
 }
 
+func newFeedbackStoreWithDB(t *testing.T) (*feedback.Store, func()) {
+	t.Helper()
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "feedback_test.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open feedback db: %v", err)
+	}
+	store := feedback.NewStore(v2db.DB(), feedback.DefaultConfig(), nil)
+	cleanup := func() {
+		_ = v2db.Close()
+	}
+	return store, cleanup
+}
+
+func TestHandler_RecordFeedback_NoStoreConfigured(t *testing.T) {
+	t.Parallel()
+	server := createTestServer(t)
+	ctx := context.Background()
+
+	resp, err := server.RecordFeedback(ctx, &pb.RecordFeedbackRequest{
+		SessionId:     "sess-1",
+		SuggestedText: "make test",
+		Action:        "accepted",
+	})
+	if err != nil {
+		t.Fatalf("RecordFeedback failed: %v", err)
+	}
+	if resp.Ok {
+		t.Fatal("expected response.Ok=false without feedback store")
+	}
+	if resp.Error == nil || resp.Error.Code != "E_NO_FEEDBACK_STORE" {
+		t.Fatalf("expected E_NO_FEEDBACK_STORE, got %+v", resp.Error)
+	}
+}
+
+func TestHandler_RecordFeedback_ValidationAndSuccess(t *testing.T) {
+	store := newMockStore()
+	feedbackStore, cleanup := newFeedbackStoreWithDB(t)
+	defer cleanup()
+
+	server, err := NewServer(&ServerConfig{
+		Store:         store,
+		Ranker:        &mockRanker{},
+		FeedbackStore: feedbackStore,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	cases := []struct {
+		name    string
+		req     *pb.RecordFeedbackRequest
+		wantMsg string
+	}{
+		{
+			name: "missing session",
+			req: &pb.RecordFeedbackRequest{
+				SuggestedText: "git status",
+				Action:        "accepted",
+			},
+			wantMsg: "session_id is required",
+		},
+		{
+			name: "missing suggested text",
+			req: &pb.RecordFeedbackRequest{
+				SessionId: "sess-1",
+				Action:    "accepted",
+			},
+			wantMsg: "suggested_text is required",
+		},
+		{
+			name: "missing action",
+			req: &pb.RecordFeedbackRequest{
+				SessionId:     "sess-1",
+				SuggestedText: "git status",
+			},
+			wantMsg: "action is required",
+		},
+	}
+	for _, tc := range cases {
+		resp, fbErr := server.RecordFeedback(ctx, tc.req)
+		if fbErr != nil {
+			t.Fatalf("%s: RecordFeedback returned error: %v", tc.name, fbErr)
+		}
+		if resp.Ok {
+			t.Fatalf("%s: expected response.Ok=false", tc.name)
+		}
+		if resp.Error == nil || resp.Error.Code != "E_INVALID_REQUEST" || !strings.Contains(resp.Error.Message, tc.wantMsg) {
+			t.Fatalf("%s: expected validation error %q, got %+v", tc.name, tc.wantMsg, resp.Error)
+		}
+	}
+
+	successReq := &pb.RecordFeedbackRequest{
+		SessionId:     "sess-success",
+		SuggestedText: "git status",
+		Action:        "accepted",
+		ExecutedText:  "git status",
+		Prefix:        "git st",
+		LatencyMs:     42,
+	}
+	resp, err := server.RecordFeedback(ctx, successReq)
+	if err != nil {
+		t.Fatalf("success RecordFeedback error: %v", err)
+	}
+	if !resp.Ok {
+		t.Fatalf("expected success response, got %+v", resp.Error)
+	}
+
+	aliasResp, err := server.SuggestFeedback(ctx, &pb.RecordFeedbackRequest{
+		SessionId:     "sess-success",
+		SuggestedText: "git diff",
+		Action:        "dismissed",
+	})
+	if err != nil {
+		t.Fatalf("SuggestFeedback error: %v", err)
+	}
+	if !aliasResp.Ok {
+		t.Fatalf("expected alias success response, got %+v", aliasResp.Error)
+	}
+
+	recs, err := feedbackStore.QueryFeedback(ctx, "sess-success", 10)
+	if err != nil {
+		t.Fatalf("QueryFeedback failed: %v", err)
+	}
+	if len(recs) != 2 {
+		t.Fatalf("expected 2 feedback records, got %d", len(recs))
+	}
+}
+
+func TestHandler_RecordFeedback_StoreError(t *testing.T) {
+	store := newMockStore()
+	feedbackStore, cleanup := newFeedbackStoreWithDB(t)
+	// Close the DB immediately to force store errors during RecordFeedback.
+	cleanup()
+
+	server, err := NewServer(&ServerConfig{
+		Store:         store,
+		Ranker:        &mockRanker{},
+		FeedbackStore: feedbackStore,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	resp, err := server.RecordFeedback(context.Background(), &pb.RecordFeedbackRequest{
+		SessionId:     "sess-err",
+		SuggestedText: "npm test",
+		Action:        "accepted",
+	})
+	if err != nil {
+		t.Fatalf("RecordFeedback returned error: %v", err)
+	}
+	if resp.Ok {
+		t.Fatal("expected Ok=false when feedback store write fails")
+	}
+	if resp.Error == nil || resp.Error.Code != "E_STORE_ERROR" {
+		t.Fatalf("expected E_STORE_ERROR, got %+v", resp.Error)
+	}
+}
+
+func TestHandler_RecordFeedback_StaleSnapshotIgnored(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "stale_snapshot.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 DB: %v", err)
+	}
+	defer v2db.Close()
+
+	server, err := NewServer(&ServerConfig{
+		Store: newMockStore(),
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	server.snapshotMu.Lock()
+	server.lastSuggestSnapshots["sess-stale"] = suggestSnapshot{
+		Context: suggest2.SuggestContext{
+			Scope:          "global",
+			LastTemplateID: "tmpl:last",
+		},
+		Suggestions: []suggest2.Suggestion{
+			{Command: "git status", TemplateID: "tmpl:git-status", Score: 10},
+			{Command: "ls -la", TemplateID: "tmpl:ls", Score: 9},
+		},
+		ShownAtMs: time.Now().Add(-maxSuggestSnapshotAge - time.Minute).UnixMilli(),
+	}
+	server.snapshotMu.Unlock()
+
+	before := int64(0)
+	if server.learner != nil {
+		before = server.learner.SampleCount()
+	}
+
+	resp, err := server.RecordFeedback(ctx, &pb.RecordFeedbackRequest{
+		SessionId:     "sess-stale",
+		SuggestedText: "git status",
+		Action:        "accepted",
+		Prefix:        "git",
+	})
+	if err != nil {
+		t.Fatalf("RecordFeedback failed: %v", err)
+	}
+	if !resp.Ok {
+		t.Fatalf("RecordFeedback returned ok=false: %+v", resp.Error)
+	}
+
+	if server.learner != nil && server.learner.SampleCount() != before {
+		t.Fatalf("expected stale snapshot to skip learner update")
+	}
+	if _, ok := server.getSuggestSnapshot("sess-stale"); ok {
+		t.Fatalf("expected stale snapshot to be evicted")
+	}
+}
+
+func TestServer_ApplyLearningProfile_ReordersSuggestions(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "learning_profile.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 DB: %v", err)
+	}
+	defer v2db.Close()
+
+	server, err := NewServer(&ServerConfig{
+		Store: newMockStore(),
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+	if server.learningStore == nil {
+		t.Fatal("expected learning store to be configured")
+	}
+
+	w := learning.DefaultWeights()
+	w.Prefix = 0.60
+	w.RiskPenalty = 0.20
+	if err := server.learningStore.SaveWeights(ctx, "repo:demo", &w, 80, 0.01); err != nil {
+		t.Fatalf("failed to save weights: %v", err)
+	}
+
+	suggestions := []suggest2.Suggestion{
+		{Command: "ls -la", Score: 10.5},
+		{Command: "git status", Score: 10.0},
+	}
+
+	server.applyLearningProfile(ctx, &suggest2.SuggestContext{
+		Scope:  "repo:demo",
+		Prefix: "git",
+	}, suggestions)
+
+	if suggestions[0].Command != "git status" {
+		t.Fatalf("expected learning profile to reorder prefix match first, got %q", suggestions[0].Command)
+	}
+}
+
+func TestImportHistory_EdgeCases(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("if_not_exists_skip", func(t *testing.T) {
+		store := &importStatusStore{mockStore: newMockStore(), has: true}
+		server, err := NewServer(&ServerConfig{Store: store, Ranker: &mockRanker{}})
+		if err != nil {
+			t.Fatalf("NewServer failed: %v", err)
+		}
+
+		resp, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{
+			Shell:       "bash",
+			IfNotExists: true,
+		})
+		if err != nil {
+			t.Fatalf("ImportHistory failed: %v", err)
+		}
+		if !resp.Skipped {
+			t.Fatalf("expected import to be skipped: %+v", resp)
+		}
+	})
+
+	t.Run("if_not_exists_status_error", func(t *testing.T) {
+		store := &importStatusStore{mockStore: newMockStore(), hasErr: fmt.Errorf("boom")}
+		server, err := NewServer(&ServerConfig{Store: store, Ranker: &mockRanker{}})
+		if err != nil {
+			t.Fatalf("NewServer failed: %v", err)
+		}
+
+		if _, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{Shell: "bash", IfNotExists: true}); err == nil {
+			t.Fatal("expected HasImportedHistory error")
+		}
+	})
+
+	t.Run("unsupported_shell", func(t *testing.T) {
+		server := createTestServer(t)
+		resp, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{Shell: "pwsh"})
+		if err != nil {
+			t.Fatalf("ImportHistory failed: %v", err)
+		}
+		if !strings.Contains(resp.Error, "unsupported shell") {
+			t.Fatalf("expected unsupported shell response, got %+v", resp)
+		}
+	})
+
+	t.Run("auto_detect_failure", func(t *testing.T) {
+		server := createTestServer(t)
+		t.Setenv("SHELL", "")
+		resp, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{Shell: "auto"})
+		if err != nil {
+			t.Fatalf("ImportHistory failed: %v", err)
+		}
+		if !strings.Contains(resp.Error, "could not detect shell type") {
+			t.Fatalf("expected detect shell failure, got %+v", resp)
+		}
+	})
+
+	t.Run("read_error", func(t *testing.T) {
+		server := createTestServer(t)
+		if _, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{
+			Shell:       "bash",
+			HistoryPath: t.TempDir(),
+		}); err == nil {
+			t.Fatal("expected read error for directory history path")
+		}
+	})
+
+	t.Run("store_import_error", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		histPath := filepath.Join(tmpDir, "bash_history")
+		if err := writeTestFile(histPath, "#1700000000\ngit status\n"); err != nil {
+			t.Fatalf("failed writing history file: %v", err)
+		}
+
+		store := &importStatusStore{mockStore: newMockStore(), importErr: fmt.Errorf("import failed")}
+		server, err := NewServer(&ServerConfig{Store: store, Ranker: &mockRanker{}})
+		if err != nil {
+			t.Fatalf("NewServer failed: %v", err)
+		}
+
+		if _, err := server.ImportHistory(ctx, &pb.HistoryImportRequest{
+			Shell:       "bash",
+			HistoryPath: histPath,
+		}); err == nil {
+			t.Fatal("expected ImportHistory store error")
+		}
+	})
+}
+
 func TestHandler_Suggest_ReturnsHistorySuggestions(t *testing.T) {
 	t.Parallel()
 
@@ -479,6 +930,113 @@ func TestHandler_Suggest_ReturnsHistorySuggestions(t *testing.T) {
 	// The mock ranker returns "git status"
 	if resp.Suggestions[0].Text != "git status" {
 		t.Errorf("expected first suggestion to be 'git status', got %s", resp.Suggestions[0].Text)
+	}
+}
+
+func TestHandler_Suggest_V1IncludesWhyDetailsWhenAvailable(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+
+	now := time.Now().UnixMilli()
+	lastSeen := now - (2 * time.Hour).Milliseconds()
+
+	ranker := &mockRanker{
+		suggestions: []suggest.Suggestion{
+			{
+				Text:           "make install",
+				Source:         "global",
+				Score:          0.77,
+				CmdNorm:        "make install",
+				LastSeenUnixMs: lastSeen,
+				SuccessCount:   11,
+				FailureCount:   1,
+				Reasons: []suggest.Reason{
+					{Type: "source", Contribution: 0.16},
+					{Type: "recency", Contribution: 0.21},
+					{Type: "success", Contribution: 0.18},
+				},
+			},
+		},
+	}
+
+	registry := provider.NewRegistry()
+	server, err := NewServer(&ServerConfig{
+		Store:       store,
+		Ranker:      ranker,
+		Registry:    registry,
+		IdleTimeout: 5 * time.Minute,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.SuggestRequest{
+		SessionId:  "test-session",
+		Cwd:        "/tmp",
+		Buffer:     "make",
+		MaxResults: 5,
+	}
+
+	resp, err := server.Suggest(ctx, req)
+	if err != nil {
+		t.Fatalf("Suggest failed: %v", err)
+	}
+	if len(resp.Suggestions) != 1 {
+		t.Fatalf("expected 1 suggestion, got %d", len(resp.Suggestions))
+	}
+
+	got := resp.Suggestions[0]
+	if got.CmdNorm == "" {
+		t.Errorf("expected cmd_norm to be set")
+	}
+	if got.Description == "" {
+		t.Errorf("expected description to be set")
+	}
+	lowDesc := strings.ToLower(got.Description)
+	if strings.Contains(lowDesc, "last ") || strings.Contains(lowDesc, "freq") || strings.Contains(lowDesc, "success") {
+		t.Errorf("expected narrative description without numeric hints, got %q", got.Description)
+	}
+	if len(got.Reasons) == 0 {
+		t.Fatalf("expected reasons to be set")
+	}
+
+	// Ensure hints are present (recency/frequency/success), and causality tags are present.
+	// These assertions intentionally pin exact display strings as part of the
+	// picker UX contract; changes here should be deliberate and coordinated.
+	var hasRecencyHint, hasFreqHint, hasSuccessHint, hasSourceTag bool
+	for _, r := range got.Reasons {
+		switch strings.TrimSpace(r.Type) {
+		case "recency":
+			if strings.Contains(r.Description, "last 2h ago") {
+				hasRecencyHint = true
+			}
+		case "frequency":
+			if r.Description == "freq 12" {
+				hasFreqHint = true
+			}
+		case "success":
+			if strings.Contains(r.Description, "success 91%") {
+				hasSuccessHint = true
+			}
+		case "source":
+			if r.Contribution != 0 {
+				hasSourceTag = true
+			}
+		}
+	}
+	if !hasRecencyHint {
+		t.Errorf("expected recency hint (last 2h ago)")
+	}
+	if !hasFreqHint {
+		t.Errorf("expected frequency hint (freq 12)")
+	}
+	if !hasSuccessHint {
+		t.Errorf("expected success hint (success 91%%)")
+	}
+	if !hasSourceTag {
+		t.Errorf("expected scoring tag contribution for source")
 	}
 }
 
@@ -636,14 +1194,14 @@ func TestHandler_SuggestWithDestructiveCommand(t *testing.T) {
 func TestTruncate(t *testing.T) {
 	tests := []struct {
 		input    string
-		maxLen   int
 		expected string
+		maxLen   int
 	}{
-		{"hello", 10, "hello"},
-		{"hello world", 5, "he..."},
-		{"abc", 3, "abc"},
-		{"abcd", 3, "abc"},
-		{"hello", 0, ""},
+		{"hello", "hello", 10},
+		{"hello world", "he...", 5},
+		{"abc", "abc", 3},
+		{"abcd", "abc", 3},
+		{"hello", "", 0},
 	}
 
 	for _, tt := range tests {
@@ -666,8 +1224,8 @@ func TestTruncate_EdgeCases(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		maxLen   int
 		expected string
+		maxLen   int
 	}{
 		{
 			name:     "empty string",
@@ -2092,7 +2650,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-1",
 		Command:       "git status",
 		CommandNorm:   "git status",
-		TsStartUnixMs: 1000,
+		TSStartUnixMs: 1000,
 		CWD:           "/tmp",
 	}
 	store.commands["cmd-2"] = &storage.Command{
@@ -2100,7 +2658,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-1",
 		Command:       "git log",
 		CommandNorm:   "git log",
-		TsStartUnixMs: 2000,
+		TSStartUnixMs: 2000,
 		CWD:           "/tmp",
 	}
 	store.commands["cmd-3"] = &storage.Command{
@@ -2108,7 +2666,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-1",
 		Command:       "git status",
 		CommandNorm:   "git status",
-		TsStartUnixMs: 3000,
+		TSStartUnixMs: 3000,
 		CWD:           "/tmp",
 	}
 	store.commands["cmd-4"] = &storage.Command{
@@ -2116,7 +2674,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-2",
 		Command:       "ls -la",
 		CommandNorm:   "ls -la",
-		TsStartUnixMs: 4000,
+		TSStartUnixMs: 4000,
 		CWD:           "/tmp",
 	}
 	store.commands["cmd-5"] = &storage.Command{
@@ -2124,7 +2682,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 		SessionID:     "session-2",
 		Command:       "echo hello",
 		CommandNorm:   "echo hello",
-		TsStartUnixMs: 5000,
+		TSStartUnixMs: 5000,
 		CWD:           "/tmp",
 	}
 
@@ -2296,7 +2854,7 @@ func TestHandler_FetchHistory_ANSIStripping(t *testing.T) {
 		SessionID:     "session-1",
 		Command:       "\x1b[32mgit\x1b[0m status",
 		CommandNorm:   "git status",
-		TsStartUnixMs: 1000,
+		TSStartUnixMs: 1000,
 		CWD:           "/tmp",
 	}
 
@@ -2380,6 +2938,147 @@ func TestHandler_FetchHistory_EmptyResult(t *testing.T) {
 	}
 }
 
+func TestHandler_FetchHistory_V2SearchPaginationOffset(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "history_v2_offset.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 DB: %v", err)
+	}
+	defer v2db.Close()
+	if _, ftsErr := v2db.DB().ExecContext(ctx, `
+		CREATE VIRTUAL TABLE IF NOT EXISTS command_fts USING fts5(cmd_raw, repo_key, cwd)
+	`); ftsErr != nil {
+		t.Fatalf("failed to create command_fts: %v", ftsErr)
+	}
+
+	for i := 1; i <= 4; i++ {
+		cmd := fmt.Sprintf("git cmd %d", i)
+		res, insertErr := v2db.DB().ExecContext(ctx, `
+			INSERT INTO command_event (session_id, ts_ms, cwd, repo_key, cmd_raw, cmd_norm, ephemeral)
+			VALUES (?, ?, ?, ?, ?, ?, 0)
+		`, "sess-v2", int64(1000+i), "/tmp", "repo-a", cmd, cmd)
+		if insertErr != nil {
+			t.Fatalf("insert command_event failed: %v", insertErr)
+		}
+		id, idErr := res.LastInsertId()
+		if idErr != nil {
+			t.Fatalf("last insert id failed: %v", idErr)
+		}
+		if _, ftsInsertErr := v2db.DB().ExecContext(ctx, `
+			INSERT INTO command_fts(rowid, cmd_raw, repo_key, cwd)
+			VALUES (?, ?, ?, ?)
+		`, id, cmd, "repo-a", "/tmp"); ftsInsertErr != nil {
+			t.Fatalf("insert command_fts failed: %v", ftsInsertErr)
+		}
+	}
+
+	server, err := NewServer(&ServerConfig{
+		Store: newMockStore(),
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	page1, err := server.FetchHistory(ctx, &pb.HistoryFetchRequest{
+		Global:  true,
+		Query:   "git",
+		RepoKey: "repo-a",
+		Mode:    pb.SearchMode_SEARCH_MODE_FTS,
+		Scope:   "global",
+		Limit:   2,
+		Offset:  0,
+	})
+	if err != nil {
+		t.Fatalf("FetchHistory page1 failed: %v", err)
+	}
+	page2, err := server.FetchHistory(ctx, &pb.HistoryFetchRequest{
+		Global:  true,
+		Query:   "git",
+		RepoKey: "repo-a",
+		Mode:    pb.SearchMode_SEARCH_MODE_FTS,
+		Scope:   "global",
+		Limit:   2,
+		Offset:  2,
+	})
+	if err != nil {
+		t.Fatalf("FetchHistory page2 failed: %v", err)
+	}
+
+	if len(page1.Items) != 2 || len(page2.Items) != 2 {
+		t.Fatalf("expected two items per page, got page1=%d page2=%d", len(page1.Items), len(page2.Items))
+	}
+
+	seen := make(map[string]struct{}, len(page1.Items))
+	for _, it := range page1.Items {
+		seen[it.Command] = struct{}{}
+	}
+	for _, it := range page2.Items {
+		if _, ok := seen[it.Command]; ok {
+			t.Fatalf("expected non-overlapping pages, found duplicate command %q", it.Command)
+		}
+	}
+}
+
+func TestHandler_FetchHistory_V2SearchErrorFallsBackToStorage(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "history_v2_fallback.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 DB: %v", err)
+	}
+	// Force V2 search init/query failures.
+	_ = v2db.Close()
+
+	store := newMockStore()
+	store.commands["cmd-fallback-1"] = &storage.Command{
+		CommandID:     "cmd-fallback-1",
+		SessionID:     "sess-fallback",
+		Command:       "git status",
+		CommandNorm:   "git status",
+		TSStartUnixMs: 1000,
+		CWD:           "/tmp",
+	}
+
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("failed to create server: %v", err)
+	}
+
+	resp, err := server.FetchHistory(ctx, &pb.HistoryFetchRequest{
+		Global: true,
+		Query:  "git",
+		Mode:   pb.SearchMode_SEARCH_MODE_FTS,
+		Limit:  10,
+		Offset: 0,
+	})
+	if err != nil {
+		t.Fatalf("FetchHistory failed: %v", err)
+	}
+	if len(resp.Items) == 0 {
+		t.Fatal("expected storage fallback to return history results")
+	}
+	if resp.Backend != "storage" {
+		t.Fatalf("expected backend=storage on fallback, got %q", resp.Backend)
+	}
+}
+
 func TestStripANSI(t *testing.T) {
 	t.Parallel()
 
@@ -2428,4 +3127,422 @@ func TestStripANSI(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ============================================================================
+// ImportHistory V2 backfill tests
+// ============================================================================
+
+// TestImportHistory_V2BackfillCalled verifies that V2 backfill writes
+// command_event rows into the V2 database after a successful V1 import.
+func TestImportHistory_V2BackfillCalled(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "v2_backfill_test.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	// Create a bash history file with timestamped entries
+	histPath := filepath.Join(tmpDir, "bash_history")
+	histContent := "#1700000000\ngit status\n#1700000100\nls -la\n#1700000200\necho hello\n"
+	if writeErr := writeTestFile(histPath, histContent); writeErr != nil {
+		t.Fatalf("failed to write test history file: %v", writeErr)
+	}
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	req := &pb.HistoryImportRequest{
+		Shell:       "bash",
+		HistoryPath: histPath,
+	}
+
+	resp, err := server.ImportHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("ImportHistory failed: %v", err)
+	}
+
+	if resp.Error != "" {
+		t.Fatalf("ImportHistory returned error: %s", resp.Error)
+	}
+
+	if resp.ImportedCount != 3 {
+		t.Errorf("expected ImportedCount=3, got %d", resp.ImportedCount)
+	}
+
+	// Verify V2 backfill wrote command_event rows
+	var v2Count int
+	err = v2db.DB().QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM command_event WHERE session_id = 'backfill-bash'`,
+	).Scan(&v2Count)
+	if err != nil {
+		t.Fatalf("failed to query V2 command_event: %v", err)
+	}
+
+	if v2Count != 3 {
+		t.Errorf("expected 3 command_event rows in V2 DB, got %d", v2Count)
+	}
+}
+
+// TestImportHistory_V2BackfillNilDB verifies that ImportHistory works normally
+// when v2db is nil (no panic, no error).
+func TestImportHistory_V2BackfillNilDB(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+
+	// Create a bash history file
+	histPath := filepath.Join(tmpDir, "bash_history")
+	histContent := "#1700000000\ngit status\n#1700000100\nls -la\n"
+	if err := writeTestFile(histPath, histContent); err != nil {
+		t.Fatalf("failed to write test history file: %v", err)
+	}
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  nil, // explicitly nil
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	ctx := context.Background()
+	req := &pb.HistoryImportRequest{
+		Shell:       "bash",
+		HistoryPath: histPath,
+	}
+
+	resp, err := server.ImportHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("ImportHistory failed: %v", err)
+	}
+
+	if resp.Error != "" {
+		t.Fatalf("ImportHistory returned error: %s", resp.Error)
+	}
+
+	if resp.ImportedCount != 2 {
+		t.Errorf("expected ImportedCount=2, got %d", resp.ImportedCount)
+	}
+}
+
+// TestImportHistory_V2BackfillFailureNonFatal verifies that if V2 backfill
+// fails, the V1 import response is still success with the correct count.
+func TestImportHistory_V2BackfillFailureNonFatal(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "v2_fail_test.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+
+	// Close the V2 database to force backfill failure.
+	// Operations on a closed DB return errors, simulating V2 unavailability.
+	v2db.Close()
+
+	// Create a bash history file
+	histPath := filepath.Join(tmpDir, "bash_history")
+	histContent := "#1700000000\ngit status\n#1700000100\nls -la\n#1700000200\necho hello\n"
+	if writeErr := writeTestFile(histPath, histContent); writeErr != nil {
+		t.Fatalf("failed to write test history file: %v", writeErr)
+	}
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db, // closed DB - backfill will fail
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	req := &pb.HistoryImportRequest{
+		Shell:       "bash",
+		HistoryPath: histPath,
+	}
+
+	resp, err := server.ImportHistory(ctx, req)
+	if err != nil {
+		t.Fatalf("ImportHistory should not return error when V2 backfill fails: %v", err)
+	}
+
+	if resp.Error != "" {
+		t.Fatalf("ImportHistory should not return error message when V2 backfill fails: %s", resp.Error)
+	}
+
+	// V1 import should still succeed with correct count
+	if resp.ImportedCount != 3 {
+		t.Errorf("expected ImportedCount=3 (V1 still succeeds), got %d", resp.ImportedCount)
+	}
+}
+
+// ============================================================================
+// CommandEnded V2 batch writer tests
+// ============================================================================
+
+// TestCommandEnded_FeedsV2 verifies that CommandEnded enqueues events to the
+// V2 batch writer after V1 storage succeeds.
+func TestCommandEnded_FeedsV2(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "v2_cmd_ended_test.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	// Start the batch writer
+	server.batchWriter.Start()
+
+	// Start a session
+	_, err = server.SessionStart(ctx, &pb.SessionStartRequest{
+		SessionId: "v2-session",
+		Cwd:       "/home/user",
+		Client:    &pb.ClientInfo{Shell: "zsh"},
+	})
+	if err != nil {
+		t.Fatalf("SessionStart failed: %v", err)
+	}
+
+	// CommandStarted stashes data for V2
+	_, err = server.CommandStarted(ctx, &pb.CommandStartRequest{
+		SessionId:   "v2-session",
+		CommandId:   "v2-cmd-1",
+		Cwd:         "/home/user/project",
+		Command:     "make build",
+		GitRepoName: "clai",
+		GitBranch:   "main",
+	})
+	if err != nil {
+		t.Fatalf("CommandStarted failed: %v", err)
+	}
+
+	// CommandEnded should enqueue to V2 batch writer
+	endTS := time.Now().Add(-2 * time.Minute).UnixMilli()
+	resp, err := server.CommandEnded(ctx, &pb.CommandEndRequest{
+		SessionId:  "v2-session",
+		CommandId:  "v2-cmd-1",
+		ExitCode:   0,
+		TsUnixMs:   endTS,
+		DurationMs: 250,
+	})
+	if err != nil {
+		t.Fatalf("CommandEnded failed: %v", err)
+	}
+	if !resp.Ok {
+		t.Fatalf("CommandEnded returned ok=false: %s", resp.Error)
+	}
+
+	// Stop the batch writer to flush all pending events (blocks until done)
+	server.batchWriter.Stop()
+
+	// Verify event appears in V2 DB
+	var v2Count int
+	err = v2db.DB().QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM command_event WHERE session_id = ? AND cmd_raw = ?`,
+		"v2-session", "make build",
+	).Scan(&v2Count)
+	if err != nil {
+		t.Fatalf("failed to query V2 command_event: %v", err)
+	}
+
+	if v2Count != 1 {
+		t.Errorf("expected 1 command_event row in V2 DB, got %d", v2Count)
+	}
+
+	// Verify exit code, duration, and timestamp in the V2 row
+	var exitCode int
+	var durationMs int64
+	var ts int64
+	err = v2db.DB().QueryRowContext(ctx,
+		`SELECT exit_code, duration_ms, ts_ms FROM command_event WHERE session_id = ? AND cmd_raw = ?`,
+		"v2-session", "make build",
+	).Scan(&exitCode, &durationMs, &ts)
+	if err != nil {
+		t.Fatalf("failed to query V2 event details: %v", err)
+	}
+
+	if exitCode != 0 {
+		t.Errorf("expected exit_code=0, got %d", exitCode)
+	}
+	if durationMs != 250 {
+		t.Errorf("expected duration_ms=250, got %d", durationMs)
+	}
+	if ts != endTS {
+		t.Errorf("expected ts=%d from request, got %d", endTS, ts)
+	}
+}
+
+// TestCommandEnded_V2NilGraceful verifies that CommandEnded works normally
+// when batchWriter is nil (V2 disabled).
+func TestCommandEnded_V2NilGraceful(t *testing.T) {
+	t.Parallel()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  nil, // V2 disabled
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	// Verify batchWriter is nil
+	if server.batchWriter != nil {
+		t.Fatal("expected batchWriter to be nil when V2DB is nil")
+	}
+
+	ctx := context.Background()
+
+	// Start session and command
+	_, _ = server.SessionStart(ctx, &pb.SessionStartRequest{
+		SessionId: "nil-v2-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	})
+
+	_, _ = server.CommandStarted(ctx, &pb.CommandStartRequest{
+		SessionId: "nil-v2-session",
+		CommandId: "nil-v2-cmd",
+		Cwd:       "/tmp",
+		Command:   "echo hello",
+	})
+
+	// CommandEnded should succeed without V2
+	resp, err := server.CommandEnded(ctx, &pb.CommandEndRequest{
+		SessionId:  "nil-v2-session",
+		CommandId:  "nil-v2-cmd",
+		ExitCode:   0,
+		DurationMs: 50,
+	})
+	if err != nil {
+		t.Fatalf("CommandEnded failed: %v", err)
+	}
+	if !resp.Ok {
+		t.Errorf("CommandEnded returned ok=false: %s", resp.Error)
+	}
+
+	// V1 counter should still be incremented
+	if server.getCommandsLogged() != 1 {
+		t.Errorf("expected commandsLogged=1, got %d", server.getCommandsLogged())
+	}
+}
+
+// TestCommandEnded_ExitCodeRecorded verifies that a non-zero exit code is
+// correctly recorded in the V2 event.
+func TestCommandEnded_ExitCodeRecorded(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "v2_exitcode_test.db")
+
+	ctx := context.Background()
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 database: %v", err)
+	}
+	defer v2db.Close()
+
+	store := newMockStore()
+	server, err := NewServer(&ServerConfig{
+		Store: store,
+		V2DB:  v2db,
+	})
+	if err != nil {
+		t.Fatalf("NewServer failed: %v", err)
+	}
+
+	server.batchWriter.Start()
+
+	// Start session + command
+	_, _ = server.SessionStart(ctx, &pb.SessionStartRequest{
+		SessionId: "exitcode-session",
+		Cwd:       "/tmp",
+		Client:    &pb.ClientInfo{Shell: "bash"},
+	})
+
+	_, _ = server.CommandStarted(ctx, &pb.CommandStartRequest{
+		SessionId: "exitcode-session",
+		CommandId: "exitcode-cmd",
+		Cwd:       "/tmp",
+		Command:   "false",
+	})
+
+	// CommandEnded with exit_code=1
+	resp, err := server.CommandEnded(ctx, &pb.CommandEndRequest{
+		SessionId:  "exitcode-session",
+		CommandId:  "exitcode-cmd",
+		ExitCode:   1,
+		DurationMs: 10,
+	})
+	if err != nil {
+		t.Fatalf("CommandEnded failed: %v", err)
+	}
+	if !resp.Ok {
+		t.Fatalf("CommandEnded returned ok=false: %s", resp.Error)
+	}
+
+	// Stop the batch writer to flush all pending events (blocks until done)
+	server.batchWriter.Stop()
+
+	// Verify exit_code=1 in V2 DB
+	var exitCode int
+	err = v2db.DB().QueryRowContext(ctx,
+		`SELECT exit_code FROM command_event WHERE session_id = ? AND cmd_raw = ?`,
+		"exitcode-session", "false",
+	).Scan(&exitCode)
+	if err != nil {
+		t.Fatalf("failed to query V2 event: %v", err)
+	}
+
+	if exitCode != 1 {
+		t.Errorf("expected exit_code=1 in V2 event, got %d", exitCode)
+	}
+}
+
+// writeTestFile is a helper that writes content to a file for testing.
+func writeTestFile(path, content string) error {
+	return os.WriteFile(path, []byte(content), 0644)
 }

@@ -1,26 +1,36 @@
 package daemon
 
 import (
+	"maps"
 	"sync"
 	"time"
 )
 
 // SessionInfo contains metadata about an active session.
 type SessionInfo struct {
-	SessionID    string
-	Shell        string
-	OS           string
-	Hostname     string
-	Username     string
-	CWD          string
-	StartedAt    time.Time
-	LastActivity time.Time
+	StartedAt      time.Time
+	LastActivity   time.Time
+	Aliases        map[string]string
+	LastCmdRaw     string
+	LastGitRepo    string
+	CWD            string
+	Hostname       string
+	OS             string
+	SessionID      string
+	LastCmdCWD     string
+	Username       string
+	LastGitRoot    string
+	LastGitBranch  string
+	LastCmdID      string
+	LastTemplateID string
+	Shell          string
+	ProjectTypes   []string
 }
 
 // SessionManager tracks active sessions.
 type SessionManager struct {
-	mu       sync.RWMutex
 	sessions map[string]*SessionInfo
+	mu       sync.RWMutex
 }
 
 // NewSessionManager creates a new SessionManager.
@@ -44,6 +54,7 @@ func (m *SessionManager) Start(sessionID, shell, os, hostname, username, cwd str
 		CWD:          cwd,
 		StartedAt:    startedAt,
 		LastActivity: time.Now(),
+		Aliases:      make(map[string]string),
 	}
 }
 
@@ -67,6 +78,12 @@ func (m *SessionManager) Get(sessionID string) (*SessionInfo, bool) {
 
 	// Return a copy to avoid data races
 	infoCopy := *info
+	if len(info.ProjectTypes) > 0 {
+		infoCopy.ProjectTypes = append([]string(nil), info.ProjectTypes...)
+	}
+	if info.Aliases != nil {
+		infoCopy.Aliases = maps.Clone(info.Aliases)
+	}
 	return &infoCopy, true
 }
 
@@ -87,6 +104,53 @@ func (m *SessionManager) UpdateCWD(sessionID, cwd string) {
 
 	if info, ok := m.sessions[sessionID]; ok {
 		info.CWD = cwd
+		info.LastActivity = time.Now()
+	}
+}
+
+// StashCommand stores command data from CommandStarted for later retrieval by CommandEnded.
+func (m *SessionManager) StashCommand(sessionID, cmdID, cmdRaw, cwd, gitRepo, gitRoot, gitBranch string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if info, ok := m.sessions[sessionID]; ok {
+		info.LastCmdRaw = cmdRaw
+		info.LastCmdCWD = cwd
+		info.LastGitRepo = gitRepo
+		info.LastGitRoot = gitRoot
+		info.LastGitBranch = gitBranch
+		info.LastCmdID = cmdID
+		info.LastActivity = time.Now()
+	}
+}
+
+func (m *SessionManager) SetLastTemplateID(sessionID, templateID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if info, ok := m.sessions[sessionID]; ok {
+		info.LastTemplateID = templateID
+		info.LastActivity = time.Now()
+	}
+}
+
+func (m *SessionManager) SetProjectTypes(sessionID string, projectTypes []string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if info, ok := m.sessions[sessionID]; ok {
+		info.ProjectTypes = append([]string(nil), projectTypes...)
+		info.LastActivity = time.Now()
+	}
+}
+
+func (m *SessionManager) SetAliases(sessionID string, aliases map[string]string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if info, ok := m.sessions[sessionID]; ok {
+		if aliases == nil {
+			info.Aliases = make(map[string]string)
+		} else {
+			info.Aliases = maps.Clone(aliases)
+		}
 		info.LastActivity = time.Now()
 	}
 }
@@ -120,7 +184,7 @@ func (m *SessionManager) List() []string {
 	return ids
 }
 
-// GetAll returns a copy of all session info.
+// GetAll returns a deep copy of all session info.
 func (m *SessionManager) GetAll() []*SessionInfo {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -128,6 +192,12 @@ func (m *SessionManager) GetAll() []*SessionInfo {
 	infos := make([]*SessionInfo, 0, len(m.sessions))
 	for _, info := range m.sessions {
 		infoCopy := *info
+		if len(info.ProjectTypes) > 0 {
+			infoCopy.ProjectTypes = append([]string(nil), info.ProjectTypes...)
+		}
+		if info.Aliases != nil {
+			infoCopy.Aliases = maps.Clone(info.Aliases)
+		}
 		infos = append(infos, &infoCopy)
 	}
 	return infos

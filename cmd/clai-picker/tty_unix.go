@@ -46,7 +46,7 @@ func checkTermWidth() error {
 		syscall.SYS_IOCTL,
 		f.Fd(),
 		syscall.TIOCGWINSZ,
-		uintptr(unsafe.Pointer(&ws)),
+		uintptr(unsafe.Pointer(&ws)), //nolint:gosec // G103: unsafe.Pointer required for ioctl syscall
 	)
 	if errno != 0 {
 		return fmt.Errorf("cannot get terminal size: %w", errno)

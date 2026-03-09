@@ -25,11 +25,24 @@ type RankRequest struct {
 
 // Suggestion represents a ranked command suggestion.
 type Suggestion struct {
-	Text        string  // The suggested command
-	Description string  // Optional description
-	Source      string  // "session", "cwd", "global", "ai"
-	Score       float64 // Ranking score (0.0 to 1.0)
-	Risk        string  // "safe", "destructive", or empty
+	Text           string
+	Description    string
+	Source         string
+	Risk           string
+	CmdNorm        string
+	Reasons        []Reason
+	Score          float64
+	LastSeenUnixMs int64
+	SuccessCount   int
+	FailureCount   int
+}
+
+// Reason describes a single "why" component for a suggestion score.
+// Contribution is the weighted contribution (0.0 to 1.0) to the final score.
+type Reason struct {
+	Type         string
+	Description  string
+	Contribution float64
 }
 
 // DefaultRanker implements the Ranker interface using the scoring formula
@@ -55,8 +68,8 @@ const (
 
 // candidate represents an aggregated command candidate for ranking.
 type candidate struct {
-	cmd          storage.Command
 	source       Source
+	cmd          storage.Command
 	successCount int
 	failureCount int
 	latestTime   int64
@@ -78,6 +91,14 @@ func (r *DefaultRanker) Rank(ctx context.Context, req *RankRequest) ([]Suggestio
 	}
 
 	candidates := aggregateCandidates(results)
+	// Never suggest the exact last command again; users can re-run via shell history.
+	// This prevents the common "next suggestion == last command" annoyance.
+	if req.LastCommand != "" {
+		lastNorm := NormalizeCommand(req.LastCommand)
+		if lastNorm != "" {
+			delete(candidates, DeduplicateKey(lastNorm))
+		}
+	}
 	suggestions := scoreCandidates(candidates, time.Now(), GetToolPrefix(req.LastCommand))
 	return limitResults(suggestions, maxResults), nil
 }
@@ -100,9 +121,9 @@ func aggregateCandidates(results []*QueryResult) map[string]*candidate {
 			key := DeduplicateKey(cmd.CommandNorm)
 			existing, ok := candidates[key]
 			if !ok {
-				candidates[key] = newCandidate(*cmd, result.Source)
+				candidates[key] = newCandidate(cmd, result.Source)
 			} else {
-				updateCandidate(existing, *cmd, result.Source)
+				updateCandidate(existing, cmd, result.Source)
 			}
 		}
 	}
@@ -111,19 +132,19 @@ func aggregateCandidates(results []*QueryResult) map[string]*candidate {
 }
 
 // newCandidate creates a new candidate from a command.
-func newCandidate(cmd storage.Command, source Source) *candidate {
+func newCandidate(cmd *storage.Command, source Source) *candidate {
 	successCount, failureCount := countSuccessFailure(cmd)
 	return &candidate{
-		cmd:          cmd,
+		cmd:          *cmd,
 		source:       source,
 		successCount: successCount,
 		failureCount: failureCount,
-		latestTime:   cmd.TsStartUnixMs,
+		latestTime:   cmd.TSStartUnixMs,
 	}
 }
 
 // countSuccessFailure returns (successCount, failureCount) for a command.
-func countSuccessFailure(cmd storage.Command) (int, int) {
+func countSuccessFailure(cmd *storage.Command) (successCount, failureCount int) {
 	if cmd.IsSuccess == nil || *cmd.IsSuccess {
 		return 1, 0
 	}
@@ -131,16 +152,16 @@ func countSuccessFailure(cmd storage.Command) (int, int) {
 }
 
 // updateCandidate updates an existing candidate with a new command occurrence.
-func updateCandidate(existing *candidate, cmd storage.Command, source Source) {
+func updateCandidate(existing *candidate, cmd *storage.Command, source Source) {
 	if cmd.IsSuccess == nil || *cmd.IsSuccess {
 		existing.successCount++
 	} else {
 		existing.failureCount++
 	}
 
-	if cmd.TsStartUnixMs > existing.latestTime {
-		existing.latestTime = cmd.TsStartUnixMs
-		existing.cmd = cmd
+	if cmd.TSStartUnixMs > existing.latestTime {
+		existing.latestTime = cmd.TSStartUnixMs
+		existing.cmd = *cmd
 	}
 
 	if SourceWeight(source) > SourceWeight(existing.source) {
@@ -153,12 +174,55 @@ func scoreCandidates(candidates map[string]*candidate, now time.Time, lastToolPr
 	suggestions := make([]Suggestion, 0, len(candidates))
 
 	for _, c := range candidates {
-		score := calculateScore(c.source, c.latestTime, now, c.successCount, c.failureCount, c.cmd.Command, lastToolPrefix)
+		sourceScore := SourceWeight(c.source)
+		recencyScore := calculateRecencyScore(c.latestTime, now)
+		successScore := calculateSuccessScore(c.successCount, c.failureCount)
+		affinityScore := calculateAffinityScore(c.cmd.Command, lastToolPrefix)
+
+		score := (sourceScore * weightSource) +
+			(recencyScore * weightRecency) +
+			(successScore * weightSuccess) +
+			(affinityScore * weightAffinity)
+
+		reasons := make([]Reason, 0, 4)
+		reasons = append(reasons,
+			Reason{
+				Type:         "source",
+				Description:  "", // UI already shows source; keep tags compact
+				Contribution: sourceScore * weightSource,
+			},
+			Reason{
+				Type:         "recency",
+				Description:  "", // human-friendly "last ..." hint is added at RPC boundary
+				Contribution: recencyScore * weightRecency,
+			},
+			Reason{
+				Type:         "success",
+				Description:  "", // human-friendly hint is added at RPC boundary
+				Contribution: successScore * weightSuccess,
+			},
+		)
+		if affinityScore != 0 {
+			desc := ""
+			if lastToolPrefix != "" {
+				desc = "same tool: " + lastToolPrefix
+			}
+			reasons = append(reasons, Reason{
+				Type:         "affinity",
+				Description:  desc,
+				Contribution: affinityScore * weightAffinity,
+			})
+		}
 		suggestions = append(suggestions, Suggestion{
-			Text:   c.cmd.Command,
-			Source: string(c.source),
-			Score:  score,
-			Risk:   "", // Risk assessment to be added by caller if needed
+			Text:           c.cmd.Command,
+			Source:         string(c.source),
+			Score:          score,
+			Risk:           "", // Risk assessment to be added by caller if needed
+			CmdNorm:        c.cmd.CommandNorm,
+			LastSeenUnixMs: c.latestTime,
+			SuccessCount:   c.successCount,
+			FailureCount:   c.failureCount,
+			Reasons:        reasons,
 		})
 	}
 

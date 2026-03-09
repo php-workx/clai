@@ -19,7 +19,7 @@ func TestSuggestion(t *testing.T) {
 : 1706000005:0;npm install express
 : 1706000006:0;npm run build
 `
-	if err := os.WriteFile(histFile, []byte(histContent), 0644); err != nil {
+	if err := os.WriteFile(histFile, []byte(histContent), 0600); err != nil {
 		t.Fatalf("Failed to write test history: %v", err)
 	}
 
@@ -62,7 +62,7 @@ func TestSuggestion_PlainHistory(t *testing.T) {
 git status
 git commit -m "test"
 `
-	if err := os.WriteFile(histFile, []byte(histContent), 0644); err != nil {
+	if err := os.WriteFile(histFile, []byte(histContent), 0600); err != nil {
 		t.Fatalf("Failed to write test history: %v", err)
 	}
 
@@ -85,7 +85,7 @@ func TestSuggestion_MostRecent(t *testing.T) {
 : 1706000002:0;git stash
 : 1706000003:0;git stash pop
 `
-	if err := os.WriteFile(histFile, []byte(histContent), 0644); err != nil {
+	if err := os.WriteFile(histFile, []byte(histContent), 0600); err != nil {
 		t.Fatalf("Failed to write test history: %v", err)
 	}
 
@@ -149,8 +149,8 @@ func TestSuggestions_Multiple(t *testing.T) {
 	tests := []struct {
 		name     string
 		prefix   string
-		limit    int
 		expected []string
+		limit    int
 	}{
 		{
 			name:     "multiple git commands",
@@ -213,7 +213,7 @@ func TestHasUnescapedTrailingBackslash(t *testing.T) {
 	}{
 		{`hello\`, true},     // single trailing backslash = continuation
 		{`hello\\`, false},   // two trailing backslashes = escaped, not continuation
-		{`hello\\\`, true},   // three = escaped + continuation
+		{`hello\\\`, true},   // three trailing: escaped backslash + continuation
 		{`hello\\\\`, false}, // four = two escaped
 		{`hello`, false},     // no backslash
 		{`\`, true},          // just a backslash

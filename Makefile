@@ -10,7 +10,18 @@ BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X github.com/runger/clai/internal/cmd.GitCommit=$(GIT_COMMIT) -X github.com/runger/clai/internal/cmd.BuildDate=$(BUILD_DATE)"
 PICKER_LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
-.PHONY: all build install install-dev clean test test-all test-rust test-interactive test-docker cover fmt lint vuln dev help proto bin/linux
+.PHONY: all build install install-dev clean test test-all test-interactive test-docker test-server test-server-stop test-server-status test-e2e test-e2e-shell cover fmt lint vuln roam dev help proto bin/linux
+
+TEST_SHELL?=bash
+PORT?=8080
+ADDRESS?=127.0.0.1
+E2E_SHELL?=bash
+E2E_SHELLS?=bash zsh fish
+E2E_PLANS?=tests/e2e/example-test-plan.yaml,tests/e2e/suggestions-tests.yaml
+E2E_GREP?=
+E2E_OUT?=.tmp/e2e-runs
+E2E_URL?=http://127.0.0.1:8080
+E2E_REPORTER?=line
 
 all: build
 
@@ -127,30 +138,53 @@ bin/linux:
 
 ## test-docker: Run interactive tests in Docker containers (Alpine, Ubuntu, Debian, Fedora) sequentially
 test-docker: bin/linux
-	@if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
-		docker compose -f tests/docker/docker-compose.yml build && \
-		echo "=== Running Alpine tests ===" && \
-		docker compose -f tests/docker/docker-compose.yml run --rm alpine && \
-		echo "=== Running Ubuntu tests ===" && \
-		docker compose -f tests/docker/docker-compose.yml run --rm ubuntu && \
-		echo "=== Running Debian tests ===" && \
-		docker compose -f tests/docker/docker-compose.yml run --rm debian && \
-		echo "=== Running Fedora tests ===" && \
-		docker compose -f tests/docker/docker-compose.yml run --rm fedora; \
-	elif command -v docker-compose >/dev/null 2>&1; then \
-		docker-compose -f tests/docker/docker-compose.yml build && \
-		echo "=== Running Alpine tests ===" && \
-		docker-compose -f tests/docker/docker-compose.yml run --rm alpine && \
-		echo "=== Running Ubuntu tests ===" && \
-		docker-compose -f tests/docker/docker-compose.yml run --rm ubuntu && \
-		echo "=== Running Debian tests ===" && \
-		docker-compose -f tests/docker/docker-compose.yml run --rm debian && \
-		echo "=== Running Fedora tests ===" && \
-		docker-compose -f tests/docker/docker-compose.yml run --rm fedora; \
+	@set -e; \
+	if command -v docker-compose >/dev/null 2>&1; then \
+		compose_cmd="docker-compose -f tests/docker/docker-compose.yml"; \
+	elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then \
+		compose_cmd="docker compose -f tests/docker/docker-compose.yml"; \
 	else \
 		echo "Error: docker-compose or docker compose not found"; \
 		exit 1; \
-	fi
+	fi; \
+	$$compose_cmd build; \
+	for svc in alpine ubuntu debian fedora; do \
+		echo "==> Running docker expect tests in $$svc"; \
+		$$compose_cmd run --rm $$svc expect.test -test.v -test.parallel=1; \
+	done
+
+## test-server: Start gotty-backed terminal server for browser e2e tests
+test-server:
+	@test_shell="$(if $(filter bash zsh fish,$(SHELL)),$(SHELL),$(TEST_SHELL))"; \
+	TEST_SHELL="$$test_shell" PORT="$(PORT)" ADDRESS="$(ADDRESS)" ./scripts/start-test-server.sh
+
+## test-server-stop: Stop gotty-backed terminal server
+test-server-stop:
+	@./scripts/stop-test-server.sh
+
+## test-server-status: Show status of gotty-backed terminal server
+test-server-status:
+	@./scripts/stop-test-server.sh --status
+
+## test-e2e: Run gotty+Playwright e2e suite for bash/zsh/fish and aggregate results
+test-e2e:
+	@E2E_SHELLS="$(E2E_SHELLS)" \
+	E2E_PLANS="$(E2E_PLANS)" \
+	E2E_GREP="$(E2E_GREP)" \
+	E2E_OUT="$(E2E_OUT)" \
+	E2E_URL="$(E2E_URL)" \
+	E2E_REPORTER="$(E2E_REPORTER)" \
+	./scripts/run-e2e-suite.sh
+
+## test-e2e-shell: Run gotty+Playwright e2e suite for one shell (set E2E_SHELL=bash|zsh|fish)
+test-e2e-shell:
+	@E2E_SHELLS="$(E2E_SHELL)" \
+	E2E_PLANS="$(E2E_PLANS)" \
+	E2E_GREP="$(E2E_GREP)" \
+	E2E_OUT="$(E2E_OUT)" \
+	E2E_URL="$(E2E_URL)" \
+	E2E_REPORTER="$(E2E_REPORTER)" \
+	./scripts/run-e2e-suite.sh
 
 ## fmt: Format code
 fmt:
@@ -161,7 +195,10 @@ lint:
 	@if command -v golangci-lint >/dev/null 2>&1; then \
 		golangci-lint run; \
 	else \
-		echo "golangci-lint not installed, skipping..."; \
+		echo "Error: golangci-lint not installed."; \
+		echo "Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+		echo "Or run: make install-dev"; \
+		exit 1; \
 	fi
 
 ## vuln: Scan for vulnerabilities
@@ -169,11 +206,22 @@ vuln:
 	@if command -v govulncheck >/dev/null 2>&1; then \
 		govulncheck ./...; \
 	else \
-		echo "govulncheck not installed. Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+		echo "Error: govulncheck not installed."; \
+		echo "Install with: go install golang.org/x/vuln/cmd/govulncheck@latest"; \
+		echo "Or run: make install-dev"; \
+		exit 1; \
 	fi
 
-## dev: Run all checks (fmt, lint, test, vuln)
-dev: fmt lint test vuln
+## roam: Run roam architectural checks (fitness + pr-risk)
+roam:
+	@if command -v roam >/dev/null 2>&1; then \
+		roam index && roam fitness && roam pr-risk main..HEAD; \
+	else \
+		echo "roam not installed, skipping roam checks..."; \
+	fi
+
+## dev: Run all checks (fmt, lint, test, vuln, roam)
+dev: fmt lint test vuln roam
 	@echo "All checks passed!"
 
 ## deps: Download dependencies

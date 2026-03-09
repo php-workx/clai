@@ -126,8 +126,8 @@ alias gst='git status'
 source ~/.fzf.zsh
 `
 
-	if err := os.WriteFile(rcFile, []byte(content), 0644); err != nil {
-		t.Fatalf("Failed to write: %v", err)
+	if writeErr := os.WriteFile(rcFile, []byte(content), 0644); writeErr != nil {
+		t.Fatalf("Failed to write: %v", writeErr)
 	}
 
 	removed, err := removeFromRCFile(rcFile, hooksDir)

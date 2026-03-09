@@ -190,6 +190,102 @@ func TestSessionManager_UpdateCWDNonexistent(t *testing.T) {
 	m.UpdateCWD("nonexistent", "/new/path")
 }
 
+func TestSessionManager_StashCommandInfo(t *testing.T) {
+	t.Parallel()
+
+	m := NewSessionManager()
+	now := time.Now()
+
+	m.Start("sess-stash", "zsh", "darwin", "host1", "user1", "/tmp", now)
+
+	m.StashCommand("sess-stash", "cmd-1", "git status", "/home/user/repo", "myrepo", "/home/user/repo", "main")
+
+	info, ok := m.Get("sess-stash")
+	if !ok {
+		t.Fatal("session not found")
+	}
+
+	if info.LastCmdID != "cmd-1" {
+		t.Errorf("expected LastCmdID 'cmd-1', got %s", info.LastCmdID)
+	}
+	if info.LastCmdRaw != "git status" {
+		t.Errorf("expected LastCmdRaw 'git status', got %s", info.LastCmdRaw)
+	}
+	if info.LastCmdCWD != "/home/user/repo" {
+		t.Errorf("expected LastCmdCWD '/home/user/repo', got %s", info.LastCmdCWD)
+	}
+	if info.LastGitRepo != "myrepo" {
+		t.Errorf("expected LastGitRepo 'myrepo', got %s", info.LastGitRepo)
+	}
+	if info.LastGitBranch != "main" {
+		t.Errorf("expected LastGitBranch 'main', got %s", info.LastGitBranch)
+	}
+}
+
+func TestSessionManager_StashOverwrites(t *testing.T) {
+	t.Parallel()
+
+	m := NewSessionManager()
+	now := time.Now()
+
+	m.Start("sess-overwrite", "bash", "linux", "", "", "/tmp", now)
+
+	m.StashCommand("sess-overwrite", "cmd-1", "ls -la", "/first", "repo1", "/first", "dev")
+	m.StashCommand("sess-overwrite", "cmd-2", "cat file.txt", "/second", "repo2", "/second", "feature")
+
+	info, ok := m.Get("sess-overwrite")
+	if !ok {
+		t.Fatal("session not found")
+	}
+
+	if info.LastCmdID != "cmd-2" {
+		t.Errorf("expected LastCmdID 'cmd-2', got %s", info.LastCmdID)
+	}
+	if info.LastCmdRaw != "cat file.txt" {
+		t.Errorf("expected LastCmdRaw 'cat file.txt', got %s", info.LastCmdRaw)
+	}
+	if info.LastCmdCWD != "/second" {
+		t.Errorf("expected LastCmdCWD '/second', got %s", info.LastCmdCWD)
+	}
+	if info.LastGitRepo != "repo2" {
+		t.Errorf("expected LastGitRepo 'repo2', got %s", info.LastGitRepo)
+	}
+	if info.LastGitBranch != "feature" {
+		t.Errorf("expected LastGitBranch 'feature', got %s", info.LastGitBranch)
+	}
+}
+
+func TestSessionManager_StashClearedOnEnd(t *testing.T) {
+	t.Parallel()
+
+	m := NewSessionManager()
+	now := time.Now()
+
+	m.Start("sess-clear", "zsh", "darwin", "", "", "/tmp", now)
+	m.StashCommand("sess-clear", "cmd-1", "make build", "/project", "proj", "/project", "main")
+
+	m.End("sess-clear")
+
+	_, ok := m.Get("sess-clear")
+	if ok {
+		t.Error("expected session to not exist after End")
+	}
+}
+
+func TestSessionManager_StashOnNonexistentSession(t *testing.T) {
+	t.Parallel()
+
+	m := NewSessionManager()
+
+	// Should not panic
+	m.StashCommand("nonexistent", "cmd-1", "echo hello", "/tmp", "repo", "/tmp", "main")
+
+	_, ok := m.Get("nonexistent")
+	if ok {
+		t.Error("expected session to not exist for nonexistent session")
+	}
+}
+
 func TestSessionManager_Concurrent(t *testing.T) {
 	t.Parallel()
 

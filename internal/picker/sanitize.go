@@ -8,6 +8,11 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
+const (
+	readableEscCSI = "<ESC>["
+	readableEscOSC = "<ESC>]"
+)
+
 // ansiRE matches ANSI escape sequences:
 //   - CSI sequences: ESC [ ... final_byte  (covers SGR like \x1b[31m)
 //   - OSC sequences: ESC ] ... (ST | BEL)
@@ -47,6 +52,30 @@ func ValidateUTF8(s string) string {
 		}
 	}
 	return b.String()
+}
+
+// PrettyEscapeLiterals replaces common *literal* escape-sequence spellings in
+// shell commands (like "\033[" or "\x1b[") with a more readable token.
+//
+// This is intended for display-only rendering in pickers; it must not be used
+// on strings that will be executed.
+func PrettyEscapeLiterals(s string) string {
+	if s == "" {
+		return s
+	}
+	// Common ANSI escape spellings found in shell commands, including printf.
+	// Note: these are *literal* backslashes, not actual ESC bytes.
+	r := strings.NewReplacer(
+		"\\033[", readableEscCSI,
+		"\\033]", readableEscOSC,
+		"\\x1b[", readableEscCSI,
+		"\\x1B[", readableEscCSI,
+		"\\x1b]", readableEscOSC,
+		"\\x1B]", readableEscOSC,
+		"\\e[", readableEscCSI,
+		"\\e]", readableEscOSC,
+	)
+	return r.Replace(s)
 }
 
 // MiddleTruncate truncates a string in the middle with an ellipsis character

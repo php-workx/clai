@@ -2,6 +2,7 @@
 package config
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -67,6 +68,11 @@ func (p *Paths) PIDFile() string {
 	return filepath.Join(p.BaseDir, "clai.pid")
 }
 
+// LockFile returns the path to the daemon lock file.
+func (p *Paths) LockFile() string {
+	return filepath.Join(p.BaseDir, "clai.lock")
+}
+
 // LogDir returns the path to the log directory.
 func (p *Paths) LogDir() string {
 	return filepath.Join(p.BaseDir, "logs")
@@ -80,6 +86,18 @@ func (p *Paths) LogFile() string {
 // HooksDir returns the path to the hooks directory.
 func (p *Paths) HooksDir() string {
 	return filepath.Join(p.BaseDir, "hooks")
+}
+
+// WorkflowLogDir returns the path to the workflow log directory.
+// Creates the directory if it doesn't exist.
+func (p *Paths) WorkflowLogDir(ctx context.Context) string {
+	_ = ctx // Reserved for future context-aware path resolution.
+	dir := filepath.Join(p.BaseDir, "workflow-logs")
+	if err := os.MkdirAll(dir, 0o755); err != nil { //nolint:gosec // G301: workflow log directory needs standard permissions
+		// Best-effort creation; callers may still use the returned path.
+		_ = err
+	}
+	return dir
 }
 
 // CacheDir returns the path to the cache directory.
@@ -107,7 +125,7 @@ func (p *Paths) EnsureDirectories() error {
 	}
 
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return err
 		}
 	}

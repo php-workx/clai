@@ -8,9 +8,9 @@ import (
 
 // Pattern represents a command extraction pattern
 type Pattern struct {
-	Name    string
 	Regex   *regexp.Regexp
 	Process func(string) string
+	Name    string
 }
 
 // Patterns contains all extraction patterns in priority order
@@ -98,7 +98,7 @@ func Clean(s string) string {
 
 // SuggestionWithPattern extracts a suggestion and returns which pattern matched
 // Useful for debugging and testing
-func SuggestionWithPattern(content string) (suggestion string, patternName string) {
+func SuggestionWithPattern(content string) (suggestion, patternName string) {
 	for _, p := range Patterns {
 		matches := p.Regex.FindAllString(content, -1)
 		if len(matches) > 0 {

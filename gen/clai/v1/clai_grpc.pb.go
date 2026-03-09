@@ -20,18 +20,25 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ClaiService_SessionStart_FullMethodName   = "/clai.v1.ClaiService/SessionStart"
-	ClaiService_SessionEnd_FullMethodName     = "/clai.v1.ClaiService/SessionEnd"
-	ClaiService_CommandStarted_FullMethodName = "/clai.v1.ClaiService/CommandStarted"
-	ClaiService_CommandEnded_FullMethodName   = "/clai.v1.ClaiService/CommandEnded"
-	ClaiService_Suggest_FullMethodName        = "/clai.v1.ClaiService/Suggest"
-	ClaiService_TextToCommand_FullMethodName  = "/clai.v1.ClaiService/TextToCommand"
-	ClaiService_NextStep_FullMethodName       = "/clai.v1.ClaiService/NextStep"
-	ClaiService_Diagnose_FullMethodName       = "/clai.v1.ClaiService/Diagnose"
-	ClaiService_FetchHistory_FullMethodName   = "/clai.v1.ClaiService/FetchHistory"
-	ClaiService_ImportHistory_FullMethodName  = "/clai.v1.ClaiService/ImportHistory"
-	ClaiService_Ping_FullMethodName           = "/clai.v1.ClaiService/Ping"
-	ClaiService_GetStatus_FullMethodName      = "/clai.v1.ClaiService/GetStatus"
+	ClaiService_SessionStart_FullMethodName       = "/clai.v1.ClaiService/SessionStart"
+	ClaiService_SessionEnd_FullMethodName         = "/clai.v1.ClaiService/SessionEnd"
+	ClaiService_AliasSync_FullMethodName          = "/clai.v1.ClaiService/AliasSync"
+	ClaiService_CommandStarted_FullMethodName     = "/clai.v1.ClaiService/CommandStarted"
+	ClaiService_CommandEnded_FullMethodName       = "/clai.v1.ClaiService/CommandEnded"
+	ClaiService_Suggest_FullMethodName            = "/clai.v1.ClaiService/Suggest"
+	ClaiService_TextToCommand_FullMethodName      = "/clai.v1.ClaiService/TextToCommand"
+	ClaiService_NextStep_FullMethodName           = "/clai.v1.ClaiService/NextStep"
+	ClaiService_Diagnose_FullMethodName           = "/clai.v1.ClaiService/Diagnose"
+	ClaiService_RecordFeedback_FullMethodName     = "/clai.v1.ClaiService/RecordFeedback"
+	ClaiService_SuggestFeedback_FullMethodName    = "/clai.v1.ClaiService/SuggestFeedback"
+	ClaiService_FetchHistory_FullMethodName       = "/clai.v1.ClaiService/FetchHistory"
+	ClaiService_ImportHistory_FullMethodName      = "/clai.v1.ClaiService/ImportHistory"
+	ClaiService_Ping_FullMethodName               = "/clai.v1.ClaiService/Ping"
+	ClaiService_GetStatus_FullMethodName          = "/clai.v1.ClaiService/GetStatus"
+	ClaiService_WorkflowRunStart_FullMethodName   = "/clai.v1.ClaiService/WorkflowRunStart"
+	ClaiService_WorkflowRunEnd_FullMethodName     = "/clai.v1.ClaiService/WorkflowRunEnd"
+	ClaiService_WorkflowStepUpdate_FullMethodName = "/clai.v1.ClaiService/WorkflowStepUpdate"
+	ClaiService_AnalyzeStepOutput_FullMethodName  = "/clai.v1.ClaiService/AnalyzeStepOutput"
 )
 
 // ClaiServiceClient is the client API for ClaiService service.
@@ -41,6 +48,7 @@ type ClaiServiceClient interface {
 	// Fire-and-Forget (Client ignores return)
 	SessionStart(ctx context.Context, in *SessionStartRequest, opts ...grpc.CallOption) (*Ack, error)
 	SessionEnd(ctx context.Context, in *SessionEndRequest, opts ...grpc.CallOption) (*Ack, error)
+	AliasSync(ctx context.Context, in *AliasSyncRequest, opts ...grpc.CallOption) (*Ack, error)
 	CommandStarted(ctx context.Context, in *CommandStartRequest, opts ...grpc.CallOption) (*Ack, error)
 	CommandEnded(ctx context.Context, in *CommandEndRequest, opts ...grpc.CallOption) (*Ack, error)
 	// Interactive (Client waits with timeout)
@@ -48,12 +56,20 @@ type ClaiServiceClient interface {
 	TextToCommand(ctx context.Context, in *TextToCommandRequest, opts ...grpc.CallOption) (*TextToCommandResponse, error)
 	NextStep(ctx context.Context, in *NextStepRequest, opts ...grpc.CallOption) (*NextStepResponse, error)
 	Diagnose(ctx context.Context, in *DiagnoseRequest, opts ...grpc.CallOption) (*DiagnoseResponse, error)
+	// Feedback (V2)
+	RecordFeedback(ctx context.Context, in *RecordFeedbackRequest, opts ...grpc.CallOption) (*RecordFeedbackResponse, error)
+	SuggestFeedback(ctx context.Context, in *RecordFeedbackRequest, opts ...grpc.CallOption) (*RecordFeedbackResponse, error)
 	// History
 	FetchHistory(ctx context.Context, in *HistoryFetchRequest, opts ...grpc.CallOption) (*HistoryFetchResponse, error)
 	ImportHistory(ctx context.Context, in *HistoryImportRequest, opts ...grpc.CallOption) (*HistoryImportResponse, error)
 	// Ops
 	Ping(ctx context.Context, in *Ack, opts ...grpc.CallOption) (*Ack, error)
 	GetStatus(ctx context.Context, in *Ack, opts ...grpc.CallOption) (*StatusResponse, error)
+	// Workflow RPCs — Tier 0 (§13.1)
+	WorkflowRunStart(ctx context.Context, in *WorkflowRunStartRequest, opts ...grpc.CallOption) (*WorkflowRunStartResponse, error)
+	WorkflowRunEnd(ctx context.Context, in *WorkflowRunEndRequest, opts ...grpc.CallOption) (*WorkflowRunEndResponse, error)
+	WorkflowStepUpdate(ctx context.Context, in *WorkflowStepUpdateRequest, opts ...grpc.CallOption) (*WorkflowStepUpdateResponse, error)
+	AnalyzeStepOutput(ctx context.Context, in *AnalyzeStepOutputRequest, opts ...grpc.CallOption) (*AnalyzeStepOutputResponse, error)
 }
 
 type claiServiceClient struct {
@@ -78,6 +94,16 @@ func (c *claiServiceClient) SessionEnd(ctx context.Context, in *SessionEndReques
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(Ack)
 	err := c.cc.Invoke(ctx, ClaiService_SessionEnd_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *claiServiceClient) AliasSync(ctx context.Context, in *AliasSyncRequest, opts ...grpc.CallOption) (*Ack, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Ack)
+	err := c.cc.Invoke(ctx, ClaiService_AliasSync_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +170,26 @@ func (c *claiServiceClient) Diagnose(ctx context.Context, in *DiagnoseRequest, o
 	return out, nil
 }
 
+func (c *claiServiceClient) RecordFeedback(ctx context.Context, in *RecordFeedbackRequest, opts ...grpc.CallOption) (*RecordFeedbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordFeedbackResponse)
+	err := c.cc.Invoke(ctx, ClaiService_RecordFeedback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *claiServiceClient) SuggestFeedback(ctx context.Context, in *RecordFeedbackRequest, opts ...grpc.CallOption) (*RecordFeedbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordFeedbackResponse)
+	err := c.cc.Invoke(ctx, ClaiService_SuggestFeedback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *claiServiceClient) FetchHistory(ctx context.Context, in *HistoryFetchRequest, opts ...grpc.CallOption) (*HistoryFetchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(HistoryFetchResponse)
@@ -184,6 +230,46 @@ func (c *claiServiceClient) GetStatus(ctx context.Context, in *Ack, opts ...grpc
 	return out, nil
 }
 
+func (c *claiServiceClient) WorkflowRunStart(ctx context.Context, in *WorkflowRunStartRequest, opts ...grpc.CallOption) (*WorkflowRunStartResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkflowRunStartResponse)
+	err := c.cc.Invoke(ctx, ClaiService_WorkflowRunStart_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *claiServiceClient) WorkflowRunEnd(ctx context.Context, in *WorkflowRunEndRequest, opts ...grpc.CallOption) (*WorkflowRunEndResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkflowRunEndResponse)
+	err := c.cc.Invoke(ctx, ClaiService_WorkflowRunEnd_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *claiServiceClient) WorkflowStepUpdate(ctx context.Context, in *WorkflowStepUpdateRequest, opts ...grpc.CallOption) (*WorkflowStepUpdateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(WorkflowStepUpdateResponse)
+	err := c.cc.Invoke(ctx, ClaiService_WorkflowStepUpdate_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *claiServiceClient) AnalyzeStepOutput(ctx context.Context, in *AnalyzeStepOutputRequest, opts ...grpc.CallOption) (*AnalyzeStepOutputResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AnalyzeStepOutputResponse)
+	err := c.cc.Invoke(ctx, ClaiService_AnalyzeStepOutput_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ClaiServiceServer is the server API for ClaiService service.
 // All implementations must embed UnimplementedClaiServiceServer
 // for forward compatibility.
@@ -191,6 +277,7 @@ type ClaiServiceServer interface {
 	// Fire-and-Forget (Client ignores return)
 	SessionStart(context.Context, *SessionStartRequest) (*Ack, error)
 	SessionEnd(context.Context, *SessionEndRequest) (*Ack, error)
+	AliasSync(context.Context, *AliasSyncRequest) (*Ack, error)
 	CommandStarted(context.Context, *CommandStartRequest) (*Ack, error)
 	CommandEnded(context.Context, *CommandEndRequest) (*Ack, error)
 	// Interactive (Client waits with timeout)
@@ -198,12 +285,20 @@ type ClaiServiceServer interface {
 	TextToCommand(context.Context, *TextToCommandRequest) (*TextToCommandResponse, error)
 	NextStep(context.Context, *NextStepRequest) (*NextStepResponse, error)
 	Diagnose(context.Context, *DiagnoseRequest) (*DiagnoseResponse, error)
+	// Feedback (V2)
+	RecordFeedback(context.Context, *RecordFeedbackRequest) (*RecordFeedbackResponse, error)
+	SuggestFeedback(context.Context, *RecordFeedbackRequest) (*RecordFeedbackResponse, error)
 	// History
 	FetchHistory(context.Context, *HistoryFetchRequest) (*HistoryFetchResponse, error)
 	ImportHistory(context.Context, *HistoryImportRequest) (*HistoryImportResponse, error)
 	// Ops
 	Ping(context.Context, *Ack) (*Ack, error)
 	GetStatus(context.Context, *Ack) (*StatusResponse, error)
+	// Workflow RPCs — Tier 0 (§13.1)
+	WorkflowRunStart(context.Context, *WorkflowRunStartRequest) (*WorkflowRunStartResponse, error)
+	WorkflowRunEnd(context.Context, *WorkflowRunEndRequest) (*WorkflowRunEndResponse, error)
+	WorkflowStepUpdate(context.Context, *WorkflowStepUpdateRequest) (*WorkflowStepUpdateResponse, error)
+	AnalyzeStepOutput(context.Context, *AnalyzeStepOutputRequest) (*AnalyzeStepOutputResponse, error)
 	mustEmbedUnimplementedClaiServiceServer()
 }
 
@@ -219,6 +314,9 @@ func (UnimplementedClaiServiceServer) SessionStart(context.Context, *SessionStar
 }
 func (UnimplementedClaiServiceServer) SessionEnd(context.Context, *SessionEndRequest) (*Ack, error) {
 	return nil, status.Error(codes.Unimplemented, "method SessionEnd not implemented")
+}
+func (UnimplementedClaiServiceServer) AliasSync(context.Context, *AliasSyncRequest) (*Ack, error) {
+	return nil, status.Error(codes.Unimplemented, "method AliasSync not implemented")
 }
 func (UnimplementedClaiServiceServer) CommandStarted(context.Context, *CommandStartRequest) (*Ack, error) {
 	return nil, status.Error(codes.Unimplemented, "method CommandStarted not implemented")
@@ -238,6 +336,12 @@ func (UnimplementedClaiServiceServer) NextStep(context.Context, *NextStepRequest
 func (UnimplementedClaiServiceServer) Diagnose(context.Context, *DiagnoseRequest) (*DiagnoseResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Diagnose not implemented")
 }
+func (UnimplementedClaiServiceServer) RecordFeedback(context.Context, *RecordFeedbackRequest) (*RecordFeedbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordFeedback not implemented")
+}
+func (UnimplementedClaiServiceServer) SuggestFeedback(context.Context, *RecordFeedbackRequest) (*RecordFeedbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SuggestFeedback not implemented")
+}
 func (UnimplementedClaiServiceServer) FetchHistory(context.Context, *HistoryFetchRequest) (*HistoryFetchResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method FetchHistory not implemented")
 }
@@ -249,6 +353,18 @@ func (UnimplementedClaiServiceServer) Ping(context.Context, *Ack) (*Ack, error) 
 }
 func (UnimplementedClaiServiceServer) GetStatus(context.Context, *Ack) (*StatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetStatus not implemented")
+}
+func (UnimplementedClaiServiceServer) WorkflowRunStart(context.Context, *WorkflowRunStartRequest) (*WorkflowRunStartResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WorkflowRunStart not implemented")
+}
+func (UnimplementedClaiServiceServer) WorkflowRunEnd(context.Context, *WorkflowRunEndRequest) (*WorkflowRunEndResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WorkflowRunEnd not implemented")
+}
+func (UnimplementedClaiServiceServer) WorkflowStepUpdate(context.Context, *WorkflowStepUpdateRequest) (*WorkflowStepUpdateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method WorkflowStepUpdate not implemented")
+}
+func (UnimplementedClaiServiceServer) AnalyzeStepOutput(context.Context, *AnalyzeStepOutputRequest) (*AnalyzeStepOutputResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AnalyzeStepOutput not implemented")
 }
 func (UnimplementedClaiServiceServer) mustEmbedUnimplementedClaiServiceServer() {}
 func (UnimplementedClaiServiceServer) testEmbeddedByValue()                     {}
@@ -303,6 +419,24 @@ func _ClaiService_SessionEnd_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ClaiServiceServer).SessionEnd(ctx, req.(*SessionEndRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClaiService_AliasSync_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AliasSyncRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).AliasSync(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_AliasSync_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).AliasSync(ctx, req.(*AliasSyncRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -415,6 +549,42 @@ func _ClaiService_Diagnose_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClaiService_RecordFeedback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordFeedbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).RecordFeedback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_RecordFeedback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).RecordFeedback(ctx, req.(*RecordFeedbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClaiService_SuggestFeedback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordFeedbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).SuggestFeedback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_SuggestFeedback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).SuggestFeedback(ctx, req.(*RecordFeedbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ClaiService_FetchHistory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(HistoryFetchRequest)
 	if err := dec(in); err != nil {
@@ -487,6 +657,78 @@ func _ClaiService_GetStatus_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ClaiService_WorkflowRunStart_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WorkflowRunStartRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).WorkflowRunStart(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_WorkflowRunStart_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).WorkflowRunStart(ctx, req.(*WorkflowRunStartRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClaiService_WorkflowRunEnd_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WorkflowRunEndRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).WorkflowRunEnd(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_WorkflowRunEnd_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).WorkflowRunEnd(ctx, req.(*WorkflowRunEndRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClaiService_WorkflowStepUpdate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WorkflowStepUpdateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).WorkflowStepUpdate(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_WorkflowStepUpdate_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).WorkflowStepUpdate(ctx, req.(*WorkflowStepUpdateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ClaiService_AnalyzeStepOutput_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AnalyzeStepOutputRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ClaiServiceServer).AnalyzeStepOutput(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ClaiService_AnalyzeStepOutput_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ClaiServiceServer).AnalyzeStepOutput(ctx, req.(*AnalyzeStepOutputRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ClaiService_ServiceDesc is the grpc.ServiceDesc for ClaiService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -501,6 +743,10 @@ var ClaiService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SessionEnd",
 			Handler:    _ClaiService_SessionEnd_Handler,
+		},
+		{
+			MethodName: "AliasSync",
+			Handler:    _ClaiService_AliasSync_Handler,
 		},
 		{
 			MethodName: "CommandStarted",
@@ -527,6 +773,14 @@ var ClaiService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ClaiService_Diagnose_Handler,
 		},
 		{
+			MethodName: "RecordFeedback",
+			Handler:    _ClaiService_RecordFeedback_Handler,
+		},
+		{
+			MethodName: "SuggestFeedback",
+			Handler:    _ClaiService_SuggestFeedback_Handler,
+		},
+		{
 			MethodName: "FetchHistory",
 			Handler:    _ClaiService_FetchHistory_Handler,
 		},
@@ -541,6 +795,22 @@ var ClaiService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetStatus",
 			Handler:    _ClaiService_GetStatus_Handler,
+		},
+		{
+			MethodName: "WorkflowRunStart",
+			Handler:    _ClaiService_WorkflowRunStart_Handler,
+		},
+		{
+			MethodName: "WorkflowRunEnd",
+			Handler:    _ClaiService_WorkflowRunEnd_Handler,
+		},
+		{
+			MethodName: "WorkflowStepUpdate",
+			Handler:    _ClaiService_WorkflowStepUpdate_Handler,
+		},
+		{
+			MethodName: "AnalyzeStepOutput",
+			Handler:    _ClaiService_AnalyzeStepOutput_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

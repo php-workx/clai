@@ -1,3 +1,4 @@
+// Package cache provides file-system caching for clai suggestion and session state.
 package cache
 
 import (
@@ -17,7 +18,7 @@ func Dir() string {
 
 // EnsureDir creates the cache directory if it doesn't exist
 func EnsureDir() error {
-	return os.MkdirAll(Dir(), 0o755)
+	return os.MkdirAll(Dir(), 0o750)
 }
 
 // SuggestionFile returns the path to the suggestion cache file
@@ -47,7 +48,7 @@ func SetSessionOff(off bool) error {
 		if err := EnsureDir(); err != nil {
 			return err
 		}
-		return os.WriteFile(OffFile(), []byte("1"), 0o644)
+		return os.WriteFile(OffFile(), []byte("1"), 0o600)
 	}
 	if err := os.Remove(OffFile()); err != nil && !os.IsNotExist(err) {
 		return err
@@ -72,7 +73,7 @@ func WriteSuggestion(suggestion string) error {
 	if err := EnsureDir(); err != nil {
 		return err
 	}
-	return os.WriteFile(SuggestionFile(), []byte(suggestion), 0o644)
+	return os.WriteFile(SuggestionFile(), []byte(suggestion), 0o600)
 }
 
 // ClearSuggestion clears the suggestion file
@@ -102,5 +103,5 @@ func WriteLastOutput(output string) error {
 	if err := EnsureDir(); err != nil {
 		return err
 	}
-	return os.WriteFile(LastOutputFile(), []byte(output), 0o644)
+	return os.WriteFile(LastOutputFile(), []byte(output), 0o600)
 }

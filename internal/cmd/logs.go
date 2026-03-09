@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -41,11 +42,9 @@ func init() {
 
 func runLogs(cmd *cobra.Command, args []string) error {
 	paths := config.DefaultPaths()
-	logFile := paths.LogFile()
-
-	// Check if log file exists
-	if _, err := os.Stat(logFile); os.IsNotExist(err) {
-		fmt.Printf("No log file found at: %s\n", logFile)
+	logFile, ok := resolveLogFile(paths)
+	if !ok {
+		fmt.Printf("No log file found at: %s\n", paths.LogFile())
 		fmt.Println("The daemon may not have been started yet.")
 		return nil
 	}
@@ -57,18 +56,29 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	return tailLogs(logFile, logsLines)
 }
 
+func resolveLogFile(paths *config.Paths) (string, bool) {
+	primary := paths.LogFile()
+	if _, err := os.Stat(primary); err == nil {
+		return primary, true
+	}
+	legacy := filepath.Join(paths.BaseDir, "clai.log")
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy, true
+	}
+	return primary, false
+}
+
 func tailLogs(filename string, n int) error {
 	if n <= 0 {
 		return fmt.Errorf("lines must be a positive number")
 	}
 
-	f, err := os.Open(filename)
+	f, err := os.Open(filename) //nolint:gosec // G304: log file path from trusted config
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}
 	defer f.Close()
 
-	// Get file size
 	stat, err := f.Stat()
 	if err != nil {
 		return fmt.Errorf("failed to stat log file: %w", err)
@@ -80,59 +90,78 @@ func tailLogs(filename string, n int) error {
 		return nil
 	}
 
-	// Read from the end to find the last n lines
-	lines := make([]string, 0, n)
-	bufSize := int64(4096)
-	offset := size
-	remainder := "" // Carry partial line fragment between chunks
-
-	for len(lines) < n && offset > 0 {
-		// Calculate read position
-		readSize := bufSize
-		if offset < bufSize {
-			readSize = offset
-		}
-		offset -= readSize
-
-		// Read chunk
-		buf := make([]byte, readSize)
-		n, err := f.ReadAt(buf, offset)
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("failed to read log file: %w", err)
-		}
-
-		// Parse lines from chunk (in reverse order)
-		// Prepend remainder from previous chunk to handle lines spanning chunks
-		chunk := string(buf[:n]) + remainder
-		chunkLines := splitLines(chunk)
-
-		// The first element may be a partial line if we're not at file start
-		if offset > 0 && len(chunkLines) > 0 {
-			remainder = chunkLines[0]
-			chunkLines = chunkLines[1:]
-		} else {
-			remainder = ""
-		}
-
-		// Prepend lines
-		for i := len(chunkLines) - 1; i >= 0 && len(lines) < n; i-- {
-			if chunkLines[i] != "" || len(lines) > 0 {
-				lines = append([]string{chunkLines[i]}, lines...)
-			}
-		}
+	lines, err := collectTailLines(f, size, n)
+	if err != nil {
+		return fmt.Errorf("failed to read log tail: %w", err)
 	}
 
-	// Include remainder if we have room and it's not empty
-	if remainder != "" && len(lines) < n {
-		lines = append([]string{remainder}, lines...)
-	}
-
-	// Print lines
 	for _, line := range lines {
 		fmt.Println(line)
 	}
 
 	return nil
+}
+
+// collectTailLines reads the last n lines from f whose total size is fileSize.
+func collectTailLines(f *os.File, fileSize int64, n int) ([]string, error) {
+	lines := make([]string, 0, n)
+	bufSize := int64(4096)
+	offset := fileSize
+	remainder := "" // Carry partial line fragment between chunks
+
+	for len(lines) < n && offset > 0 {
+		chunkLines, newRemainder, err := readChunkLines(f, &offset, bufSize, remainder)
+		if err != nil {
+			return nil, err
+		}
+		remainder = newRemainder
+		lines = prependLines(lines, chunkLines, n)
+	}
+
+	// Include remainder if we have room and it's not empty.
+	if remainder != "" && len(lines) < n {
+		lines = append([]string{remainder}, lines...)
+	}
+
+	return lines, nil
+}
+
+// readChunkLines reads one chunk ending at *offset, splits it into lines, and
+// returns the full lines plus any leading partial-line remainder.
+// *offset is decremented by the bytes read.
+func readChunkLines(f *os.File, offset *int64, bufSize int64, prevRemainder string) (fullLines []string, remainder string, err error) {
+	readSize := bufSize
+	if *offset < bufSize {
+		readSize = *offset
+	}
+	*offset -= readSize
+
+	buf := make([]byte, readSize)
+	n, readErr := f.ReadAt(buf, *offset)
+	if readErr != nil && readErr != io.EOF {
+		return nil, "", fmt.Errorf("read log chunk: %w", readErr)
+	}
+	buf = buf[:n]
+
+	chunk := string(buf) + prevRemainder
+	chunkLines := splitLines(chunk)
+
+	if *offset > 0 && len(chunkLines) > 0 {
+		remainder = chunkLines[0]
+		chunkLines = chunkLines[1:]
+	}
+
+	return chunkLines, remainder, nil
+}
+
+// prependLines collects lines from chunkLines (in reverse) into dst until cap n is reached.
+func prependLines(dst, chunkLines []string, n int) []string {
+	for i := len(chunkLines) - 1; i >= 0 && len(dst) < n; i-- {
+		if chunkLines[i] != "" || len(dst) > 0 {
+			dst = append([]string{chunkLines[i]}, dst...)
+		}
+	}
+	return dst
 }
 
 func splitLines(s string) []string {
@@ -152,7 +181,7 @@ func splitLines(s string) []string {
 
 func followLogs(ctx context.Context, filename string) error {
 	// Open file
-	f, err := os.Open(filename)
+	f, err := os.Open(filename) //nolint:gosec // G304: log file path from trusted config
 	if err != nil {
 		return fmt.Errorf("failed to open log file: %w", err)
 	}

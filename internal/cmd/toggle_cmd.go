@@ -37,7 +37,7 @@ func init() {
 	offCmd.Flags().BoolVar(&offSessionOnly, "session", false, "Disable for this session only")
 }
 
-func toggleIntegration(enable bool, sessionOnly bool) error {
+func toggleIntegration(enable, sessionOnly bool) error {
 	if sessionOnly {
 		if err := cache.SetSessionOff(!enable); err != nil {
 			return err
@@ -60,8 +60,7 @@ func toggleIntegration(enable bool, sessionOnly bool) error {
 	}
 	// Also clear/set session flag so all disable sources are consistent.
 	if err := cache.SetSessionOff(!enable); err != nil {
-		// Best-effort: config is the source of truth, session flag is supplementary
-		_ = err
+		return fmt.Errorf("failed to update session flag: %w", err)
 	}
 	if enable {
 		fmt.Println("Integrations enabled")

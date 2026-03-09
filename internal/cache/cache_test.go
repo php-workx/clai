@@ -171,38 +171,38 @@ func TestWriteAndReadLastOutput(t *testing.T) {
 	tests := []struct {
 		name     string
 		output   string
-		maxLines int
 		want     string
+		maxLines int
 	}{
 		{
 			name:     "simple output",
 			output:   "Hello World",
-			maxLines: 50,
 			want:     "Hello World",
+			maxLines: 50,
 		},
 		{
 			name:     "multiline output within limit",
 			output:   "line1\nline2\nline3",
-			maxLines: 50,
 			want:     "line1\nline2\nline3",
+			maxLines: 50,
 		},
 		{
 			name:     "multiline output exceeds limit",
 			output:   "line1\nline2\nline3\nline4\nline5",
-			maxLines: 3,
 			want:     "line3\nline4\nline5",
+			maxLines: 3,
 		},
 		{
 			name:     "empty output",
 			output:   "",
-			maxLines: 50,
 			want:     "",
+			maxLines: 50,
 		},
 		{
 			name:     "output with error messages",
 			output:   "npm ERR! code ENOENT\nnpm ERR! syscall open\nnpm ERR! path /package.json",
-			maxLines: 50,
 			want:     "npm ERR! code ENOENT\nnpm ERR! syscall open\nnpm ERR! path /package.json",
+			maxLines: 50,
 		},
 	}
 

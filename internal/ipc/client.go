@@ -85,6 +85,21 @@ func (c *Client) SessionEnd(sessionID string) {
 	_, _ = c.client.SessionEnd(ctx, req)
 }
 
+// AliasSync sends an alias snapshot for a session.
+// Uses fire-and-forget semantics - errors are silently ignored.
+func (c *Client) AliasSync(sessionID, shell, rawSnapshot string) {
+	ctx, cancel := context.WithTimeout(context.Background(), FireAndForgetTimeout)
+	defer cancel()
+
+	req := &pb.AliasSyncRequest{
+		SessionId:   sessionID,
+		Shell:       shell,
+		RawSnapshot: rawSnapshot,
+	}
+
+	_, _ = c.client.AliasSync(ctx, req)
+}
+
 // --- Command Lifecycle (Fire-and-Forget) ---
 
 // CommandContext contains optional context for a command execution.
@@ -103,7 +118,7 @@ func (c *Client) LogStart(sessionID, commandID, cwd, command string) {
 
 // LogStartWithContext logs the start of a command execution with additional context.
 // Uses fire-and-forget semantics - errors are silently ignored.
-func (c *Client) LogStartWithContext(sessionID, commandID, cwd, command string, ctx_info *CommandContext) {
+func (c *Client) LogStartWithContext(sessionID, commandID, cwd, command string, ctxInfo *CommandContext) {
 	ctx, cancel := context.WithTimeout(context.Background(), FireAndForgetTimeout)
 	defer cancel()
 
@@ -116,11 +131,11 @@ func (c *Client) LogStartWithContext(sessionID, commandID, cwd, command string, 
 	}
 
 	// Add optional context if provided
-	if ctx_info != nil {
-		req.GitBranch = ctx_info.GitBranch
-		req.GitRepoName = ctx_info.GitRepoName
-		req.GitRepoRoot = ctx_info.GitRepoRoot
-		req.PrevCommandId = ctx_info.PrevCommandID
+	if ctxInfo != nil {
+		req.GitBranch = ctxInfo.GitBranch
+		req.GitRepoName = ctxInfo.GitRepoName
+		req.GitRepoRoot = ctxInfo.GitRepoRoot
+		req.PrevCommandId = ctxInfo.PrevCommandID
 	}
 
 	// Fire and forget - ignore errors
@@ -137,7 +152,7 @@ func (c *Client) LogEnd(sessionID, commandID string, exitCode int, durationMs in
 		SessionId:  sessionID,
 		CommandId:  commandID,
 		TsUnixMs:   time.Now().UnixMilli(),
-		ExitCode:   int32(exitCode),
+		ExitCode:   int32(exitCode), //nolint:gosec // G115: exit codes are bounded 0-255
 		DurationMs: durationMs,
 	}
 
@@ -162,7 +177,7 @@ func (c *Client) Suggest(ctx context.Context, sessionID, cwd, buffer string, cur
 		SessionId:  sessionID,
 		Cwd:        cwd,
 		Buffer:     buffer,
-		CursorPos:  int32(cursorPos),
+		CursorPos:  int32(cursorPos), //nolint:gosec // G115: bounded by terminal width
 		IncludeAi:  includeAI,
 		MaxResults: int32(maxResults),
 	}
@@ -196,6 +211,47 @@ func (c *Client) TextToCommand(ctx context.Context, sessionID, prompt, cwd strin
 	return c.client.TextToCommand(ctx, req)
 }
 
+// --- Feedback (Fire-and-Forget + Sync) ---
+
+// RecordFeedback sends suggestion feedback to the daemon (fire-and-forget).
+func (c *Client) RecordFeedback(sessionID, action, suggestedText, executedText, prefix string, latencyMs int64) {
+	ctx, cancel := context.WithTimeout(context.Background(), FireAndForgetTimeout)
+	defer cancel()
+
+	req := &pb.RecordFeedbackRequest{
+		SessionId:     sessionID,
+		Action:        action,
+		SuggestedText: suggestedText,
+		ExecutedText:  executedText,
+		Prefix:        prefix,
+		LatencyMs:     latencyMs,
+	}
+
+	// Fire and forget - ignore errors
+	_, _ = c.client.RecordFeedback(ctx, req)
+}
+
+// RecordFeedbackSync sends suggestion feedback to the daemon and waits for a response.
+func (c *Client) RecordFeedbackSync(ctx context.Context, sessionID, action, suggestedText, executedText, prefix string, latencyMs int64) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, SuggestTimeout)
+	defer cancel()
+
+	req := &pb.RecordFeedbackRequest{
+		SessionId:     sessionID,
+		Action:        action,
+		SuggestedText: suggestedText,
+		ExecutedText:  executedText,
+		Prefix:        prefix,
+		LatencyMs:     latencyMs,
+	}
+
+	resp, err := c.client.RecordFeedback(ctx, req)
+	if err != nil {
+		return false, err
+	}
+	return resp.Ok, nil
+}
+
 // --- Ops ---
 
 // Ping checks if the daemon is responsive.
@@ -217,9 +273,9 @@ func (c *Client) GetStatus() (*pb.StatusResponse, error) {
 
 // ImportHistoryResponse contains the result of an import operation.
 type ImportHistoryResponse struct {
+	Error         string
 	ImportedCount int
 	Skipped       bool
-	Error         string
 }
 
 // ImportHistory imports shell history into the daemon's database.
