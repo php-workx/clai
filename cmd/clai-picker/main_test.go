@@ -8,11 +8,13 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/termenv"
 
 	"github.com/runger/clai/internal/config"
+	"github.com/runger/clai/internal/picker"
 )
 
 // --- Query sanitization tests ---

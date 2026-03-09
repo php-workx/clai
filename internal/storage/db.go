@@ -175,6 +175,10 @@ func (s *SQLiteStore) migrate(ctx context.Context) error {
 			version: 3,
 			sql:     migrationV3,
 		},
+		{
+			version: 4,
+			sql:     migrationV4,
+		},
 	}
 
 	for _, m := range migrations {
@@ -356,4 +360,31 @@ CREATE TABLE IF NOT EXISTS workflow_analyses (
 
 CREATE INDEX IF NOT EXISTS idx_workflow_analyses_step ON workflow_analyses(run_id, step_id, matrix_key);
 CREATE INDEX IF NOT EXISTS idx_workflow_analyses_decision ON workflow_analyses(decision);
+`
+
+// migrationV4 adds PTY command capture tables.
+const migrationV4 = `
+-- Command events (PTY phase-2 capture)
+CREATE TABLE IF NOT EXISTS command_events (
+  command_id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  start_ts INTEGER,
+  end_ts INTEGER,
+  exit_code INTEGER,
+  is_sensitive INTEGER NOT NULL DEFAULT 0,
+  captured_bytes INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_command_events_session ON command_events(session_id);
+
+-- Command output blobs (PTY phase-2 capture)
+CREATE TABLE IF NOT EXISTS command_output (
+  command_id TEXT PRIMARY KEY,
+  stdout_blob BLOB,
+  stderr_blob BLOB,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_command_output_expires ON command_output(expires_at);
 `

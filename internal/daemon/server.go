@@ -60,9 +60,9 @@ type Server struct {
 	ranker               suggest.Ranker
 	llm                  LLMQuerier
 	listener             net.Listener
-	aliasStore           *alias.Store
-	batchWriter          *batch.Writer
-	paths                *config.Paths
+	jsonListener         net.Listener
+	maintenanceRunner    *maintenance.Runner
+	v2SearchSvc          *search2.Service
 	logger               *slog.Logger
 	sessionManager       *SessionManager
 	grpcServer           *grpc.Server
@@ -74,32 +74,28 @@ type Server struct {
 	weightsCache         map[string]cachedWeights
 	feedbackStore        *feedback.Store
 	dismissalStore       *dismissal.Store
-	maintenanceRunner    *maintenance.Runner
+	batchWriter          *batch.Writer
 	diagnosticsMux       *http.ServeMux
 	diagHTTPServer       *http.Server
 	v2Scorer             *suggest2.Scorer
-	v2SearchSvc          *search2.Service
+	paths                *config.Paths
 	learner              *learning.Learner
 	projectDetector      *projecttype.Detector
 	v2db                 *suggestdb.DB
 	workflowMiner        *workflow.Miner
 	learningStore        *learning.Store
+	capturedSize         map[string]int64
+	aliasStore           *alias.Store
 	scorerVersion        string
-	workflowMineInterval time.Duration
+	wg                   sync.WaitGroup
 	idleTimeout          time.Duration
 	commandsLogged       int64
-	wg                   sync.WaitGroup
+	workflowMineInterval time.Duration
 	weightsCacheMu       sync.RWMutex
 	snapshotMu           sync.RWMutex
 	mu                   sync.RWMutex
 	shutdownOnce         sync.Once
-
-	// JSON-RPC listener for clai-wrap phase-2 protocol
-	jsonListener net.Listener
-
-	// JSON-RPC capture accounting (command_id -> bytes seen)
-	captureMu    sync.Mutex
-	capturedSize map[string]int64
+	captureMu            sync.Mutex
 }
 
 // ServerConfig contains configuration options for the daemon server.
@@ -349,6 +345,8 @@ func resolveWorkflowMiner(v2db *suggestdb.DB) (*workflow.Miner, time.Duration) {
 }
 
 // Start starts the gRPC server and listens on the Unix socket.
+//
+//nolint:funlen // Startup orchestration is inherently sequential; splitting fragments the flow.
 func (s *Server) Start(ctx context.Context) error {
 	// Ensure runtime directory exists
 	if err := s.paths.EnsureDirectories(); err != nil {
@@ -369,9 +367,9 @@ func (s *Server) Start(ctx context.Context) error {
 	s.listener = listener
 
 	// Set socket permissions (readable/writable by owner only)
-	if err := os.Chmod(socketPath, 0o600); err != nil {
+	if chmodErr := os.Chmod(socketPath, 0o600); chmodErr != nil {
 		listener.Close()
-		return fmt.Errorf("failed to set socket permissions: %w", err)
+		return fmt.Errorf("failed to set socket permissions: %w", chmodErr)
 	}
 
 	// Create gRPC server

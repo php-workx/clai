@@ -1015,6 +1015,7 @@ func TestListKeys(t *testing.T) {
 		"history.picker_case_sensitive",
 		"history.up_arrow_trigger",
 		"history.up_arrow_double_window_ms",
+		"pty.enabled",
 	}
 
 	if len(keys) != len(expectedKeys) {
@@ -1062,6 +1063,7 @@ func TestListKeysAllSettable(t *testing.T) {
 		"history.picker_case_sensitive":     "true",
 		"history.up_arrow_trigger":          "double",
 		"history.up_arrow_double_window_ms": "300",
+		"pty.enabled":                       "false",
 	}
 
 	for _, key := range keys {

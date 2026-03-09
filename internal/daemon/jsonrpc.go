@@ -39,21 +39,21 @@ type jsonRPCRequest struct {
 }
 
 type jsonRPCResponse struct {
-	JSONRPC string           `json:"jsonrpc"`
-	ID      json.RawMessage  `json:"id"`
 	Result  any              `json:"result,omitempty"`
 	Error   *jsonRPCErrorObj `json:"error,omitempty"`
+	JSONRPC string           `json:"jsonrpc"`
+	ID      json.RawMessage  `json:"id"`
 }
 
 type jsonRPCErrorObj struct {
-	Code    int    `json:"code"`
 	Message string `json:"message"`
+	Code    int    `json:"code"`
 }
 
 type jsonRPCNotification struct {
+	Params  any    `json:"params"`
 	JSONRPC string `json:"jsonrpc"`
 	Method  string `json:"method"`
-	Params  any    `json:"params"`
 }
 
 type jsonRPCConn struct {
@@ -77,7 +77,7 @@ func (c *jsonRPCConn) writeMessage(v any) error {
 
 func (s *Server) startJSONRPCListener() (net.Listener, error) {
 	socketPath := s.paths.JSONRPCSocketFile()
-	if err := os.MkdirAll(filepath.Dir(socketPath), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(socketPath), 0o750); err != nil {
 		return nil, fmt.Errorf("failed to create json-rpc socket directory: %w", err)
 	}
 	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
@@ -200,6 +200,7 @@ type outputChunkParams struct {
 	IsStderr   bool   `json:"is_stderr"`
 }
 
+//nolint:cyclop,funlen // JSON-RPC method dispatch is a single switch; splitting would obscure the protocol.
 func (s *Server) handleJSONRPCMethod(
 	ctx context.Context,
 	req *jsonRPCRequest,

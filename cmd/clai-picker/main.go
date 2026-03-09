@@ -415,6 +415,9 @@ func selectConfiguredTabs(allTabs []config.TabDef, tabsArg string) []config.TabD
 			selected = append(selected, t)
 		}
 	}
+	if len(selected) == 0 {
+		return allTabs
+	}
 	return selected
 }
 

@@ -22,8 +22,8 @@ func TestSetPTYEnabled_PersistentConfig(t *testing.T) {
 		t.Fatal("expected pty.enabled to be false")
 	}
 
-	if err := setPTYEnabled(true); err != nil {
-		t.Fatalf("setPTYEnabled(true) error: %v", err)
+	if setErr := setPTYEnabled(true); setErr != nil {
+		t.Fatalf("setPTYEnabled(true) error: %v", setErr)
 	}
 	cfg, err = config.Load()
 	if err != nil {

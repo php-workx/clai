@@ -2,6 +2,7 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 )
@@ -31,8 +32,8 @@ func TestSQLiteStore_CommandCaptureLifecycle(t *testing.T) {
 		t.Fatalf("expected one seeded row, got %d", rows)
 	}
 
-	if err := store.FinalizeCommandEvent(ctx, "cmd-1", 1, endTS, true, 1234); err != nil {
-		t.Fatalf("FinalizeCommandEvent() error = %v", err)
+	if finalizeErr := store.FinalizeCommandEvent(ctx, "cmd-1", 1, endTS, true, 1234); finalizeErr != nil {
+		t.Fatalf("FinalizeCommandEvent() error = %v", finalizeErr)
 	}
 
 	var (
@@ -127,7 +128,7 @@ func TestSQLiteStore_FinalizeCommandEvent_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for missing command event")
 	}
-	if err != ErrCommandNotFound {
+	if !errors.Is(err, ErrCommandNotFound) {
 		t.Fatalf("expected ErrCommandNotFound, got %v", err)
 	}
 }

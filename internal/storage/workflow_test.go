@@ -793,7 +793,7 @@ func TestMigrationV3_CreatesWorkflowTables(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read schema version: %v", err)
 	}
-	if version != 3 {
-		t.Errorf("schema version = %d, want 3", version)
+	if version != 4 {
+		t.Errorf("schema version = %d, want 4", version)
 	}
 }

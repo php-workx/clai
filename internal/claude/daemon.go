@@ -491,8 +491,8 @@ func (c *claudeProcess) query(ctx context.Context, prompt string) (string, error
 
 	// Read responses in a goroutine so we can select on context cancellation.
 	type scanResult struct {
-		text string
 		err  error
+		text string
 	}
 	ch := make(chan scanResult, 1)
 

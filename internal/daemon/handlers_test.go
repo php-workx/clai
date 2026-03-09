@@ -20,11 +20,33 @@ import (
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
+// mockCommandEvent holds in-memory command event data for the mock store.
+type mockCommandEvent struct {
+	StartTS       *int64
+	ExitCode      *int
+	EndTS         *int64
+	SessionID     string
+	CommandID     string
+	CapturedBytes int64
+	IsSensitive   bool
+}
+
+// mockCommandOutput holds in-memory command output data for the mock store.
+type mockCommandOutput struct {
+	CommandID  string
+	StdoutBlob []byte
+	StderrBlob []byte
+	CreatedAt  int64
+	ExpiresAt  int64
+}
+
 // mockStore implements storage.Store for testing.
 type mockStore struct {
-	sessions map[string]*storage.Session
-	commands map[string]*storage.Command
-	cache    map[string]*storage.CacheEntry
+	sessions      map[string]*storage.Session
+	commands      map[string]*storage.Command
+	cache         map[string]*storage.CacheEntry
+	commandEvents map[string]*mockCommandEvent
+	commandOutput map[string]*mockCommandOutput
 }
 
 type importStatusStore struct {
@@ -50,9 +72,11 @@ func (m *importStatusStore) ImportHistory(ctx context.Context, entries []history
 
 func newMockStore() *mockStore {
 	return &mockStore{
-		sessions: make(map[string]*storage.Session),
-		commands: make(map[string]*storage.Command),
-		cache:    make(map[string]*storage.CacheEntry),
+		sessions:      make(map[string]*storage.Session),
+		commands:      make(map[string]*storage.Command),
+		cache:         make(map[string]*storage.CacheEntry),
+		commandEvents: make(map[string]*mockCommandEvent),
+		commandOutput: make(map[string]*mockCommandOutput),
 	}
 }
 
@@ -164,7 +188,7 @@ func (m *mockStore) QueryHistoryCommands(ctx context.Context, q storage.CommandQ
 }
 
 func (m *mockStore) UpsertCommandEventStart(ctx context.Context, sessionID, commandID string, startTS int64) error {
-	m.commandEvents[commandID] = &storage.CommandEvent{
+	m.commandEvents[commandID] = &mockCommandEvent{
 		SessionID: sessionID,
 		CommandID: commandID,
 		StartTS:   &startTS,
@@ -187,7 +211,7 @@ func (m *mockStore) FinalizeCommandEvent(ctx context.Context, commandID string, 
 func (m *mockStore) AppendCommandOutputChunk(ctx context.Context, commandID string, chunk []byte, isStderr bool, createdAt, expiresAt int64) error {
 	out, ok := m.commandOutput[commandID]
 	if !ok {
-		out = &storage.CommandOutput{
+		out = &mockCommandOutput{
 			CommandID: commandID,
 			CreatedAt: createdAt,
 			ExpiresAt: expiresAt,

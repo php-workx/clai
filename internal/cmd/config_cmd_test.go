@@ -23,6 +23,7 @@ func TestConfigCmd_List(t *testing.T) {
 		"history.picker_case_sensitive",
 		"history.up_arrow_trigger",
 		"history.up_arrow_double_window_ms",
+		"pty.enabled",
 	}
 
 	if len(keys) != len(expectedKeys) {
