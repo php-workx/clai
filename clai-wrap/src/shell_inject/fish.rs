@@ -1,8 +1,9 @@
 //! Fish shell integration injection for OSC 133 semantic prompt support.
 //!
 //! This module provides the `FishInjector` which handles OSC 133 integration
-//! for Fish shell. Fish 3.6+ has native OSC 133 support, so the injector
-//! detects the Fish version and only injects hooks for older versions.
+//! for Fish shell. While modern Fish versions may support OSC 133 natively,
+//! clai-wrap injects hooks consistently to guarantee deterministic markers
+//! across terminals and Fish builds.
 //!
 //! # OSC 133 Sequences
 //!
@@ -18,16 +19,11 @@
 //!
 //! let injector = FishInjector::new().expect("failed to create injector");
 //!
-//! if injector.has_native_osc133() {
-//!     // Fish 3.6+ - no injection needed
-//!     println!("Fish has native OSC 133 support");
-//! } else {
-//!     // Older Fish - use --init-command
-//!     let args = injector.shell_args();
-//!     // Launch fish with: fish --init-command "..."
-//! }
+//! let args = injector.shell_args();
+//! // Launch fish with: fish --init-command "..."
 //! ```
 
+use std::path::Path;
 use std::process::Command;
 
 use thiserror::Error;
@@ -45,13 +41,15 @@ pub enum FishInjectorError {
 }
 
 /// The Fish version where native OSC 133 support was added.
+///
+/// This is retained for diagnostics/telemetry; hook injection is still applied
+/// for deterministic behavior.
 const NATIVE_OSC133_VERSION: (u32, u32) = (3, 6);
 
 /// Fish shell integration injector.
 ///
-/// Detects the Fish version and provides appropriate shell arguments for
-/// OSC 133 integration. Fish 3.6+ has native OSC 133 support, so no
-/// injection is needed for modern Fish versions.
+/// Detects the Fish version and provides shell arguments for OSC 133
+/// integration.
 ///
 /// # Example
 ///
@@ -60,13 +58,8 @@ const NATIVE_OSC133_VERSION: (u32, u32) = (3, 6);
 ///
 /// let injector = FishInjector::new().expect("failed to create injector");
 ///
-/// // Check if injection is needed
-/// if injector.has_native_osc133() {
-///     println!("Fish {} has native OSC 133", injector.version_string());
-/// } else {
-///     let args = injector.shell_args();
-///     println!("Use fish with args: {:?}", args);
-/// }
+/// let args = injector.shell_args();
+/// println!("Use fish with args: {:?}", args);
 /// ```
 #[derive(Debug, Clone)]
 pub struct FishInjector {
@@ -89,7 +82,20 @@ impl FishInjector {
     /// - Fish is not installed or not found in PATH
     /// - The version output cannot be parsed
     pub fn new() -> Result<Self, FishInjectorError> {
-        let version = Self::detect_version()?;
+        let version = Self::detect_version_via("fish")?;
+        let native_osc133 = Self::version_has_native_osc133(version);
+
+        Ok(Self {
+            fish_version: Some(version),
+            native_osc133,
+        })
+    }
+
+    /// Creates a new `FishInjector` by detecting version from a shell path.
+    ///
+    /// This is preferred when the target shell path may not match `PATH`.
+    pub fn for_shell_path(shell_path: &Path) -> Result<Self, FishInjectorError> {
+        let version = Self::detect_version_via(shell_path)?;
         let native_osc133 = Self::version_has_native_osc133(version);
 
         Ok(Self {
@@ -154,29 +160,25 @@ impl FishInjector {
 
     /// Returns the shell arguments for OSC 133 injection.
     ///
-    /// If Fish has native OSC 133 support (version >= 3.6), returns an
-    /// empty vector (no injection needed).
+    /// Returns `["--init-command", "<script>"]` where `<script>` contains OSC
+    /// 133 hooks.
     ///
-    /// For older Fish versions, returns `["--init-command", "<script>"]`
-    /// where `<script>` contains the OSC 133 hooks.
+    /// We inject for all versions (including those with native support) to
+    /// keep command-boundary behavior deterministic.
     pub fn shell_args(&self) -> Vec<String> {
-        if self.native_osc133 {
-            // Fish 3.6+ has native OSC 133 support
-            return Vec::new();
-        }
-
-        // For older Fish, inject OSC 133 hooks via --init-command
         vec![
             "--init-command".to_string(),
             Self::init_script().to_string(),
         ]
     }
 
-    /// Detects the Fish version by running `fish --version`.
+    /// Detects the Fish version by running `<shell> --version`.
     ///
     /// Expected output format: "fish, version X.Y.Z"
-    fn detect_version() -> Result<(u32, u32), FishInjectorError> {
-        let output = Command::new("fish")
+    fn detect_version_via(
+        shell: impl AsRef<std::ffi::OsStr>,
+    ) -> Result<(u32, u32), FishInjectorError> {
+        let output = Command::new(shell)
             .arg("--version")
             .output()
             .map_err(FishInjectorError::FishNotFound)?;
@@ -411,10 +413,9 @@ mod tests {
     fn test_shell_args_native() {
         let injector = FishInjector::with_version(3, 6);
         let args = injector.shell_args();
-        assert!(
-            args.is_empty(),
-            "Fish 3.6+ should return empty args (no injection needed)"
-        );
+        assert_eq!(args.len(), 2, "Fish 3.6+ should still inject hooks");
+        assert_eq!(args[0], "--init-command");
+        assert!(args[1].contains("__clai_osc133"));
     }
 
     #[test]
@@ -445,6 +446,15 @@ mod tests {
         assert!(
             !injector.shell_args().is_empty(),
             "should return injection args without detection"
+        );
+    }
+
+    #[test]
+    fn test_for_shell_path_detects_version() {
+        let injector = FishInjector::for_shell_path(Path::new("fish"));
+        assert!(
+            injector.is_ok(),
+            "for_shell_path should work when fish is on PATH"
         );
     }
 

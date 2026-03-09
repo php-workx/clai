@@ -148,8 +148,7 @@ fn test_history_empty_file() {
     let file = NamedTempFile::with_suffix(".bash_history").unwrap();
     // File is empty
 
-    let entries =
-        history_parser::detect_and_parse(file.path()).expect("Should handle empty file");
+    let entries = history_parser::detect_and_parse(file.path()).expect("Should handle empty file");
 
     assert!(entries.is_empty(), "Should return empty vector");
 }
@@ -162,8 +161,8 @@ fn test_history_empty_file() {
 fn test_picker_from_history() {
     let history_file = create_mock_bash_history();
 
-    let entries = history_parser::detect_and_parse(history_file.path())
-        .expect("Failed to parse history");
+    let entries =
+        history_parser::detect_and_parse(history_file.path()).expect("Failed to parse history");
 
     let items: Vec<PickerItem> = entries
         .iter()
@@ -185,10 +184,13 @@ fn test_picker_from_history() {
 fn test_picker_filter_git_commands() {
     let history_file = create_mock_bash_history();
 
-    let entries = history_parser::detect_and_parse(history_file.path())
-        .expect("Failed to parse history");
+    let entries =
+        history_parser::detect_and_parse(history_file.path()).expect("Failed to parse history");
 
-    let items: Vec<PickerItem> = entries.iter().map(|e| PickerItem::new(&e.command)).collect();
+    let items: Vec<PickerItem> = entries
+        .iter()
+        .map(|e| PickerItem::new(&e.command))
+        .collect();
 
     let mut picker = Picker::new(items);
     picker.update_query("git");
@@ -197,10 +199,7 @@ fn test_picker_filter_git_commands() {
     assert_eq!(picker.filtered_count(), 2);
 
     let selected = picker.selected_item().expect("Should have selection");
-    assert!(
-        selected.text.contains("git"),
-        "Selected should contain git"
-    );
+    assert!(selected.text.contains("git"), "Selected should contain git");
 }
 
 #[test]
@@ -669,10 +668,7 @@ fn test_full_picker_flow() {
     injector.inject(&mut output, &selected.text).unwrap();
 
     // Verify injection
-    assert_eq!(
-        String::from_utf8_lossy(output.get_ref()),
-        selected.text
-    );
+    assert_eq!(String::from_utf8_lossy(output.get_ref()), selected.text);
 }
 
 // ============================================================================

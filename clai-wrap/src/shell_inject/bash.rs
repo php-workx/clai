@@ -25,15 +25,16 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use tempfile::TempDir;
 use thiserror::Error;
+
+use crate::temp_dir::{TempDirError, TempDirManager};
 
 /// Errors that can occur during Bash injection setup.
 #[derive(Debug, Error)]
 pub enum BashInjectorError {
-    /// Failed to create temporary directory
-    #[error("failed to create temp directory: {0}")]
-    TempDirCreation(#[source] std::io::Error),
+    /// Failed to create managed temporary directory
+    #[error("failed to create managed temp directory: {0}")]
+    TempDir(#[from] TempDirError),
 
     /// Failed to create init file
     #[error("failed to create init file: {0}")]
@@ -115,9 +116,12 @@ const INIT_FILENAME: &str = "init.bash";
 /// // because it owns the temp directory
 /// ```
 pub struct BashInjector {
-    /// Temporary directory containing the init file.
-    /// Automatically deleted on drop.
-    temp_dir: TempDir,
+    /// Managed session-scoped temp directory owner.
+    #[allow(dead_code)] // Keeps session temp dir alive for injector lifetime.
+    manager: TempDirManager,
+
+    /// Shell-specific directory for bash injection files.
+    shell_dir: PathBuf,
 
     /// Path to the generated rcfile.
     rcfile_path: PathBuf,
@@ -136,20 +140,9 @@ impl BashInjector {
     /// - The init file cannot be written
     /// - Permissions cannot be set (Unix only)
     pub fn new() -> Result<Self, BashInjectorError> {
-        // Create temp directory with a recognizable prefix
-        let temp_dir =
-            TempDir::with_prefix("clai-bash-").map_err(BashInjectorError::TempDirCreation)?;
-
-        // Set directory permissions to 0700 on Unix
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let permissions = fs::Permissions::from_mode(0o700);
-            fs::set_permissions(temp_dir.path(), permissions)
-                .map_err(BashInjectorError::Permissions)?;
-        }
-
-        let rcfile_path = temp_dir.path().join(INIT_FILENAME);
+        let manager = TempDirManager::new()?;
+        let shell_dir = manager.shell_dir("bash")?;
+        let rcfile_path = shell_dir.join(INIT_FILENAME);
 
         // Write the init file
         let mut file = File::create(&rcfile_path).map_err(BashInjectorError::FileCreation)?;
@@ -167,7 +160,8 @@ impl BashInjector {
         }
 
         Ok(Self {
-            temp_dir,
+            manager,
+            shell_dir,
             rcfile_path,
         })
     }
@@ -209,7 +203,7 @@ impl BashInjector {
     /// The temporary directory is automatically cleaned up when the
     /// `BashInjector` is dropped.
     pub fn temp_dir(&self) -> &Path {
-        self.temp_dir.path()
+        self.shell_dir.as_path()
     }
 }
 
@@ -321,8 +315,8 @@ mod tests {
             args[1]
         );
         assert!(
-            args[1].contains("clai-bash-"),
-            "path should contain temp dir prefix, got: {}",
+            args[1].contains("/bash/") || args[1].contains("\\bash\\"),
+            "path should contain managed bash subdirectory, got: {}",
             args[1]
         );
     }

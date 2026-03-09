@@ -429,9 +429,9 @@ mod tests {
     use std::fs;
     #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
+    use std::time::Duration;
     #[cfg(unix)]
     use tempfile::NamedTempFile;
-    use std::time::Duration;
 
     #[test]
     fn test_spawn_echo_command() {
@@ -743,8 +743,7 @@ mod tests {
         let perms = fs::Permissions::from_mode(0o755);
         fs::set_permissions(&script_path, perms).expect("set script executable");
 
-        let mut host =
-            PtyHost::new_with_login(Some(script_path), false).expect("spawn pty host");
+        let mut host = PtyHost::new_with_login(Some(script_path), false).expect("spawn pty host");
         let mut reader = host.reader().expect("pty reader");
 
         let mut output = String::new();

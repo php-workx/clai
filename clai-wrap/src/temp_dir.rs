@@ -4,7 +4,7 @@
 //! directories used for shell injection scripts. It handles:
 //!
 //! - Creating per-user base directories (`/tmp/clai-{uid}/`)
-//! - Creating per-session directories (`session-{pid}/`)
+//! - Creating per-session directories (`session-{pid}-{counter}/`)
 //! - Shell-specific subdirectories for injection files
 //! - Automatic cleanup on drop
 //! - Stale session cleanup (orphaned directories from crashed processes)
@@ -13,7 +13,7 @@
 //!
 //! ```text
 //! /tmp/clai-{uid}/
-//!   └── session-{pid}/
+//!   └── session-{pid}-{counter}/
 //!         ├── zsh/          # ZDOTDIR for zsh injection
 //!         │   ├── .zshenv
 //!         │   └── .zshrc
@@ -45,13 +45,15 @@
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-#[cfg(test)]
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use thiserror::Error;
 use tracing::{debug, warn};
 
-/// Counter for generating unique session IDs in tests
+/// Counter for generating unique session IDs in a single process.
+static SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Counter for generating unique test session IDs.
 #[cfg(test)]
 static TEST_SESSION_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -122,7 +124,7 @@ pub type Result<T> = std::result::Result<T, TempDirError>;
 /// # Directory Structure
 ///
 /// - Base: `/tmp/clai-{uid}/` (or `$XDG_RUNTIME_DIR/clai/` if available)
-/// - Session: `session-{pid}/`
+/// - Session: `session-{pid}-{counter}/`
 /// - Shell subdirs: `zsh/`, `bash/`, `fish/`
 ///
 /// # Cleanup
@@ -164,11 +166,12 @@ impl TempDirManager {
     pub fn new() -> Result<Self> {
         let uid = get_uid()?;
         let pid = std::process::id();
+        let counter = SESSION_COUNTER.fetch_add(1, Ordering::SeqCst);
 
         // Determine base directory
         let base_path = get_base_dir(uid)?;
 
-        Self::with_base_and_session_id(base_path, &format!("session-{pid}"))
+        Self::with_base_and_session_id(base_path, &format!("session-{pid}-{counter}"))
     }
 
     /// Creates a temp directory manager with a custom base directory and session ID.
@@ -331,7 +334,8 @@ impl TempDirManager {
                 continue;
             };
 
-            let Ok(pid) = pid_str.parse::<u32>() else {
+            let pid_component = pid_str.split('-').next().unwrap_or(pid_str);
+            let Ok(pid) = pid_component.parse::<u32>() else {
                 // Invalid pid format, skip
                 warn!(path = %path.display(), "invalid session directory name");
                 continue;

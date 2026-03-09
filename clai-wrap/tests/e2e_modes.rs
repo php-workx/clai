@@ -15,6 +15,7 @@ use std::io::Write;
 use std::os::fd::{FromRawFd, RawFd};
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use tempfile::NamedTempFile;
@@ -24,6 +25,8 @@ use clai_wrap::passthrough::{
 };
 use clai_wrap::raw_mode::{detect_tty, TtyStatus};
 use clai_wrap::standalone::{Feature, StandaloneError, StandaloneReason, StandaloneState};
+
+static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 #[cfg(unix)]
 fn clai_wrap_binary() -> Option<PathBuf> {
@@ -57,7 +60,9 @@ fn run_with_timeout(mut child: std::process::Child, timeout: Duration) -> Output
         }
     }
     let _ = child.kill();
-    child.wait_with_output().expect("collect killed child output")
+    child
+        .wait_with_output()
+        .expect("collect killed child output")
 }
 
 #[cfg(unix)]
@@ -187,6 +192,8 @@ fn test_passthrough_reason_unsupported_shell() {
 
 #[test]
 fn test_should_use_passthrough_dumb_term() {
+    let _lock = ENV_LOCK.lock().expect("lock env");
+
     // Save original TERM
     let original = env::var("TERM").ok();
 
@@ -205,6 +212,8 @@ fn test_should_use_passthrough_dumb_term() {
 
 #[test]
 fn test_should_use_passthrough_unset_term() {
+    let _lock = ENV_LOCK.lock().expect("lock env");
+
     // Save original TERM
     let original = env::var("TERM").ok();
 
@@ -221,6 +230,8 @@ fn test_should_use_passthrough_unset_term() {
 
 #[test]
 fn test_should_use_passthrough_valid_term() {
+    let _lock = ENV_LOCK.lock().expect("lock env");
+
     // Save original TERM
     let original = env::var("TERM").ok();
 
@@ -312,6 +323,8 @@ fn test_check_shell_support_case_insensitive() {
 
 #[test]
 fn test_check_passthrough_needed_with_unsupported_shell() {
+    let _lock = ENV_LOCK.lock().expect("lock env");
+
     // Save original TERM
     let original = env::var("TERM").ok();
 
@@ -536,6 +549,8 @@ fn test_mode_transition_with_history() {
 
 #[test]
 fn test_term_environment_handling() {
+    let _lock = ENV_LOCK.lock().expect("lock env");
+
     let original = env::var("TERM").ok();
 
     // Test various TERM values
@@ -585,7 +600,13 @@ fn test_non_tty_without_force_non_tty_fails_raw_mode() {
     };
 
     let child = Command::new(binary)
-        .args(["--standalone", "--shell", "/bin/sh", "--login-shell", "false"])
+        .args([
+            "--standalone",
+            "--shell",
+            "/bin/sh",
+            "--login-shell",
+            "false",
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -600,8 +621,8 @@ fn test_non_tty_without_force_non_tty_fails_raw_mode() {
         "Expected failure when raw mode is required in non-TTY"
     );
     assert!(
-        stderr.contains("Failed to enter raw mode"),
-        "Expected raw-mode failure message, got: {stderr}"
+        stderr.contains("use --force-non-tty"),
+        "Expected non-TTY guidance message, got: {stderr}"
     );
 }
 
@@ -692,7 +713,10 @@ fn test_reset_terminal_restores_termios_on_corrupted_tty() {
     let stdin_fd = unsafe { libc::dup(pty.slave) };
     let stdout_fd = unsafe { libc::dup(pty.slave) };
     let stderr_fd = unsafe { libc::dup(pty.slave) };
-    assert!(stdin_fd >= 0 && stdout_fd >= 0 && stderr_fd >= 0, "dup failed");
+    assert!(
+        stdin_fd >= 0 && stdout_fd >= 0 && stderr_fd >= 0,
+        "dup failed"
+    );
 
     let mut child = Command::new(binary)
         .arg("reset-terminal")
@@ -723,7 +747,10 @@ fn test_interactive_mode_detection() {
     let status = detect_tty();
 
     // When running interactively, all should be TTY
-    assert!(status.stdin, "stdin should be TTY when running interactively");
+    assert!(
+        status.stdin,
+        "stdin should be TTY when running interactively"
+    );
     assert!(
         status.stdout,
         "stdout should be TTY when running interactively"

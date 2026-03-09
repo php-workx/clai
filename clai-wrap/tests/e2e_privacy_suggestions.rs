@@ -144,10 +144,7 @@ fn test_echo_gap_detector_password_prompt() {
         detector.is_secure_mode(),
         "Should enter secure mode when input has no echo"
     );
-    assert!(
-        detector.bytes_to_scrub() > 0,
-        "Should have bytes to scrub"
-    );
+    assert!(detector.bytes_to_scrub() > 0, "Should have bytes to scrub");
 }
 
 #[test]
@@ -317,8 +314,8 @@ fn test_comment_manager_add_from_suggestion() {
     let renderer = CommentRenderer::new(Shell::Bash);
     let mut manager = CommentManager::with_renderer(renderer);
 
-    let suggestion = Suggestion::command_fix("cmd-1", "git push")
-        .with_explanation("Push your changes");
+    let suggestion =
+        Suggestion::command_fix("cmd-1", "git push").with_explanation("Push your changes");
 
     manager.add_from_suggestion(&suggestion);
 
@@ -433,10 +430,7 @@ fn test_all_comment_types_render_correctly() {
             AssistantComment::explanation("cmd", "lists files"),
             "explanation",
         ),
-        (
-            AssistantComment::error("cmd", "command not found"),
-            "error",
-        ),
+        (AssistantComment::error("cmd", "command not found"), "error"),
     ];
 
     for (comment, expected_label) in cases {
