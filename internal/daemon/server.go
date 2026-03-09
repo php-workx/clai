@@ -93,6 +93,13 @@ type Server struct {
 	snapshotMu           sync.RWMutex
 	mu                   sync.RWMutex
 	shutdownOnce         sync.Once
+
+	// JSON-RPC listener for clai-wrap phase-2 protocol
+	jsonListener net.Listener
+
+	// JSON-RPC capture accounting (command_id -> bytes seen)
+	captureMu    sync.Mutex
+	capturedSize map[string]int64
 }
 
 // ServerConfig contains configuration options for the daemon server.
@@ -166,6 +173,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		lastActivity:         now,
 		idleTimeout:          idleTimeout,
 		shutdownChan:         make(chan struct{}),
+		capturedSize:         make(map[string]int64),
 		maintenanceRunner:    cfg.MaintenanceRunner,
 		diagnosticsMux:       diagMux,
 		batchWriter:          bw,

@@ -25,6 +25,18 @@ export CLAI_CURRENT_SHELL=zsh
 : ${CLAI_UP_ARROW_TRIGGER:={{CLAI_UP_ARROW_TRIGGER}}}
 : ${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:={{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}}
 
+# PTY auto-wrap (new sessions only)
+# - Controlled by config value injected at init time
+# - Disabled when already inside clai-wrap (CLAI_WRAP=1)
+# - Requires interactive TTY streams
+if [[ "{{CLAI_PTY_ENABLED}}" == "true" ]]; then
+    if [[ -o interactive && -z "${CLAI_WRAP:-}" && "${CLAI_PTY_DISABLE:-0}" != "1" && -t 0 && -t 1 ]]; then
+        if command -v clai-wrap >/dev/null 2>&1; then
+            exec clai-wrap --shell "${SHELL:-/bin/zsh}"
+        fi
+    fi
+fi
+
 # Ensure cache directory exists
 mkdir -p "$CLAI_CACHE"
 

@@ -23,6 +23,22 @@ export CLAI_CURRENT_SHELL=bash
 : ${CLAI_UP_ARROW_TRIGGER:={{CLAI_UP_ARROW_TRIGGER}}}
 : ${CLAI_UP_ARROW_DOUBLE_WINDOW_MS:={{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}}
 
+# PTY auto-wrap (new sessions only)
+# - Controlled by config value injected at init time
+# - Disabled when already inside clai-wrap (CLAI_WRAP=1)
+# - Requires interactive TTY streams
+if [[ "{{CLAI_PTY_ENABLED}}" == "true" ]]; then
+    case "$-" in
+        *i*)
+            if [[ -z "${CLAI_WRAP:-}" && "${CLAI_PTY_DISABLE:-0}" != "1" && -t 0 && -t 1 ]]; then
+                if command -v clai-wrap >/dev/null 2>&1; then
+                    exec clai-wrap --shell "${SHELL:-/bin/bash}"
+                fi
+            fi
+            ;;
+    esac
+fi
+
 # Only initialize in interactive shells.
 # This avoids installing hooks in non-interactive contexts like `bash -c` or scripts.
 if [[ $- != *i* ]]; then

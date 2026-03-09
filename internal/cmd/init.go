@@ -83,6 +83,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		"{{CLAI_UP_ARROW_HISTORY}}", strconv.FormatBool(cfg.History.UpArrowOpensHistory),
 		"{{CLAI_UP_ARROW_TRIGGER}}", cfg.History.UpArrowTrigger,
 		"{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}", strconv.Itoa(cfg.History.UpArrowDoubleWindowMs),
+		"{{CLAI_PTY_ENABLED}}", strconv.FormatBool(cfg.PTY.Enabled),
 	)
 	fmt.Print(replacer.Replace(string(content)))
 	return nil

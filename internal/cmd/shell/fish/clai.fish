@@ -37,6 +37,27 @@ if not set -q CLAI_UP_ARROW_DOUBLE_WINDOW_MS
     set -gx CLAI_UP_ARROW_DOUBLE_WINDOW_MS {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}
 end
 
+# PTY auto-wrap (new sessions only)
+# - Controlled by config value injected at init time
+# - Disabled when already inside clai-wrap (CLAI_WRAP=1)
+# - Requires interactive TTY streams
+if test "{{CLAI_PTY_ENABLED}}" = "true"
+    if status is-interactive
+        if not set -q CLAI_WRAP; and test "$CLAI_PTY_DISABLE" != "1"
+            if isatty stdin; and isatty stdout
+                if type -q clai-wrap
+                    set -l _clai_fish_path (command -s fish 2>/dev/null)
+                    if test -n "$_clai_fish_path"
+                        exec clai-wrap --shell "$_clai_fish_path"
+                    else
+                        exec clai-wrap
+                    end
+                end
+            end
+        end
+    end
+end
+
 # Ensure cache directory exists
 mkdir -p $CLAI_CACHE
 

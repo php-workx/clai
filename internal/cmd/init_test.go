@@ -206,6 +206,38 @@ func TestShellScripts_HistoryPickerDownRestoresOriginal(t *testing.T) {
 	}
 }
 
+func TestRunInit_ReplacesPlaceholders(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CLAI_HOME", home)
+
+	cfg := config.DefaultConfig()
+	cfg.History.UpArrowOpensHistory = true
+	cfg.PTY.Enabled = false
+	if err := cfg.Save(); err != nil {
+		t.Fatalf("failed to save config: %v", err)
+	}
+
+	out := captureStdout(t, func() {
+		if err := runInit(initCmd, []string{"zsh"}); err != nil {
+			t.Fatalf("runInit failed: %v", err)
+		}
+	})
+
+	if strings.Contains(out, "{{CLAI_SESSION_ID}}") ||
+		strings.Contains(out, "{{CLAI_UP_ARROW_HISTORY}}") ||
+		strings.Contains(out, "{{CLAI_PTY_ENABLED}}") {
+		t.Fatalf("expected placeholders to be replaced, got output with template markers")
+	}
+
+	if !strings.Contains(out, `CLAI_UP_ARROW_HISTORY:=true`) {
+		t.Errorf("expected CLAI_UP_ARROW_HISTORY replacement to be true")
+	}
+
+	if !strings.Contains(out, `if [[ "false" == "true" ]]; then`) {
+		t.Errorf("expected PTY enabled replacement to be false in zsh script")
+	}
+}
+
 func TestRunInit_UnsupportedShell(t *testing.T) {
 	err := runInit(initCmd, []string{"powershell"})
 	if err == nil {
