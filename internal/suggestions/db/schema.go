@@ -7,13 +7,14 @@ package db
 // Version history:
 //   - V1: Original schema (suggestions.db) - 7 tables
 //   - V2: Extended schema (suggestions_v2.db) - 23 tables, separate DB file
+//   - V3: Unified schema - adds tables from state.db (ai_cache, pty, ci_workflow, etc.)
 const (
 	// V1SchemaVersion is the schema version for V1 database files (suggestions.db).
 	V1SchemaVersion = 1
 
-	// SchemaVersion is the current supported schema version (V2).
+	// SchemaVersion is the current supported schema version (V3).
 	// The daemon will refuse to run if the DB schema version exceeds this.
-	SchemaVersion = 2
+	SchemaVersion = 3
 )
 
 // schemaV1 creates the initial V1 schema for the suggestions engine.
@@ -438,8 +439,110 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 `
 
+// schemaV3 migrates V2 to the unified schema by adding tables previously
+// stored in state.db (ai_cache, PTY capture, CI workflow, history import meta)
+// and extending existing tables with columns from V1's sessions/commands.
+const schemaV3 = `
+-- Extend session table with V1 fields
+ALTER TABLE session ADD COLUMN os TEXT;
+ALTER TABLE session ADD COLUMN initial_cwd TEXT;
+
+-- Extend command_event with V1's command_id UUID
+ALTER TABLE command_event ADD COLUMN command_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_command_id ON command_event(command_id);
+
+-- AI response cache (from state.db ai_cache)
+CREATE TABLE IF NOT EXISTS ai_cache (
+  cache_key         TEXT PRIMARY KEY,
+  response_json     TEXT NOT NULL,
+  provider          TEXT NOT NULL,
+  created_at_ms     INTEGER NOT NULL,
+  expires_at_ms     INTEGER NOT NULL,
+  hit_count         INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ai_cache_expires ON ai_cache(expires_at_ms);
+
+-- PTY command events (from state.db command_events, renamed to avoid collision)
+CREATE TABLE IF NOT EXISTS pty_command_event (
+  command_id        TEXT PRIMARY KEY,
+  session_id        TEXT NOT NULL,
+  start_ts          INTEGER,
+  end_ts            INTEGER,
+  exit_code         INTEGER,
+  is_sensitive      INTEGER NOT NULL DEFAULT 0,
+  captured_bytes    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_pty_command_event_session ON pty_command_event(session_id);
+
+-- PTY command output blobs (from state.db command_output)
+CREATE TABLE IF NOT EXISTS pty_command_output (
+  command_id        TEXT PRIMARY KEY,
+  stdout_blob       BLOB,
+  stderr_blob       BLOB,
+  created_at        INTEGER NOT NULL,
+  expires_at        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pty_command_output_expires ON pty_command_output(expires_at);
+
+-- CI workflow runs (from state.db workflow_runs, renamed)
+CREATE TABLE IF NOT EXISTS ci_workflow_run (
+  run_id            TEXT PRIMARY KEY,
+  workflow_name     TEXT NOT NULL,
+  workflow_hash     TEXT NOT NULL,
+  workflow_path     TEXT NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'running',
+  started_at        INTEGER NOT NULL,
+  ended_at          INTEGER NOT NULL DEFAULT 0,
+  duration_ms       INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_run_name ON ci_workflow_run(workflow_name);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_run_status ON ci_workflow_run(status);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_run_started ON ci_workflow_run(started_at DESC);
+
+-- CI workflow steps (from state.db workflow_steps, renamed)
+CREATE TABLE IF NOT EXISTS ci_workflow_step (
+  run_id            TEXT NOT NULL REFERENCES ci_workflow_run(run_id),
+  step_id           TEXT NOT NULL,
+  matrix_key        TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'running',
+  command           TEXT NOT NULL DEFAULT '',
+  exit_code         INTEGER NOT NULL DEFAULT 0,
+  duration_ms       INTEGER NOT NULL DEFAULT 0,
+  stdout_tail       TEXT NOT NULL DEFAULT '',
+  stderr_tail       TEXT NOT NULL DEFAULT '',
+  outputs_json      TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (run_id, step_id, matrix_key)
+);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_step_run ON ci_workflow_step(run_id);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_step_status ON ci_workflow_step(status);
+
+-- CI workflow analyses (from state.db workflow_analyses, renamed)
+CREATE TABLE IF NOT EXISTS ci_workflow_analysis (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id            TEXT NOT NULL,
+  step_id           TEXT NOT NULL,
+  matrix_key        TEXT NOT NULL DEFAULT '',
+  decision          TEXT NOT NULL,
+  reasoning         TEXT NOT NULL DEFAULT '',
+  flags_json        TEXT NOT NULL DEFAULT '{}',
+  prompt            TEXT NOT NULL DEFAULT '',
+  raw_response      TEXT NOT NULL DEFAULT '',
+  duration_ms       INTEGER NOT NULL DEFAULT 0,
+  analyzed_at       INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_analysis_step ON ci_workflow_analysis(run_id, step_id, matrix_key);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_analysis_decision ON ci_workflow_analysis(decision);
+
+-- History import metadata (replaces V1 convention of session_id = 'imported-<shell>')
+CREATE TABLE IF NOT EXISTS history_import_meta (
+  shell             TEXT PRIMARY KEY,
+  imported_at_ms    INTEGER NOT NULL,
+  entry_count       INTEGER NOT NULL DEFAULT 0
+);
+`
+
 // V2AllTables lists all tables in the V2 schema for validation purposes.
-// This includes all 23 tables from spec Section 4.1.
+// This includes all 23 tables from spec Section 4.1 plus V3 additions.
 var V2AllTables = []string{
 	"session",
 	"command_event",
@@ -464,6 +567,14 @@ var V2AllTables = []string{
 	"rank_weight_profile",
 	"command_event_fts",
 	"schema_migrations",
+	// V3 additions
+	"ai_cache",
+	"pty_command_event",
+	"pty_command_output",
+	"ci_workflow_run",
+	"ci_workflow_step",
+	"ci_workflow_analysis",
+	"history_import_meta",
 }
 
 // V2AllIndexes lists all indexes in the V2 schema for validation purposes.
@@ -480,6 +591,18 @@ var V2AllIndexes = []string{
 	"idx_workflow_step_template",
 	"idx_task_candidate_repo",
 	"idx_feedback_session",
+	// V3 additions
+	"idx_event_command_id",
+	"idx_ai_cache_expires",
+	"idx_pty_command_event_session",
+	"idx_pty_command_output_expires",
+	"idx_ci_workflow_run_name",
+	"idx_ci_workflow_run_status",
+	"idx_ci_workflow_run_started",
+	"idx_ci_workflow_step_run",
+	"idx_ci_workflow_step_status",
+	"idx_ci_workflow_analysis_step",
+	"idx_ci_workflow_analysis_decision",
 }
 
 // V2AllTriggers lists all triggers in the V2 schema for validation purposes.

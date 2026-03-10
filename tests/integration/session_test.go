@@ -6,7 +6,7 @@ import (
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
-	"github.com/runger/clai/internal/storage"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 // TestCP2_SessionFlow verifies session start/end persists to SQLite.
@@ -41,7 +41,7 @@ func TestCP2_SessionFlow(t *testing.T) {
 	}
 
 	// Verify session was persisted to SQLite
-	session, err := env.Store.GetSession(ctx, sessionID)
+	session, err := ops.GetSession(ctx, env.V2DB, sessionID)
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
@@ -65,15 +65,11 @@ func TestCP2_SessionFlow(t *testing.T) {
 	if session.InitialCWD != "/home/test/project" {
 		t.Errorf("session CWD mismatch: got %s, want /home/test/project", session.InitialCWD)
 	}
-	if session.EndedAtUnixMs != nil {
-		t.Errorf("session should not have end time yet")
-	}
 
 	// End the session
-	endTime := time.Now()
 	endResp, err := env.Client.SessionEnd(ctx, &pb.SessionEndRequest{
 		SessionId:     sessionID,
-		EndedAtUnixMs: endTime.UnixMilli(),
+		EndedAtUnixMs: time.Now().UnixMilli(),
 	})
 	if err != nil {
 		t.Fatalf("SessionEnd failed: %v", err)
@@ -82,16 +78,13 @@ func TestCP2_SessionFlow(t *testing.T) {
 		t.Fatalf("SessionEnd returned ok=false: %s", endResp.Error)
 	}
 
-	// Verify end time was persisted
-	session, err = env.Store.GetSession(ctx, sessionID)
+	// Verify session still exists after end (end time tracked in memory, not DB)
+	session, err = ops.GetSession(ctx, env.V2DB, sessionID)
 	if err != nil {
 		t.Fatalf("GetSession after end failed: %v", err)
 	}
-	if session.EndedAtUnixMs == nil {
-		t.Fatal("session should have end time after SessionEnd")
-	}
-	if *session.EndedAtUnixMs != endTime.UnixMilli() {
-		t.Errorf("session end time mismatch: got %d, want %d", *session.EndedAtUnixMs, endTime.UnixMilli())
+	if session.SessionID != sessionID {
+		t.Errorf("session should still exist after SessionEnd")
 	}
 }
 
@@ -171,7 +164,7 @@ func TestCP3_CommandLogging(t *testing.T) {
 	}
 
 	// Query commands from storage
-	commands, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
+	commands, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
 		SessionID: &sessionID,
 		Limit:     100,
 	})
@@ -184,9 +177,9 @@ func TestCP3_CommandLogging(t *testing.T) {
 	}
 
 	// Verify each command was stored correctly
-	commandMap := make(map[string]storage.Command)
+	commandMap := make(map[string]ops.Command)
 	for _, cmd := range commands {
-		commandMap[cmd.Command] = cmd
+		commandMap[cmd.CmdRaw] = cmd
 	}
 
 	for _, tc := range testCases {
@@ -205,8 +198,9 @@ func TestCP3_CommandLogging(t *testing.T) {
 			t.Errorf("command %q exit code mismatch: got %d, want %d", tc.command, *cmd.ExitCode, tc.exitCode)
 		}
 		expectedSuccess := tc.exitCode == 0
-		if cmd.IsSuccess == nil || *cmd.IsSuccess != expectedSuccess {
-			t.Errorf("command %q IsSuccess mismatch: got %v, want %v", tc.command, cmd.IsSuccess, expectedSuccess)
+		actualSuccess := cmd.ExitCode != nil && *cmd.ExitCode == 0
+		if actualSuccess != expectedSuccess {
+			t.Errorf("command %q success mismatch: got %v, want %v", tc.command, actualSuccess, expectedSuccess)
 		}
 	}
 }
@@ -263,20 +257,18 @@ func TestSession_EndNonexistent(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Try to end a session that doesn't exist
+	// Try to end a session that doesn't exist.
+	// V2 EndSession is a no-op (session lifecycle tracked in memory), so this
+	// returns Ok=true. We just verify it doesn't panic or return an error.
 	resp, err := env.Client.SessionEnd(ctx, &pb.SessionEndRequest{
 		SessionId:     "nonexistent-session-id",
 		EndedAtUnixMs: time.Now().UnixMilli(),
 	})
 	if err != nil {
-		// gRPC error for non-existent session is acceptable
-		t.Logf("End nonexistent session returned gRPC error: %v", err)
-		return
+		t.Fatalf("SessionEnd returned unexpected gRPC error: %v", err)
 	}
-
-	// If no gRPC error, the response should indicate failure
-	if resp.Ok {
-		t.Error("Ending nonexistent session should not succeed")
+	if !resp.Ok {
+		t.Errorf("SessionEnd returned ok=false unexpectedly: %s", resp.Error)
 	}
 }
 
@@ -364,7 +356,7 @@ func TestSession_MultipleSessions(t *testing.T) {
 
 	// Verify each session in database
 	for _, s := range sessions {
-		session, err := env.Store.GetSession(ctx, s.id)
+		session, err := ops.GetSession(ctx, env.V2DB, s.id)
 		if err != nil {
 			t.Errorf("GetSession for %s failed: %v", s.id, err)
 			continue
@@ -472,12 +464,12 @@ func assertSharedPrefixAttribution(t *testing.T, suggestions []*pb.Suggestion, o
 
 // assertNoCommandCrossContamination verifies that commands from one session
 // don't appear in another session's stored commands.
-func assertNoCommandCrossContamination(t *testing.T, commands []storage.Command, foreignCommands []string, label string) {
+func assertNoCommandCrossContamination(t *testing.T, commands []ops.Command, foreignCommands []string, label string) {
 	t.Helper()
 	for _, cmd := range commands {
 		for _, foreign := range foreignCommands {
-			if cmd.Command == foreign {
-				t.Errorf("session %s commands contain foreign command: %s", label, cmd.Command)
+			if cmd.CmdRaw == foreign {
+				t.Errorf("session %s commands contain foreign command: %s", label, cmd.CmdRaw)
 			}
 		}
 	}
@@ -590,7 +582,7 @@ func TestSession_HistoryIsolation(t *testing.T) {
 
 	// Verify via direct storage query that commands are properly tagged
 	t.Run("StorageQuery_CommandsTaggedWithSession", func(t *testing.T) {
-		commandsA, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
+		commandsA, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
 			SessionID: &sessionA,
 			Limit:     100,
 		})
@@ -598,7 +590,7 @@ func TestSession_HistoryIsolation(t *testing.T) {
 			t.Fatalf("QueryCommands for session A failed: %v", err)
 		}
 
-		commandsB, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
+		commandsB, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
 			SessionID: &sessionB,
 			Limit:     100,
 		})
@@ -626,22 +618,20 @@ func TestSession_ClientInfoDefaults(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Test 1: Session without any client info should fail (shell required)
+	// Test 1: Session without any client info succeeds (V2 doesn't require shell)
 	t.Run("NoClientInfo", func(t *testing.T) {
 		sessionID := generateSessionID()
 		resp, err := env.Client.SessionStart(ctx, &pb.SessionStartRequest{
 			SessionId:       sessionID,
 			Cwd:             "/home/test",
 			StartedAtUnixMs: time.Now().UnixMilli(),
-			// No Client field
+			// No Client field — V2 allows empty shell
 		})
 		if err != nil {
-			// gRPC error is acceptable
-			return
+			t.Fatalf("SessionStart failed: %v", err)
 		}
-		// The storage layer requires shell, so this should fail
-		if resp.Ok {
-			t.Error("session without shell should not be created")
+		if !resp.Ok {
+			t.Errorf("SessionStart returned ok=false: %s", resp.Error)
 		}
 	})
 
@@ -665,7 +655,7 @@ func TestSession_ClientInfoDefaults(t *testing.T) {
 		}
 
 		// Verify session was created with defaults
-		session, err := env.Store.GetSession(ctx, sessionID)
+		session, err := ops.GetSession(ctx, env.V2DB, sessionID)
 		if err != nil {
 			t.Fatalf("GetSession failed: %v", err)
 		}

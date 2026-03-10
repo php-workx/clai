@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/runger/clai/internal/storage"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 const (
@@ -223,7 +223,7 @@ func (s *Server) handleJSONRPCMethod(
 			params.Timestamp = time.Now().UnixMilli()
 		}
 
-		if err := s.store.UpsertCommandEventStart(ctx, params.SessionID, params.CommandID, params.Timestamp); err != nil {
+		if err := ops.UpsertCommandEventStart(ctx, s.v2db, params.SessionID, params.CommandID, params.Timestamp); err != nil {
 			return nil, nil, internalError(err)
 		}
 
@@ -252,7 +252,7 @@ func (s *Server) handleJSONRPCMethod(
 
 		now := time.Now().UnixMilli()
 		expiresAt := now + int64((7*24*time.Hour)/time.Millisecond)
-		if err := s.store.AppendCommandOutputChunk(ctx, params.CommandID, chunk, params.IsStderr, now, expiresAt); err != nil {
+		if err := ops.AppendCommandOutputChunk(ctx, s.v2db, params.CommandID, chunk, params.IsStderr, now, expiresAt); err != nil {
 			return nil, nil, internalError(err)
 		}
 
@@ -272,8 +272,9 @@ func (s *Server) handleJSONRPCMethod(
 		}
 
 		capturedBytes := s.popCapturedBytes(params.CommandID)
-		err := s.store.FinalizeCommandEvent(
+		err := ops.FinalizeCommandEvent(
 			ctx,
+			s.v2db,
 			params.CommandID,
 			params.ExitCode,
 			params.Timestamp,
@@ -281,7 +282,7 @@ func (s *Server) handleJSONRPCMethod(
 			capturedBytes,
 		)
 		if err != nil {
-			if errors.Is(err, storage.ErrCommandNotFound) {
+			if errors.Is(err, ops.ErrCommandNotFound) {
 				return nil, nil, &jsonRPCErrorObj{
 					Code:    jsonRPCCommandAbsent,
 					Message: "Command not found",

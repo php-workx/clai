@@ -19,7 +19,7 @@ import (
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/daemon"
 	"github.com/runger/clai/internal/provider"
-	"github.com/runger/clai/internal/storage"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
 )
 
 // TestEnv holds all resources for an integration test.
@@ -27,7 +27,7 @@ type TestEnv struct {
 	Client     pb.ClaiServiceClient
 	Cancel     context.CancelFunc
 	T          *testing.T
-	Store      *storage.SQLiteStore
+	V2DB       *suggestdb.DB
 	Server     *daemon.Server
 	Conn       *grpc.ClientConn
 	Paths      *config.Paths
@@ -56,12 +56,15 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 		t.Fatalf("failed to create directories: %v", dirErr)
 	}
 
-	// Create SQLite store
-	dbPath := filepath.Join(tempDir, "state.db")
-	store, err := storage.NewSQLiteStore(dbPath)
+	// Create V2 database
+	dbPath := filepath.Join(tempDir, "suggestions_v2.db")
+	v2db, err := suggestdb.Open(context.Background(), suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
 	if err != nil {
 		os.RemoveAll(tempDir)
-		t.Fatalf("failed to create store: %v", err)
+		t.Fatalf("failed to create V2 database: %v", err)
 	}
 
 	// Create mock provider for AI operations
@@ -72,14 +75,14 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 
 	// Create server
 	serverCfg := &daemon.ServerConfig{
-		Store:       store,
+		V2DB:        v2db,
 		Registry:    registry,
 		Paths:       paths,
 		IdleTimeout: 30 * time.Minute, // Long timeout for tests
 	}
 	server, err := daemon.NewServer(serverCfg)
 	if err != nil {
-		store.Close()
+		v2db.Close()
 		os.RemoveAll(tempDir)
 		t.Fatalf("failed to create server: %v", err)
 	}
@@ -101,12 +104,12 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 		select {
 		case startErr := <-errChan:
 			cancel()
-			store.Close()
+			v2db.Close()
 			os.RemoveAll(tempDir)
 			t.Fatalf("server start error: %v", startErr)
 		default:
 			cancel()
-			store.Close()
+			v2db.Close()
 			os.RemoveAll(tempDir)
 			t.Fatalf("failed to wait for socket: %v", err)
 		}
@@ -117,7 +120,7 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 	if err != nil {
 		cancel()
 		server.Shutdown()
-		store.Close()
+		v2db.Close()
 		os.RemoveAll(tempDir)
 		t.Fatalf("failed to connect to server: %v", err)
 	}
@@ -127,7 +130,7 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 		TempDir:    tempDir,
 		DBPath:     dbPath,
 		SocketPath: socketPath,
-		Store:      store,
+		V2DB:       v2db,
 		Server:     server,
 		Client:     client,
 		Conn:       conn,
@@ -229,8 +232,8 @@ func (e *TestEnv) Teardown() {
 	if e.Server != nil {
 		e.Server.Shutdown()
 	}
-	if e.Store != nil {
-		e.Store.Close()
+	if e.V2DB != nil {
+		e.V2DB.Close()
 	}
 	if e.TempDir != "" {
 		os.RemoveAll(e.TempDir)

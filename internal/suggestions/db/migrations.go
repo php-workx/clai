@@ -29,9 +29,11 @@ func V1Migrations() []Migration {
 // V2Migrations returns the migration list for V2 database files (suggestions_v2.db).
 // V2 uses a separate database file and does not migrate from V1.
 // The schema starts at version 2 to clearly distinguish from V1 databases.
+// V3 adds unified storage tables (ai_cache, PTY capture, CI workflow, etc.)
 func V2Migrations() []Migration {
 	return []Migration{
 		{Version: 2, SQL: schemaV2},
+		{Version: 3, SQL: schemaV3},
 	}
 }
 

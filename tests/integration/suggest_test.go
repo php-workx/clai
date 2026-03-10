@@ -7,7 +7,7 @@ import (
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
-	"github.com/runger/clai/internal/storage"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 // TestCP4_Suggestions verifies history-based suggestions work.
@@ -656,7 +656,7 @@ func TestSuggest_QueryCommandsDirectly(t *testing.T) {
 
 	// Query by session
 	sessionID := "hist-session"
-	commands, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
+	commands, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
 		SessionID: &sessionID,
 		Limit:     100,
 	})
@@ -670,7 +670,7 @@ func TestSuggest_QueryCommandsDirectly(t *testing.T) {
 
 	// Query by CWD
 	cwd := "/home/test/repo"
-	commands, err = env.Store.QueryCommands(ctx, storage.CommandQuery{
+	commands, err = ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
 		CWD:   &cwd,
 		Limit: 100,
 	})
@@ -686,7 +686,7 @@ func TestSuggest_QueryCommandsDirectly(t *testing.T) {
 	}
 
 	// Query by prefix
-	commands, err = env.Store.QueryCommands(ctx, storage.CommandQuery{
+	commands, err = ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
 		Prefix: "git",
 		Limit:  100,
 	})
@@ -695,8 +695,8 @@ func TestSuggest_QueryCommandsDirectly(t *testing.T) {
 	}
 
 	for _, cmd := range commands {
-		if len(cmd.Command) < 3 || cmd.Command[:3] != "git" {
-			t.Errorf("command %q does not match 'git' prefix", cmd.Command)
+		if len(cmd.CmdRaw) < 3 || cmd.CmdRaw[:3] != "git" {
+			t.Errorf("command %q does not match 'git' prefix", cmd.CmdRaw)
 		}
 	}
 }

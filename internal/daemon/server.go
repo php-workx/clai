@@ -19,8 +19,6 @@ import (
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/provider"
-	"github.com/runger/clai/internal/storage"
-	"github.com/runger/clai/internal/suggest"
 	"github.com/runger/clai/internal/suggestions/alias"
 	"github.com/runger/clai/internal/suggestions/api"
 	"github.com/runger/clai/internal/suggestions/batch"
@@ -30,6 +28,7 @@ import (
 	"github.com/runger/clai/internal/suggestions/ingest"
 	"github.com/runger/clai/internal/suggestions/learning"
 	"github.com/runger/clai/internal/suggestions/maintenance"
+	"github.com/runger/clai/internal/suggestions/ops"
 	"github.com/runger/clai/internal/suggestions/projecttype"
 	search2 "github.com/runger/clai/internal/suggestions/search"
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
@@ -56,8 +55,6 @@ type Server struct {
 	lastActivity         time.Time
 	startTime            time.Time
 	diagListener         net.Listener
-	store                storage.Store
-	ranker               suggest.Ranker
 	llm                  LLMQuerier
 	listener             net.Listener
 	jsonListener         net.Listener
@@ -101,8 +98,6 @@ type Server struct {
 // ServerConfig contains configuration options for the daemon server.
 type ServerConfig struct {
 	LLM               LLMQuerier
-	Ranker            suggest.Ranker
-	Store             storage.Store
 	MaintenanceRunner *maintenance.Runner
 	Paths             *config.Paths
 	Logger            *slog.Logger
@@ -122,13 +117,12 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is required")
 	}
-	if cfg.Store == nil {
-		return nil, fmt.Errorf("store is required")
+	if cfg.V2DB == nil {
+		return nil, fmt.Errorf("V2DB is required")
 	}
 
 	paths := defaultPaths(cfg.Paths)
 	logger := defaultLogger(cfg.Logger)
-	ranker := defaultRanker(cfg.Ranker, cfg.Store)
 	registry := defaultRegistry(cfg.Registry)
 	idleTimeout := defaultIdleTimeout(cfg.IdleTimeout)
 
@@ -155,9 +149,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 
 	now := time.Now()
 	return &Server{
-		store:                cfg.Store,
 		v2db:                 cfg.V2DB,
-		ranker:               ranker,
 		registry:             registry,
 		llm:                  cfg.LLM,
 		paths:                paths,
@@ -200,13 +192,6 @@ func defaultLogger(logger *slog.Logger) *slog.Logger {
 		return slog.Default()
 	}
 	return logger
-}
-
-func defaultRanker(ranker suggest.Ranker, store storage.Store) suggest.Ranker {
-	if ranker == nil {
-		return suggest.NewRanker(store)
-	}
-	return ranker
 }
 
 func defaultRegistry(registry *provider.Registry) *provider.Registry {
@@ -682,14 +667,14 @@ func (s *Server) pruneCacheLoop(ctx context.Context) {
 
 // pruneCache removes expired cache entries.
 func (s *Server) pruneCache(ctx context.Context) {
-	pruned, err := s.store.PruneExpiredCache(ctx)
+	pruned, err := ops.PruneExpiredCache(ctx, s.v2db)
 	if err != nil {
 		s.logger.Warn("failed to prune cache", "error", err)
 	} else if pruned > 0 {
 		s.logger.Info("pruned expired cache entries", "count", pruned)
 	}
 
-	outputPruned, err := s.store.PruneExpiredCommandOutput(ctx)
+	outputPruned, err := ops.PruneExpiredCommandOutput(ctx, s.v2db)
 	if err != nil {
 		s.logger.Warn("failed to prune command output", "error", err)
 	} else if outputPruned > 0 {

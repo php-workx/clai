@@ -17,7 +17,7 @@ import (
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/daemon"
 	"github.com/runger/clai/internal/provider"
-	"github.com/runger/clai/internal/storage"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
 )
 
 // TestProvider_Unavailable tests behavior when no provider is available.
@@ -304,11 +304,14 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
-	dbPath := filepath.Join(tempDir, "state.db")
-	store, err := storage.NewSQLiteStore(dbPath)
+	dbPath := filepath.Join(tempDir, "suggestions_v2.db")
+	v2db, err := suggestdb.Open(context.Background(), suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
 	if err != nil {
 		os.RemoveAll(tempDir)
-		t.Fatalf("failed to create store: %v", err)
+		t.Fatalf("failed to create V2 database: %v", err)
 	}
 
 	registry := provider.NewRegistry()
@@ -316,14 +319,14 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 	registry.SetPreferred(prov.Name())
 
 	serverCfg := &daemon.ServerConfig{
-		Store:       store,
+		V2DB:        v2db,
 		Registry:    registry,
 		Paths:       paths,
 		IdleTimeout: 30 * time.Minute,
 	}
 	server, err := daemon.NewServer(serverCfg)
 	if err != nil {
-		store.Close()
+		v2db.Close()
 		os.RemoveAll(tempDir)
 		t.Fatalf("failed to create server: %v", err)
 	}
@@ -337,7 +340,7 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 
 	if err = waitForSocket(socketPath, 5*time.Second); err != nil {
 		cancel()
-		store.Close()
+		v2db.Close()
 		os.RemoveAll(tempDir)
 		t.Fatalf("failed to wait for socket: %v", err)
 	}
@@ -346,7 +349,7 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 	if err != nil {
 		cancel()
 		server.Shutdown()
-		store.Close()
+		v2db.Close()
 		os.RemoveAll(tempDir)
 		t.Fatalf("failed to connect to server: %v", err)
 	}
@@ -356,7 +359,7 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 		TempDir:    tempDir,
 		DBPath:     dbPath,
 		SocketPath: socketPath,
-		Store:      store,
+		V2DB:       v2db,
 		Server:     server,
 		Client:     client,
 		Conn:       conn,

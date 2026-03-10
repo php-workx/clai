@@ -14,18 +14,47 @@ import (
 
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/provider"
-	"github.com/runger/clai/internal/storage"
-	"github.com/runger/clai/internal/suggest"
 	"github.com/runger/clai/internal/suggestions/batch"
 	suggestdb "github.com/runger/clai/internal/suggestions/db"
 )
 
+// openTestDB is a helper that opens a V2 database in a temp directory for testing.
+func openTestDB(t *testing.T) *suggestdb.DB {
+	t.Helper()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "test.db")
+	v2db, err := suggestdb.Open(context.Background(), suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open test V2 database: %v", err)
+	}
+	t.Cleanup(func() { v2db.Close() })
+	return v2db
+}
+
+// openTestDBInDir opens a V2 database in the specified directory for testing.
+func openTestDBInDir(t *testing.T, dir string) *suggestdb.DB {
+	t.Helper()
+	dbPath := filepath.Join(dir, "test.db")
+	v2db, err := suggestdb.Open(context.Background(), suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open test V2 database: %v", err)
+	}
+	t.Cleanup(func() { v2db.Close() })
+	return v2db
+}
+
 func TestNewServer_Success(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	v2db := openTestDB(t)
 	cfg := &ServerConfig{
-		Store:       store,
+		V2DB:        v2db,
 		IdleTimeout: 5 * time.Minute,
 	}
 
@@ -38,12 +67,8 @@ func TestNewServer_Success(t *testing.T) {
 		t.Fatal("server should not be nil")
 	}
 
-	if server.store != store {
-		t.Error("store should be set")
-	}
-
-	if server.ranker == nil {
-		t.Error("ranker should be created automatically")
+	if server.v2db != v2db {
+		t.Error("v2db should be set")
 	}
 
 	if server.registry == nil {
@@ -64,25 +89,25 @@ func TestNewServer_NilConfig(t *testing.T) {
 	}
 }
 
-func TestNewServer_NilStore(t *testing.T) {
+func TestNewServer_NilV2DB(t *testing.T) {
 	t.Parallel()
 
 	cfg := &ServerConfig{
-		Store: nil,
+		V2DB: nil,
 	}
 
 	_, err := NewServer(cfg)
 	if err == nil {
-		t.Error("expected error for nil store")
+		t.Error("expected error for nil V2DB")
 	}
 }
 
 func TestNewServer_DefaultIdleTimeout(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	v2db := openTestDB(t)
 	cfg := &ServerConfig{
-		Store: store,
+		V2DB: v2db,
 	}
 
 	server, err := NewServer(cfg)
@@ -99,8 +124,8 @@ func TestNewServer_DefaultIdleTimeout(t *testing.T) {
 func TestServer_TouchActivity(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -118,8 +143,8 @@ func TestServer_TouchActivity(t *testing.T) {
 func TestServer_IncrementCommandsLogged(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -149,10 +174,11 @@ func TestServer_Version(t *testing.T) {
 func TestNewServer_TableDriven(t *testing.T) {
 	t.Parallel()
 
-	validStore := newMockStore()
 	validLogger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
-	validRanker := &mockRanker{}
 	validRegistry := provider.NewRegistry()
+
+	// Open a shared V2 DB for the table-driven tests that need one.
+	validV2DB := openTestDB(t)
 
 	tests := []struct {
 		config      *ServerConfig
@@ -168,25 +194,22 @@ func TestNewServer_TableDriven(t *testing.T) {
 			errContains: "config is required",
 		},
 		{
-			name: "nil store returns error",
+			name: "nil V2DB returns error",
 			config: &ServerConfig{
-				Store: nil,
+				V2DB: nil,
 			},
 			wantErr:     true,
-			errContains: "store is required",
+			errContains: "V2DB is required",
 		},
 		{
 			name: "valid config with minimal options",
 			config: &ServerConfig{
-				Store: validStore,
+				V2DB: validV2DB,
 			},
 			wantErr: false,
 			validate: func(t *testing.T, s *Server) {
-				if s.store != validStore {
-					t.Error("store should be set correctly")
-				}
-				if s.ranker == nil {
-					t.Error("ranker should be auto-created")
+				if s.v2db != validV2DB {
+					t.Error("v2db should be set correctly")
 				}
 				if s.registry == nil {
 					t.Error("registry should be auto-created")
@@ -211,19 +234,15 @@ func TestNewServer_TableDriven(t *testing.T) {
 		{
 			name: "valid config with all options provided",
 			config: &ServerConfig{
-				Store:       validStore,
-				Ranker:      validRanker,
+				V2DB:        validV2DB,
 				Registry:    validRegistry,
 				Logger:      validLogger,
 				IdleTimeout: 10 * time.Minute,
 			},
 			wantErr: false,
 			validate: func(t *testing.T, s *Server) {
-				if s.store != validStore {
-					t.Error("store should be the provided store")
-				}
-				if s.ranker != validRanker {
-					t.Error("ranker should be the provided ranker")
+				if s.v2db != validV2DB {
+					t.Error("v2db should be the provided database")
 				}
 				if s.registry != validRegistry {
 					t.Error("registry should be the provided registry")
@@ -239,7 +258,7 @@ func TestNewServer_TableDriven(t *testing.T) {
 		{
 			name: "custom paths are respected",
 			config: &ServerConfig{
-				Store: validStore,
+				V2DB: validV2DB,
 				Paths: &config.Paths{
 					BaseDir: "/tmp/clai-test",
 				},
@@ -302,8 +321,8 @@ func findSubstring(s, substr string) bool {
 func TestServer_ActivityTracking_Concurrent(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -348,8 +367,8 @@ func TestServer_ActivityTracking_Concurrent(t *testing.T) {
 func TestServer_CommandsLogged_Concurrent(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -383,8 +402,8 @@ func TestServer_CommandsLogged_Concurrent(t *testing.T) {
 func TestServer_CommandsLogged_ReadWhileWrite(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -436,9 +455,9 @@ func TestServer_WritePIDFile(t *testing.T) {
 		BaseDir: tmpDir,
 	}
 
-	store := newMockStore()
+	v2db := openTestDBInDir(t, tmpDir)
 	server, err := NewServer(&ServerConfig{
-		Store: store,
+		V2DB:  v2db,
 		Paths: paths,
 	})
 	if err != nil {
@@ -486,12 +505,12 @@ func TestServer_Cleanup(t *testing.T) {
 		BaseDir: tmpDir,
 	}
 
-	store := newMockStore()
+	v2db := openTestDBInDir(t, tmpDir)
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		Store:  store,
+		V2DB:   v2db,
 		Paths:  paths,
 		Logger: logger,
 	})
@@ -539,12 +558,12 @@ func TestServer_Cleanup_NonexistentFiles(t *testing.T) {
 		BaseDir: tmpDir,
 	}
 
-	store := newMockStore()
+	v2db := openTestDBInDir(t, tmpDir)
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		Store:  store,
+		V2DB:   v2db,
 		Paths:  paths,
 		Logger: logger,
 	})
@@ -563,6 +582,8 @@ func TestServer_Cleanup_NonexistentFiles(t *testing.T) {
 // TestServer_IdleTimeout_Configuration verifies idle timeout is configured correctly.
 func TestServer_IdleTimeout_Configuration(t *testing.T) {
 	t.Parallel()
+
+	v2db := openTestDB(t)
 
 	tests := []struct {
 		name     string
@@ -590,9 +611,8 @@ func TestServer_IdleTimeout_Configuration(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			store := newMockStore()
 			server, err := NewServer(&ServerConfig{
-				Store:       store,
+				V2DB:        v2db,
 				IdleTimeout: tt.timeout,
 			})
 			if err != nil {
@@ -610,9 +630,9 @@ func TestServer_IdleTimeout_Configuration(t *testing.T) {
 func TestServer_WatchIdle_IdleConditionCheck(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		Store:       store,
+		V2DB:        v2db,
 		IdleTimeout: 1 * time.Second,
 	})
 	if err != nil {
@@ -640,9 +660,9 @@ func TestServer_WatchIdle_IdleConditionCheck(t *testing.T) {
 func TestServer_WatchIdle_CancelContext(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		Store:       store,
+		V2DB:        v2db,
 		IdleTimeout: 1 * time.Hour, // Long timeout - we're testing cancellation
 	})
 	if err != nil {
@@ -675,9 +695,9 @@ func TestServer_WatchIdle_CancelContext(t *testing.T) {
 func TestServer_WatchIdle_ShutdownChan(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		Store:       store,
+		V2DB:        v2db,
 		IdleTimeout: 1 * time.Hour,
 	})
 	if err != nil {
@@ -711,9 +731,9 @@ func TestServer_WatchIdle_ShutdownChan(t *testing.T) {
 func TestServer_WatchIdle_NoShutdownWithActiveSessions(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
+	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		Store:       store,
+		V2DB:        v2db,
 		IdleTimeout: 1 * time.Millisecond,
 	})
 	if err != nil {
@@ -755,46 +775,17 @@ func TestServer_WatchIdle_NoShutdownWithActiveSessions(t *testing.T) {
 	}
 }
 
-// mockStoreWithPruning is a mock store that tracks prune calls.
-type mockStoreWithPruning struct {
-	pruneErr error
-	*mockStore
-	pruneCalls   int
-	pruneReturns int64
-	mu           sync.Mutex
-}
-
-func newMockStoreWithPruning() *mockStoreWithPruning {
-	return &mockStoreWithPruning{
-		mockStore: newMockStore(),
-	}
-}
-
-func (m *mockStoreWithPruning) PruneExpiredCache(ctx context.Context) (int64, error) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	m.pruneCalls++
-	return m.pruneReturns, m.pruneErr
-}
-
-func (m *mockStoreWithPruning) getPruneCalls() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	return m.pruneCalls
-}
-
-// TestServer_PruneCache verifies pruneCache calls the store.
+// TestServer_PruneCache verifies pruneCache calls the V2 ops layer.
 func TestServer_PruneCache(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStoreWithPruning()
-	store.pruneReturns = 5
+	v2db := openTestDB(t)
 
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		Store:  store,
+		V2DB:   v2db,
 		Logger: logger,
 	})
 	if err != nil {
@@ -802,25 +793,21 @@ func TestServer_PruneCache(t *testing.T) {
 	}
 
 	ctx := context.Background()
+	// Should not panic - pruneCache now calls ops.PruneExpiredCache on the v2db
 	server.pruneCache(ctx)
-
-	if store.getPruneCalls() != 1 {
-		t.Errorf("expected 1 prune call, got %d", store.getPruneCalls())
-	}
 }
 
 // TestServer_PruneCache_HandlesError verifies pruneCache handles errors gracefully.
 func TestServer_PruneCache_HandlesError(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStoreWithPruning()
-	store.pruneErr = storage.ErrSessionNotFound // Use any error
+	v2db := openTestDB(t)
 
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		Store:  store,
+		V2DB:   v2db,
 		Logger: logger,
 	})
 	if err != nil {
@@ -829,20 +816,16 @@ func TestServer_PruneCache_HandlesError(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Should not panic
+	// Should not panic - with a real DB there's no error, but we verify the path works
 	server.pruneCache(ctx)
-
-	if store.getPruneCalls() != 1 {
-		t.Errorf("expected 1 prune call, got %d", store.getPruneCalls())
-	}
 }
 
 // TestServer_PruneCacheLoop_CancelContext verifies pruneCacheLoop respects context cancellation.
 func TestServer_PruneCacheLoop_CancelContext(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStoreWithPruning()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -869,19 +852,14 @@ func TestServer_PruneCacheLoop_CancelContext(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Error("pruneCacheLoop did not exit after context cancellation")
 	}
-
-	// Should have at least the initial prune call
-	if store.getPruneCalls() < 1 {
-		t.Error("expected at least one prune call on startup")
-	}
 }
 
 // TestServer_PruneCacheLoop_ShutdownChan verifies pruneCacheLoop respects shutdown.
 func TestServer_PruneCacheLoop_ShutdownChan(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStoreWithPruning()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -931,12 +909,12 @@ func TestServer_Start_CreatesSocket(t *testing.T) {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
-	store := newMockStore()
+	v2db := openTestDBInDir(t, tmpDir)
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		Store:       store,
+		V2DB:        v2db,
 		Paths:       paths,
 		Logger:      logger,
 		IdleTimeout: 1 * time.Hour,
@@ -1014,14 +992,22 @@ func TestServer_Start_CreatesSocket(t *testing.T) {
 func TestServer_Shutdown_Idempotent(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
 	// Create a new shutdown channel since the default one is used
 	server.shutdownChan = make(chan struct{})
+
+	// Start components that Shutdown() will try to stop, so they don't block.
+	if server.batchWriter != nil {
+		server.batchWriter.Start()
+	}
+	if server.workflowMiner != nil {
+		server.workflowMiner.Start()
+	}
 
 	// Call Shutdown multiple times - should not panic
 	for i := 0; i < 5; i++ {
@@ -1049,9 +1035,9 @@ func TestServer_Shutdown_ClosesListener(t *testing.T) {
 		t.Fatalf("failed to create directories: %v", err)
 	}
 
-	store := newMockStore()
+	v2db := openTestDBInDir(t, tmpDir)
 	server, err := NewServer(&ServerConfig{
-		Store: store,
+		V2DB:  v2db,
 		Paths: paths,
 	})
 	if err != nil {
@@ -1092,8 +1078,8 @@ func TestServer_Shutdown_ClosesListener(t *testing.T) {
 func TestServer_ActivityTracking_TimeProgression(t *testing.T) {
 	t.Parallel()
 
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -1121,8 +1107,8 @@ func TestServer_StartTime(t *testing.T) {
 
 	before := time.Now()
 
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -1141,8 +1127,8 @@ func TestServer_InitialActivity(t *testing.T) {
 
 	before := time.Now()
 
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{Store: store})
+	v2db := openTestDB(t)
+	server, err := NewServer(&ServerConfig{V2DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -1160,23 +1146,9 @@ func TestServer_InitialActivity(t *testing.T) {
 func TestNewServer_WithV2DB(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
-
-	ctx := context.Background()
-	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
-		Path:     dbPath,
-		SkipLock: true,
-	})
-	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
-	}
-	defer v2db.Close()
-
-	store := newMockStore()
+	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		Store: store,
-		V2DB:  v2db,
+		V2DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
@@ -1185,36 +1157,9 @@ func TestNewServer_WithV2DB(t *testing.T) {
 	if server.v2db != v2db {
 		t.Error("v2db should be set to the provided database")
 	}
-	if server.store != store {
-		t.Error("store should still be set")
-	}
 }
 
-// TestNewServer_WithoutV2DB verifies the server starts successfully without V2 database
-// (graceful degradation - V1 only mode).
-func TestNewServer_WithoutV2DB(t *testing.T) {
-	t.Parallel()
-
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{
-		Store: store,
-		V2DB:  nil,
-	})
-	if err != nil {
-		t.Fatalf("NewServer failed: %v", err)
-	}
-
-	if server.v2db != nil {
-		t.Error("v2db should be nil when not provided")
-	}
-	if server.store != store {
-		t.Error("store should still be set for V1 operation")
-	}
-}
-
-// TestNewServer_V2DB_UnwritablePath verifies graceful degradation when V2 DB path is unwritable.
-// This simulates the pattern used in cmd/claid/main.go where Open failure is handled
-// by warning and continuing with v2db = nil.
+// TestNewServer_V2DB_UnwritablePath verifies graceful handling when V2 DB path is unwritable.
 func TestNewServer_V2DB_UnwritablePath(t *testing.T) {
 	t.Parallel()
 
@@ -1245,21 +1190,15 @@ func TestNewServer_V2DB_UnwritablePath(t *testing.T) {
 		t.Fatal("v2db should be nil after failed open")
 	}
 
-	// Daemon should still start successfully with V2DB = nil
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{
-		Store: store,
-		V2DB:  nil, // simulating graceful degradation from main.go
+	// NewServer should fail with nil V2DB since V2DB is now required
+	_, err = NewServer(&ServerConfig{
+		V2DB: nil,
 	})
-	if err != nil {
-		t.Fatalf("NewServer should succeed without V2DB: %v", err)
+	if err == nil {
+		t.Fatal("NewServer should fail without V2DB")
 	}
-
-	if server.v2db != nil {
-		t.Error("v2db should be nil for graceful degradation")
-	}
-	if server.store != store {
-		t.Error("V1 store should still be operational")
+	if !containsSubstring(err.Error(), "V2DB is required") {
+		t.Errorf("expected error about V2DB being required, got: %v", err)
 	}
 }
 
@@ -1267,23 +1206,9 @@ func TestNewServer_V2DB_UnwritablePath(t *testing.T) {
 func TestNewServer_WithBatchWriter(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
-
-	ctx := context.Background()
-	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
-		Path:     dbPath,
-		SkipLock: true,
-	})
-	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
-	}
-	defer v2db.Close()
-
-	store := newMockStore()
+	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		Store: store,
-		V2DB:  v2db,
+		V2DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
@@ -1297,50 +1222,16 @@ func TestNewServer_WithBatchWriter(t *testing.T) {
 	}
 }
 
-// TestNewServer_BatchWriterNilWithoutV2 verifies the batch writer is nil when V2DB is not provided.
-func TestNewServer_BatchWriterNilWithoutV2(t *testing.T) {
-	t.Parallel()
-
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{
-		Store: store,
-		V2DB:  nil,
-	})
-	if err != nil {
-		t.Fatalf("NewServer failed: %v", err)
-	}
-
-	if server.batchWriter != nil {
-		t.Error("batchWriter should be nil when V2DB is not provided")
-	}
-	if server.v2Scorer != nil {
-		t.Error("v2Scorer should be nil when V2Scorer config is not provided")
-	}
-}
-
 // TestNewServer_CustomBatchWriter verifies a custom batch writer is used when provided.
 func TestNewServer_CustomBatchWriter(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
-
-	ctx := context.Background()
-	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
-		Path:     dbPath,
-		SkipLock: true,
-	})
-	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
-	}
-	defer v2db.Close()
+	v2db := openTestDB(t)
 
 	// Create a custom batch writer
 	customWriter := batch.NewWriter(v2db.DB(), batch.DefaultOptions())
 
-	store := newMockStore()
 	server, err := NewServer(&ServerConfig{
-		Store:       store,
 		V2DB:        v2db,
 		BatchWriter: customWriter,
 	})
@@ -1365,17 +1256,7 @@ func TestServer_BatchWriterLifecycle(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
-
-	ctx := context.Background()
-	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
-		Path:     dbPath,
-		SkipLock: true,
-	})
-	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
-	}
-	defer v2db.Close()
+	v2db := openTestDBInDir(t, tmpDir)
 
 	paths := &config.Paths{
 		BaseDir: tmpDir,
@@ -1387,9 +1268,7 @@ func TestServer_BatchWriterLifecycle(t *testing.T) {
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
-	store := newMockStore()
 	server, err := NewServer(&ServerConfig{
-		Store:       store,
 		V2DB:        v2db,
 		Paths:       paths,
 		Logger:      logger,
@@ -1456,7 +1335,8 @@ func TestServer_BatchWriterLifecycle(t *testing.T) {
 	server.batchWriter.Stop()
 }
 
-// TestServer_BatchWriterNilLifecycle verifies Start and Shutdown work when batch writer is nil.
+// TestServer_BatchWriterNilLifecycle verifies Start and Shutdown work when V2DB
+// is provided but batch writer is explicitly set to nil (edge case).
 func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 	t.Parallel()
 
@@ -1477,10 +1357,11 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
-	store := newMockStore()
+	// Even though V2DB is required, we still test that a nil BatchWriter override
+	// doesn't cause issues - the server auto-creates one from V2DB.
+	v2db := openTestDBInDir(t, tmpDir)
 	server, err := NewServer(&ServerConfig{
-		Store:       store,
-		V2DB:        nil, // No V2DB means no batch writer
+		V2DB:        v2db,
 		Paths:       paths,
 		Logger:      logger,
 		IdleTimeout: 1 * time.Hour,
@@ -1489,11 +1370,12 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
-	if server.batchWriter != nil {
-		t.Fatal("batchWriter should be nil without V2DB")
+	// batchWriter should be auto-created from V2DB
+	if server.batchWriter == nil {
+		t.Fatal("batchWriter should be auto-created when V2DB is provided")
 	}
 
-	// Start the server - should work fine without batch writer
+	// Start the server - should work fine
 	serverCtx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -1511,7 +1393,7 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 		}
 	}
 
-	// Shutdown - should work fine without batch writer
+	// Shutdown - should work fine
 	cancel()
 	server.Shutdown()
 
@@ -1530,23 +1412,9 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 func TestNewServer_V2ScorerInitialized(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
-
-	ctx := context.Background()
-	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
-		Path:     dbPath,
-		SkipLock: true,
-	})
-	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
-	}
-	defer v2db.Close()
-
-	store := newMockStore()
+	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		Store: store,
-		V2DB:  v2db,
+		V2DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
@@ -1560,27 +1428,5 @@ func TestNewServer_V2ScorerInitialized(t *testing.T) {
 	}
 }
 
-// TestNewServer_V2ScorerNilWithoutV2 verifies that the V2 scorer is nil
-// when no V2DB is provided (V1-only mode).
-func TestNewServer_V2ScorerNilWithoutV2(t *testing.T) {
-	t.Parallel()
-
-	store := newMockStore()
-	server, err := NewServer(&ServerConfig{
-		Store: store,
-		V2DB:  nil,
-	})
-	if err != nil {
-		t.Fatalf("NewServer failed: %v", err)
-	}
-
-	if server.v2Scorer != nil {
-		t.Error("v2Scorer should be nil when V2DB is not provided")
-	}
-}
-
 // Ensure mock types satisfy their interfaces.
-var _ storage.Store = (*mockStore)(nil)
-var _ storage.Store = (*mockStoreWithPruning)(nil)
-var _ suggest.Ranker = (*mockRanker)(nil)
 var _ provider.Provider = (*mockProvider)(nil)

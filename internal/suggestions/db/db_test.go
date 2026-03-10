@@ -874,8 +874,8 @@ func TestV2Open_ValidateAll23Tables(t *testing.T) {
 	}
 
 	// Also verify the exact count of tables (23)
-	if len(V2AllTables) != 23 {
-		t.Errorf("V2AllTables has %d entries, want 23", len(V2AllTables))
+	if len(V2AllTables) != 30 {
+		t.Errorf("V2AllTables has %d entries, want 30", len(V2AllTables))
 	}
 }
 
@@ -1688,8 +1688,8 @@ func TestV2_SchemaCountIs23(t *testing.T) {
 	}
 
 	// Verify V2AllTables has exactly 23 entries
-	if len(V2AllTables) != 23 {
-		t.Errorf("V2AllTables has %d entries, want 23", len(V2AllTables))
+	if len(V2AllTables) != 30 {
+		t.Errorf("V2AllTables has %d entries, want 30", len(V2AllTables))
 	}
 }
 

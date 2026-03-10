@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/runger/clai/internal/config"
-	"github.com/runger/clai/internal/storage"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 func TestFormatDurationMs(t *testing.T) {
@@ -118,41 +118,42 @@ func TestHistoryCmd_JSONFlagDefault(t *testing.T) {
 
 // Integration tests for session ID resolution
 
-func newTestStore(t *testing.T) *storage.SQLiteStore {
+func newTestStore(t *testing.T) *suggestdb.DB {
 	t.Helper()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
-	store, err := storage.NewSQLiteStore(dbPath)
+	ctx := context.Background()
+	db, err := suggestdb.Open(ctx, suggestdb.Options{Path: dbPath, SkipLock: true})
 	if err != nil {
-		t.Fatalf("NewSQLiteStore() error = %v", err)
+		t.Fatalf("suggestdb.Open() error = %v", err)
 	}
-	return store
+	return db
 }
 
 func TestHistoryCmd_ShortSessionID_Resolution(t *testing.T) {
 	t.Parallel()
 
-	store := newTestStore(t)
-	defer store.Close()
+	db := newTestStore(t)
+	defer db.Close()
 
 	ctx := context.Background()
 
 	// Create a session with a known ID
-	session := &storage.Session{
-		SessionID:       "abc12345-6789-0def-ghij-klmnopqrstuv",
-		StartedAtUnixMs: 1700000000000,
-		Shell:           "zsh",
-		OS:              "darwin",
-		InitialCWD:      "/home/user",
+	session := &ops.Session{
+		SessionID:   "abc12345-6789-0def-ghij-klmnopqrstuv",
+		StartedAtMs: 1700000000000,
+		Shell:       "zsh",
+		OS:          "darwin",
+		InitialCWD:  "/home/user",
 	}
 
-	if err := store.CreateSession(ctx, session); err != nil {
+	if err := ops.CreateSession(ctx, db, session); err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 
 	// Test: 8-character prefix should resolve to full session
 	shortID := "abc12345"
-	resolved, err := store.GetSessionByPrefix(ctx, shortID)
+	resolved, err := ops.GetSessionByPrefix(ctx, db, shortID)
 	if err != nil {
 		t.Fatalf("GetSessionByPrefix(%q) error = %v", shortID, err)
 	}
@@ -165,17 +166,17 @@ func TestHistoryCmd_ShortSessionID_Resolution(t *testing.T) {
 func TestHistoryCmd_ShortSessionID_NotFound(t *testing.T) {
 	t.Parallel()
 
-	store := newTestStore(t)
-	defer store.Close()
+	db := newTestStore(t)
+	defer db.Close()
 
 	ctx := context.Background()
 
 	// Test: Non-existent prefix should return error
-	_, err := store.GetSessionByPrefix(ctx, "nonexist")
+	_, err := ops.GetSessionByPrefix(ctx, db, "nonexist")
 	if err == nil {
 		t.Error("GetSessionByPrefix() should return error for non-existent session")
 	}
-	if !errors.Is(err, storage.ErrSessionNotFound) {
+	if !errors.Is(err, ops.ErrSessionNotFound) {
 		t.Errorf("GetSessionByPrefix() error = %v, want ErrSessionNotFound", err)
 	}
 }
@@ -183,40 +184,40 @@ func TestHistoryCmd_ShortSessionID_NotFound(t *testing.T) {
 func TestHistoryCmd_ShortSessionID_Ambiguous(t *testing.T) {
 	t.Parallel()
 
-	store := newTestStore(t)
-	defer store.Close()
+	db := newTestStore(t)
+	defer db.Close()
 
 	ctx := context.Background()
 
 	// Create two sessions with same prefix
-	session1 := &storage.Session{
-		SessionID:       "same1234-aaaa-bbbb-cccc-ddddeeeeffffgggg",
-		StartedAtUnixMs: 1700000000000,
-		Shell:           "zsh",
-		OS:              "darwin",
-		InitialCWD:      "/home/user",
+	session1 := &ops.Session{
+		SessionID:   "same1234-aaaa-bbbb-cccc-ddddeeeeffffgggg",
+		StartedAtMs: 1700000000000,
+		Shell:       "zsh",
+		OS:          "darwin",
+		InitialCWD:  "/home/user",
 	}
-	session2 := &storage.Session{
-		SessionID:       "same1234-xxxx-yyyy-zzzz-111122223333",
-		StartedAtUnixMs: 1700000001000,
-		Shell:           "bash",
-		OS:              "linux",
-		InitialCWD:      "/tmp",
+	session2 := &ops.Session{
+		SessionID:   "same1234-xxxx-yyyy-zzzz-111122223333",
+		StartedAtMs: 1700000001000,
+		Shell:       "bash",
+		OS:          "linux",
+		InitialCWD:  "/tmp",
 	}
 
-	if err := store.CreateSession(ctx, session1); err != nil {
+	if err := ops.CreateSession(ctx, db, session1); err != nil {
 		t.Fatalf("CreateSession(1) error = %v", err)
 	}
-	if err := store.CreateSession(ctx, session2); err != nil {
+	if err := ops.CreateSession(ctx, db, session2); err != nil {
 		t.Fatalf("CreateSession(2) error = %v", err)
 	}
 
 	// Test: Ambiguous prefix should return error
-	_, err := store.GetSessionByPrefix(ctx, "same1234")
+	_, err := ops.GetSessionByPrefix(ctx, db, "same1234")
 	if err == nil {
 		t.Error("GetSessionByPrefix() should return error for ambiguous prefix")
 	}
-	if !errors.Is(err, storage.ErrAmbiguousSession) {
+	if !errors.Is(err, ops.ErrAmbiguousSession) {
 		t.Errorf("GetSessionByPrefix() error = %v, want ErrAmbiguousSession", err)
 	}
 }
@@ -224,27 +225,27 @@ func TestHistoryCmd_ShortSessionID_Ambiguous(t *testing.T) {
 func TestHistoryCmd_FullSessionID_StillWorks(t *testing.T) {
 	t.Parallel()
 
-	store := newTestStore(t)
-	defer store.Close()
+	db := newTestStore(t)
+	defer db.Close()
 
 	ctx := context.Background()
 
 	// Create a session
 	fullID := "full1234-5678-90ab-cdef-ghijklmnopqr"
-	session := &storage.Session{
-		SessionID:       fullID,
-		StartedAtUnixMs: 1700000000000,
-		Shell:           "zsh",
-		OS:              "darwin",
-		InitialCWD:      "/home/user",
+	session := &ops.Session{
+		SessionID:   fullID,
+		StartedAtMs: 1700000000000,
+		Shell:       "zsh",
+		OS:          "darwin",
+		InitialCWD:  "/home/user",
 	}
 
-	if err := store.CreateSession(ctx, session); err != nil {
+	if err := ops.CreateSession(ctx, db, session); err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 
 	// Test: Full session ID should work via exact match
-	resolved, err := store.GetSession(ctx, fullID)
+	resolved, err := ops.GetSession(ctx, db, fullID)
 	if err != nil {
 		t.Fatalf("GetSession(%q) error = %v", fullID, err)
 	}
@@ -257,18 +258,18 @@ func TestHistoryCmd_FullSessionID_StillWorks(t *testing.T) {
 func TestHistoryCmd_FullSessionID_NotFound(t *testing.T) {
 	t.Parallel()
 
-	store := newTestStore(t)
-	defer store.Close()
+	db := newTestStore(t)
+	defer db.Close()
 
 	ctx := context.Background()
 
 	// Test: Full UUID that doesn't exist should return error
 	fullID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-	_, err := store.GetSession(ctx, fullID)
+	_, err := ops.GetSession(ctx, db, fullID)
 	if err == nil {
 		t.Error("GetSession() should return error for non-existent full UUID")
 	}
-	if !errors.Is(err, storage.ErrSessionNotFound) {
+	if !errors.Is(err, ops.ErrSessionNotFound) {
 		t.Errorf("GetSession() error = %v, want ErrSessionNotFound", err)
 	}
 }
@@ -278,27 +279,27 @@ func TestHistoryCmd_FullSessionID_NotFound(t *testing.T) {
 func TestHistoryCmd_SessionResolution_ShortToFull(t *testing.T) {
 	t.Parallel()
 
-	store := newTestStore(t)
-	defer store.Close()
+	db := newTestStore(t)
+	defer db.Close()
 
 	ctx := context.Background()
 
 	// Create a session with a full UUID
 	fullID := "12345678-1234-5678-9abc-def012345678"
-	session := &storage.Session{
-		SessionID:       fullID,
-		StartedAtUnixMs: 1700000000000,
-		Shell:           "zsh",
-		OS:              "darwin",
-		InitialCWD:      "/home/user",
+	session := &ops.Session{
+		SessionID:   fullID,
+		StartedAtMs: 1700000000000,
+		Shell:       "zsh",
+		OS:          "darwin",
+		InitialCWD:  "/home/user",
 	}
 
-	if err := store.CreateSession(ctx, session); err != nil {
+	if err := ops.CreateSession(ctx, db, session); err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 
 	// Test: Short prefix should resolve to full UUID
-	resolved, err := resolveSessionID(ctx, store, "12345678")
+	resolved, err := resolveSessionID(ctx, db, "12345678")
 	if err != nil {
 		t.Fatalf("resolveSessionID(%q) error = %v", "12345678", err)
 	}
@@ -307,7 +308,7 @@ func TestHistoryCmd_SessionResolution_ShortToFull(t *testing.T) {
 	}
 
 	// Test: Full UUID should resolve to itself
-	resolved, err = resolveSessionID(ctx, store, fullID)
+	resolved, err = resolveSessionID(ctx, db, fullID)
 	if err != nil {
 		t.Fatalf("resolveSessionID(%q) error = %v", fullID, err)
 	}
@@ -319,92 +320,95 @@ func TestHistoryCmd_SessionResolution_ShortToFull(t *testing.T) {
 func TestHistoryCmd_SessionResolution_FullUUID_NoFallback(t *testing.T) {
 	t.Parallel()
 
-	store := newTestStore(t)
-	defer store.Close()
+	db := newTestStore(t)
+	defer db.Close()
 
 	ctx := context.Background()
 
 	// Create a session
 	existingID := "abcd1234-5678-90ab-cdef-ghijklmnopqr"
-	session := &storage.Session{
-		SessionID:       existingID,
-		StartedAtUnixMs: 1700000000000,
-		Shell:           "zsh",
-		OS:              "darwin",
-		InitialCWD:      "/home/user",
+	session := &ops.Session{
+		SessionID:   existingID,
+		StartedAtMs: 1700000000000,
+		Shell:       "zsh",
+		OS:          "darwin",
+		InitialCWD:  "/home/user",
 	}
 
-	if err := store.CreateSession(ctx, session); err != nil {
+	if err := ops.CreateSession(ctx, db, session); err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 
 	// Test: Non-existent full UUID should NOT fall back to prefix matching
 	// Even though "abcd1234" prefix exists, the full UUID lookup should fail
 	nonExistentFullID := "abcd1234-0000-0000-0000-000000000000"
-	_, err := resolveSessionID(ctx, store, nonExistentFullID)
+	_, err := resolveSessionID(ctx, db, nonExistentFullID)
 	if err == nil {
 		t.Error("resolveSessionID() should return error for non-existent full UUID")
 	}
-	if !errors.Is(err, storage.ErrSessionNotFound) {
+	if !errors.Is(err, ops.ErrSessionNotFound) {
 		t.Errorf("resolveSessionID() error = %v, want ErrSessionNotFound", err)
 	}
 }
 
-func setupHistoryStore(t *testing.T) *storage.SQLiteStore {
+func setupHistoryStore(t *testing.T) *suggestdb.DB {
 	t.Helper()
 	root := t.TempDir()
-	t.Setenv("CLAI_HOME", root)
-	paths := config.DefaultPaths()
-	store, err := storage.NewSQLiteStore(paths.DatabaseFile())
+	// Set HOME so that suggestdb.DefaultDBPath() resolves under the temp dir.
+	// runHistory calls suggestdb.Open without an explicit Path, so it relies
+	// on os.UserHomeDir() -> ~/.clai/suggestions_v2.db.
+	t.Setenv("HOME", root)
+	ctx := context.Background()
+	db, err := suggestdb.Open(ctx, suggestdb.Options{SkipLock: true})
 	if err != nil {
-		t.Fatalf("NewSQLiteStore() error = %v", err)
+		t.Fatalf("suggestdb.Open() error = %v", err)
 	}
-	return store
+	return db
 }
 
-func createSession(t *testing.T, store *storage.SQLiteStore, id string) {
+func createSession(t *testing.T, db *suggestdb.DB, id string) {
 	t.Helper()
 	ctx := context.Background()
-	session := &storage.Session{
-		SessionID:       id,
-		StartedAtUnixMs: 1700000000000,
-		Shell:           "zsh",
-		OS:              "darwin",
-		InitialCWD:      "/home/user",
+	session := &ops.Session{
+		SessionID:   id,
+		StartedAtMs: 1700000000000,
+		Shell:       "zsh",
+		OS:          "darwin",
+		InitialCWD:  "/home/user",
 	}
-	if err := store.CreateSession(ctx, session); err != nil {
+	if err := ops.CreateSession(ctx, db, session); err != nil {
 		t.Fatalf("CreateSession() error = %v", err)
 	}
 }
 
-func createCommand(t *testing.T, store *storage.SQLiteStore, cmd storage.Command) {
+func createCommand(t *testing.T, db *suggestdb.DB, cmd ops.Command) {
 	t.Helper()
 	ctx := context.Background()
-	if err := store.CreateCommand(ctx, &cmd); err != nil {
+	if err := ops.CreateCommand(ctx, db, &cmd); err != nil {
 		t.Fatalf("CreateCommand() error = %v", err)
 	}
 }
 
 func TestRunHistory_JSON_Global(t *testing.T) {
-	store := setupHistoryStore(t)
-	defer store.Close()
+	db := setupHistoryStore(t)
+	defer db.Close()
 
-	createSession(t, store, "sess-1")
-	createSession(t, store, "sess-2")
+	createSession(t, db, "sess-1")
+	createSession(t, db, "sess-2")
 
-	createCommand(t, store, storage.Command{
-		CommandID:     "cmd-1",
-		SessionID:     "sess-1",
-		TSStartUnixMs: 1000,
-		CWD:           "/tmp",
-		Command:       "git status",
+	createCommand(t, db, ops.Command{
+		CommandID: "cmd-1",
+		SessionID: "sess-1",
+		TSStartMs: 1000,
+		CWD:       "/tmp",
+		CmdRaw:    "git status",
 	})
-	createCommand(t, store, storage.Command{
-		CommandID:     "cmd-2",
-		SessionID:     "sess-2",
-		TSStartUnixMs: 2000,
-		CWD:           "/work",
-		Command:       "ls -la",
+	createCommand(t, db, ops.Command{
+		CommandID: "cmd-2",
+		SessionID: "sess-2",
+		TSStartMs: 2000,
+		CWD:       "/work",
+		CmdRaw:    "ls -la",
 	})
 
 	withHistoryGlobals(t, historyGlobals{limit: 20, global: true, format: "json"})
@@ -431,25 +435,25 @@ func TestRunHistory_JSON_Global(t *testing.T) {
 }
 
 func TestRunHistory_JSON_SessionDefault(t *testing.T) {
-	store := setupHistoryStore(t)
-	defer store.Close()
+	db := setupHistoryStore(t)
+	defer db.Close()
 
-	createSession(t, store, "sess-a")
-	createSession(t, store, "sess-b")
+	createSession(t, db, "sess-a")
+	createSession(t, db, "sess-b")
 
-	createCommand(t, store, storage.Command{
-		CommandID:     "cmd-a",
-		SessionID:     "sess-a",
-		TSStartUnixMs: 1000,
-		CWD:           "/tmp",
-		Command:       "git status",
+	createCommand(t, db, ops.Command{
+		CommandID: "cmd-a",
+		SessionID: "sess-a",
+		TSStartMs: 1000,
+		CWD:       "/tmp",
+		CmdRaw:    "git status",
 	})
-	createCommand(t, store, storage.Command{
-		CommandID:     "cmd-b",
-		SessionID:     "sess-b",
-		TSStartUnixMs: 2000,
-		CWD:           "/tmp",
-		Command:       "ls",
+	createCommand(t, db, ops.Command{
+		CommandID: "cmd-b",
+		SessionID: "sess-b",
+		TSStartMs: 2000,
+		CWD:       "/tmp",
+		CmdRaw:    "ls",
 	})
 
 	t.Setenv("CLAI_SESSION_ID", "sess-a")
@@ -477,30 +481,26 @@ func TestRunHistory_JSON_SessionDefault(t *testing.T) {
 }
 
 func TestRunHistory_StatusFilterFailure(t *testing.T) {
-	store := setupHistoryStore(t)
-	defer store.Close()
+	db := setupHistoryStore(t)
+	defer db.Close()
 
-	createSession(t, store, "sess-1")
+	createSession(t, db, "sess-1")
 
-	ok := true
-	bad := false
-	createCommand(t, store, storage.Command{
-		CommandID:     "cmd-ok",
-		SessionID:     "sess-1",
-		TSStartUnixMs: 1000,
-		CWD:           "/tmp",
-		Command:       "echo ok",
-		IsSuccess:     &ok,
-		ExitCode:      intPtr(0),
+	createCommand(t, db, ops.Command{
+		CommandID: "cmd-ok",
+		SessionID: "sess-1",
+		TSStartMs: 1000,
+		CWD:       "/tmp",
+		CmdRaw:    "echo ok",
+		ExitCode:  intPtr(0),
 	})
-	createCommand(t, store, storage.Command{
-		CommandID:     "cmd-bad",
-		SessionID:     "sess-1",
-		TSStartUnixMs: 2000,
-		CWD:           "/tmp",
-		Command:       "false",
-		IsSuccess:     &bad,
-		ExitCode:      intPtr(1),
+	createCommand(t, db, ops.Command{
+		CommandID: "cmd-bad",
+		SessionID: "sess-1",
+		TSStartMs: 2000,
+		CWD:       "/tmp",
+		CmdRaw:    "false",
+		ExitCode:  intPtr(1),
 	})
 
 	t.Setenv("CLAI_SESSION_ID", "sess-1")
@@ -525,24 +525,24 @@ func TestRunHistory_StatusFilterFailure(t *testing.T) {
 }
 
 func TestRunHistory_JSON_CWDSource(t *testing.T) {
-	store := setupHistoryStore(t)
-	defer store.Close()
+	db := setupHistoryStore(t)
+	defer db.Close()
 
-	createSession(t, store, "sess-1")
+	createSession(t, db, "sess-1")
 
-	createCommand(t, store, storage.Command{
-		CommandID:     "cmd-1",
-		SessionID:     "sess-1",
-		TSStartUnixMs: 1000,
-		CWD:           "/tmp",
-		Command:       "ls",
+	createCommand(t, db, ops.Command{
+		CommandID: "cmd-1",
+		SessionID: "sess-1",
+		TSStartMs: 1000,
+		CWD:       "/tmp",
+		CmdRaw:    "ls",
 	})
-	createCommand(t, store, storage.Command{
-		CommandID:     "cmd-2",
-		SessionID:     "sess-1",
-		TSStartUnixMs: 2000,
-		CWD:           "/work",
-		Command:       "pwd",
+	createCommand(t, db, ops.Command{
+		CommandID: "cmd-2",
+		SessionID: "sess-1",
+		TSStartMs: 2000,
+		CWD:       "/work",
+		CmdRaw:    "pwd",
 	})
 
 	t.Setenv("CLAI_SESSION_ID", "")

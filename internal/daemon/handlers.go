@@ -10,17 +10,17 @@ import (
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
+	"github.com/runger/clai/internal/cmdutil"
 	"github.com/runger/clai/internal/history"
 	"github.com/runger/clai/internal/provider"
 	"github.com/runger/clai/internal/sanitize"
-	"github.com/runger/clai/internal/storage"
-	"github.com/runger/clai/internal/suggest"
 	"github.com/runger/clai/internal/suggestions/alias"
 	"github.com/runger/clai/internal/suggestions/backfill"
 	"github.com/runger/clai/internal/suggestions/event"
 	"github.com/runger/clai/internal/suggestions/feedback"
 	"github.com/runger/clai/internal/suggestions/learning"
 	snormalize "github.com/runger/clai/internal/suggestions/normalize"
+	"github.com/runger/clai/internal/suggestions/ops"
 	search2 "github.com/runger/clai/internal/suggestions/search"
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
@@ -33,62 +33,6 @@ const (
 	// Expire per-session suggestion snapshots so stale feedback cannot update learning state.
 	maxSuggestSnapshotAge = 15 * time.Minute
 )
-
-func v1WhyNarrative(sug *suggest.Suggestion, lastCmd string) string {
-	// Prefer explaining something the user cannot infer from the numbers above.
-	// Avoid embedding numeric values here; those are rendered as structured hints.
-
-	cmdTool := suggest.GetToolPrefix(sug.Text)
-	lastTool := suggest.GetToolPrefix(lastCmd)
-	if cmdTool != "" && lastTool != "" && cmdTool == lastTool {
-		return fmt.Sprintf("Same tool as your last command (%s).", cmdTool)
-	}
-
-	src := strings.TrimSpace(strings.ToLower(sug.Source))
-	base := ""
-	switch src {
-	case "session":
-		base = "From this session's history."
-	case "cwd":
-		base = "Often used in this directory."
-	case "global":
-		base = "From your global history."
-	default:
-		// Unknown source; leave base empty.
-	}
-
-	total := sug.SuccessCount + sug.FailureCount
-	if total >= 3 {
-		rate := float64(sug.SuccessCount) / float64(total)
-		reliability := ""
-		switch {
-		case rate >= 0.90:
-			reliability = "It has been reliable."
-		case rate >= 0.60:
-			reliability = "It usually works."
-		default:
-			// Low reliability; no label.
-		}
-
-		if reliability != "" {
-			if base == "" {
-				base = reliability
-			} else {
-				base = base + " " + reliability
-			}
-		}
-	}
-
-	if base != "" {
-		return base
-	}
-
-	// Last-resort fallback: keep it short and non-numeric.
-	if sug.LastSeenUnixMs > 0 {
-		return "Used recently."
-	}
-	return ""
-}
 
 // SessionStart handles the SessionStart RPC.
 // It creates a new session in the database and registers it with the session manager.
@@ -114,17 +58,17 @@ func (s *Server) SessionStart(ctx context.Context, req *pb.SessionStartRequest) 
 	}
 
 	// Create session in database
-	session := &storage.Session{
-		SessionID:       req.SessionId,
-		StartedAtUnixMs: startedAt.UnixMilli(),
-		Shell:           shell,
-		OS:              osName,
-		Hostname:        hostname,
-		Username:        username,
-		InitialCWD:      req.Cwd,
+	session := &ops.Session{
+		SessionID:   req.SessionId,
+		StartedAtMs: startedAt.UnixMilli(),
+		Shell:       shell,
+		OS:          osName,
+		Hostname:    hostname,
+		Username:    username,
+		InitialCWD:  req.Cwd,
 	}
 
-	if err := s.store.CreateSession(ctx, session); err != nil {
+	if err := ops.CreateSession(ctx, s.v2db, session); err != nil {
 		s.logger.Warn("failed to create session",
 			"session_id", req.SessionId,
 			"error", err,
@@ -164,7 +108,7 @@ func (s *Server) SessionEnd(ctx context.Context, req *pb.SessionEndRequest) (*pb
 	}
 
 	// Update session in database
-	if err := s.store.EndSession(ctx, req.SessionId, endedAt.UnixMilli()); err != nil {
+	if err := ops.EndSession(ctx, s.v2db, req.SessionId, endedAt.UnixMilli()); err != nil {
 		s.logger.Warn("failed to end session",
 			"session_id", req.SessionId,
 			"error", err,
@@ -239,15 +183,13 @@ func (s *Server) CommandStarted(ctx context.Context, req *pb.CommandStartRequest
 	}
 
 	// Create command in database
-	cmd := &storage.Command{
-		CommandID:     req.CommandId,
-		SessionID:     req.SessionId,
-		TSStartUnixMs: tsStart.UnixMilli(),
-		CWD:           req.Cwd,
-		Command:       req.Command,
-		CommandNorm:   suggest.NormalizeCommand(req.Command),
-		CommandHash:   suggest.Hash(req.Command),
-		IsSuccess:     boolPtr(true), // Assume success until CommandEnded
+	cmd := &ops.Command{
+		CommandID: req.CommandId,
+		SessionID: req.SessionId,
+		TSStartMs: tsStart.UnixMilli(),
+		CWD:       req.Cwd,
+		CmdRaw:    req.Command,
+		CmdNorm:   cmdutil.NormalizeCommand(req.Command),
 	}
 
 	// Add git context if provided
@@ -255,16 +197,10 @@ func (s *Server) CommandStarted(ctx context.Context, req *pb.CommandStartRequest
 		cmd.GitBranch = &req.GitBranch
 	}
 	if req.GitRepoName != "" {
-		cmd.GitRepoName = &req.GitRepoName
-	}
-	if req.GitRepoRoot != "" {
-		cmd.GitRepoRoot = &req.GitRepoRoot
-	}
-	if req.PrevCommandId != "" {
-		cmd.PrevCommandID = &req.PrevCommandId
+		cmd.GitRepoKey = &req.GitRepoName
 	}
 
-	if err := s.store.CreateCommand(ctx, cmd); err != nil {
+	if err := ops.CreateCommand(ctx, s.v2db, cmd); err != nil {
 		s.logger.Warn("failed to create command",
 			"command_id", req.CommandId,
 			"session_id", req.SessionId,
@@ -307,7 +243,7 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 	}
 
 	// Update command in database
-	if err := s.store.UpdateCommandEnd(ctx, req.CommandId, int(req.ExitCode), tsEnd.UnixMilli(), req.DurationMs); err != nil {
+	if err := ops.UpdateCommandEnd(ctx, s.v2db, req.CommandId, int(req.ExitCode), tsEnd.UnixMilli(), req.DurationMs); err != nil {
 		s.logger.Warn("failed to update command end",
 			"command_id", req.CommandId,
 			"session_id", req.SessionId,
@@ -368,143 +304,13 @@ func (s *Server) Suggest(ctx context.Context, req *pb.SuggestRequest) (*pb.Sugge
 	}
 
 	var resp *pb.SuggestResponse
-	if s.scorerVersion == "v2" {
-		resp = s.suggestV2(ctx, req, maxResults)
-		if resp == nil || len(resp.Suggestions) == 0 {
-			s.clearSuggestSnapshot(req.SessionId)
-			resp = s.suggestV1(ctx, req, maxResults)
-			resp.CacheStatus = "miss"
-			resp.LatencyMs = time.Since(start).Milliseconds()
-			return resp, nil
-		}
-	} else {
-		resp = s.suggestV1(ctx, req, maxResults)
+	resp = s.suggestV2(ctx, req, maxResults)
+	if resp == nil {
+		resp = &pb.SuggestResponse{}
 	}
 	resp.CacheStatus = "miss"
 	resp.LatencyMs = time.Since(start).Milliseconds()
 	return resp, nil
-}
-
-// suggestV1 generates suggestions using the V1 ranker (history-based).
-func (s *Server) suggestV1(ctx context.Context, req *pb.SuggestRequest, maxResults int) *pb.SuggestResponse {
-	nowMs := time.Now().UnixMilli()
-	lastCommand := s.lastCommandForSession(ctx, req.SessionId)
-	suggestions, err := s.rankV1Suggestions(ctx, req, maxResults, lastCommand)
-	if err != nil {
-		s.logger.Warn("failed to rank suggestions",
-			"session_id", req.SessionId,
-			"error", err,
-		)
-		return &pb.SuggestResponse{}
-	}
-
-	// Convert to protobuf
-	pbSuggestions := make([]*pb.Suggestion, len(suggestions))
-	for i := range suggestions {
-		pbSuggestions[i] = v1SuggestionToProto(&suggestions[i], lastCommand, nowMs)
-	}
-
-	return &pb.SuggestResponse{
-		Suggestions: pbSuggestions,
-		FromCache:   false,
-	}
-}
-
-func (s *Server) lastCommandForSession(ctx context.Context, sessionID string) string {
-	if strings.TrimSpace(sessionID) == "" {
-		return ""
-	}
-	cmds, err := s.store.QueryCommands(ctx, storage.CommandQuery{
-		SessionID: &sessionID,
-		Limit:     1,
-	})
-	if err != nil || len(cmds) == 0 {
-		return ""
-	}
-	return cmds[0].Command
-}
-
-func (s *Server) rankV1Suggestions(
-	ctx context.Context,
-	req *pb.SuggestRequest,
-	maxResults int,
-	lastCommand string,
-) ([]suggest.Suggestion, error) {
-	return s.ranker.Rank(ctx, &suggest.RankRequest{
-		SessionID:   req.SessionId,
-		CWD:         req.Cwd,
-		Prefix:      req.Buffer,
-		LastCommand: lastCommand,
-		MaxResults:  maxResults,
-	})
-}
-
-func v1SuggestionToProto(sug *suggest.Suggestion, lastCommand string, nowMs int64) *pb.Suggestion {
-	desc := strings.TrimSpace(sug.Description)
-	if desc == "" {
-		desc = v1WhyNarrative(sug, lastCommand)
-	}
-	cmdNorm := strings.TrimSpace(sug.CmdNorm)
-	if cmdNorm == "" {
-		cmdNorm = suggest.NormalizeCommand(sug.Text)
-	}
-	return &pb.Suggestion{
-		Text:        sug.Text,
-		Description: desc,
-		Source:      sug.Source,
-		Score:       sug.Score,
-		Risk:        v1SuggestionRisk(sug.Text),
-		CmdNorm:     cmdNorm,
-		Confidence:  0, // V1 ranker does not compute a separate confidence score.
-		Reasons:     v1SuggestionReasons(sug, nowMs),
-	}
-}
-
-func v1SuggestionRisk(text string) string {
-	if sanitize.IsDestructive(text) {
-		return riskDestructive
-	}
-	return ""
-}
-
-func v1SuggestionReasons(sug *suggest.Suggestion, nowMs int64) []*pb.SuggestionReason {
-	reasons := make([]*pb.SuggestionReason, 0, len(sug.Reasons)+3)
-	reasons = append(reasons, v1BaseReasons(sug)...)
-	if sug.LastSeenUnixMs > 0 {
-		reasons = append(reasons, &pb.SuggestionReason{
-			Type:        "recency",
-			Description: fmt.Sprintf("last %s ago", formatAgo(nowMs-sug.LastSeenUnixMs)),
-		})
-	}
-	totalRuns := sug.SuccessCount + sug.FailureCount
-	if totalRuns > 0 {
-		reasons = append(reasons, &pb.SuggestionReason{
-			Type:        "frequency",
-			Description: fmt.Sprintf("freq %d", totalRuns),
-		})
-		successPct := int((float64(sug.SuccessCount) / float64(totalRuns)) * 100.0)
-		reasons = append(reasons, &pb.SuggestionReason{
-			Type:        "success",
-			Description: fmt.Sprintf("success %d%% (%d/%d)", successPct, sug.SuccessCount, totalRuns),
-		})
-	}
-	return reasons
-}
-
-func v1BaseReasons(sug *suggest.Suggestion) []*pb.SuggestionReason {
-	reasons := make([]*pb.SuggestionReason, 0, len(sug.Reasons))
-	for _, r := range sug.Reasons {
-		typ := strings.TrimSpace(r.Type)
-		if typ == "" {
-			continue
-		}
-		reasons = append(reasons, &pb.SuggestionReason{
-			Type:         typ,
-			Description:  r.Description,
-			Contribution: float32(r.Contribution),
-		})
-	}
-	return reasons
 }
 
 // TextToCommand handles the TextToCommand RPC.
@@ -966,7 +772,7 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 		req.Mode == pb.SearchMode_SEARCH_MODE_AUTO
 	if s.v2db != nil && req.Query != "" && !usesSessionScope && isV2SearchMode {
 		items, atEnd, backend, ok := s.fetchHistoryV2Search(ctx, req, limit)
-		if ok {
+		if ok && len(items) > 0 {
 			return &pb.HistoryFetchResponse{
 				Items:     items,
 				AtEnd:     atEnd,
@@ -976,7 +782,7 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 		}
 	}
 
-	q := storage.CommandQuery{
+	q := ops.CommandQuery{
 		Limit:  limit + 1, // Fetch one extra to determine at_end
 		Offset: offset,
 		// Deduplicate by raw command string for pickers; do not collapse by command_norm.
@@ -1010,7 +816,7 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 		}
 	}
 
-	rows, err := s.store.QueryHistoryCommands(ctx, q)
+	rows, err := ops.QueryHistoryCommands(ctx, s.v2db, q)
 	if err != nil {
 		s.logger.Warn("failed to query history",
 			"error", err,
@@ -1032,7 +838,7 @@ func (s *Server) FetchHistory(ctx context.Context, req *pb.HistoryFetchRequest) 
 		items[i] = &pb.HistoryItem{
 			Command:     cmd,
 			TimestampMs: row.TimestampMs,
-			CmdNorm:     suggest.NormalizeCommand(cmd),
+			CmdNorm:     cmdutil.NormalizeCommand(cmd),
 		}
 	}
 
@@ -1134,7 +940,7 @@ func (s *Server) ImportHistory(ctx context.Context, req *pb.HistoryImportRequest
 
 	// Check if already imported (if_not_exists mode)
 	if req.IfNotExists {
-		has, err := s.store.HasImportedHistory(ctx, shell)
+		has, err := ops.HasImportedHistory(ctx, s.v2db, shell)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check import status: %w", err)
 		}
@@ -1183,7 +989,7 @@ func (s *Server) ImportHistory(ctx context.Context, req *pb.HistoryImportRequest
 	}
 
 	// Import into database
-	count, err := s.store.ImportHistory(ctx, entries, shell)
+	count, err := ops.ImportHistory(ctx, s.v2db, entries, shell)
 	if err != nil {
 		s.logger.Warn("failed to import history",
 			"shell", shell,
@@ -1197,11 +1003,9 @@ func (s *Server) ImportHistory(ctx context.Context, req *pb.HistoryImportRequest
 		"count", count,
 	)
 
-	// Seed V2 suggestions tables (non-fatal)
-	if s.v2db != nil {
-		if err := backfill.Seed(ctx, s.v2db.DB(), entries, shell); err != nil {
-			s.logger.Warn("V2 backfill failed (non-fatal)", "error", err)
-		}
+	// Seed V2 suggestions stats tables (non-fatal)
+	if err := backfill.Seed(ctx, s.v2db.DB(), entries, shell); err != nil {
+		s.logger.Warn("V2 backfill failed (non-fatal)", "error", err)
 	}
 
 	return &pb.HistoryImportResponse{
@@ -1237,9 +1041,4 @@ func (s *Server) getSessionContext(sessionID string) (osName, shell string) {
 		}
 	}
 	return osName, shell
-}
-
-// boolPtr returns a pointer to a bool value.
-func boolPtr(b bool) *bool {
-	return &b
 }

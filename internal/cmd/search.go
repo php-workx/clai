@@ -10,9 +10,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/history"
-	"github.com/runger/clai/internal/storage"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 var (
@@ -144,17 +144,16 @@ func searchCommands(ctx context.Context, query string, limit int) []searchOutput
 }
 
 func searchCommandsFromDB(ctx context.Context, query string, limit int) ([]searchOutput, error) {
-	paths := config.DefaultPaths()
-	store, err := storage.NewSQLiteStore(paths.DatabaseFile())
+	db, err := suggestdb.Open(ctx, suggestdb.Options{ReadOnly: true, SkipLock: true})
 	if err != nil {
 		return nil, err
 	}
-	defer store.Close()
+	defer db.Close()
 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
-	q := storage.CommandQuery{
+	q := ops.CommandQuery{
 		Limit:     limit,
 		Substring: strings.ToLower(strings.TrimSpace(query)),
 	}
@@ -164,7 +163,7 @@ func searchCommandsFromDB(ctx context.Context, query string, limit int) ([]searc
 		}
 	}
 
-	commands, err := store.QueryCommands(ctx, q)
+	commands, err := ops.QueryCommands(ctx, db, q)
 	if err != nil {
 		return nil, err
 	}
@@ -172,12 +171,12 @@ func searchCommandsFromDB(ctx context.Context, query string, limit int) ([]searc
 	out := make([]searchOutput, 0, len(commands))
 	for i := range commands {
 		row := searchOutput{
-			CmdRaw: commands[i].Command,
+			CmdRaw: commands[i].CmdRaw,
 			Cwd:    commands[i].CWD,
-			TS:     commands[i].TSStartUnixMs,
+			TS:     commands[i].TSStartMs,
 		}
-		if commands[i].GitRepoRoot != nil {
-			row.RepoKey = *commands[i].GitRepoRoot
+		if commands[i].GitRepoKey != nil {
+			row.RepoKey = *commands[i].GitRepoKey
 		}
 		out = append(out, row)
 	}

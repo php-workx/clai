@@ -3,12 +3,14 @@ package daemon
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
-	"github.com/runger/clai/internal/storage"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 // mockLLMQuerier implements LLMQuerier for testing.
@@ -21,96 +23,23 @@ func (m *mockLLMQuerier) Query(ctx context.Context, prompt string) (string, erro
 	return m.response, m.err
 }
 
-// workflowMockStore extends mockStore with workflow-aware tracking.
-type workflowMockStore struct {
-	*mockStore
-	runs     map[string]*storage.WorkflowRun
-	steps    map[string]*storage.WorkflowStep
-	analyses []*storage.WorkflowAnalysis
-}
-
-func newWorkflowMockStore() *workflowMockStore {
-	return &workflowMockStore{
-		mockStore: newMockStore(),
-		runs:      make(map[string]*storage.WorkflowRun),
-		steps:     make(map[string]*storage.WorkflowStep),
-	}
-}
-
-func (m *workflowMockStore) CreateWorkflowRun(ctx context.Context, run *storage.WorkflowRun) error {
-	m.runs[run.RunID] = run
-	return nil
-}
-
-func (m *workflowMockStore) UpdateWorkflowRun(ctx context.Context, runID string, status string, endedAt int64, durationMs int64) error {
-	if run, ok := m.runs[runID]; ok {
-		run.Status = status
-		run.EndedAt = endedAt
-		run.DurationMs = durationMs
-		return nil
-	}
-	return fmt.Errorf("run not found: %s", runID)
-}
-
-func (m *workflowMockStore) GetWorkflowRun(ctx context.Context, runID string) (*storage.WorkflowRun, error) {
-	if run, ok := m.runs[runID]; ok {
-		return run, nil
-	}
-	return nil, nil
-}
-
-func (m *workflowMockStore) QueryWorkflowRuns(ctx context.Context, q storage.WorkflowRunQuery) ([]storage.WorkflowRun, error) {
-	return nil, nil
-}
-
-func stepKey(runID, stepID, matrixKey string) string {
-	return runID + "/" + stepID + "/" + matrixKey
-}
-
-func (m *workflowMockStore) CreateWorkflowStep(ctx context.Context, step *storage.WorkflowStep) error {
-	m.steps[stepKey(step.RunID, step.StepID, step.MatrixKey)] = step
-	return nil
-}
-
-func (m *workflowMockStore) UpdateWorkflowStep(ctx context.Context, update *storage.WorkflowStepUpdate) error {
-	key := stepKey(update.RunID, update.StepID, update.MatrixKey)
-	if step, ok := m.steps[key]; ok {
-		step.Status = update.Status
-		step.Command = update.Command
-		step.ExitCode = update.ExitCode
-		step.DurationMs = update.DurationMs
-		step.StdoutTail = update.StdoutTail
-		step.StderrTail = update.StderrTail
-		step.OutputsJSON = update.OutputsJSON
-		return nil
-	}
-	return fmt.Errorf("step not found: %s", key)
-}
-
-func (m *workflowMockStore) GetWorkflowStep(ctx context.Context, runID, stepID, matrixKey string) (*storage.WorkflowStep, error) {
-	if step, ok := m.steps[stepKey(runID, stepID, matrixKey)]; ok {
-		return step, nil
-	}
-	return nil, nil
-}
-
-func (m *workflowMockStore) CreateWorkflowAnalysis(ctx context.Context, analysis *storage.WorkflowAnalysis) error {
-	m.analyses = append(m.analyses, analysis)
-	return nil
-}
-
-func (m *workflowMockStore) GetWorkflowAnalyses(ctx context.Context, runID, stepID, matrixKey string) ([]storage.WorkflowAnalysisRecord, error) {
-	return nil, nil
-}
-
-func createWorkflowTestServer(t *testing.T, llm LLMQuerier) (*Server, *workflowMockStore) {
+func createWorkflowTestServer(t *testing.T, llm LLMQuerier) (*Server, *suggestdb.DB) {
 	t.Helper()
 
-	store := newWorkflowMockStore()
+	ctx := context.Background()
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "workflow_test.db")
+	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
+		Path:     dbPath,
+		SkipLock: true,
+	})
+	if err != nil {
+		t.Fatalf("failed to open V2 DB: %v", err)
+	}
+	t.Cleanup(func() { v2db.Close() })
 
 	server, err := NewServer(&ServerConfig{
-		Store:       store,
-		Ranker:      &mockRanker{},
+		V2DB:        v2db,
 		LLM:         llm,
 		IdleTimeout: 5 * time.Minute,
 	})
@@ -118,7 +47,7 @@ func createWorkflowTestServer(t *testing.T, llm LLMQuerier) (*Server, *workflowM
 		t.Fatalf("failed to create server: %v", err)
 	}
 
-	return server, store
+	return server, v2db
 }
 
 // --- WorkflowRunStart tests ---
@@ -126,7 +55,7 @@ func createWorkflowTestServer(t *testing.T, llm LLMQuerier) (*Server, *workflowM
 func TestHandler_WorkflowRunStart_Success(t *testing.T) {
 	t.Parallel()
 
-	server, store := createWorkflowTestServer(t, nil)
+	server, v2db := createWorkflowTestServer(t, nil)
 	ctx := context.Background()
 
 	req := &pb.WorkflowRunStartRequest{
@@ -147,8 +76,11 @@ func TestHandler_WorkflowRunStart_Success(t *testing.T) {
 	}
 
 	// Verify run was stored
-	run, ok := store.runs["run-001"]
-	if !ok {
+	run, err := ops.GetWorkflowRun(ctx, v2db, "run-001")
+	if err != nil {
+		t.Fatalf("failed to get workflow run: %v", err)
+	}
+	if run == nil {
 		t.Fatal("run not found in store")
 	}
 
@@ -169,7 +101,7 @@ func TestHandler_WorkflowRunStart_Success(t *testing.T) {
 func TestHandler_WorkflowRunStart_DefaultTimestamp(t *testing.T) {
 	t.Parallel()
 
-	server, store := createWorkflowTestServer(t, nil)
+	server, v2db := createWorkflowTestServer(t, nil)
 	ctx := context.Background()
 
 	before := time.Now().UnixMilli()
@@ -191,7 +123,10 @@ func TestHandler_WorkflowRunStart_DefaultTimestamp(t *testing.T) {
 
 	after := time.Now().UnixMilli()
 
-	run := store.runs["run-002"]
+	run, err := ops.GetWorkflowRun(ctx, v2db, "run-002")
+	if err != nil {
+		t.Fatalf("failed to get workflow run: %v", err)
+	}
 	if run.StartedAt < before || run.StartedAt > after {
 		t.Errorf("expected started_at between %d and %d, got %d", before, after, run.StartedAt)
 	}
@@ -202,8 +137,17 @@ func TestHandler_WorkflowRunStart_DefaultTimestamp(t *testing.T) {
 func TestHandler_WorkflowStepUpdate_CreateNew(t *testing.T) {
 	t.Parallel()
 
-	server, store := createWorkflowTestServer(t, nil)
+	server, v2db := createWorkflowTestServer(t, nil)
 	ctx := context.Background()
+
+	// Create parent workflow run first (required by FK constraint)
+	_, err := server.WorkflowRunStart(ctx, &pb.WorkflowRunStartRequest{
+		RunId:        "run-001",
+		WorkflowName: "test-workflow",
+	})
+	if err != nil {
+		t.Fatalf("WorkflowRunStart failed: %v", err)
+	}
 
 	req := &pb.WorkflowStepUpdateRequest{
 		RunId:       "run-001",
@@ -228,9 +172,11 @@ func TestHandler_WorkflowStepUpdate_CreateNew(t *testing.T) {
 	}
 
 	// Verify step was created
-	key := stepKey("run-001", "step-1", "go1.21")
-	step, ok := store.steps[key]
-	if !ok {
+	step, err := ops.GetWorkflowStep(ctx, v2db, "run-001", "step-1", "go1.21")
+	if err != nil {
+		t.Fatalf("failed to get workflow step: %v", err)
+	}
+	if step == nil {
 		t.Fatal("step not found in store")
 	}
 
@@ -245,8 +191,17 @@ func TestHandler_WorkflowStepUpdate_CreateNew(t *testing.T) {
 func TestHandler_WorkflowStepUpdate_UpdateExisting(t *testing.T) {
 	t.Parallel()
 
-	server, store := createWorkflowTestServer(t, nil)
+	server, v2db := createWorkflowTestServer(t, nil)
 	ctx := context.Background()
+
+	// Create parent workflow run first (required by FK constraint)
+	_, err := server.WorkflowRunStart(ctx, &pb.WorkflowRunStartRequest{
+		RunId:        "run-001",
+		WorkflowName: "test-workflow",
+	})
+	if err != nil {
+		t.Fatalf("WorkflowRunStart failed: %v", err)
+	}
 
 	// Create a step first
 	createReq := &pb.WorkflowStepUpdateRequest{
@@ -281,8 +236,10 @@ func TestHandler_WorkflowStepUpdate_UpdateExisting(t *testing.T) {
 	}
 
 	// Verify step was updated
-	key := stepKey("run-001", "step-1", "go1.21")
-	step := store.steps[key]
+	step, err := ops.GetWorkflowStep(ctx, v2db, "run-001", "step-1", "go1.21")
+	if err != nil {
+		t.Fatalf("failed to get workflow step: %v", err)
+	}
 	if step.Status != "passed" {
 		t.Errorf("expected status 'passed', got %q", step.Status)
 	}
@@ -300,8 +257,17 @@ func TestHandler_WorkflowStepUpdate_UpdateExisting(t *testing.T) {
 func TestHandler_WorkflowStepUpdate_EmptyMatrixKey(t *testing.T) {
 	t.Parallel()
 
-	server, store := createWorkflowTestServer(t, nil)
+	server, v2db := createWorkflowTestServer(t, nil)
 	ctx := context.Background()
+
+	// Create parent workflow run first (required by FK constraint)
+	_, err := server.WorkflowRunStart(ctx, &pb.WorkflowRunStartRequest{
+		RunId:        "run-001",
+		WorkflowName: "test-workflow",
+	})
+	if err != nil {
+		t.Fatalf("WorkflowRunStart failed: %v", err)
+	}
 
 	req := &pb.WorkflowStepUpdateRequest{
 		RunId:     "run-001",
@@ -320,8 +286,11 @@ func TestHandler_WorkflowStepUpdate_EmptyMatrixKey(t *testing.T) {
 		t.Errorf("expected ok=true, got error: %s", resp.Error)
 	}
 
-	key := stepKey("run-001", "step-1", "")
-	if _, ok := store.steps[key]; !ok {
+	step, err := ops.GetWorkflowStep(ctx, v2db, "run-001", "step-1", "")
+	if err != nil {
+		t.Fatalf("failed to get workflow step: %v", err)
+	}
+	if step == nil {
 		t.Fatal("step not found in store")
 	}
 }
@@ -331,7 +300,7 @@ func TestHandler_WorkflowStepUpdate_EmptyMatrixKey(t *testing.T) {
 func TestHandler_WorkflowRunEnd_Success(t *testing.T) {
 	t.Parallel()
 
-	server, store := createWorkflowTestServer(t, nil)
+	server, v2db := createWorkflowTestServer(t, nil)
 	ctx := context.Background()
 
 	// Create a run first
@@ -360,7 +329,10 @@ func TestHandler_WorkflowRunEnd_Success(t *testing.T) {
 	}
 
 	// Verify run was updated
-	run := store.runs["run-001"]
+	run, err := ops.GetWorkflowRun(ctx, v2db, "run-001")
+	if err != nil {
+		t.Fatalf("failed to get workflow run: %v", err)
+	}
 	if run.Status != "passed" {
 		t.Errorf("expected status 'passed', got %q", run.Status)
 	}
@@ -375,7 +347,7 @@ func TestHandler_WorkflowRunEnd_Success(t *testing.T) {
 func TestHandler_WorkflowRunEnd_DefaultTimestamp(t *testing.T) {
 	t.Parallel()
 
-	server, store := createWorkflowTestServer(t, nil)
+	server, v2db := createWorkflowTestServer(t, nil)
 	ctx := context.Background()
 
 	// Create a run first
@@ -405,7 +377,10 @@ func TestHandler_WorkflowRunEnd_DefaultTimestamp(t *testing.T) {
 
 	after := time.Now().UnixMilli()
 
-	run := store.runs["run-003"]
+	run, err := ops.GetWorkflowRun(ctx, v2db, "run-003")
+	if err != nil {
+		t.Fatalf("failed to get workflow run: %v", err)
+	}
 	if run.EndedAt < before || run.EndedAt > after {
 		t.Errorf("expected ended_at between %d and %d, got %d", before, after, run.EndedAt)
 	}
@@ -445,7 +420,7 @@ func TestHandler_AnalyzeStepOutput_Success(t *testing.T) {
 	llm := &mockLLMQuerier{
 		response: `{"decision": "approve", "reasoning": "All tests passed", "flags": {}}`,
 	}
-	server, store := createWorkflowTestServer(t, llm)
+	server, v2db := createWorkflowTestServer(t, llm)
 	ctx := context.Background()
 
 	req := &pb.AnalyzeStepOutputRequest{
@@ -470,11 +445,15 @@ func TestHandler_AnalyzeStepOutput_Success(t *testing.T) {
 	}
 
 	// Verify analysis was stored
-	if len(store.analyses) != 1 {
-		t.Fatalf("expected 1 analysis stored, got %d", len(store.analyses))
+	analyses, err := ops.GetWorkflowAnalyses(ctx, v2db, "run-001", "step-1", "go1.21")
+	if err != nil {
+		t.Fatalf("failed to get workflow analyses: %v", err)
+	}
+	if len(analyses) != 1 {
+		t.Fatalf("expected 1 analysis stored, got %d", len(analyses))
 	}
 
-	a := store.analyses[0]
+	a := analyses[0]
 	if a.Decision != "proceed" {
 		t.Errorf("stored decision should be 'proceed', got %q", a.Decision)
 	}
@@ -541,7 +520,7 @@ func TestHandler_AnalyzeStepOutput_LLMFailure(t *testing.T) {
 	llm := &mockLLMQuerier{
 		err: fmt.Errorf("connection refused"),
 	}
-	server, store := createWorkflowTestServer(t, llm)
+	server, v2db := createWorkflowTestServer(t, llm)
 	ctx := context.Background()
 
 	req := &pb.AnalyzeStepOutputRequest{
@@ -561,11 +540,15 @@ func TestHandler_AnalyzeStepOutput_LLMFailure(t *testing.T) {
 	}
 
 	// Verify error analysis was stored
-	if len(store.analyses) != 1 {
-		t.Fatalf("expected 1 error analysis stored, got %d", len(store.analyses))
+	analyses, err := ops.GetWorkflowAnalyses(ctx, v2db, "run-001", "step-1", "")
+	if err != nil {
+		t.Fatalf("failed to get workflow analyses: %v", err)
 	}
-	if store.analyses[0].Decision != "error" {
-		t.Errorf("stored decision should be 'error', got %q", store.analyses[0].Decision)
+	if len(analyses) != 1 {
+		t.Fatalf("expected 1 error analysis stored, got %d", len(analyses))
+	}
+	if analyses[0].Decision != "error" {
+		t.Errorf("stored decision should be 'error', got %q", analyses[0].Decision)
 	}
 }
 
@@ -575,7 +558,7 @@ func TestHandler_AnalyzeStepOutput_CustomPrompt(t *testing.T) {
 	llm := &mockLLMQuerier{
 		response: `{"decision": "approve", "reasoning": "Looks good"}`,
 	}
-	server, store := createWorkflowTestServer(t, llm)
+	server, v2db := createWorkflowTestServer(t, llm)
 	ctx := context.Background()
 
 	customPrompt := "Is this output acceptable? Respond with JSON."
@@ -598,11 +581,15 @@ func TestHandler_AnalyzeStepOutput_CustomPrompt(t *testing.T) {
 	}
 
 	// Verify the custom prompt was used (stored in analysis)
-	if len(store.analyses) != 1 {
-		t.Fatalf("expected 1 analysis stored, got %d", len(store.analyses))
+	analyses, err := ops.GetWorkflowAnalyses(ctx, v2db, "run-001", "step-1", "")
+	if err != nil {
+		t.Fatalf("failed to get workflow analyses: %v", err)
 	}
-	if !strings.Contains(store.analyses[0].Prompt, customPrompt) {
-		t.Errorf("expected stored prompt to contain custom instructions %q, got %q", customPrompt, store.analyses[0].Prompt)
+	if len(analyses) != 1 {
+		t.Fatalf("expected 1 analysis stored, got %d", len(analyses))
+	}
+	if !strings.Contains(analyses[0].Prompt, customPrompt) {
+		t.Errorf("expected stored prompt to contain custom instructions %q, got %q", customPrompt, analyses[0].Prompt)
 	}
 }
 

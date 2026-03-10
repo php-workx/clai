@@ -9,7 +9,7 @@ import (
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
-	"github.com/runger/clai/internal/storage"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 // WorkflowRunStart handles the WorkflowRunStart RPC.
@@ -22,7 +22,7 @@ func (s *Server) WorkflowRunStart(ctx context.Context, req *pb.WorkflowRunStartR
 		startedAt = req.StartedAtUnixMs
 	}
 
-	run := &storage.WorkflowRun{
+	run := &ops.WorkflowRun{
 		RunID:        req.RunId,
 		WorkflowName: req.WorkflowName,
 		WorkflowHash: req.WorkflowHash,
@@ -31,7 +31,7 @@ func (s *Server) WorkflowRunStart(ctx context.Context, req *pb.WorkflowRunStartR
 		StartedAt:    startedAt,
 	}
 
-	if err := s.store.CreateWorkflowRun(ctx, run); err != nil {
+	if err := ops.CreateWorkflowRun(ctx, s.v2db, run); err != nil {
 		s.logger.Warn("failed to create workflow run",
 			"run_id", req.RunId,
 			"error", err,
@@ -53,8 +53,8 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 	s.touchActivity()
 
 	// Check if the step already exists
-	existing, err := s.store.GetWorkflowStep(ctx, req.RunId, req.StepId, req.MatrixKey)
-	if err != nil && !errors.Is(err, storage.ErrWorkflowStepNotFound) {
+	existing, err := ops.GetWorkflowStep(ctx, s.v2db, req.RunId, req.StepId, req.MatrixKey)
+	if err != nil && !errors.Is(err, ops.ErrWorkflowStepNotFound) {
 		s.logger.Warn("failed to get workflow step",
 			"run_id", req.RunId,
 			"step_id", req.StepId,
@@ -63,9 +63,9 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 		return &pb.WorkflowStepUpdateResponse{Ok: false, Error: err.Error()}, nil
 	}
 
-	if existing == nil || errors.Is(err, storage.ErrWorkflowStepNotFound) {
+	if existing == nil || errors.Is(err, ops.ErrWorkflowStepNotFound) {
 		// Create new step
-		step := &storage.WorkflowStep{
+		step := &ops.WorkflowStep{
 			RunID:       req.RunId,
 			StepID:      req.StepId,
 			MatrixKey:   req.MatrixKey,
@@ -78,7 +78,7 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 			OutputsJSON: req.OutputsJson,
 		}
 
-		if err := s.store.CreateWorkflowStep(ctx, step); err != nil {
+		if err := ops.CreateWorkflowStep(ctx, s.v2db, step); err != nil {
 			s.logger.Warn("failed to create workflow step",
 				"run_id", req.RunId,
 				"step_id", req.StepId,
@@ -88,7 +88,7 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 		}
 	} else {
 		// Update existing step
-		update := &storage.WorkflowStepUpdate{
+		update := &ops.WorkflowStepUpdate{
 			RunID:       req.RunId,
 			StepID:      req.StepId,
 			MatrixKey:   req.MatrixKey,
@@ -101,7 +101,7 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 			OutputsJSON: req.OutputsJson,
 		}
 
-		if err := s.store.UpdateWorkflowStep(ctx, update); err != nil {
+		if err := ops.UpdateWorkflowStep(ctx, s.v2db, update); err != nil {
 			s.logger.Warn("failed to update workflow step",
 				"run_id", req.RunId,
 				"step_id", req.StepId,
@@ -130,7 +130,7 @@ func (s *Server) WorkflowRunEnd(ctx context.Context, req *pb.WorkflowRunEndReque
 		endedAt = req.EndedAtUnixMs
 	}
 
-	if err := s.store.UpdateWorkflowRun(ctx, req.RunId, req.Status, endedAt, req.DurationMs); err != nil {
+	if err := ops.UpdateWorkflowRun(ctx, s.v2db, req.RunId, req.Status, endedAt, req.DurationMs); err != nil {
 		s.logger.Warn("failed to end workflow run",
 			"run_id", req.RunId,
 			"error", err,
@@ -176,7 +176,7 @@ func (s *Server) AnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutpu
 		)
 
 		// Store the error analysis record
-		analysis := &storage.WorkflowAnalysis{
+		analysis := &ops.WorkflowAnalysis{
 			RunID:       req.RunId,
 			StepID:      req.StepId,
 			MatrixKey:   req.MatrixKey,
@@ -187,7 +187,7 @@ func (s *Server) AnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutpu
 			DurationMs:  durationMs,
 			AnalyzedAt:  time.Now().UnixMilli(),
 		}
-		if storeErr := s.store.CreateWorkflowAnalysis(ctx, analysis); storeErr != nil {
+		if storeErr := ops.CreateWorkflowAnalysis(ctx, s.v2db, analysis); storeErr != nil {
 			s.logger.Warn("failed to store error analysis",
 				"run_id", req.RunId,
 				"step_id", req.StepId,
@@ -205,7 +205,7 @@ func (s *Server) AnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutpu
 	decision, reasoning, flagsJSON := parseAnalysisResponse(rawResponse)
 
 	// Store analysis record
-	analysis := &storage.WorkflowAnalysis{
+	analysis := &ops.WorkflowAnalysis{
 		RunID:       req.RunId,
 		StepID:      req.StepId,
 		MatrixKey:   req.MatrixKey,
@@ -218,7 +218,7 @@ func (s *Server) AnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutpu
 		AnalyzedAt:  time.Now().UnixMilli(),
 	}
 
-	if err := s.store.CreateWorkflowAnalysis(ctx, analysis); err != nil {
+	if err := ops.CreateWorkflowAnalysis(ctx, s.v2db, analysis); err != nil {
 		s.logger.Warn("failed to store analysis",
 			"run_id", req.RunId,
 			"step_id", req.StepId,
