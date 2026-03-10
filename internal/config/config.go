@@ -69,7 +69,6 @@ type SuggestionsWeights struct {
 type SuggestionsConfig struct {
 	SocketPath                      string             `yaml:"socket_path"`
 	IncognitoMode                   string             `yaml:"incognito_mode"`
-	ScorerVersion                   string             `yaml:"scorer_version"`
 	SearchTagVocabularyPath         string             `yaml:"search_tag_vocabulary_path"`
 	SearchFTSTokenizer              string             `yaml:"search_fts_tokenizer"`
 	TaskPlaybookPath                string             `yaml:"task_playbook_path"`
@@ -379,9 +378,6 @@ func DefaultSuggestionsConfig() SuggestionsConfig {
 		// Directory scope
 		DirectoryScopingEnabled: true,
 		DirectoryScopeMaxDepth:  3,
-
-		// Scorer version
-		ScorerVersion: "v2",
 
 		// Explainability
 		ExplainEnabled:         true,
@@ -700,8 +696,6 @@ func (c *Config) getSuggestionsField(field string) (string, error) {
 		return strconv.Itoa(c.Suggestions.MaxAI), nil
 	case "show_risk_warning":
 		return strconv.FormatBool(c.Suggestions.ShowRiskWarning), nil
-	case "scorer_version":
-		return c.Suggestions.ScorerVersion, nil
 	case "picker_view":
 		return c.Suggestions.PickerView, nil
 	default:
@@ -719,8 +713,6 @@ func (c *Config) setSuggestionsField(field, value string) error {
 		return c.setSuggestionsMaxAI(value)
 	case "show_risk_warning":
 		return c.setSuggestionsShowRiskWarning(value)
-	case "scorer_version":
-		return c.setSuggestionsScorerVersion(value)
 	case "picker_view":
 		return c.setSuggestionsPickerView(value)
 	default:
@@ -767,14 +759,6 @@ func (c *Config) setSuggestionsShowRiskWarning(value string) error {
 		return fmt.Errorf("invalid value for show_risk_warning: %w", err)
 	}
 	c.Suggestions.ShowRiskWarning = v
-	return nil
-}
-
-func (c *Config) setSuggestionsScorerVersion(value string) error {
-	if !isValidScorerVersion(value) {
-		return fmt.Errorf("invalid scorer_version: %s (must be v1 or v2)", value)
-	}
-	c.Suggestions.ScorerVersion = value
 	return nil
 }
 
@@ -1167,7 +1151,6 @@ func ListKeys() []string {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
-		"suggestions.scorer_version",
 		"suggestions.picker_view",
 		"history.picker_backend",
 		"history.picker_open_on_empty",
@@ -1301,10 +1284,6 @@ func (s *SuggestionsConfig) validateEnumFields(warn func(string, string), defaul
 		warn("shim_mode", fmt.Sprintf("must be auto, persistent, or oneshot, got %q; falling back to default %q", s.ShimMode, defaults.ShimMode))
 		s.ShimMode = defaults.ShimMode
 	}
-	if !isValidScorerVersion(s.ScorerVersion) {
-		warn("scorer_version", fmt.Sprintf("must be v1 or v2, got %q; falling back to default %q", s.ScorerVersion, defaults.ScorerVersion))
-		s.ScorerVersion = defaults.ScorerVersion
-	}
 	if !isValidFTSTokenizer(s.SearchFTSTokenizer) {
 		warn(
 			"search_fts_tokenizer",
@@ -1355,15 +1334,6 @@ func isValidShimMode(mode string) bool {
 func isValidFTSTokenizer(tokenizer string) bool {
 	switch tokenizer {
 	case "trigram", "unicode61":
-		return true
-	default:
-		return false
-	}
-}
-
-func isValidScorerVersion(version string) bool {
-	switch version {
-	case "v1", "v2":
 		return true
 	default:
 		return false

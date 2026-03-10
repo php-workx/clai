@@ -27,7 +27,7 @@ type TestEnv struct {
 	Client     pb.ClaiServiceClient
 	Cancel     context.CancelFunc
 	T          *testing.T
-	V2DB       *suggestdb.DB
+	DB         *suggestdb.DB
 	Server     *daemon.Server
 	Conn       *grpc.ClientConn
 	Paths      *config.Paths
@@ -75,7 +75,7 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 
 	// Create server
 	serverCfg := &daemon.ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		Registry:    registry,
 		Paths:       paths,
 		IdleTimeout: 30 * time.Minute, // Long timeout for tests
@@ -130,7 +130,7 @@ func SetupTestEnv(t *testing.T) *TestEnv {
 		TempDir:    tempDir,
 		DBPath:     dbPath,
 		SocketPath: socketPath,
-		V2DB:       v2db,
+		DB:         v2db,
 		Server:     server,
 		Client:     client,
 		Conn:       conn,
@@ -232,8 +232,8 @@ func (e *TestEnv) Teardown() {
 	if e.Server != nil {
 		e.Server.Shutdown()
 	}
-	if e.V2DB != nil {
-		e.V2DB.Close()
+	if e.DB != nil {
+		e.DB.Close()
 	}
 	if e.TempDir != "" {
 		os.RemoveAll(e.TempDir)

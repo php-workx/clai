@@ -11,7 +11,7 @@ import (
 )
 
 // =============================================================================
-// V1 Database Tests (backward compatibility)
+// Database Tests
 // =============================================================================
 
 func TestOpen_CreatesDatabase(t *testing.T) {
@@ -23,7 +23,6 @@ func TestOpen_CreatesDatabase(t *testing.T) {
 	db, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true, // Skip lock for parallel tests
-		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -45,7 +44,6 @@ func TestOpen_CreatesDirectory(t *testing.T) {
 	db, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true,
-		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -62,7 +60,7 @@ func TestOpen_CreatesDirectory(t *testing.T) {
 func TestOpen_RunsMigrations(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV1DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -97,7 +95,7 @@ func TestOpen_RunsMigrations(t *testing.T) {
 func TestOpen_WALModeEnabled(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV1DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	var journalMode string
@@ -115,7 +113,7 @@ func TestOpen_WALModeEnabled(t *testing.T) {
 func TestOpen_ForeignKeysEnabled(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV1DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	var foreignKeys int
@@ -133,7 +131,7 @@ func TestOpen_ForeignKeysEnabled(t *testing.T) {
 func TestDB_SchemaVersion(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV1DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -142,15 +140,15 @@ func TestDB_SchemaVersion(t *testing.T) {
 		t.Fatalf("Version() error = %v", err)
 	}
 
-	if version != V1SchemaVersion {
-		t.Errorf("Version() = %d, want %d", version, V1SchemaVersion)
+	if version != SchemaVersion {
+		t.Errorf("Version() = %d, want %d", version, SchemaVersion)
 	}
 }
 
 func TestDB_Validate(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV1DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	err := db.Validate(context.Background())
@@ -162,7 +160,7 @@ func TestDB_Validate(t *testing.T) {
 func TestDB_Close(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV1DB(t)
+	db := newTestDB(t)
 
 	// Close should not error
 	if err := db.Close(); err != nil {
@@ -178,7 +176,7 @@ func TestDB_Close(t *testing.T) {
 func TestDB_PrepareStatement(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV1DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -210,7 +208,6 @@ func TestMigrations_RefuseNewerVersion(t *testing.T) {
 	db, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true,
-		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -218,9 +215,9 @@ func TestMigrations_RefuseNewerVersion(t *testing.T) {
 
 	// Manually update schema version to a future version
 	_, err = db.ExecContext(context.Background(), `
-		INSERT OR REPLACE INTO schema_migrations (version, applied_ts)
+		INSERT OR REPLACE INTO schema_migrations (version, applied_ms)
 		VALUES (?, ?)
-	`, V1SchemaVersion+10, time.Now().UnixMilli())
+	`, SchemaVersion+10, time.Now().UnixMilli())
 	if err != nil {
 		t.Fatalf("Failed to insert future version: %v", err)
 	}
@@ -230,7 +227,6 @@ func TestMigrations_RefuseNewerVersion(t *testing.T) {
 	_, err = Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true,
-		UseV1:    true,
 	})
 	if err == nil {
 		t.Fatal("Open() should fail with newer schema version")
@@ -253,7 +249,6 @@ func TestMigrations_Idempotent(t *testing.T) {
 		db, err := Open(context.Background(), Options{
 			Path:     dbPath,
 			SkipLock: true,
-			UseV1:    true,
 		})
 		if err != nil {
 			t.Fatalf("Open() iteration %d error = %v", i, err)
@@ -277,7 +272,6 @@ func TestLock_PreventsMultipleOpens(t *testing.T) {
 	db1, err := Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 100 * time.Millisecond,
-		UseV1:       true,
 	})
 	if err != nil {
 		t.Fatalf("First Open() error = %v", err)
@@ -288,7 +282,6 @@ func TestLock_PreventsMultipleOpens(t *testing.T) {
 	_, err = Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 100 * time.Millisecond,
-		UseV1:       true,
 	})
 	if err == nil {
 		t.Fatal("Second Open() should fail due to lock")
@@ -304,7 +297,6 @@ func TestLock_ReleasedOnClose(t *testing.T) {
 	db1, err := Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 100 * time.Millisecond,
-		UseV1:       true,
 	})
 	if err != nil {
 		t.Fatalf("First Open() error = %v", err)
@@ -315,7 +307,6 @@ func TestLock_ReleasedOnClose(t *testing.T) {
 	db2, err := Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 100 * time.Millisecond,
-		UseV1:       true,
 	})
 	if err != nil {
 		t.Fatalf("Second Open() after close error = %v", err)
@@ -342,7 +333,6 @@ func TestLock_ConcurrentStartup(t *testing.T) {
 			db, err := Open(context.Background(), Options{
 				Path:        dbPath,
 				LockTimeout: 100 * time.Millisecond,
-				UseV1:       true,
 			})
 			if err == nil {
 				successMu.Lock()
@@ -372,8 +362,7 @@ func TestLock_TimeoutBehavior(t *testing.T) {
 
 	// First open
 	db1, err := Open(context.Background(), Options{
-		Path:  dbPath,
-		UseV1: true,
+		Path: dbPath,
 	})
 	if err != nil {
 		t.Fatalf("First Open() error = %v", err)
@@ -385,7 +374,6 @@ func TestLock_TimeoutBehavior(t *testing.T) {
 	_, err = Open(context.Background(), Options{
 		Path:        dbPath,
 		LockTimeout: 200 * time.Millisecond,
-		UseV1:       true,
 	})
 	elapsed := time.Since(start)
 
@@ -416,8 +404,7 @@ func TestIsLocked(t *testing.T) {
 
 	// Open and check
 	db, err := Open(context.Background(), Options{
-		Path:  dbPath,
-		UseV1: true,
+		Path: dbPath,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -449,8 +436,7 @@ func TestGetLockHolderPID(t *testing.T) {
 
 	// Open
 	db, err := Open(context.Background(), Options{
-		Path:  dbPath,
-		UseV1: true,
+		Path: dbPath,
 	})
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -474,7 +460,6 @@ func TestOpen_ReadOnly(t *testing.T) {
 	db, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		SkipLock: true,
-		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("Initial Open() error = %v", err)
@@ -485,7 +470,6 @@ func TestOpen_ReadOnly(t *testing.T) {
 	roDB, err := Open(context.Background(), Options{
 		Path:     dbPath,
 		ReadOnly: true,
-		UseV1:    true,
 	})
 	if err != nil {
 		t.Fatalf("ReadOnly Open() error = %v", err)
@@ -497,8 +481,8 @@ func TestOpen_ReadOnly(t *testing.T) {
 	if err != nil {
 		t.Errorf("Version() error = %v", err)
 	}
-	if version != V1SchemaVersion {
-		t.Errorf("Version() = %d, want %d", version, V1SchemaVersion)
+	if version != SchemaVersion {
+		t.Errorf("Version() = %d, want %d", version, SchemaVersion)
 	}
 
 	// Write should fail
@@ -513,14 +497,14 @@ func TestOpen_ReadOnly(t *testing.T) {
 func TestDB_ConcurrentReads(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV1DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
 
 	// Insert some test data
 	_, err := db.ExecContext(ctx, `
-		INSERT INTO session (id, created_at, shell) VALUES ('test-session', 1000, 'zsh')
+		INSERT INTO session (id, started_at_ms, shell) VALUES ('test-session', 1000, 'zsh')
 	`)
 	if err != nil {
 		t.Fatalf("Insert error = %v", err)
@@ -553,300 +537,14 @@ func TestDB_ConcurrentReads(t *testing.T) {
 	}
 }
 
-func TestSchemaValidity_SessionTable(t *testing.T) {
-	t.Parallel()
-
-	db := newTestV1DB(t)
-	defer db.Close()
-
-	ctx := context.Background()
-
-	// Test inserting a valid session
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO session (id, created_at, shell, host, user)
-		VALUES ('sess-1', 1000, 'zsh', 'localhost', 'testuser')
-	`)
-	if err != nil {
-		t.Errorf("Insert session error = %v", err)
-	}
-
-	// Test querying
-	var id string
-	var shell string
-	err = db.QueryRowContext(ctx, `
-		SELECT id, shell FROM session WHERE id = ?
-	`, "sess-1").Scan(&id, &shell)
-	if err != nil {
-		t.Errorf("Query session error = %v", err)
-	}
-	if id != "sess-1" || shell != "zsh" {
-		t.Errorf("Got id=%s, shell=%s, want sess-1, zsh", id, shell)
-	}
-}
-
-func TestSchemaValidity_CommandEventTable(t *testing.T) {
-	t.Parallel()
-
-	db := newTestV1DB(t)
-	defer db.Close()
-
-	ctx := context.Background()
-
-	// Create session first (foreign key)
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO session (id, created_at, shell) VALUES ('sess-1', 1000, 'zsh')
-	`)
-	if err != nil {
-		t.Fatalf("Insert session error = %v", err)
-	}
-
-	// Insert command event
-	_, err = db.ExecContext(ctx, `
-		INSERT INTO command_event (session_id, ts, duration_ms, exit_code, cwd, repo_key, branch, cmd_raw, cmd_norm)
-		VALUES ('sess-1', 2000, 100, 0, '/home/user', 'abc123', 'main', 'git status', 'git status')
-	`)
-	if err != nil {
-		t.Errorf("Insert command_event error = %v", err)
-	}
-
-	// Test index usage (query by ts)
-	rows, err := db.QueryContext(ctx, `
-		SELECT id FROM command_event WHERE ts >= 1000 ORDER BY ts
-	`)
-	if err != nil {
-		t.Errorf("Query by ts error = %v", err)
-	}
-	rows.Close()
-
-	// Test index usage (query by repo_key, ts)
-	rows, err = db.QueryContext(ctx, `
-		SELECT id FROM command_event WHERE repo_key = 'abc123' ORDER BY ts
-	`)
-	if err != nil {
-		t.Errorf("Query by repo_key error = %v", err)
-	}
-	rows.Close()
-}
-
-func TestSchemaValidity_TransitionTable(t *testing.T) {
-	t.Parallel()
-
-	db := newTestV1DB(t)
-	defer db.Close()
-
-	ctx := context.Background()
-
-	// Insert transition
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO transition (scope, prev_norm, next_norm, count, last_ts)
-		VALUES ('global', 'git add', 'git commit', 5, 1000)
-	`)
-	if err != nil {
-		t.Errorf("Insert transition error = %v", err)
-	}
-
-	// Test upsert (primary key conflict)
-	_, err = db.ExecContext(ctx, `
-		INSERT OR REPLACE INTO transition (scope, prev_norm, next_norm, count, last_ts)
-		VALUES ('global', 'git add', 'git commit', 10, 2000)
-	`)
-	if err != nil {
-		t.Errorf("Upsert transition error = %v", err)
-	}
-
-	// Verify count was updated
-	var count int
-	err = db.QueryRowContext(ctx, `
-		SELECT count FROM transition WHERE scope='global' AND prev_norm='git add' AND next_norm='git commit'
-	`).Scan(&count)
-	if err != nil {
-		t.Errorf("Query transition error = %v", err)
-	}
-	if count != 10 {
-		t.Errorf("count = %d, want 10", count)
-	}
-}
-
-func TestSchemaValidity_CommandScoreTable(t *testing.T) {
-	t.Parallel()
-
-	db := newTestV1DB(t)
-	defer db.Close()
-
-	ctx := context.Background()
-
-	// Insert scores
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO command_score (scope, cmd_norm, score, last_ts) VALUES
-		('global', 'git status', 5.5, 1000),
-		('global', 'git add', 3.2, 1000),
-		('repo-123', 'make test', 10.0, 1000)
-	`)
-	if err != nil {
-		t.Errorf("Insert command_score error = %v", err)
-	}
-
-	// Test index usage (query by scope, score desc)
-	rows, err := db.QueryContext(ctx, `
-		SELECT cmd_norm, score FROM command_score WHERE scope = 'global' ORDER BY score DESC LIMIT 10
-	`)
-	if err != nil {
-		t.Errorf("Query by scope/score error = %v", err)
-	}
-	defer rows.Close()
-
-	var results []string
-	for rows.Next() {
-		var cmdNorm string
-		var score float64
-		if err := rows.Scan(&cmdNorm, &score); err != nil {
-			t.Errorf("Scan error = %v", err)
-		}
-		results = append(results, cmdNorm)
-	}
-
-	if len(results) != 2 {
-		t.Errorf("Got %d results, want 2", len(results))
-	}
-	if results[0] != "git status" {
-		t.Errorf("First result = %s, want git status", results[0])
-	}
-}
-
-func TestSchemaValidity_SlotValueTable(t *testing.T) {
-	t.Parallel()
-
-	db := newTestV1DB(t)
-	defer db.Close()
-
-	ctx := context.Background()
-
-	// Insert slot values
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO slot_value (scope, cmd_norm, slot_idx, value, count, last_ts) VALUES
-		('global', 'kubectl get pods -n <arg>', 0, 'default', 10.0, 1000),
-		('global', 'kubectl get pods -n <arg>', 0, 'kube-system', 5.0, 1000),
-		('repo-123', 'kubectl get pods -n <arg>', 0, 'production', 15.0, 1000)
-	`)
-	if err != nil {
-		t.Errorf("Insert slot_value error = %v", err)
-	}
-
-	// Test index usage (query for top values)
-	rows, err := db.QueryContext(ctx, `
-		SELECT value, count FROM slot_value
-		WHERE scope = 'global' AND cmd_norm = 'kubectl get pods -n <arg>' AND slot_idx = 0
-		ORDER BY count DESC
-		LIMIT 10
-	`)
-	if err != nil {
-		t.Errorf("Query slot_value error = %v", err)
-	}
-	defer rows.Close()
-
-	var topValue string
-	var topCount float64
-	if rows.Next() {
-		if err := rows.Scan(&topValue, &topCount); err != nil {
-			t.Errorf("Scan error = %v", err)
-		}
-	}
-
-	if topValue != "default" {
-		t.Errorf("Top value = %s, want default", topValue)
-	}
-}
-
-func TestSchemaValidity_ProjectTaskTable(t *testing.T) {
-	t.Parallel()
-
-	db := newTestV1DB(t)
-	defer db.Close()
-
-	ctx := context.Background()
-
-	// Insert project tasks
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO project_task (repo_key, kind, name, command, description, discovered_ts) VALUES
-		('repo-123', 'npm', 'test', 'npm test', 'Run tests', 1000),
-		('repo-123', 'npm', 'build', 'npm run build', 'Build project', 1000),
-		('repo-123', 'make', 'lint', 'make lint', NULL, 1000)
-	`)
-	if err != nil {
-		t.Errorf("Insert project_task error = %v", err)
-	}
-
-	// Query tasks for repo
-	rows, err := db.QueryContext(ctx, `
-		SELECT name, command FROM project_task WHERE repo_key = 'repo-123'
-	`)
-	if err != nil {
-		t.Errorf("Query project_task error = %v", err)
-	}
-	defer rows.Close()
-
-	count := 0
-	for rows.Next() {
-		count++
-		var name, command string
-		if err := rows.Scan(&name, &command); err != nil {
-			t.Errorf("Scan error = %v", err)
-		}
-	}
-
-	if count != 3 {
-		t.Errorf("Got %d tasks, want 3", count)
-	}
-}
-
-func TestSchemaValidity_ForeignKeyEnforced(t *testing.T) {
-	t.Parallel()
-
-	db := newTestV1DB(t)
-	defer db.Close()
-
-	ctx := context.Background()
-
-	// Try to insert command_event without session (should fail)
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO command_event (session_id, ts, cwd, cmd_raw, cmd_norm)
-		VALUES ('nonexistent-session', 1000, '/tmp', 'ls', 'ls')
-	`)
-
-	if err == nil {
-		t.Error("Insert with invalid session_id should fail due to foreign key constraint")
-	}
-}
-
 // =============================================================================
-// V2 Database Tests
+// Schema Tests
 // =============================================================================
 
-func TestV2Open_CreatesDatabase(t *testing.T) {
+func TestOpen_SchemaVersion(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
-
-	db, err := Open(context.Background(), Options{
-		Path:     dbPath,
-		SkipLock: true,
-	})
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
-	defer db.Close()
-
-	// Verify database file was created
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		t.Error("V2 database file was not created")
-	}
-}
-
-func TestV2Open_SchemaVersion(t *testing.T) {
-	t.Parallel()
-
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
@@ -860,26 +558,26 @@ func TestV2Open_SchemaVersion(t *testing.T) {
 	}
 }
 
-func TestV2Open_ValidateAll23Tables(t *testing.T) {
+func TestOpen_ValidateAll23Tables(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	ctx := context.Background()
 
-	err := db.ValidateV2(ctx)
+	err := db.Validate(ctx)
 	if err != nil {
-		t.Fatalf("ValidateV2() error = %v", err)
+		t.Fatalf("Validate() error = %v", err)
 	}
 
 	// Also verify the exact count of tables (23)
-	if len(V2AllTables) != 30 {
-		t.Errorf("V2AllTables has %d entries, want 30", len(V2AllTables))
+	if len(AllTables) != 30 {
+		t.Errorf("AllTables has %d entries, want 30", len(AllTables))
 	}
 }
 
-func TestV2Open_Idempotent(t *testing.T) {
+func TestOpen_Idempotent(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -895,15 +593,15 @@ func TestV2Open_Idempotent(t *testing.T) {
 			t.Fatalf("Open() iteration %d error = %v", i, err)
 		}
 
-		if err := db.ValidateV2(context.Background()); err != nil {
-			t.Errorf("ValidateV2() iteration %d error = %v", i, err)
+		if err := db.Validate(context.Background()); err != nil {
+			t.Errorf("Validate() iteration %d error = %v", i, err)
 		}
 
 		db.Close()
 	}
 }
 
-func TestV2Open_RefuseNewerVersion(t *testing.T) {
+func TestOpen_RefuseNewerVersion(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -942,10 +640,10 @@ func TestV2Open_RefuseNewerVersion(t *testing.T) {
 	}
 }
 
-func TestV2_SessionTable(t *testing.T) {
+func Test_SessionTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -970,10 +668,10 @@ func TestV2_SessionTable(t *testing.T) {
 	}
 }
 
-func TestV2_CommandEventTable(t *testing.T) {
+func Test_CommandEventTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1006,10 +704,10 @@ func TestV2_CommandEventTable(t *testing.T) {
 	}
 }
 
-func TestV2_CommandTemplateTable(t *testing.T) {
+func Test_CommandTemplateTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1034,10 +732,10 @@ func TestV2_CommandTemplateTable(t *testing.T) {
 	}
 }
 
-func TestV2_TransitionStatTable(t *testing.T) {
+func Test_TransitionStatTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1062,10 +760,10 @@ func TestV2_TransitionStatTable(t *testing.T) {
 	}
 }
 
-func TestV2_CommandStatTable(t *testing.T) {
+func Test_CommandStatTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1090,10 +788,10 @@ func TestV2_CommandStatTable(t *testing.T) {
 	}
 }
 
-func TestV2_SlotStatTable(t *testing.T) {
+func Test_SlotStatTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1118,10 +816,10 @@ func TestV2_SlotStatTable(t *testing.T) {
 	}
 }
 
-func TestV2_SlotCorrelationTable(t *testing.T) {
+func Test_SlotCorrelationTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1134,10 +832,10 @@ func TestV2_SlotCorrelationTable(t *testing.T) {
 	}
 }
 
-func TestV2_ProjectTypeStatTable(t *testing.T) {
+func Test_ProjectTypeStatTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1150,10 +848,10 @@ func TestV2_ProjectTypeStatTable(t *testing.T) {
 	}
 }
 
-func TestV2_ProjectTypeTransitionTable(t *testing.T) {
+func Test_ProjectTypeTransitionTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1166,10 +864,10 @@ func TestV2_ProjectTypeTransitionTable(t *testing.T) {
 	}
 }
 
-func TestV2_PipelineEventTable(t *testing.T) {
+func Test_PipelineEventTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1207,10 +905,10 @@ func TestV2_PipelineEventTable(t *testing.T) {
 	}
 }
 
-func TestV2_PipelineTransitionTable(t *testing.T) {
+func Test_PipelineTransitionTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1223,10 +921,10 @@ func TestV2_PipelineTransitionTable(t *testing.T) {
 	}
 }
 
-func TestV2_PipelinePatternTable(t *testing.T) {
+func Test_PipelinePatternTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1239,10 +937,10 @@ func TestV2_PipelinePatternTable(t *testing.T) {
 	}
 }
 
-func TestV2_FailureRecoveryTable(t *testing.T) {
+func Test_FailureRecoveryTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1255,10 +953,10 @@ func TestV2_FailureRecoveryTable(t *testing.T) {
 	}
 }
 
-func TestV2_WorkflowPatternTable(t *testing.T) {
+func Test_WorkflowPatternTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1271,10 +969,10 @@ func TestV2_WorkflowPatternTable(t *testing.T) {
 	}
 }
 
-func TestV2_WorkflowStepTable(t *testing.T) {
+func Test_WorkflowStepTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1310,10 +1008,10 @@ func TestV2_WorkflowStepTable(t *testing.T) {
 	}
 }
 
-func TestV2_TaskCandidateTable(t *testing.T) {
+func Test_TaskCandidateTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1338,10 +1036,10 @@ func TestV2_TaskCandidateTable(t *testing.T) {
 	}
 }
 
-func TestV2_SuggestionCacheTable(t *testing.T) {
+func Test_SuggestionCacheTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1365,10 +1063,10 @@ func TestV2_SuggestionCacheTable(t *testing.T) {
 	}
 }
 
-func TestV2_SuggestionFeedbackTable(t *testing.T) {
+func Test_SuggestionFeedbackTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1381,10 +1079,10 @@ func TestV2_SuggestionFeedbackTable(t *testing.T) {
 	}
 }
 
-func TestV2_SessionAliasTable(t *testing.T) {
+func Test_SessionAliasTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1409,10 +1107,10 @@ func TestV2_SessionAliasTable(t *testing.T) {
 	}
 }
 
-func TestV2_DismissalPatternTable(t *testing.T) {
+func Test_DismissalPatternTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1425,10 +1123,10 @@ func TestV2_DismissalPatternTable(t *testing.T) {
 	}
 }
 
-func TestV2_RankWeightProfileTable(t *testing.T) {
+func Test_RankWeightProfileTable(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1450,10 +1148,10 @@ func TestV2_RankWeightProfileTable(t *testing.T) {
 	}
 }
 
-func TestV2_FTS5_InsertTrigger(t *testing.T) {
+func Test_FTS5_InsertTrigger(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1487,10 +1185,10 @@ func TestV2_FTS5_InsertTrigger(t *testing.T) {
 	}
 }
 
-func TestV2_FTS5_EphemeralNotIndexed(t *testing.T) {
+func Test_FTS5_EphemeralNotIndexed(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1521,10 +1219,10 @@ func TestV2_FTS5_EphemeralNotIndexed(t *testing.T) {
 	}
 }
 
-func TestV2_FTS5_DeleteTrigger(t *testing.T) {
+func Test_FTS5_DeleteTrigger(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1575,74 +1273,10 @@ func TestV2_FTS5_DeleteTrigger(t *testing.T) {
 	}
 }
 
-func TestV2_SeparateFromV1(t *testing.T) {
+func Test_SchemaCountIs23(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := t.TempDir()
-	v1Path := filepath.Join(tmpDir, "suggestions.db")
-	v2Path := filepath.Join(tmpDir, "suggestions_v2.db")
-
-	// Create V1 database
-	v1DB, err := Open(context.Background(), Options{
-		Path:     v1Path,
-		SkipLock: true,
-		UseV1:    true,
-	})
-	if err != nil {
-		t.Fatalf("V1 Open() error = %v", err)
-	}
-	defer v1DB.Close()
-
-	// Create V2 database
-	v2DB, err := Open(context.Background(), Options{
-		Path:     v2Path,
-		SkipLock: true,
-	})
-	if err != nil {
-		t.Fatalf("V2 Open() error = %v", err)
-	}
-	defer v2DB.Close()
-
-	// Both should exist as separate files
-	if _, statErr := os.Stat(v1Path); os.IsNotExist(statErr) {
-		t.Error("V1 database file does not exist")
-	}
-	if _, statErr := os.Stat(v2Path); os.IsNotExist(statErr) {
-		t.Error("V2 database file does not exist")
-	}
-
-	// V1 should have V1 tables
-	if valErr := v1DB.Validate(context.Background()); valErr != nil {
-		t.Errorf("V1 Validate() error = %v", valErr)
-	}
-
-	// V2 should have V2 tables
-	if valErr := v2DB.ValidateV2(context.Background()); valErr != nil {
-		t.Errorf("V2 ValidateV2() error = %v", valErr)
-	}
-
-	// V1 should NOT have V2-only tables
-	var name string
-	err = v1DB.QueryRowContext(context.Background(), `
-		SELECT name FROM sqlite_master WHERE type='table' AND name='command_template'
-	`).Scan(&name)
-	if err == nil {
-		t.Error("V1 database should not have command_template table")
-	}
-
-	// V2 should NOT have V1-only tables
-	err = v2DB.QueryRowContext(context.Background(), `
-		SELECT name FROM sqlite_master WHERE type='table' AND name='transition'
-	`).Scan(&name)
-	if err == nil {
-		t.Error("V2 database should not have V1 transition table")
-	}
-}
-
-func TestV2_SchemaCountIs23(t *testing.T) {
-	t.Parallel()
-
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 	ctx := context.Background()
 
@@ -1669,9 +1303,9 @@ func TestV2_SchemaCountIs23(t *testing.T) {
 
 	// command_event_fts creates multiple internal tables (command_event_fts,
 	// command_event_fts_config, command_event_fts_content, etc.)
-	// We count the logical tables from V2AllTables.
-	// Check that each V2AllTables entry exists in the DB.
-	for _, expected := range V2AllTables {
+	// We count the logical tables from AllTables.
+	// Check that each AllTables entry exists in the DB.
+	for _, expected := range AllTables {
 		found := false
 		// Check tables
 		var name string
@@ -1687,16 +1321,16 @@ func TestV2_SchemaCountIs23(t *testing.T) {
 		}
 	}
 
-	// Verify V2AllTables has exactly 23 entries
-	if len(V2AllTables) != 30 {
-		t.Errorf("V2AllTables has %d entries, want 30", len(V2AllTables))
+	// Verify AllTables has exactly 30 entries (23 base + 7 from migration v3)
+	if len(AllTables) != 30 {
+		t.Errorf("AllTables has %d entries, want 30", len(AllTables))
 	}
 }
 
-func TestV2_WALModeEnabled(t *testing.T) {
+func Test_WALModeEnabled(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	var journalMode string
@@ -1711,7 +1345,7 @@ func TestV2_WALModeEnabled(t *testing.T) {
 	}
 }
 
-func TestV2_DefaultDBPath(t *testing.T) {
+func Test_DefaultDBPath(t *testing.T) {
 	t.Parallel()
 
 	path, err := DefaultDBPath()
@@ -1732,48 +1366,12 @@ func TestV2_DefaultDBPath(t *testing.T) {
 	}
 }
 
-func TestV1_DefaultDBPath(t *testing.T) {
-	t.Parallel()
-
-	path, err := DefaultV1DBPath()
-	if err != nil {
-		t.Fatalf("DefaultV1DBPath() error = %v", err)
-	}
-
-	if path == "" {
-		t.Error("DefaultV1DBPath() returned empty string")
-	}
-
-	if filepath.Base(path) != "suggestions.db" {
-		t.Errorf("DefaultV1DBPath() = %s does not end with suggestions.db", path)
-	}
-}
-
 // =============================================================================
 // Helper functions
 // =============================================================================
 
-// newTestV1DB creates a V1 test database.
-func newTestV1DB(t *testing.T) *DB {
-	t.Helper()
-
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "test.db")
-
-	db, err := Open(context.Background(), Options{
-		Path:     dbPath,
-		SkipLock: true,
-		UseV1:    true,
-	})
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
-
-	return db
-}
-
-// newTestV2DB creates a V2 test database.
-func newTestV2DB(t *testing.T) *DB {
+// newTestDB creates a test database.
+func newTestDB(t *testing.T) *DB {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -1805,7 +1403,6 @@ var _ interface {
 	DB() *sql.DB
 	Close() error
 	Validate(context.Context) error
-	ValidateV2(context.Context) error
 	Version(context.Context) (int, error)
 	ExecContext(context.Context, string, ...interface{}) (sql.Result, error)
 	QueryContext(context.Context, string, ...interface{}) (*sql.Rows, error)

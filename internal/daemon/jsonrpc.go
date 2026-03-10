@@ -223,7 +223,7 @@ func (s *Server) handleJSONRPCMethod(
 			params.Timestamp = time.Now().UnixMilli()
 		}
 
-		if err := ops.UpsertCommandEventStart(ctx, s.v2db, params.SessionID, params.CommandID, params.Timestamp); err != nil {
+		if err := ops.UpsertCommandEventStart(ctx, s.db, params.SessionID, params.CommandID, params.Timestamp); err != nil {
 			return nil, nil, internalError(err)
 		}
 
@@ -252,7 +252,7 @@ func (s *Server) handleJSONRPCMethod(
 
 		now := time.Now().UnixMilli()
 		expiresAt := now + int64((7*24*time.Hour)/time.Millisecond)
-		if err := ops.AppendCommandOutputChunk(ctx, s.v2db, params.CommandID, chunk, params.IsStderr, now, expiresAt); err != nil {
+		if err := ops.AppendCommandOutputChunk(ctx, s.db, params.CommandID, chunk, params.IsStderr, now, expiresAt); err != nil {
 			return nil, nil, internalError(err)
 		}
 
@@ -274,7 +274,7 @@ func (s *Server) handleJSONRPCMethod(
 		capturedBytes := s.popCapturedBytes(params.CommandID)
 		err := ops.FinalizeCommandEvent(
 			ctx,
-			s.v2db,
+			s.db,
 			params.CommandID,
 			params.ExitCode,
 			params.Timestamp,

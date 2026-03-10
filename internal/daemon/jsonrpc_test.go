@@ -117,9 +117,9 @@ func startJSONRPCTestServer(t *testing.T) (socketPath string, cleanup func()) {
 	}
 	paths := &config.Paths{BaseDir: tmpDir}
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		Paths:       paths,
 		IdleTimeout: 10 * time.Minute,
 	})

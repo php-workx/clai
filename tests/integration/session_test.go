@@ -41,7 +41,7 @@ func TestCP2_SessionFlow(t *testing.T) {
 	}
 
 	// Verify session was persisted to SQLite
-	session, err := ops.GetSession(ctx, env.V2DB, sessionID)
+	session, err := ops.GetSession(ctx, env.DB, sessionID)
 	if err != nil {
 		t.Fatalf("GetSession failed: %v", err)
 	}
@@ -79,7 +79,7 @@ func TestCP2_SessionFlow(t *testing.T) {
 	}
 
 	// Verify session still exists after end (end time tracked in memory, not DB)
-	session, err = ops.GetSession(ctx, env.V2DB, sessionID)
+	session, err = ops.GetSession(ctx, env.DB, sessionID)
 	if err != nil {
 		t.Fatalf("GetSession after end failed: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestCP3_CommandLogging(t *testing.T) {
 	}
 
 	// Query commands from storage
-	commands, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
+	commands, err := ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 		SessionID: &sessionID,
 		Limit:     100,
 	})
@@ -356,7 +356,7 @@ func TestSession_MultipleSessions(t *testing.T) {
 
 	// Verify each session in database
 	for _, s := range sessions {
-		session, err := ops.GetSession(ctx, env.V2DB, s.id)
+		session, err := ops.GetSession(ctx, env.DB, s.id)
 		if err != nil {
 			t.Errorf("GetSession for %s failed: %v", s.id, err)
 			continue
@@ -582,7 +582,7 @@ func TestSession_HistoryIsolation(t *testing.T) {
 
 	// Verify via direct storage query that commands are properly tagged
 	t.Run("StorageQuery_CommandsTaggedWithSession", func(t *testing.T) {
-		commandsA, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
+		commandsA, err := ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 			SessionID: &sessionA,
 			Limit:     100,
 		})
@@ -590,7 +590,7 @@ func TestSession_HistoryIsolation(t *testing.T) {
 			t.Fatalf("QueryCommands for session A failed: %v", err)
 		}
 
-		commandsB, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
+		commandsB, err := ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 			SessionID: &sessionB,
 			Limit:     100,
 		})
@@ -655,7 +655,7 @@ func TestSession_ClientInfoDefaults(t *testing.T) {
 		}
 
 		// Verify session was created with defaults
-		session, err := ops.GetSession(ctx, env.V2DB, sessionID)
+		session, err := ops.GetSession(ctx, env.DB, sessionID)
 		if err != nil {
 			t.Fatalf("GetSession failed: %v", err)
 		}

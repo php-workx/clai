@@ -19,9 +19,9 @@ import (
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
 )
 
-// newTestV2DB creates a temporary V2 database for testing.
+// newTestDB creates a temporary V2 database for testing.
 // The database is automatically cleaned up when the test finishes.
-func newTestV2DB(t *testing.T) *suggestdb.DB {
+func newTestDB(t *testing.T) *suggestdb.DB {
 	t.Helper()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "test.db")
@@ -82,7 +82,7 @@ func (m *mockProvider) Diagnose(ctx context.Context, req *provider.DiagnoseReque
 func createTestServer(t *testing.T) *Server {
 	t.Helper()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	mockProv := &mockProvider{
 		name:       "test",
@@ -95,7 +95,7 @@ func createTestServer(t *testing.T) *Server {
 	registry.SetPreferred("test")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		Registry:    registry,
 		IdleTimeout: 5 * time.Minute,
 	})
@@ -308,9 +308,9 @@ func newFeedbackStoreWithDB(t *testing.T) (*feedback.Store, func()) {
 	return store, cleanup
 }
 
-func TestHandler_RecordFeedback_WithV2DB(t *testing.T) {
+func TestHandler_RecordFeedback_WithDB(t *testing.T) {
 	t.Parallel()
-	// With V2DB configured, NewServer auto-creates a feedback store,
+	// With DB configured, NewServer auto-creates a feedback store,
 	// so RecordFeedback should succeed for valid requests.
 	server := createTestServer(t)
 	ctx := context.Background()
@@ -324,17 +324,17 @@ func TestHandler_RecordFeedback_WithV2DB(t *testing.T) {
 		t.Fatalf("RecordFeedback failed: %v", err)
 	}
 	if !resp.Ok {
-		t.Fatalf("expected response.Ok=true with V2DB, got error: %+v", resp.Error)
+		t.Fatalf("expected response.Ok=true with DB, got error: %+v", resp.Error)
 	}
 }
 
 func TestHandler_RecordFeedback_ValidationAndSuccess(t *testing.T) {
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 	feedbackStore, cleanup := newFeedbackStoreWithDB(t)
 	defer cleanup()
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:          v2db,
+		DB:            v2db,
 		FeedbackStore: feedbackStore,
 	})
 	if err != nil {
@@ -423,13 +423,13 @@ func TestHandler_RecordFeedback_ValidationAndSuccess(t *testing.T) {
 }
 
 func TestHandler_RecordFeedback_StoreError(t *testing.T) {
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 	feedbackStore, cleanup := newFeedbackStoreWithDB(t)
 	// Close the DB immediately to force store errors during RecordFeedback.
 	cleanup()
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:          v2db,
+		DB:            v2db,
 		FeedbackStore: feedbackStore,
 	})
 	if err != nil {
@@ -468,7 +468,7 @@ func TestHandler_RecordFeedback_StaleSnapshotIgnored(t *testing.T) {
 	defer v2db.Close()
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
@@ -530,7 +530,7 @@ func TestServer_ApplyLearningProfile_ReordersSuggestions(t *testing.T) {
 	defer v2db.Close()
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
@@ -565,7 +565,7 @@ func TestImportHistory_EdgeCases(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("if_not_exists_skip", func(t *testing.T) {
-		v2db := newTestV2DB(t)
+		v2db := newTestDB(t)
 
 		// Pre-import history so HasImportedHistory returns true.
 		_, err := ops.ImportHistory(ctx, v2db, []history.ImportEntry{{Command: "echo pre"}}, "bash")
@@ -573,7 +573,7 @@ func TestImportHistory_EdgeCases(t *testing.T) {
 			t.Fatalf("pre-import failed: %v", err)
 		}
 
-		server, err := NewServer(&ServerConfig{V2DB: v2db})
+		server, err := NewServer(&ServerConfig{DB: v2db})
 		if err != nil {
 			t.Fatalf("NewServer failed: %v", err)
 		}
@@ -628,7 +628,7 @@ func TestHandler_Suggest_ReturnsHistorySuggestions(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	// Seed the V2 database with a session and command for suggest to find
 	if err := ops.CreateSession(ctx, v2db, &ops.Session{
@@ -661,7 +661,7 @@ func TestHandler_Suggest_ReturnsHistorySuggestions(t *testing.T) {
 	registry.SetPreferred("test")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		Registry:    registry,
 		IdleTimeout: 5 * time.Minute,
 	})
@@ -803,7 +803,7 @@ func TestHandler_SuggestWithDestructiveCommand(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	// Seed V2 DB with a destructive command so suggest can find it
 	if err := ops.CreateSession(ctx, v2db, &ops.Session{
@@ -828,7 +828,7 @@ func TestHandler_SuggestWithDestructiveCommand(t *testing.T) {
 	}
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
@@ -1318,7 +1318,7 @@ func TestHandler_TextToCommand_DestructiveCommandFlagged(t *testing.T) {
 	t.Parallel()
 
 	// Create server with mock provider that returns destructive command
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	mockProv := &mockProvider{
 		name:       "test",
@@ -1331,7 +1331,7 @@ func TestHandler_TextToCommand_DestructiveCommandFlagged(t *testing.T) {
 	registry.SetPreferred("test")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:     v2db,
+		DB:       v2db,
 		Registry: registry,
 	})
 	if err != nil {
@@ -1362,7 +1362,7 @@ func TestHandler_TextToCommand_DestructiveCommandFlagged(t *testing.T) {
 func TestHandler_NextStep_DestructiveCommandFlagged(t *testing.T) {
 	t.Parallel()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	mockProv := &mockProvider{
 		name:       "test",
@@ -1375,7 +1375,7 @@ func TestHandler_NextStep_DestructiveCommandFlagged(t *testing.T) {
 	registry.SetPreferred("test")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:     v2db,
+		DB:       v2db,
 		Registry: registry,
 	})
 	if err != nil {
@@ -1407,7 +1407,7 @@ func TestHandler_NextStep_DestructiveCommandFlagged(t *testing.T) {
 func TestHandler_Diagnose_DestructiveFixFlagged(t *testing.T) {
 	t.Parallel()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	mockProv := &mockProvider{
 		name:       "test",
@@ -1420,7 +1420,7 @@ func TestHandler_Diagnose_DestructiveFixFlagged(t *testing.T) {
 	registry.SetPreferred("test")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:     v2db,
+		DB:       v2db,
 		Registry: registry,
 	})
 	if err != nil {
@@ -1451,9 +1451,9 @@ func TestHandler_Diagnose_DestructiveFixFlagged(t *testing.T) {
 
 // --- Store failure tests ---
 
-// newClosedTestV2DB creates a V2 database and immediately closes it,
+// newClosedTestDB creates a V2 database and immediately closes it,
 // so that all subsequent operations against it will fail.
-func newClosedTestV2DB(t *testing.T) *suggestdb.DB {
+func newClosedTestDB(t *testing.T) *suggestdb.DB {
 	t.Helper()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "closed.db")
@@ -1472,10 +1472,10 @@ func newClosedTestV2DB(t *testing.T) *suggestdb.DB {
 func TestHandler_SessionStart_StoreFailure(t *testing.T) {
 	t.Parallel()
 
-	closedDB := newClosedTestV2DB(t)
+	closedDB := newClosedTestDB(t)
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: closedDB,
+		DB: closedDB,
 	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
@@ -1508,10 +1508,10 @@ func TestHandler_CommandStarted_StoreFailure(t *testing.T) {
 
 	// Use a working DB for session start, then swap to a closed one is not possible,
 	// so instead we use a closed DB and expect command creation to fail.
-	closedDB := newClosedTestV2DB(t)
+	closedDB := newClosedTestDB(t)
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: closedDB,
+		DB: closedDB,
 	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
@@ -1545,10 +1545,10 @@ func TestHandler_CommandStarted_StoreFailure(t *testing.T) {
 func TestHandler_Suggest_EmptyDatabase(t *testing.T) {
 	t.Parallel()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
@@ -1614,7 +1614,7 @@ func (m *mockFailingProvider) Diagnose(ctx context.Context, req *provider.Diagno
 func TestHandler_TextToCommand_NoProvider(t *testing.T) {
 	t.Parallel()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	// Empty registry with no available providers
 	registry := provider.NewRegistry()
@@ -1622,7 +1622,7 @@ func TestHandler_TextToCommand_NoProvider(t *testing.T) {
 	registry.SetPreferred("nonexistent")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:     v2db,
+		DB:       v2db,
 		Registry: registry,
 	})
 	if err != nil {
@@ -1650,7 +1650,7 @@ func TestHandler_TextToCommand_NoProvider(t *testing.T) {
 func TestHandler_TextToCommand_ProviderFailure(t *testing.T) {
 	t.Parallel()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	mockProv := &mockFailingProvider{
 		name:       "failing",
@@ -1663,7 +1663,7 @@ func TestHandler_TextToCommand_ProviderFailure(t *testing.T) {
 	registry.SetPreferred("failing")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:     v2db,
+		DB:       v2db,
 		Registry: registry,
 	})
 	if err != nil {
@@ -1691,13 +1691,13 @@ func TestHandler_TextToCommand_ProviderFailure(t *testing.T) {
 func TestHandler_NextStep_NoProvider(t *testing.T) {
 	t.Parallel()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	registry := provider.NewRegistry()
 	registry.SetPreferred("nonexistent")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:     v2db,
+		DB:       v2db,
 		Registry: registry,
 	})
 	if err != nil {
@@ -1725,7 +1725,7 @@ func TestHandler_NextStep_NoProvider(t *testing.T) {
 func TestHandler_NextStep_ProviderFailure(t *testing.T) {
 	t.Parallel()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	mockProv := &mockFailingProvider{
 		name:       "failing",
@@ -1738,7 +1738,7 @@ func TestHandler_NextStep_ProviderFailure(t *testing.T) {
 	registry.SetPreferred("failing")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:     v2db,
+		DB:       v2db,
 		Registry: registry,
 	})
 	if err != nil {
@@ -1766,13 +1766,13 @@ func TestHandler_NextStep_ProviderFailure(t *testing.T) {
 func TestHandler_Diagnose_NoProvider(t *testing.T) {
 	t.Parallel()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	registry := provider.NewRegistry()
 	registry.SetPreferred("nonexistent")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:     v2db,
+		DB:       v2db,
 		Registry: registry,
 	})
 	if err != nil {
@@ -1801,7 +1801,7 @@ func TestHandler_Diagnose_NoProvider(t *testing.T) {
 func TestHandler_Diagnose_ProviderFailure(t *testing.T) {
 	t.Parallel()
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	mockProv := &mockFailingProvider{
 		name:       "failing",
@@ -1814,7 +1814,7 @@ func TestHandler_Diagnose_ProviderFailure(t *testing.T) {
 	registry.SetPreferred("failing")
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:     v2db,
+		DB:       v2db,
 		Registry: registry,
 	})
 	if err != nil {
@@ -1968,7 +1968,7 @@ func TestHandler_Suggest_MultipleDestructivePatterns(t *testing.T) {
 	for _, destructiveCmd := range destructiveCommands {
 		t.Run(destructiveCmd, func(t *testing.T) {
 			ctx := context.Background()
-			v2db := newTestV2DB(t)
+			v2db := newTestDB(t)
 
 			// Seed DB with this destructive command so suggest can find it
 			if err := ops.CreateSession(ctx, v2db, &ops.Session{
@@ -1993,7 +1993,7 @@ func TestHandler_Suggest_MultipleDestructivePatterns(t *testing.T) {
 			}
 
 			server, err := NewServer(&ServerConfig{
-				V2DB: v2db,
+				DB: v2db,
 			})
 			if err != nil {
 				t.Fatalf("failed to create server: %v", err)
@@ -2041,7 +2041,7 @@ func TestHandler_Suggest_SafeCommands(t *testing.T) {
 	for _, safeCmd := range safeCommands {
 		t.Run(safeCmd, func(t *testing.T) {
 			ctx := context.Background()
-			v2db := newTestV2DB(t)
+			v2db := newTestDB(t)
 
 			// Seed DB with this safe command so suggest can find it
 			if err := ops.CreateSession(ctx, v2db, &ops.Session{
@@ -2066,7 +2066,7 @@ func TestHandler_Suggest_SafeCommands(t *testing.T) {
 			}
 
 			server, err := NewServer(&ServerConfig{
-				V2DB: v2db,
+				DB: v2db,
 			})
 			if err != nil {
 				t.Fatalf("failed to create server: %v", err)
@@ -2163,7 +2163,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 	t.Helper()
 
 	ctx := context.Background()
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	// Add sessions
 	for _, sid := range []string{"session-1", "session-2"} {
@@ -2191,7 +2191,7 @@ func createTestServerWithCommands(t *testing.T) *Server {
 	}
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		IdleTimeout: 5 * time.Minute,
 	})
 	if err != nil {
@@ -2351,7 +2351,7 @@ func TestHandler_FetchHistory_ANSIStripping(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	// Create session for the command
 	if err := ops.CreateSession(ctx, v2db, &ops.Session{
@@ -2375,7 +2375,7 @@ func TestHandler_FetchHistory_ANSIStripping(t *testing.T) {
 	}
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		IdleTimeout: 5 * time.Minute,
 	})
 	if err != nil {
@@ -2493,7 +2493,7 @@ func TestHandler_FetchHistory_V2SearchPaginationOffset(t *testing.T) {
 	}
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
@@ -2543,7 +2543,7 @@ func TestHandler_FetchHistory_V2SearchFallback(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 
 	// Populate with real data via ops
 	if err := ops.CreateSession(ctx, v2db, &ops.Session{
@@ -2566,7 +2566,7 @@ func TestHandler_FetchHistory_V2SearchFallback(t *testing.T) {
 	}
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("failed to create server: %v", err)
@@ -2667,7 +2667,7 @@ func TestImportHistory_V2BackfillCalled(t *testing.T) {
 	}
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
@@ -2719,9 +2719,9 @@ func TestImportHistory_V2BackfillWithDB(t *testing.T) {
 		t.Fatalf("failed to write test history file: %v", err)
 	}
 
-	v2db := newTestV2DB(t)
+	v2db := newTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
@@ -2776,7 +2776,7 @@ func TestCommandEnded_FeedsV2(t *testing.T) {
 	defer v2db.Close()
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
@@ -2867,7 +2867,7 @@ func TestCommandEnded_FeedsV2(t *testing.T) {
 }
 
 // TestCommandEnded_V2NilGraceful was removed during V1->V2 migration.
-// V2DB is now required by NewServer, so the nil-V2DB scenario no longer applies.
+// DB is now required by NewServer, so the nil-DB scenario no longer applies.
 
 // TestCommandEnded_ExitCodeRecorded verifies that a non-zero exit code is
 // correctly recorded in the V2 event.
@@ -2888,7 +2888,7 @@ func TestCommandEnded_ExitCodeRecorded(t *testing.T) {
 	defer v2db.Close()
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)

@@ -22,21 +22,21 @@ type cachedWeights struct {
 	fetchedAt time.Time
 }
 
-// suggestV2 generates suggestions using only the V2 scorer.
-// Returns nil response if the V2 scorer is not available (caller should fall back).
-func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResults int) *pb.SuggestResponse {
-	if s.v2Scorer == nil {
+// scoreSuggestions generates suggestions using the scorer.
+// Returns nil response if the scorer is not available (caller should fall back).
+func (s *Server) scoreSuggestions(ctx context.Context, req *pb.SuggestRequest, maxResults int) *pb.SuggestResponse {
+	if s.scorer == nil {
 		return nil
 	}
 
-	suggestCtx := s.buildV2SuggestContext(req)
+	suggestCtx := s.buildSuggestContext(req)
 	if suggestCtx.NowMs == 0 {
 		suggestCtx.NowMs = time.Now().UnixMilli()
 	}
 
-	suggestions, err := s.v2Scorer.Suggest(ctx, &suggestCtx)
+	suggestions, err := s.scorer.Suggest(ctx, &suggestCtx)
 	if err != nil {
-		s.logger.Warn("V2 scorer failed", "error", err)
+		s.logger.Warn("scorer failed", "error", err)
 		return nil
 	}
 	s.applyLearningProfile(ctx, &suggestCtx, suggestions)
@@ -54,7 +54,7 @@ func (s *Server) suggestV2(ctx context.Context, req *pb.SuggestRequest, maxResul
 		s.snapshotMu.Unlock()
 	}
 
-	return s.v2SuggestionsToProto(suggestions, suggestCtx.LastCmd, suggestCtx.NowMs)
+	return s.suggestionsToProto(suggestions, suggestCtx.LastCmd, suggestCtx.NowMs)
 }
 
 func (s *Server) applyLearningProfile(
@@ -133,21 +133,21 @@ func learningDelta(sug *suggest2.Suggestion, prefix string, w *learning.Weights)
 	return (positive - negative) * learningScale
 }
 
-// mergeResponses merges V1 and V2 responses, deduplicating by command text.
-// V2 suggestions take priority on conflicts. Results are interleaved
-// (v2, v1, v2, v1, ...) and capped at maxResults.
-func mergeResponses(v1, v2 *pb.SuggestResponse, maxResults int) *pb.SuggestResponse {
-	if v2 == nil || len(v2.Suggestions) == 0 {
-		return v1
+// mergeResponses merges responses, deduplicating by command text.
+// Scorer suggestions take priority on conflicts. Results are interleaved
+// (primary, secondary, primary, secondary, ...) and capped at maxResults.
+func mergeResponses(primary, secondary *pb.SuggestResponse, maxResults int) *pb.SuggestResponse {
+	if secondary == nil || len(secondary.Suggestions) == 0 {
+		return primary
 	}
-	if v1 == nil || len(v1.Suggestions) == 0 {
-		return v2
+	if primary == nil || len(primary.Suggestions) == 0 {
+		return secondary
 	}
-	merged := interleaveUniqueSuggestions(v2.Suggestions, v1.Suggestions, maxResults)
+	merged := interleaveUniqueSuggestions(secondary.Suggestions, primary.Suggestions, maxResults)
 
 	return &pb.SuggestResponse{
 		Suggestions: merged,
-		FromCache:   v1.FromCache,
+		FromCache:   primary.FromCache,
 	}
 }
 
@@ -186,8 +186,8 @@ func appendUniqueSuggestion(
 	return append(merged, sug), idx
 }
 
-// buildV2SuggestContext creates a V2 SuggestContext from a Suggest RPC request.
-func (s *Server) buildV2SuggestContext(req *pb.SuggestRequest) suggest2.SuggestContext {
+// buildSuggestContext creates a SuggestContext from a Suggest RPC request.
+func (s *Server) buildSuggestContext(req *pb.SuggestRequest) suggest2.SuggestContext {
 	suggestCtx := suggest2.SuggestContext{
 		SessionID: req.SessionId,
 		Prefix:    req.Buffer,
@@ -227,15 +227,15 @@ func (s *Server) buildV2SuggestContext(req *pb.SuggestRequest) suggest2.SuggestC
 	return suggestCtx
 }
 
-// v2SuggestionsToProto converts V2 scorer suggestions to protobuf format.
-func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd string, nowMs int64) *pb.SuggestResponse {
+// suggestionsToProto converts scorer suggestions to protobuf format.
+func (s *Server) suggestionsToProto(suggestions []suggest2.Suggestion, prevCmd string, nowMs int64) *pb.SuggestResponse {
 	// Use default explain config; CLI can request more, but the picker UI
 	// should always have a basic "why" available.
 	explainCfg := explain.DefaultConfig()
 
 	pbSuggestions := make([]*pb.Suggestion, len(suggestions))
 	for i := range suggestions {
-		pbSuggestions[i] = v2SuggestionToProto(&suggestions[i], prevCmd, nowMs, explainCfg)
+		pbSuggestions[i] = suggestionToProto(&suggestions[i], prevCmd, nowMs, explainCfg)
 	}
 	return &pb.SuggestResponse{
 		Suggestions: pbSuggestions,
@@ -248,7 +248,7 @@ func (s *Server) v2SuggestionsToProto(suggestions []suggest2.Suggestion, prevCmd
 	}
 }
 
-func v2SuggestionToProto(
+func suggestionToProto(
 	sug *suggest2.Suggestion,
 	prevCmd string,
 	nowMs int64,
@@ -257,17 +257,17 @@ func v2SuggestionToProto(
 	why := explain.Explain(sug, explainCfg, prevCmd)
 	return &pb.Suggestion{
 		Text:        sug.Command,
-		Description: v2SuggestionDescription(sug, why, prevCmd),
-		Source:      v2SuggestionSource(sug),
+		Description: suggestionDescription(sug, why, prevCmd),
+		Source:      suggestionSource(sug),
 		Score:       sug.Score,
-		Risk:        v2SuggestionRisk(sug.Command),
+		Risk:        suggestionRisk(sug.Command),
 		CmdNorm:     sug.Command,
 		Confidence:  sug.Confidence,
-		Reasons:     v2SuggestionReasons(sug, why, nowMs),
+		Reasons:     suggestionReasons(sug, why, nowMs),
 	}
 }
 
-func v2SuggestionSource(sug *suggest2.Suggestion) string {
+func suggestionSource(sug *suggest2.Suggestion) string {
 	breakdown := sug.ScoreBreakdown()
 
 	cwdScore := breakdown.DirTransition + breakdown.DirFrequency
@@ -297,14 +297,14 @@ func v2SuggestionSource(sug *suggest2.Suggestion) string {
 	return source
 }
 
-func v2SuggestionRisk(command string) string {
+func suggestionRisk(command string) string {
 	if sanitize.IsDestructive(command) {
 		return riskDestructive
 	}
 	return ""
 }
 
-func v2SuggestionReasons(
+func suggestionReasons(
 	sug *suggest2.Suggestion,
 	why []explain.Reason,
 	nowMs int64,
@@ -338,7 +338,7 @@ func v2SuggestionReasons(
 	return reasons
 }
 
-func v2SuggestionDescription(sug *suggest2.Suggestion, why []explain.Reason, prevCmd string) string {
+func suggestionDescription(sug *suggest2.Suggestion, why []explain.Reason, prevCmd string) string {
 	if len(why) > 0 {
 		return why[0].Description
 	}

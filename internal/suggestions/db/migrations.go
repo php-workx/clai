@@ -19,28 +19,14 @@ type Migration struct {
 	Version int
 }
 
-// V1Migrations returns the migration list for V1 database files (suggestions.db).
-func V1Migrations() []Migration {
-	return []Migration{
-		{Version: 1, SQL: schemaV1},
-	}
-}
-
-// V2Migrations returns the migration list for V2 database files (suggestions_v2.db).
-// V2 uses a separate database file and does not migrate from V1.
-// The schema starts at version 2 to clearly distinguish from V1 databases.
-// V3 adds unified storage tables (ai_cache, PTY capture, CI workflow, etc.)
-func V2Migrations() []Migration {
+// Migrations returns the migration list for the database (suggestions_v2.db).
+// The schema starts at version 2 for historical reasons (to distinguish from
+// the now-deleted V1 schema). V3 adds unified storage tables.
+func Migrations() []Migration {
 	return []Migration{
 		{Version: 2, SQL: schemaV2},
 		{Version: 3, SQL: schemaV3},
 	}
-}
-
-// Migrations returns the V1 migration list for backward compatibility.
-// New code should use V1Migrations() or V2Migrations() explicitly.
-func Migrations() []Migration {
-	return V1Migrations()
 }
 
 // GetSchemaVersion returns the current schema version from the database.
@@ -73,18 +59,10 @@ func GetSchemaVersion(ctx context.Context, db *sql.DB) (int, error) {
 	return version, nil
 }
 
-// RunMigrations applies all pending V1 migrations to the database.
-// For V2 databases, use RunV2Migrations instead.
-// It will refuse to run if the database schema version exceeds V1SchemaVersion.
-func RunMigrations(ctx context.Context, db *sql.DB) error {
-	return runMigrationList(ctx, db, V1Migrations(), V1SchemaVersion)
-}
-
-// RunV2Migrations applies the V2 schema migration to a fresh database.
-// V2 uses a separate database file (suggestions_v2.db) and starts fresh.
+// RunMigrations applies all pending migrations to the database.
 // It will refuse to run if the database schema version exceeds SchemaVersion.
-func RunV2Migrations(ctx context.Context, db *sql.DB) error {
-	return runMigrationList(ctx, db, V2Migrations(), SchemaVersion)
+func RunMigrations(ctx context.Context, db *sql.DB) error {
+	return runMigrationList(ctx, db, Migrations(), SchemaVersion)
 }
 
 // runMigrationList applies pending migrations from the given list.
@@ -126,8 +104,7 @@ func applyMigration(ctx context.Context, db *sql.DB, m Migration) error {
 		return fmt.Errorf("failed to execute migration SQL: %w", execErr)
 	}
 
-	// Record the migration. Detect the column name since V1 uses
-	// applied_ts and V2 uses applied_ms.
+	// Record the migration
 	columnName := migrationTimestampColumn(ctx, tx)
 	_, err = tx.ExecContext(ctx, fmt.Sprintf(`
 		INSERT INTO schema_migrations (version, %s)
@@ -145,11 +122,10 @@ func applyMigration(ctx context.Context, db *sql.DB, m Migration) error {
 }
 
 // migrationTimestampColumn detects the timestamp column name in schema_migrations.
-// V1 uses "applied_ts", V2 uses "applied_ms".
 func migrationTimestampColumn(ctx context.Context, tx *sql.Tx) string {
 	rows, err := tx.QueryContext(ctx, "PRAGMA table_info(schema_migrations)")
 	if err != nil {
-		return "applied_ms" // default to V2
+		return "applied_ms"
 	}
 	defer rows.Close()
 
@@ -168,57 +144,18 @@ func migrationTimestampColumn(ctx context.Context, tx *sql.Tx) string {
 			return "applied_ms"
 		}
 	}
-	return "applied_ms" // default to V2
+	return "applied_ms"
 }
 
-// ValidateSchema checks that all expected V1 tables and indexes exist.
-// This can be used for health checks after migrations on V1 databases.
+// ValidateSchema checks that all expected tables, indexes, and triggers exist.
 func ValidateSchema(ctx context.Context, db *sql.DB) error {
-	// Check all tables exist
-	for _, table := range AllTables {
-		var name string
-		err := db.QueryRowContext(ctx, `
-			SELECT name FROM sqlite_master
-			WHERE type='table' AND name=?
-		`, table).Scan(&name)
-
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("table %q does not exist", table)
-			}
-			return fmt.Errorf("failed to check table %q: %w", table, err)
-		}
-	}
-
-	// Check all indexes exist
-	for _, index := range AllIndexes {
-		var name string
-		err := db.QueryRowContext(ctx, `
-			SELECT name FROM sqlite_master
-			WHERE type='index' AND name=?
-		`, index).Scan(&name)
-
-		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				return fmt.Errorf("index %q does not exist", index)
-			}
-			return fmt.Errorf("failed to check index %q: %w", index, err)
-		}
-	}
-
-	return nil
-}
-
-// ValidateV2Schema checks that all expected V2 tables, indexes, and triggers exist.
-// This is the primary validation for V2 database files.
-func ValidateV2Schema(ctx context.Context, db *sql.DB) error {
-	if err := validateSchemaObjects(ctx, db, "(type='table' OR type='view')", V2AllTables, "table"); err != nil {
+	if err := validateSchemaObjects(ctx, db, "(type='table' OR type='view')", AllTables, "table"); err != nil {
 		return err
 	}
-	if err := validateSchemaObjects(ctx, db, "type='index'", V2AllIndexes, "index"); err != nil {
+	if err := validateSchemaObjects(ctx, db, "type='index'", AllIndexes, "index"); err != nil {
 		return err
 	}
-	return validateSchemaObjects(ctx, db, "type='trigger'", V2AllTriggers, "trigger")
+	return validateSchemaObjects(ctx, db, "type='trigger'", AllTriggers, "trigger")
 }
 
 func validateSchemaObjects(

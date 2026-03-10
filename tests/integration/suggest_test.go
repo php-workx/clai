@@ -656,7 +656,7 @@ func TestSuggest_QueryCommandsDirectly(t *testing.T) {
 
 	// Query by session
 	sessionID := "hist-session"
-	commands, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
+	commands, err := ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 		SessionID: &sessionID,
 		Limit:     100,
 	})
@@ -670,7 +670,7 @@ func TestSuggest_QueryCommandsDirectly(t *testing.T) {
 
 	// Query by CWD
 	cwd := "/home/test/repo"
-	commands, err = ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
+	commands, err = ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 		CWD:   &cwd,
 		Limit: 100,
 	})
@@ -686,7 +686,7 @@ func TestSuggest_QueryCommandsDirectly(t *testing.T) {
 	}
 
 	// Query by prefix
-	commands, err = ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
+	commands, err = ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 		Prefix: "git",
 		Limit:  100,
 	})

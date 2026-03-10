@@ -45,12 +45,11 @@ type Options struct {
 	LockTimeout       time.Duration
 	SkipLock          bool
 	ReadOnly          bool
-	UseV1             bool
 	EnableRecovery    bool
 	RunIntegrityCheck bool
 }
 
-// DefaultDBPath returns the default V2 database path (~/.clai/suggestions_v2.db).
+// DefaultDBPath returns the default database path (~/.clai/suggestions_v2.db).
 func DefaultDBPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -59,20 +58,10 @@ func DefaultDBPath() (string, error) {
 	return filepath.Join(home, ".clai", "suggestions_v2.db"), nil
 }
 
-// DefaultV1DBPath returns the default V1 database path (~/.clai/suggestions.db).
-// This is retained for backward compatibility with existing V1 data.
-func DefaultV1DBPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get home directory: %w", err)
-	}
-	return filepath.Join(home, ".clai", "suggestions.db"), nil
-}
-
 // Open opens the database, acquires the daemon lock, and runs migrations.
 // The caller must call Close() when done.
 //
-// When EnableRecovery is true (V2 only), corruption detected during open or
+// When EnableRecovery is true, corruption detected during open or
 // migration triggers automatic recovery: corrupt files are rotated to
 // .corrupt.<timestamp> and a fresh database is initialized.
 func Open(ctx context.Context, opts Options) (*DB, error) {
@@ -103,9 +92,6 @@ func Open(ctx context.Context, opts Options) (*DB, error) {
 func resolveDBPath(opts Options) (string, error) {
 	if opts.Path != "" {
 		return opts.Path, nil
-	}
-	if opts.UseV1 {
-		return DefaultV1DBPath()
 	}
 	return DefaultDBPath()
 }
@@ -144,7 +130,7 @@ func openDatabaseWithRecovery(ctx context.Context, dbPath string, opts Options, 
 }
 
 func canRecoverFromOpenError(opts Options, err error) bool {
-	canRecover := opts.EnableRecovery && !opts.UseV1 && !opts.ReadOnly
+	canRecover := opts.EnableRecovery && !opts.ReadOnly
 	return canRecover && isCorruptionError(err) && !isPermissionError(err) && !isDiskFullError(err)
 }
 
@@ -155,7 +141,7 @@ func runIntegrityRecoveryIfNeeded(
 	opts Options,
 	lock *LockFile,
 ) (*sql.DB, error) {
-	if !opts.EnableRecovery || !opts.RunIntegrityCheck || opts.UseV1 || opts.ReadOnly {
+	if !opts.EnableRecovery || !opts.RunIntegrityCheck || opts.ReadOnly {
 		return sqlDB, nil
 	}
 	intErr := RunIntegrityCheck(ctx, sqlDB)
@@ -230,12 +216,7 @@ func openAndInit(ctx context.Context, dbPath string, opts Options) (*sql.DB, err
 
 	// Run migrations (unless read-only)
 	if !opts.ReadOnly {
-		var migErr error
-		if opts.UseV1 {
-			migErr = RunMigrations(ctx, db)
-		} else {
-			migErr = RunV2Migrations(ctx, db)
-		}
+		migErr := RunMigrations(ctx, db)
 		if migErr != nil {
 			db.Close()
 			return nil, fmt.Errorf("failed to run migrations: %w", migErr)
@@ -368,16 +349,9 @@ func (d *DB) BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error) 
 	return d.db.BeginTx(ctx, opts)
 }
 
-// Validate checks that the V1 schema is correctly initialized.
-// For V2 databases, use ValidateV2 instead.
+// Validate checks that the schema is correctly initialized.
 func (d *DB) Validate(ctx context.Context) error {
 	return ValidateSchema(ctx, d.db)
-}
-
-// ValidateV2 checks that the V2 schema is correctly initialized.
-// This validates all 23 tables, indexes, and triggers required by V2.
-func (d *DB) ValidateV2(ctx context.Context) error {
-	return ValidateV2Schema(ctx, d.db)
 }
 
 // Version returns the current schema version.

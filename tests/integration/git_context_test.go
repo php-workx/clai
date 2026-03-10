@@ -41,7 +41,7 @@ func TestCommandStarted_StoresGitBranch(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	commands, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
+	commands, err := ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 		SessionID: &sessionID,
 		Limit:     5,
 	})

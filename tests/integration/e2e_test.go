@@ -446,7 +446,7 @@ func TestE2E_DestructiveCommandRiskFlag(t *testing.T) {
 	}
 
 	// Verify the command was stored by querying commands directly.
-	commands, err := ops.QueryCommands(ctx, env.V2DB, ops.CommandQuery{
+	commands, err := ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 		SessionID: &sessionID,
 		Limit:     10,
 	})

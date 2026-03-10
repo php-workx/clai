@@ -14,12 +14,12 @@ import (
 )
 
 // ============================================================================
-// Feature flag tests
+// Scorer initialization tests
 // ============================================================================
 
-// TestScorerVersion_DefaultsToV2 verifies that a server with V2DB
-// defaults to "v2" scorer version.
-func TestScorerVersion_DefaultsToV2(t *testing.T) {
+// TestScorer_InitializedWithDB verifies that a server with DB
+// initializes the scorer.
+func TestScorer_InitializedWithDB(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
@@ -30,27 +30,24 @@ func TestScorerVersion_DefaultsToV2(t *testing.T) {
 		SkipLock: true,
 	})
 	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
+		t.Fatalf("failed to open database: %v", err)
 	}
 	defer v2db.Close()
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
-	if server.scorerVersion != "v2" {
-		t.Errorf("expected scorerVersion='v2', got %q", server.scorerVersion)
-	}
-	if server.v2Scorer == nil {
-		t.Error("v2Scorer should be initialized when V2DB is provided")
+	if server.scorer == nil {
+		t.Error("scorer should be initialized when DB is provided")
 	}
 }
 
-// TestScorerVersion_V2WorksWithDB verifies that "v2" scorer version is kept
-// when V2DB is provided (and scorer is auto-initialized).
-func TestScorerVersion_V2WorksWithDB(t *testing.T) {
+// TestScorer_WorksWithDB verifies that the scorer is initialized
+// when DB is provided.
+func TestScorer_WorksWithDB(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
@@ -61,22 +58,18 @@ func TestScorerVersion_V2WorksWithDB(t *testing.T) {
 		SkipLock: true,
 	})
 	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
+		t.Fatalf("failed to open database: %v", err)
 	}
 	defer v2db.Close()
 
 	server, err := NewServer(&ServerConfig{
-		ScorerVersion: "v2",
-		V2DB:          v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
-	if server.scorerVersion != "v2" {
-		t.Errorf("expected scorerVersion='v2', got %q", server.scorerVersion)
-	}
-	if server.v2Scorer == nil {
-		t.Error("v2Scorer should be initialized when V2DB is provided")
+	if server.scorer == nil {
+		t.Error("scorer should be initialized when DB is provided")
 	}
 }
 
@@ -84,7 +77,7 @@ func TestScorerVersion_V2WorksWithDB(t *testing.T) {
 // Suggest handler tests
 // ============================================================================
 
-// TestSuggest_ReturnsResults verifies suggest returns results from V2 scorer.
+// TestSuggest_ReturnsResults verifies suggest returns results from the scorer.
 func TestSuggest_ReturnsResults(t *testing.T) {
 	t.Parallel()
 	server := createTestServer(t)
@@ -99,7 +92,7 @@ func TestSuggest_ReturnsResults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Suggest failed: %v", err)
 	}
-	// With an empty DB, V2 scorer may return empty results
+	// With an empty DB, scorer may return empty results
 	_ = resp
 }
 
@@ -122,8 +115,8 @@ func TestSuggest_DefaultMaxResults(t *testing.T) {
 	_ = resp
 }
 
-// TestSuggest_V2_WithScorer verifies V2 mode uses the V2 scorer when available.
-func TestSuggest_V2_WithScorer(t *testing.T) {
+// TestSuggest_WithScorer verifies the scorer is used when available.
+func TestSuggest_WithScorer(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
@@ -134,23 +127,22 @@ func TestSuggest_V2_WithScorer(t *testing.T) {
 		SkipLock: true,
 	})
 	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
+		t.Fatalf("failed to open database: %v", err)
 	}
 	defer v2db.Close()
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:          v2db,
-		ScorerVersion: "v2",
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
-	if server.scorerVersion != "v2" {
-		t.Fatalf("expected scorerVersion='v2', got %q", server.scorerVersion)
+	if server.scorer == nil {
+		t.Fatal("scorer should be initialized when DB is provided")
 	}
 
-	// The V2 scorer is initialized but the DB has no data, so it should
+	// The scorer is initialized but the DB has no data, so it should
 	// return an empty list (not an error).
 	resp, err := server.Suggest(ctx, &pb.SuggestRequest{
 		SessionId:  "test-session",
@@ -160,8 +152,8 @@ func TestSuggest_V2_WithScorer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Suggest failed: %v", err)
 	}
-	// Empty DB means no V2 suggestions
-	// This verifies the V2 path was attempted without error
+	// Empty DB means no suggestions
+	// This verifies the scorer path was attempted without error
 	_ = resp
 }
 
@@ -297,49 +289,49 @@ func setSuggestionScorePrivateFloat64(s *suggest2.Suggestion, field string, valu
 	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetFloat(value)
 }
 
-func TestV2SuggestionRisk(t *testing.T) {
+func TestSuggestionRisk(t *testing.T) {
 	t.Parallel()
-	if got := v2SuggestionRisk("rm -rf /tmp/test"); got != "destructive" {
+	if got := suggestionRisk("rm -rf /tmp/test"); got != "destructive" {
 		t.Fatalf("expected destructive risk, got %q", got)
 	}
-	if got := v2SuggestionRisk("git status"); got != "" {
+	if got := suggestionRisk("git status"); got != "" {
 		t.Fatalf("expected no risk for safe command, got %q", got)
 	}
 }
 
-func TestV2SuggestionDescription_CoversBranches(t *testing.T) {
+func TestSuggestionDescription_CoversBranches(t *testing.T) {
 	t.Parallel()
 
 	s := suggest2.Suggestion{Command: "git status"}
 	why := []explain.Reason{{Tag: "repo_trans", Description: "From repository workflow", Contribution: 0.4}}
-	if got := v2SuggestionDescription(&s, why, "git add ."); got != "From repository workflow" {
+	if got := suggestionDescription(&s, why, "git add ."); got != "From repository workflow" {
 		t.Fatalf("expected why-first description, got %q", got)
 	}
 
 	s2 := suggest2.Suggestion{Command: "git commit"}
 	setSuggestionPrivateInt(&s2, "maxTransCount", 2)
-	if got := v2SuggestionDescription(&s2, nil, "a very long previous command that should be truncated for display in description"); got == "" || got[:15] != "Often run after" {
+	if got := suggestionDescription(&s2, nil, "a very long previous command that should be truncated for display in description"); got == "" || got[:15] != "Often run after" {
 		t.Fatalf("expected transition description, got %q", got)
 	}
 
 	s3 := suggest2.Suggestion{Command: "npm test"}
 	setSuggestionPrivateFloat64(&s3, "maxFreqScore", 1.1)
-	if got := v2SuggestionDescription(&s3, nil, ""); got != "Frequently used command." {
+	if got := suggestionDescription(&s3, nil, ""); got != "Frequently used command." {
 		t.Fatalf("expected frequency description, got %q", got)
 	}
 
 	s4 := suggest2.Suggestion{Command: "ls"}
 	setSuggestionPrivateInt64(&s4, "lastSeenMs", 1700000000000)
-	if got := v2SuggestionDescription(&s4, nil, ""); got != "Used recently." {
+	if got := suggestionDescription(&s4, nil, ""); got != "Used recently." {
 		t.Fatalf("expected recency description, got %q", got)
 	}
 
-	if got := v2SuggestionDescription(&suggest2.Suggestion{Command: "echo hi"}, nil, ""); got != "" {
+	if got := suggestionDescription(&suggest2.Suggestion{Command: "echo hi"}, nil, ""); got != "" {
 		t.Fatalf("expected empty description fallback, got %q", got)
 	}
 }
 
-func TestV2SuggestionReasons_IncludesExplainAndSignals(t *testing.T) {
+func TestSuggestionReasons_IncludesExplainAndSignals(t *testing.T) {
 	t.Parallel()
 	nowMs := int64(1_700_000_010_000)
 	s := suggest2.Suggestion{Command: "make test"}
@@ -350,7 +342,7 @@ func TestV2SuggestionReasons_IncludesExplainAndSignals(t *testing.T) {
 	why := []explain.Reason{
 		{Tag: "repo_trans", Description: "Common in this repo", Contribution: 0.3},
 	}
-	reasons := v2SuggestionReasons(&s, why, nowMs)
+	reasons := suggestionReasons(&s, why, nowMs)
 	if len(reasons) < 4 {
 		t.Fatalf("expected explain + recency + frequency + transition reasons, got %d", len(reasons))
 	}
@@ -366,7 +358,7 @@ func TestV2SuggestionReasons_IncludesExplainAndSignals(t *testing.T) {
 	}
 }
 
-func TestV2SuggestionToProto_MapsFields(t *testing.T) {
+func TestSuggestionToProto_MapsFields(t *testing.T) {
 	t.Parallel()
 	nowMs := int64(1_700_000_010_000)
 	s := suggest2.Suggestion{
@@ -376,7 +368,7 @@ func TestV2SuggestionToProto_MapsFields(t *testing.T) {
 	}
 	setSuggestionPrivateInt64(&s, "lastSeenMs", 1_700_000_000_000)
 	cfg := explain.DefaultConfig()
-	got := v2SuggestionToProto(&s, "git clean", nowMs, cfg)
+	got := suggestionToProto(&s, "git clean", nowMs, cfg)
 
 	if got.Text != s.Command || got.CmdNorm != s.Command {
 		t.Fatalf("expected command text/cmd_norm to match, got %+v", got)
@@ -395,7 +387,7 @@ func TestV2SuggestionToProto_MapsFields(t *testing.T) {
 	}
 }
 
-func TestV2SuggestionSource_DominantSignals(t *testing.T) {
+func TestSuggestionSource_DominantSignals(t *testing.T) {
 	t.Parallel()
 
 	cases := []struct {
@@ -441,8 +433,8 @@ func TestV2SuggestionSource_DominantSignals(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s := suggest2.Suggestion{Command: "git status"}
 			tc.setter(&s)
-			if got := v2SuggestionSource(&s); got != tc.wantSrc {
-				t.Fatalf("v2SuggestionSource()=%q want %q", got, tc.wantSrc)
+			if got := suggestionSource(&s); got != tc.wantSrc {
+				t.Fatalf("suggestionSource()=%q want %q", got, tc.wantSrc)
 			}
 		})
 	}

@@ -31,7 +31,7 @@ func (s *Server) WorkflowRunStart(ctx context.Context, req *pb.WorkflowRunStartR
 		StartedAt:    startedAt,
 	}
 
-	if err := ops.CreateWorkflowRun(ctx, s.v2db, run); err != nil {
+	if err := ops.CreateWorkflowRun(ctx, s.db, run); err != nil {
 		s.logger.Warn("failed to create workflow run",
 			"run_id", req.RunId,
 			"error", err,
@@ -53,7 +53,7 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 	s.touchActivity()
 
 	// Check if the step already exists
-	existing, err := ops.GetWorkflowStep(ctx, s.v2db, req.RunId, req.StepId, req.MatrixKey)
+	existing, err := ops.GetWorkflowStep(ctx, s.db, req.RunId, req.StepId, req.MatrixKey)
 	if err != nil && !errors.Is(err, ops.ErrWorkflowStepNotFound) {
 		s.logger.Warn("failed to get workflow step",
 			"run_id", req.RunId,
@@ -78,7 +78,7 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 			OutputsJSON: req.OutputsJson,
 		}
 
-		if err := ops.CreateWorkflowStep(ctx, s.v2db, step); err != nil {
+		if err := ops.CreateWorkflowStep(ctx, s.db, step); err != nil {
 			s.logger.Warn("failed to create workflow step",
 				"run_id", req.RunId,
 				"step_id", req.StepId,
@@ -101,7 +101,7 @@ func (s *Server) WorkflowStepUpdate(ctx context.Context, req *pb.WorkflowStepUpd
 			OutputsJSON: req.OutputsJson,
 		}
 
-		if err := ops.UpdateWorkflowStep(ctx, s.v2db, update); err != nil {
+		if err := ops.UpdateWorkflowStep(ctx, s.db, update); err != nil {
 			s.logger.Warn("failed to update workflow step",
 				"run_id", req.RunId,
 				"step_id", req.StepId,
@@ -130,7 +130,7 @@ func (s *Server) WorkflowRunEnd(ctx context.Context, req *pb.WorkflowRunEndReque
 		endedAt = req.EndedAtUnixMs
 	}
 
-	if err := ops.UpdateWorkflowRun(ctx, s.v2db, req.RunId, req.Status, endedAt, req.DurationMs); err != nil {
+	if err := ops.UpdateWorkflowRun(ctx, s.db, req.RunId, req.Status, endedAt, req.DurationMs); err != nil {
 		s.logger.Warn("failed to end workflow run",
 			"run_id", req.RunId,
 			"error", err,
@@ -187,7 +187,7 @@ func (s *Server) AnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutpu
 			DurationMs:  durationMs,
 			AnalyzedAt:  time.Now().UnixMilli(),
 		}
-		if storeErr := ops.CreateWorkflowAnalysis(ctx, s.v2db, analysis); storeErr != nil {
+		if storeErr := ops.CreateWorkflowAnalysis(ctx, s.db, analysis); storeErr != nil {
 			s.logger.Warn("failed to store error analysis",
 				"run_id", req.RunId,
 				"step_id", req.StepId,
@@ -218,7 +218,7 @@ func (s *Server) AnalyzeStepOutput(ctx context.Context, req *pb.AnalyzeStepOutpu
 		AnalyzedAt:  time.Now().UnixMilli(),
 	}
 
-	if err := ops.CreateWorkflowAnalysis(ctx, s.v2db, analysis); err != nil {
+	if err := ops.CreateWorkflowAnalysis(ctx, s.db, analysis); err != nil {
 		s.logger.Warn("failed to store analysis",
 			"run_id", req.RunId,
 			"step_id", req.StepId,

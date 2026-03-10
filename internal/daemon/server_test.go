@@ -54,7 +54,7 @@ func TestNewServer_Success(t *testing.T) {
 
 	v2db := openTestDB(t)
 	cfg := &ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		IdleTimeout: 5 * time.Minute,
 	}
 
@@ -67,7 +67,7 @@ func TestNewServer_Success(t *testing.T) {
 		t.Fatal("server should not be nil")
 	}
 
-	if server.v2db != v2db {
+	if server.db != v2db {
 		t.Error("v2db should be set")
 	}
 
@@ -89,16 +89,16 @@ func TestNewServer_NilConfig(t *testing.T) {
 	}
 }
 
-func TestNewServer_NilV2DB(t *testing.T) {
+func TestNewServer_NilDB(t *testing.T) {
 	t.Parallel()
 
 	cfg := &ServerConfig{
-		V2DB: nil,
+		DB: nil,
 	}
 
 	_, err := NewServer(cfg)
 	if err == nil {
-		t.Error("expected error for nil V2DB")
+		t.Error("expected error for nil DB")
 	}
 }
 
@@ -107,7 +107,7 @@ func TestNewServer_DefaultIdleTimeout(t *testing.T) {
 
 	v2db := openTestDB(t)
 	cfg := &ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	}
 
 	server, err := NewServer(cfg)
@@ -125,7 +125,7 @@ func TestServer_TouchActivity(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -144,7 +144,7 @@ func TestServer_IncrementCommandsLogged(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -178,7 +178,7 @@ func TestNewServer_TableDriven(t *testing.T) {
 	validRegistry := provider.NewRegistry()
 
 	// Open a shared V2 DB for the table-driven tests that need one.
-	validV2DB := openTestDB(t)
+	validDB := openTestDB(t)
 
 	tests := []struct {
 		config      *ServerConfig
@@ -194,21 +194,21 @@ func TestNewServer_TableDriven(t *testing.T) {
 			errContains: "config is required",
 		},
 		{
-			name: "nil V2DB returns error",
+			name: "nil DB returns error",
 			config: &ServerConfig{
-				V2DB: nil,
+				DB: nil,
 			},
 			wantErr:     true,
-			errContains: "V2DB is required",
+			errContains: "DB is required",
 		},
 		{
 			name: "valid config with minimal options",
 			config: &ServerConfig{
-				V2DB: validV2DB,
+				DB: validDB,
 			},
 			wantErr: false,
 			validate: func(t *testing.T, s *Server) {
-				if s.v2db != validV2DB {
+				if s.db != validDB {
 					t.Error("v2db should be set correctly")
 				}
 				if s.registry == nil {
@@ -234,14 +234,14 @@ func TestNewServer_TableDriven(t *testing.T) {
 		{
 			name: "valid config with all options provided",
 			config: &ServerConfig{
-				V2DB:        validV2DB,
+				DB:          validDB,
 				Registry:    validRegistry,
 				Logger:      validLogger,
 				IdleTimeout: 10 * time.Minute,
 			},
 			wantErr: false,
 			validate: func(t *testing.T, s *Server) {
-				if s.v2db != validV2DB {
+				if s.db != validDB {
 					t.Error("v2db should be the provided database")
 				}
 				if s.registry != validRegistry {
@@ -258,7 +258,7 @@ func TestNewServer_TableDriven(t *testing.T) {
 		{
 			name: "custom paths are respected",
 			config: &ServerConfig{
-				V2DB: validV2DB,
+				DB: validDB,
 				Paths: &config.Paths{
 					BaseDir: "/tmp/clai-test",
 				},
@@ -322,7 +322,7 @@ func TestServer_ActivityTracking_Concurrent(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -368,7 +368,7 @@ func TestServer_CommandsLogged_Concurrent(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -403,7 +403,7 @@ func TestServer_CommandsLogged_ReadWhileWrite(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -457,7 +457,7 @@ func TestServer_WritePIDFile(t *testing.T) {
 
 	v2db := openTestDBInDir(t, tmpDir)
 	server, err := NewServer(&ServerConfig{
-		V2DB:  v2db,
+		DB:    v2db,
 		Paths: paths,
 	})
 	if err != nil {
@@ -510,7 +510,7 @@ func TestServer_Cleanup(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:   v2db,
+		DB:     v2db,
 		Paths:  paths,
 		Logger: logger,
 	})
@@ -563,7 +563,7 @@ func TestServer_Cleanup_NonexistentFiles(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:   v2db,
+		DB:     v2db,
 		Paths:  paths,
 		Logger: logger,
 	})
@@ -612,7 +612,7 @@ func TestServer_IdleTimeout_Configuration(t *testing.T) {
 			t.Parallel()
 
 			server, err := NewServer(&ServerConfig{
-				V2DB:        v2db,
+				DB:          v2db,
 				IdleTimeout: tt.timeout,
 			})
 			if err != nil {
@@ -632,7 +632,7 @@ func TestServer_WatchIdle_IdleConditionCheck(t *testing.T) {
 
 	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		IdleTimeout: 1 * time.Second,
 	})
 	if err != nil {
@@ -662,7 +662,7 @@ func TestServer_WatchIdle_CancelContext(t *testing.T) {
 
 	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		IdleTimeout: 1 * time.Hour, // Long timeout - we're testing cancellation
 	})
 	if err != nil {
@@ -697,7 +697,7 @@ func TestServer_WatchIdle_ShutdownChan(t *testing.T) {
 
 	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		IdleTimeout: 1 * time.Hour,
 	})
 	if err != nil {
@@ -733,7 +733,7 @@ func TestServer_WatchIdle_NoShutdownWithActiveSessions(t *testing.T) {
 
 	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		IdleTimeout: 1 * time.Millisecond,
 	})
 	if err != nil {
@@ -785,7 +785,7 @@ func TestServer_PruneCache(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:   v2db,
+		DB:     v2db,
 		Logger: logger,
 	})
 	if err != nil {
@@ -807,7 +807,7 @@ func TestServer_PruneCache_HandlesError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:   v2db,
+		DB:     v2db,
 		Logger: logger,
 	})
 	if err != nil {
@@ -825,7 +825,7 @@ func TestServer_PruneCacheLoop_CancelContext(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -859,7 +859,7 @@ func TestServer_PruneCacheLoop_ShutdownChan(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -914,7 +914,7 @@ func TestServer_Start_CreatesSocket(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		Paths:       paths,
 		Logger:      logger,
 		IdleTimeout: 1 * time.Hour,
@@ -993,7 +993,7 @@ func TestServer_Shutdown_Idempotent(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -1037,7 +1037,7 @@ func TestServer_Shutdown_ClosesListener(t *testing.T) {
 
 	v2db := openTestDBInDir(t, tmpDir)
 	server, err := NewServer(&ServerConfig{
-		V2DB:  v2db,
+		DB:    v2db,
 		Paths: paths,
 	})
 	if err != nil {
@@ -1079,7 +1079,7 @@ func TestServer_ActivityTracking_TimeProgression(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -1108,7 +1108,7 @@ func TestServer_StartTime(t *testing.T) {
 	before := time.Now()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -1128,7 +1128,7 @@ func TestServer_InitialActivity(t *testing.T) {
 	before := time.Now()
 
 	v2db := openTestDB(t)
-	server, err := NewServer(&ServerConfig{V2DB: v2db})
+	server, err := NewServer(&ServerConfig{DB: v2db})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
@@ -1142,25 +1142,25 @@ func TestServer_InitialActivity(t *testing.T) {
 	}
 }
 
-// TestNewServer_WithV2DB verifies the server starts successfully with a V2 database.
-func TestNewServer_WithV2DB(t *testing.T) {
+// TestNewServer_WithDB verifies the server starts successfully with a V2 database.
+func TestNewServer_WithDB(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
-	if server.v2db != v2db {
+	if server.db != v2db {
 		t.Error("v2db should be set to the provided database")
 	}
 }
 
-// TestNewServer_V2DB_UnwritablePath verifies graceful handling when V2 DB path is unwritable.
-func TestNewServer_V2DB_UnwritablePath(t *testing.T) {
+// TestNewServer_DB_UnwritablePath verifies graceful handling when V2 DB path is unwritable.
+func TestNewServer_DB_UnwritablePath(t *testing.T) {
 	t.Parallel()
 
 	// Create an unwritable directory to simulate V2 DB open failure
@@ -1190,34 +1190,34 @@ func TestNewServer_V2DB_UnwritablePath(t *testing.T) {
 		t.Fatal("v2db should be nil after failed open")
 	}
 
-	// NewServer should fail with nil V2DB since V2DB is now required
+	// NewServer should fail with nil DB since DB is now required
 	_, err = NewServer(&ServerConfig{
-		V2DB: nil,
+		DB: nil,
 	})
 	if err == nil {
-		t.Fatal("NewServer should fail without V2DB")
+		t.Fatal("NewServer should fail without DB")
 	}
-	if !containsSubstring(err.Error(), "V2DB is required") {
-		t.Errorf("expected error about V2DB being required, got: %v", err)
+	if !containsSubstring(err.Error(), "DB is required") {
+		t.Errorf("expected error about DB being required, got: %v", err)
 	}
 }
 
-// TestNewServer_WithBatchWriter verifies the server creates a batch writer when V2DB is provided.
+// TestNewServer_WithBatchWriter verifies the server creates a batch writer when DB is provided.
 func TestNewServer_WithBatchWriter(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
 	if server.batchWriter == nil {
-		t.Error("batchWriter should be initialized when V2DB is provided")
+		t.Error("batchWriter should be initialized when DB is provided")
 	}
-	if server.v2db != v2db {
+	if server.db != v2db {
 		t.Error("v2db should be set to the provided database")
 	}
 }
@@ -1232,7 +1232,7 @@ func TestNewServer_CustomBatchWriter(t *testing.T) {
 	customWriter := batch.NewWriter(v2db.DB(), batch.DefaultOptions())
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		BatchWriter: customWriter,
 	})
 	if err != nil {
@@ -1269,7 +1269,7 @@ func TestServer_BatchWriterLifecycle(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		Paths:       paths,
 		Logger:      logger,
 		IdleTimeout: 1 * time.Hour,
@@ -1335,7 +1335,7 @@ func TestServer_BatchWriterLifecycle(t *testing.T) {
 	server.batchWriter.Stop()
 }
 
-// TestServer_BatchWriterNilLifecycle verifies Start and Shutdown work when V2DB
+// TestServer_BatchWriterNilLifecycle verifies Start and Shutdown work when DB
 // is provided but batch writer is explicitly set to nil (edge case).
 func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 	t.Parallel()
@@ -1357,11 +1357,11 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
-	// Even though V2DB is required, we still test that a nil BatchWriter override
-	// doesn't cause issues - the server auto-creates one from V2DB.
+	// Even though DB is required, we still test that a nil BatchWriter override
+	// doesn't cause issues - the server auto-creates one from DB.
 	v2db := openTestDBInDir(t, tmpDir)
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		Paths:       paths,
 		Logger:      logger,
 		IdleTimeout: 1 * time.Hour,
@@ -1370,9 +1370,9 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
-	// batchWriter should be auto-created from V2DB
+	// batchWriter should be auto-created from DB
 	if server.batchWriter == nil {
-		t.Fatal("batchWriter should be auto-created when V2DB is provided")
+		t.Fatal("batchWriter should be auto-created when DB is provided")
 	}
 
 	// Start the server - should work fine
@@ -1408,22 +1408,22 @@ func TestServer_BatchWriterNilLifecycle(t *testing.T) {
 }
 
 // TestNewServer_V2ScorerInitialized verifies that the V2 scorer is auto-initialized
-// when a V2DB is provided but no explicit V2Scorer is configured.
+// when a DB is provided but no explicit V2Scorer is configured.
 func TestNewServer_V2ScorerInitialized(t *testing.T) {
 	t.Parallel()
 
 	v2db := openTestDB(t)
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
-	if server.v2Scorer == nil {
-		t.Error("v2Scorer should be non-nil when V2DB is provided")
+	if server.scorer == nil {
+		t.Error("v2Scorer should be non-nil when DB is provided")
 	}
-	if server.v2db != v2db {
+	if server.db != v2db {
 		t.Error("v2db should be set to the provided database")
 	}
 }

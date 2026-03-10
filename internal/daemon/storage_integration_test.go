@@ -18,12 +18,12 @@ import (
 // Full V2 lifecycle integration tests
 // ============================================================================
 
-// TestV2Integration_FullLifecycle exercises the complete V2 pipeline:
-// 1. Daemon starts with V2 database
+// TestIntegration_FullLifecycle exercises the complete storage pipeline:
+// 1. Daemon starts with database
 // 2. Session starts
-// 3. Commands are started and ended (feeding V2 batch writer)
-// 4. Suggest returns results from V2 scorer
-func TestV2Integration_FullLifecycle(t *testing.T) {
+// 3. Commands are started and ended (feeding batch writer)
+// 4. Suggest returns results from scorer
+func TestIntegration_FullLifecycle(t *testing.T) {
 	t.Parallel()
 
 	// Use /tmp to avoid macOS socket path length limits
@@ -36,13 +36,13 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	dbPath := filepath.Join(tmpDir, "suggestions_v2.db")
 	ctx := context.Background()
 
-	// Step 1: Open V2 database
+	// Step 1: Open database
 	v2db, err := suggestdb.Open(ctx, suggestdb.Options{
 		Path:     dbPath,
 		SkipLock: true,
 	})
 	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
+		t.Fatalf("failed to open database: %v", err)
 	}
 	defer v2db.Close()
 
@@ -54,30 +54,26 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	logBuf := &bytes.Buffer{}
 	logger := slog.New(slog.NewTextHandler(logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	// Create server with V2 enabled.
+	// Create server with DB.
 	server, err := NewServer(&ServerConfig{
-		V2DB:          v2db,
-		Paths:         paths,
-		Logger:        logger,
-		IdleTimeout:   1 * time.Hour,
-		ScorerVersion: "v2",
+		DB:          v2db,
+		Paths:       paths,
+		Logger:      logger,
+		IdleTimeout: 1 * time.Hour,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
-	// Verify V2 components are initialized
-	if server.v2db == nil {
-		t.Fatal("v2db should be initialized")
+	// Verify components are initialized
+	if server.db == nil {
+		t.Fatal("db should be initialized")
 	}
 	if server.batchWriter == nil {
-		t.Fatal("batchWriter should be initialized when V2DB is provided")
+		t.Fatal("batchWriter should be initialized when DB is provided")
 	}
-	if server.v2Scorer == nil {
-		t.Fatal("v2Scorer should be auto-initialized when V2DB is provided")
-	}
-	if server.scorerVersion != "v2" {
-		t.Fatalf("expected scorerVersion='v2', got %q", server.scorerVersion)
+	if server.scorer == nil {
+		t.Fatal("scorer should be auto-initialized when DB is provided")
 	}
 
 	// Step 2: Start and verify the server (with gRPC)
@@ -185,7 +181,7 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 		time.Sleep(25 * time.Millisecond)
 	}
 	if len(suggestResp.Suggestions) == 0 {
-		t.Error("expected at least one suggestion from V2 pipeline")
+		t.Error("expected at least one suggestion from storage pipeline")
 	}
 
 	// Step 6: End session
@@ -221,9 +217,9 @@ func TestV2Integration_FullLifecycle(t *testing.T) {
 	}
 }
 
-// TestV2Integration_BatchWriterLifecycle_Extended verifies the batch writer
+// TestIntegration_BatchWriterLifecycle_Extended verifies the batch writer
 // processes events throughout the server lifecycle and flushes on shutdown.
-func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
+func TestIntegration_BatchWriterLifecycle_Extended(t *testing.T) {
 	t.Parallel()
 
 	tmpDir, err := os.MkdirTemp("/tmp", "clai-bw-ext-")
@@ -240,7 +236,7 @@ func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
 		SkipLock: true,
 	})
 	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
+		t.Fatalf("failed to open database: %v", err)
 	}
 	defer v2db.Close()
 
@@ -253,7 +249,7 @@ func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(logBuf, nil))
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		Paths:       paths,
 		Logger:      logger,
 		IdleTimeout: 1 * time.Hour,
@@ -343,9 +339,9 @@ func TestV2Integration_BatchWriterLifecycle_Extended(t *testing.T) {
 	}
 }
 
-// TestV2Integration_ImportHistoryWithBackfill verifies that ImportHistory
-// triggers V2 backfill when V2DB is available.
-func TestV2Integration_ImportHistoryWithBackfill(t *testing.T) {
+// TestIntegration_ImportHistoryWithBackfill verifies that ImportHistory
+// triggers V2 backfill when DB is available.
+func TestIntegration_ImportHistoryWithBackfill(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -357,7 +353,7 @@ func TestV2Integration_ImportHistoryWithBackfill(t *testing.T) {
 		SkipLock: true,
 	})
 	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
+		t.Fatalf("failed to open database: %v", err)
 	}
 	defer v2db.Close()
 
@@ -365,14 +361,14 @@ func TestV2Integration_ImportHistoryWithBackfill(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(logBuf, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:   v2db,
+		DB:     v2db,
 		Logger: logger,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)
 	}
 
-	if server.v2db == nil {
+	if server.db == nil {
 		t.Fatal("v2db should be set for import backfill testing")
 	}
 
@@ -390,9 +386,9 @@ func TestV2Integration_ImportHistoryWithBackfill(t *testing.T) {
 	}
 }
 
-// TestV2Integration_CommandEndedFeedsBatchWriter verifies that CommandEnded
-// properly feeds the V2 batch writer when it is initialized.
-func TestV2Integration_CommandEndedFeedsBatchWriter(t *testing.T) {
+// TestIntegration_CommandEndedFeedsBatchWriter verifies that CommandEnded
+// properly feeds the batch writer when it is initialized.
+func TestIntegration_CommandEndedFeedsBatchWriter(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -404,12 +400,12 @@ func TestV2Integration_CommandEndedFeedsBatchWriter(t *testing.T) {
 		SkipLock: true,
 	})
 	if err != nil {
-		t.Fatalf("failed to open V2 database: %v", err)
+		t.Fatalf("failed to open database: %v", err)
 	}
 	defer v2db.Close()
 
 	server, err := NewServer(&ServerConfig{
-		V2DB: v2db,
+		DB: v2db,
 	})
 	if err != nil {
 		t.Fatalf("NewServer failed: %v", err)

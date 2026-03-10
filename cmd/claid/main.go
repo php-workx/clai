@@ -88,7 +88,7 @@ func run() error {
 
 	// Create server config
 	cfg := &daemon.ServerConfig{
-		V2DB:              v2db,
+		DB:                v2db,
 		Paths:             paths,
 		Logger:            logger,
 		LLM:               &claudeLLM{},

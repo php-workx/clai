@@ -31,7 +31,7 @@ func createTestDB(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	// Create minimal schema for testing (matches V2 command_event columns)
+	// Create minimal schema for testing (matches command_event columns)
 	_, err = db.Exec(`
 		CREATE TABLE command_event (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -400,10 +400,10 @@ func TestWriter_Stats(t *testing.T) {
 	assert.False(t, stats.LastFlushTime.IsZero())
 }
 
-// --- WritePath V2 integration tests ---
+// --- WritePath integration tests ---
 
-// createTestV2DB creates a V2 SQLite database with the full schema for WritePath tests.
-func createTestV2DB(t *testing.T) *sql.DB {
+// createFullSchemaTestDB creates a SQLite database with the full schema for WritePath tests.
+func createFullSchemaTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -428,7 +428,7 @@ func createTestV2DB(t *testing.T) *sql.DB {
 func TestBatchWriter_CallsWritePath(t *testing.T) {
 	t.Parallel()
 
-	db := createTestV2DB(t)
+	db := createFullSchemaTestDB(t)
 	w := NewWriter(db, Options{
 		FlushInterval:   1 * time.Hour, // Rely on explicit flush
 		MaxBatchSize:    100,
@@ -485,7 +485,7 @@ func TestBatchWriter_CallsWritePath(t *testing.T) {
 func TestBatchWriter_WritePath_ErrorSkipsEvent(t *testing.T) {
 	t.Parallel()
 
-	db := createTestV2DB(t)
+	db := createFullSchemaTestDB(t)
 	w := NewWriter(db, Options{
 		FlushInterval:   1 * time.Hour,
 		MaxBatchSize:    100,
@@ -557,7 +557,7 @@ func TestBatchWriter_WritePath_ErrorSkipsEvent(t *testing.T) {
 func TestBatchWriter_TransitionsAcrossBatches(t *testing.T) {
 	t.Parallel()
 
-	db := createTestV2DB(t)
+	db := createFullSchemaTestDB(t)
 	w := NewWriter(db, Options{
 		FlushInterval:   1 * time.Hour,
 		MaxBatchSize:    100,

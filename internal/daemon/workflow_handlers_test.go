@@ -39,7 +39,7 @@ func createWorkflowTestServer(t *testing.T, llm LLMQuerier) (*Server, *suggestdb
 	t.Cleanup(func() { v2db.Close() })
 
 	server, err := NewServer(&ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		LLM:         llm,
 		IdleTimeout: 5 * time.Minute,
 	})

@@ -319,7 +319,7 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 	registry.SetPreferred(prov.Name())
 
 	serverCfg := &daemon.ServerConfig{
-		V2DB:        v2db,
+		DB:          v2db,
 		Registry:    registry,
 		Paths:       paths,
 		IdleTimeout: 30 * time.Minute,
@@ -359,7 +359,7 @@ func setupEnvWithProvider(t *testing.T, prov provider.Provider) *TestEnv {
 		TempDir:    tempDir,
 		DBPath:     dbPath,
 		SocketPath: socketPath,
-		V2DB:       v2db,
+		DB:         v2db,
 		Server:     server,
 		Client:     client,
 		Conn:       conn,
