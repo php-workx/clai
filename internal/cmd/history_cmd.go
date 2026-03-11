@@ -98,12 +98,12 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		query.SessionID = &sessionID
 	}
 
-	commands, err := ops.QueryCommands(ctx, db, query)
+	rows, err := ops.QueryHistoryCommands(ctx, db, query)
 	if err != nil {
 		return fmt.Errorf("failed to query history: %w", err)
 	}
 
-	return outputHistory(commands)
+	return outputHistoryRows(rows)
 }
 
 func resolveSessionID(ctx context.Context, db *suggestdb.DB, rawID string) (string, error) {
@@ -164,26 +164,24 @@ func buildHistoryQuery(args []string) (ops.CommandQuery, error) {
 	return query, nil
 }
 
-func outputHistory(commands []ops.Command) error {
+func outputHistoryRows(rows []ops.HistoryRow) error {
 	format := strings.ToLower(strings.TrimSpace(historyFormat))
 	if format == "" {
 		format = "raw"
 	}
 	switch format {
 	case "raw":
-		for i := range commands {
-			fmt.Println(commands[i].CmdRaw)
+		for i := range rows {
+			fmt.Println(rows[i].Command)
 		}
 		return nil
 	case "json":
-		entries := make([]historyOutput, 0, len(commands))
+		entries := make([]historyOutput, 0, len(rows))
 		source := historySource(historyGlobal, historyCWD, historySession)
-		for i := range commands {
+		for i := range rows {
 			entries = append(entries, historyOutput{
-				Text:     commands[i].CmdRaw,
-				Cwd:      commands[i].CWD,
-				TSUnixMs: commands[i].TSStartMs,
-				ExitCode: commands[i].ExitCode,
+				Text:     rows[i].Command,
+				TSUnixMs: rows[i].TimestampMs,
 				Source:   source,
 			})
 		}

@@ -1140,14 +1140,14 @@ func TestInitPlaceholderReplacement(t *testing.T) {
 	if strings.Contains(replaced, "{{CLAI_SESSION_ID}}") {
 		t.Error("placeholder {{CLAI_SESSION_ID}} not replaced")
 	}
-	if !strings.Contains(replaced, "CLAI_UP_ARROW_HISTORY:=false") {
-		t.Error("expected CLAI_UP_ARROW_HISTORY:=false after replacement")
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_HISTORY=false") {
+		t.Error("expected CLAI_UP_ARROW_HISTORY=false after replacement")
 	}
-	if !strings.Contains(replaced, "CLAI_UP_ARROW_TRIGGER:=double") {
-		t.Error("expected CLAI_UP_ARROW_TRIGGER:=double after replacement")
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_TRIGGER=double") {
+		t.Error("expected CLAI_UP_ARROW_TRIGGER=double after replacement")
 	}
-	if !strings.Contains(replaced, "CLAI_UP_ARROW_DOUBLE_WINDOW_MS:=250") {
-		t.Error("expected CLAI_UP_ARROW_DOUBLE_WINDOW_MS:=250 after replacement")
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_DOUBLE_WINDOW_MS=250") {
+		t.Error("expected CLAI_UP_ARROW_DOUBLE_WINDOW_MS=250 after replacement")
 	}
 }
 
