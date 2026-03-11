@@ -108,15 +108,15 @@ func zshHistoryPath() string {
 	return filepath.Join(home, ".zsh_history")
 }
 
-// hasUnescapedTrailingBackslash returns true if s ends with an odd number
-// of backslashes (i.e. the final backslash is a line-continuation marker,
-// not an escaped literal backslash).
-func hasUnescapedTrailingBackslash(s string) bool {
-	n := 0
-	for i := len(s) - 1; i >= 0 && s[i] == '\\'; i-- {
-		n++
-	}
-	return n%2 == 1
+// hasTrailingBackslash returns true if s ends with a backslash character.
+// In zsh history files, a trailing backslash before a newline is always the
+// escape marker for an embedded newline (line continuation). Zsh does not
+// escape backslashes in history — it only uses \<newline> to represent
+// newlines within a command. So "cmd \\\n" means the command text has a
+// literal \ followed by a newline (two chars: the \ is command text, the
+// second \ is the escape marker that gets stripped on read).
+func hasTrailingBackslash(s string) bool {
+	return s != "" && s[len(s)-1] == '\\'
 }
 
 // historyParser accumulates parsed history entries, handling multiline commands
@@ -136,7 +136,7 @@ func (p *historyParser) processLine(line string) {
 
 // continueMultiline appends to an in-progress multiline command
 func (p *historyParser) continueMultiline(line string) {
-	if hasUnescapedTrailingBackslash(line) {
+	if hasTrailingBackslash(line) {
 		p.multilineCmd.WriteString(line[:len(line)-1])
 		p.multilineCmd.WriteString("\n")
 		return
@@ -159,7 +159,7 @@ func (p *historyParser) parseFreshLine(line string) {
 
 // addCommand adds a command, starting a multiline accumulation if it ends with backslash
 func (p *historyParser) addCommand(cmd string) {
-	if hasUnescapedTrailingBackslash(cmd) {
+	if hasTrailingBackslash(cmd) {
 		p.multilineCmd.WriteString(cmd[:len(cmd)-1])
 		p.multilineCmd.WriteString("\n")
 		return

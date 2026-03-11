@@ -152,10 +152,12 @@ alpine
 	assert.Equal(t, time.Unix(1706000001, 0), entries[0].Timestamp)
 }
 
-func TestImportZshHistory_EscapedBackslash(t *testing.T) {
-	// Double backslash at end is literal, not continuation
-	// The zsh history file stores the command as-is (with both backslashes)
+func TestImportZshHistory_BackslashContinuation(t *testing.T) {
+	// In zsh history files, \\ at end of line IS continuation. The first \
+	// is literal command text, the second \ is the escape marker for the
+	// embedded newline. This matches zsh's own history reading behavior.
 	content := `: 1706000001:0;echo path\\
+continued
 : 1706000002:0;ls -la
 `
 	path := writeTempFile(t, content)
@@ -163,8 +165,9 @@ func TestImportZshHistory_EscapedBackslash(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Len(t, entries, 2)
-	// Zsh stores commands literally, double backslash is preserved
-	assert.Equal(t, `echo path\\`, entries[0].Command)
+	// \\ at end → literal \ + continuation → command has \ then newline
+	assert.Equal(t, "echo path\\\ncontinued", entries[0].Command)
+	assert.Equal(t, "ls -la", entries[1].Command)
 }
 
 func TestImportZshHistory_EmptyFile(t *testing.T) {
@@ -172,6 +175,29 @@ func TestImportZshHistory_EmptyFile(t *testing.T) {
 	entries, err := ImportZshHistory(path)
 	require.NoError(t, err)
 	assert.Empty(t, entries)
+}
+
+func TestImportZshHistory_RealWorldMultiline(t *testing.T) {
+	// Real-world test case: zsh stores multi-line commands with \\ before each
+	// line break. This matches the actual bytes in ~/.zsh_history (verified
+	// with xxd: 5c 5c 0a = two backslashes + newline).
+	content := `: 1706000001:0;claude mcp add sonarqube \\
+  --env SONARQUBE_TOKEN=secret \\
+  --env SONARQUBE_ORG=myorg \\
+  -- docker run --init --pull=always -i --rm -e SONARQUBE_TOKEN -e SONARQUBE_ORG mcp/sonarqube
+: 1706000002:0;git status
+`
+	path := writeTempFile(t, content)
+	entries, err := ImportZshHistory(path)
+	require.NoError(t, err)
+
+	assert.Len(t, entries, 2)
+	expected := "claude mcp add sonarqube \\\n" +
+		"  --env SONARQUBE_TOKEN=secret \\\n" +
+		"  --env SONARQUBE_ORG=myorg \\\n" +
+		"  -- docker run --init --pull=always -i --rm -e SONARQUBE_TOKEN -e SONARQUBE_ORG mcp/sonarqube"
+	assert.Equal(t, expected, entries[0].Command)
+	assert.Equal(t, "git status", entries[1].Command)
 }
 
 // --- Fish history import tests ---

@@ -140,7 +140,7 @@ func (p *importParser) processLine(line string) {
 
 // continueMultiline appends to an in-progress multiline command.
 func (p *importParser) continueMultiline(line string) {
-	if hasUnescapedTrailingBackslash(line) {
+	if hasTrailingBackslash(line) {
 		p.multilineCmd.WriteString(line[:len(line)-1])
 		p.multilineCmd.WriteString("\n")
 		return
@@ -175,7 +175,7 @@ func (p *importParser) parseFreshLine(line string) {
 
 // addCommand adds a command, starting multiline accumulation if it ends with backslash.
 func (p *importParser) addCommand(cmd string) {
-	if hasUnescapedTrailingBackslash(cmd) {
+	if hasTrailingBackslash(cmd) {
 		p.multilineCmd.WriteString(cmd[:len(cmd)-1])
 		p.multilineCmd.WriteString("\n")
 		return
