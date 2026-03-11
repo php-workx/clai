@@ -134,13 +134,13 @@ func TestFish_VoiceModeFunction(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Check if voice mode function exists
-	err = session.SendLine("functions _ai_voice_execute")
+	err = session.SendLine("functions _clai_voice_execute")
 	require.NoError(t, err)
 
 	// Should show the function definition
-	output, err := session.ExpectTimeout("_ai_voice_execute", 2*time.Second)
+	output, err := session.ExpectTimeout("_clai_voice_execute", 2*time.Second)
 	require.NoError(t, err, "expected voice execute function")
-	assert.Contains(t, output, "_ai_voice_execute", "_ai_voice_execute should be defined")
+	assert.Contains(t, output, "_clai_voice_execute", "_clai_voice_execute should be defined")
 }
 
 // TestFish_RunWrapperExists verifies the run wrapper function exists.
@@ -331,14 +331,14 @@ func TestFish_EnterBindingForVoice(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(500 * time.Millisecond)
 
-	// Check that _ai_voice_execute function exists (it's bound to Enter)
-	err = session.SendLine("functions _ai_voice_execute")
+	// Check that _clai_voice_execute function exists (it's bound to Enter)
+	err = session.SendLine("functions _clai_voice_execute")
 	require.NoError(t, err)
 
 	// Should have our voice execute function
-	output, err := session.ExpectTimeout("_ai_voice_execute", 2*time.Second)
+	output, err := session.ExpectTimeout("_clai_voice_execute", 2*time.Second)
 	require.NoError(t, err, "expected voice execute function")
-	assert.Contains(t, output, "_ai_voice_execute", "_ai_voice_execute should be defined")
+	assert.Contains(t, output, "_clai_voice_execute", "_clai_voice_execute should be defined")
 }
 
 // TestFish_EscapeBindingClears verifies Escape clears suggestions.
@@ -364,14 +364,14 @@ func TestFish_EscapeBindingClears(t *testing.T) {
 	require.NoError(t, err)
 	time.Sleep(500 * time.Millisecond)
 
-	// Check that _ai_clear_suggestion function exists (it's bound to Escape)
-	err = session.SendLine("functions _ai_clear_suggestion")
+	// Check that _clai_clear_suggestion function exists (it's bound to Escape)
+	err = session.SendLine("functions _clai_clear_suggestion")
 	require.NoError(t, err)
 
 	// Should have our clear function
-	output, err := session.ExpectTimeout("_ai_clear_suggestion", 2*time.Second)
+	output, err := session.ExpectTimeout("_clai_clear_suggestion", 2*time.Second)
 	require.NoError(t, err, "expected clear suggestion function")
-	assert.Contains(t, output, "_ai_clear_suggestion", "_ai_clear_suggestion should be defined")
+	assert.Contains(t, output, "_clai_clear_suggestion", "_clai_clear_suggestion should be defined")
 }
 
 // TestFish_HistoryFunctionExists verifies the history function is defined.

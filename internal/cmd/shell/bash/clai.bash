@@ -55,8 +55,8 @@ if [[ -z "${_CLAI_ORIG_KEYSEQ_TIMEOUT:-}" ]]; then
 fi
 
 # Files
-_AI_SUGGEST_FILE="$CLAI_CACHE/suggestion"
-_AI_LAST_OUTPUT="$CLAI_CACHE/last_output"
+_CLAI_SUGGEST_FILE="$CLAI_CACHE/suggestion"
+_CLAI_LAST_OUTPUT="$CLAI_CACHE/last_output"
 
 # Session-level disable flag
 _clai_session_off() {
@@ -645,10 +645,10 @@ if [[ "$CLAI_UP_ARROW_HISTORY" == "true" ]]; then
 fi
 
 # Show AI suggestion in prompt when available (for AI-generated suggestions)
-_ai_show_suggestion() {
-    if [[ -s "$_AI_SUGGEST_FILE" ]]; then
+_clai_show_suggestion() {
+    if [[ -s "$_CLAI_SUGGEST_FILE" ]]; then
         local suggestion
-        suggestion=$(cat "$_AI_SUGGEST_FILE")
+        suggestion=$(cat "$_CLAI_SUGGEST_FILE")
         if [[ -n "$suggestion" ]]; then
             echo -e "\033[38;5;242m($suggestion) - use 'accept' to run\033[0m"
         fi
@@ -657,13 +657,13 @@ _ai_show_suggestion() {
 
 # Accept AI suggestion command
 accept() {
-    if [[ -s "$_AI_SUGGEST_FILE" ]]; then
-        local suggestion=$(cat "$_AI_SUGGEST_FILE")
+    if [[ -s "$_CLAI_SUGGEST_FILE" ]]; then
+        local suggestion=$(cat "$_CLAI_SUGGEST_FILE")
         if [[ -n "$suggestion" ]]; then
             # Record accepted feedback (fire and forget)
             (clai suggest-feedback --action=accepted --suggested="$suggestion" >/dev/null 2>&1 &)
             # Clear suggestion
-            > "$_AI_SUGGEST_FILE"
+            > "$_CLAI_SUGGEST_FILE"
             # Execute the suggestion
             echo -e "\033[2mRunning: $suggestion\033[0m"
             eval "$suggestion"
@@ -676,14 +676,14 @@ accept() {
 
 # Clear suggestion (dismiss)
 clear-suggestion() {
-    if [[ -s "$_AI_SUGGEST_FILE" ]]; then
-        local suggestion=$(cat "$_AI_SUGGEST_FILE")
+    if [[ -s "$_CLAI_SUGGEST_FILE" ]]; then
+        local suggestion=$(cat "$_CLAI_SUGGEST_FILE")
         if [[ -n "$suggestion" ]]; then
             # Record dismissed feedback (fire and forget)
             (clai suggest-feedback --action=dismissed --suggested="$suggestion" >/dev/null 2>&1 &)
         fi
     fi
-    > "$_AI_SUGGEST_FILE"
+    > "$_CLAI_SUGGEST_FILE"
     echo "Suggestion cleared"
 }
 
@@ -719,7 +719,7 @@ _clai_log_command_start() {
 
     # Skip internal clai functions and common shell patterns
     case "$cmd" in
-        _ai_*|_clai_*|_AI_*|_CLAI_*) return 1 ;;
+        _clai_*|_CLAI_*) return 1 ;;
         '['*|'[['*|'(('*) return 1 ;;  # Test expressions
         local\ *|export\ *|return\ *|declare\ *|unset\ *|shift*|readonly\ *|typeset\ *|set\ *) return 1 ;;
     esac
@@ -782,21 +782,21 @@ _clai_log_command_end() {
 }
 
 # Prompt command hook (runs after each command, before showing prompt)
-_ai_prompt_command() {
+_clai_prompt_command() {
     local last_exit=$?
 
     # Log command completion (only if we ran a user command)
     _clai_log_command_end "$last_exit"
 
     # Show any suggestions
-    _ai_show_suggestion
+    _clai_show_suggestion
 }
 
 # Append to existing PROMPT_COMMAND
 if [[ -z "$PROMPT_COMMAND" ]]; then
-    PROMPT_COMMAND="_ai_prompt_command"
+    PROMPT_COMMAND="_clai_prompt_command"
 else
-    PROMPT_COMMAND="_ai_prompt_command; $PROMPT_COMMAND"
+    PROMPT_COMMAND="_clai_prompt_command; $PROMPT_COMMAND"
 fi
 
 # ============================================
@@ -806,7 +806,7 @@ fi
 # Example: ?list all files → ls -la
 
 # Check for ? prefix and convert to command
-_ai_check_nl_prefix() {
+_clai_check_nl_prefix() {
     local cmd="$1"
     if [[ "$cmd" == '?'* && ${#cmd} -gt 1 ]]; then
         local nl_input="${cmd#\?}"         # Remove the ? prefix
@@ -818,7 +818,7 @@ _ai_check_nl_prefix() {
         if [[ -n "$result" ]]; then
             echo "→ $result"
             # Cache for 'accept' command
-            echo "$result" > "$_AI_SUGGEST_FILE"
+            echo "$result" > "$_CLAI_SUGGEST_FILE"
             echo -e "\033[2mUse 'accept' to run, or copy the command above\033[0m"
         fi
         return 0  # Handled
@@ -828,9 +828,9 @@ _ai_check_nl_prefix() {
 
 # Hook into DEBUG trap to catch ? prefix before execution and log commands
 # Note: extdebug must be enabled for the trap to block command execution
-_ai_debug_trap() {
+_clai_debug_trap() {
     # Check for natural language prefix first
-    if _ai_check_nl_prefix "$BASH_COMMAND"; then
+    if _clai_check_nl_prefix "$BASH_COMMAND"; then
         # Prevent the original command from running (requires extdebug)
         return 1
     fi
@@ -846,13 +846,13 @@ _ai_debug_trap() {
 # shell functions, command substitutions, and subshells. This is required
 # for the ? prefix interception (returning 1 from DEBUG trap skips the
 # command). The original state is saved and restored in _clai_cleanup.
-_AI_EXTDEBUG_WAS_ON=false
+_CLAI_EXTDEBUG_WAS_ON=false
 if shopt -q extdebug; then
-    _AI_EXTDEBUG_WAS_ON=true
+    _CLAI_EXTDEBUG_WAS_ON=true
 fi
 shopt -s extdebug
 
-trap '_ai_debug_trap' DEBUG
+trap '_clai_debug_trap' DEBUG
 
 # ============================================
 # Output Capture (via wrapper function)
@@ -1008,13 +1008,13 @@ _clai_disable() {
     bind -r '\C-x\C-s' 2>/dev/null
     bind -r 'ß' 2>/dev/null
 
-    # Strip _ai_prompt_command from PROMPT_COMMAND
-    PROMPT_COMMAND="${PROMPT_COMMAND//_ai_prompt_command;/}"
-    PROMPT_COMMAND="${PROMPT_COMMAND//_ai_prompt_command/}"
+    # Strip _clai_prompt_command from PROMPT_COMMAND
+    PROMPT_COMMAND="${PROMPT_COMMAND//_clai_prompt_command;/}"
+    PROMPT_COMMAND="${PROMPT_COMMAND//_clai_prompt_command/}"
 
     # Remove DEBUG trap and restore extdebug
     trap - DEBUG
-    if [[ "$_AI_EXTDEBUG_WAS_ON" != "true" ]]; then
+    if [[ "$_CLAI_EXTDEBUG_WAS_ON" != "true" ]]; then
         shopt -u extdebug
     fi
 

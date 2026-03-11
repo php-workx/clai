@@ -100,9 +100,9 @@ func TestShellHooks_ZshRequiredFunctions(t *testing.T) {
 	}
 
 	requiredFunctions := []string{
-		"_ai_update_suggestion",
-		"_ai_forward_char",
-		"_ai_precmd",
+		"_clai_update_suggestion",
+		"_clai_forward_char",
+		"_clai_precmd",
 		"run()",
 		"function history", // Uses function keyword to avoid alias expansion
 		"_clai_disable",
@@ -131,7 +131,7 @@ func TestShellHooks_BashRequiredFunctions(t *testing.T) {
 
 	requiredFunctions := []string{
 		"_clai_completion",
-		"_ai_prompt_command",
+		"_clai_prompt_command",
 		"run()",
 		"ai-fix()",
 		"history()",
@@ -331,16 +331,16 @@ func TestShellHooks_ZshIntegration(t *testing.T) {
 	// Create a test script that sources the hooks and checks functions exist
 	script := `
 source "` + hookPath + `"
-if typeset -f _ai_update_suggestion > /dev/null; then
-    echo "PASS: _ai_update_suggestion defined"
+if typeset -f _clai_update_suggestion > /dev/null; then
+    echo "PASS: _clai_update_suggestion defined"
 else
-    echo "FAIL: _ai_update_suggestion not defined"
+    echo "FAIL: _clai_update_suggestion not defined"
     exit 1
 fi
-if typeset -f _ai_precmd > /dev/null; then
-    echo "PASS: _ai_precmd defined"
+if typeset -f _clai_precmd > /dev/null; then
+    echo "PASS: _clai_precmd defined"
 else
-    echo "FAIL: _ai_precmd not defined"
+    echo "FAIL: _clai_precmd not defined"
     exit 1
 fi
 echo "All functions defined"
@@ -374,10 +374,10 @@ func TestShellHooks_BashIntegration(t *testing.T) {
 	// Note: Some bash versions don't support complete -D, so we check core functions
 	script := `
 source "` + hookPath + `" 2>/dev/null || true
-if type _ai_prompt_command &>/dev/null; then
-    echo "PASS: _ai_prompt_command defined"
+if type _clai_prompt_command &>/dev/null; then
+    echo "PASS: _clai_prompt_command defined"
 else
-    echo "FAIL: _ai_prompt_command not defined"
+    echo "FAIL: _clai_prompt_command not defined"
     exit 1
 fi
 if type run &>/dev/null; then

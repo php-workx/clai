@@ -62,8 +62,8 @@ end
 mkdir -p $CLAI_CACHE
 
 # Files
-set -g _AI_SUGGEST_FILE "$CLAI_CACHE/suggestion"
-set -g _AI_LAST_OUTPUT "$CLAI_CACHE/last_output"
+set -g _CLAI_SUGGEST_FILE "$CLAI_CACHE/suggestion"
+set -g _CLAI_LAST_OUTPUT "$CLAI_CACHE/last_output"
 
 # Disable native autosuggestions only when clai is enabled
 # (leave native suggestions working when CLAI_OFF=1 or session-off)
@@ -84,9 +84,9 @@ end
 # ============================================
 
 # Accept suggestion with custom keybinding
-function _ai_accept_suggestion
-    if test -s $_AI_SUGGEST_FILE
-        set -l suggestion (cat $_AI_SUGGEST_FILE)
+function _clai_accept_suggestion
+    if test -s $_CLAI_SUGGEST_FILE
+        set -l suggestion (cat $_CLAI_SUGGEST_FILE)
         if test -n "$suggestion"
             commandline -r $suggestion
             commandline -f end-of-line
@@ -94,7 +94,7 @@ function _ai_accept_suggestion
             clai suggest-feedback --action=accepted --suggested="$suggestion" >/dev/null 2>&1 &
             disown %1 2>/dev/null
             # Clear the suggestion
-            echo -n "" > $_AI_SUGGEST_FILE
+            echo -n "" > $_CLAI_SUGGEST_FILE
             return
         end
     end
@@ -104,21 +104,21 @@ end
 
 # Bind Alt+Enter to accept suggestion (Tab is used for completions in Fish)
 for mode in default insert visual
-    bind -M $mode \e\r _ai_accept_suggestion
+    bind -M $mode \e\r _clai_accept_suggestion
 end
 
 # Clear suggestion with Escape (dismiss feedback)
-function _ai_clear_suggestion
-    if test -s $_AI_SUGGEST_FILE
-        set -l suggestion (cat $_AI_SUGGEST_FILE)
+function _clai_clear_suggestion
+    if test -s $_CLAI_SUGGEST_FILE
+        set -l suggestion (cat $_CLAI_SUGGEST_FILE)
         if test -n "$suggestion"
             # Record dismissed feedback (fire and forget)
             clai suggest-feedback --action=dismissed --suggested="$suggestion" >/dev/null 2>&1 &
             disown %1 2>/dev/null
         end
     end
-    echo -n "" > $_AI_SUGGEST_FILE
-    set -g _AI_VOICE_MODE false
+    echo -n "" > $_CLAI_SUGGEST_FILE
+    set -g _CLAI_VOICE_MODE false
     commandline -f repaint
 end
 
@@ -127,7 +127,7 @@ function _clai_escape
     if test "$_CLAI_PICKER_ACTIVE" = "true"
         _clai_picker_cancel
     else
-        _ai_clear_suggestion
+        _clai_clear_suggestion
     end
 end
 for mode in default insert visual
@@ -620,14 +620,14 @@ end
 # ============================================
 # When activated, the next Enter press will run the input through voice conversion
 
-set -g _AI_VOICE_MODE false
+set -g _CLAI_VOICE_MODE false
 
-function _ai_enter_voice_mode
-    set -g _AI_VOICE_MODE true
+function _clai_enter_voice_mode
+    set -g _CLAI_VOICE_MODE true
     commandline -f repaint
 end
 
-function _ai_voice_execute
+function _clai_voice_execute
     # If picker is open, accept the current selection (don't execute)
     if test "$_CLAI_PICKER_ACTIVE" = "true"
         # Record accepted feedback for picker selection (fire and forget)
@@ -661,9 +661,9 @@ function _ai_voice_execute
     end
 
     # Check for explicit voice mode
-    if test "$_AI_VOICE_MODE" = "true"
+    if test "$_CLAI_VOICE_MODE" = "true"
         and test -n "$current_cmd"
-        set -g _AI_VOICE_MODE false
+        set -g _CLAI_VOICE_MODE false
         commandline -r ""
 
         echo "? $current_cmd"
@@ -678,14 +678,14 @@ function _ai_voice_execute
     end
 
     # Normal execute
-    set -g _AI_VOICE_MODE false
+    set -g _CLAI_VOICE_MODE false
     _clai_picker_clear_menu
     commandline -f execute
 end
 
 # Show voice mode indicator or suggestion in right prompt
 function fish_right_prompt
-    if test "$_AI_VOICE_MODE" = "true"
+    if test "$_CLAI_VOICE_MODE" = "true"
         set_color magenta
         echo -n "🎤 Voice mode"
         set_color normal
@@ -701,9 +701,9 @@ function fish_right_prompt
             echo -n "($current → $suggestion)"
             set_color normal
         end
-    else if test -s $_AI_SUGGEST_FILE
+    else if test -s $_CLAI_SUGGEST_FILE
         # No input - show cached AI suggestion
-        set -l suggestion (cat $_AI_SUGGEST_FILE)
+        set -l suggestion (cat $_CLAI_SUGGEST_FILE)
         if test -n "$suggestion"
             set_color brblack
             echo -n "($suggestion)"
@@ -713,10 +713,10 @@ function fish_right_prompt
 end
 
 # Bind Ctrl+X Ctrl+V to enter voice mode
-bind \cx\cv _ai_enter_voice_mode
+bind \cx\cv _clai_enter_voice_mode
 
 # Bind Enter to voice-aware execute
-bind \r _ai_voice_execute
+bind \r _clai_voice_execute
 
 
 # ============================================

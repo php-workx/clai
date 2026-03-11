@@ -337,9 +337,9 @@ func TestBash_PromptCommandSet(t *testing.T) {
 	require.NoError(t, err)
 
 	// Should contain our prompt command function
-	output, err := session.ExpectTimeout("_ai_prompt_command", 2*time.Second)
+	output, err := session.ExpectTimeout("_clai_prompt_command", 2*time.Second)
 	require.NoError(t, err, "expected prompt command to be set")
-	assert.Contains(t, output, "_ai_prompt_command", "PROMPT_COMMAND should include our function")
+	assert.Contains(t, output, "_clai_prompt_command", "PROMPT_COMMAND should include our function")
 }
 
 // TestBash_DoctorShowsCorrectShell verifies clai doctor detects bash correctly.
