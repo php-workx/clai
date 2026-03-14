@@ -112,6 +112,7 @@ type StepDef struct {
 	ResolvedArgv    []string          `yaml:"-"`
 	ResolvedEnv     []string          `yaml:"-"`
 	Analyze         bool              `yaml:"analyze,omitempty"`
+	Interactive     bool              `yaml:"interactive,omitempty"`
 }
 
 // knownStepFields is the set of YAML keys accepted in a step mapping.
@@ -123,7 +124,7 @@ var knownStepFields = map[string]bool{
 	// Tier 0 fields.
 	"id": true, "name": true, "run": true, "env": true,
 	"shell": true, "analyze": true, "analysis_prompt": true,
-	"risk_level": true,
+	"risk_level": true, "interactive": true,
 	// Tier 1 fields (ignored but tolerated).
 	"if": true, "timeout_minutes": true, "retry": true,
 	"continue_on_error": true, "working_directory": true,
@@ -141,6 +142,7 @@ type stepFields struct {
 	AnalysisPrompt string            `yaml:"analysis_prompt,omitempty"`
 	RiskLevel      string            `yaml:"risk_level,omitempty"`
 	Analyze        bool              `yaml:"analyze,omitempty"`
+	Interactive    bool              `yaml:"interactive,omitempty"`
 }
 
 // UnmarshalYAML handles both bool and string values for the Shell field.
@@ -172,6 +174,7 @@ func (s *StepDef) UnmarshalYAML(value *yaml.Node) error {
 	s.Run = raw.Run
 	s.Env = raw.Env
 	s.Analyze = raw.Analyze
+	s.Interactive = raw.Interactive
 	s.AnalysisPrompt = raw.AnalysisPrompt
 	s.RiskLevel = raw.RiskLevel
 

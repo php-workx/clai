@@ -287,11 +287,20 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 		return sr
 	}
 
-	// Create limited buffers for stdout/stderr capture.
-	stdoutBuf := NewLimitedBuffer(r.config.BufferSize)
-	stderrBuf := NewLimitedBuffer(r.config.BufferSize)
-	cmd.Stdout = stdoutBuf
-	cmd.Stderr = stderrBuf
+	// Interactive steps get direct terminal access (stdin/stdout/stderr)
+	// so they can prompt the user, open browsers, etc.
+	// Non-interactive steps capture output into limited buffers.
+	var stdoutBuf, stderrBuf *LimitedBuffer
+	if step.Interactive {
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+	} else {
+		stdoutBuf = NewLimitedBuffer(r.config.BufferSize)
+		stderrBuf = NewLimitedBuffer(r.config.BufferSize)
+		cmd.Stdout = stdoutBuf
+		cmd.Stderr = stderrBuf
+	}
 
 	// Start the process.
 	if err := r.process.Start(cmd); err != nil {
@@ -308,8 +317,13 @@ func (r *Runner) executeStep(ctx context.Context, step *StepDef, stepOutputs map
 	sr.DurationMs = time.Since(stepStart).Milliseconds()
 
 	// Capture stdout/stderr tails, masking secrets.
-	sr.StdoutTail = r.masker.Mask(stdoutBuf.String())
-	sr.StderrTail = r.masker.Mask(stderrBuf.String())
+	// Interactive steps have nil buffers (stdout/stderr go directly to terminal).
+	if stdoutBuf != nil {
+		sr.StdoutTail = r.masker.Mask(stdoutBuf.String())
+	}
+	if stderrBuf != nil {
+		sr.StderrTail = r.masker.Mask(stderrBuf.String())
+	}
 
 	// Parse the CLAI_OUTPUT file for step outputs.
 	outputs, parseErr := ParseOutputFile(outputPath)

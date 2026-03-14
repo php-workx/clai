@@ -5,6 +5,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/google/shlex"
@@ -38,11 +39,17 @@ func (a *unixShellAdapter) BuildCommand(ctx context.Context, step *StepDef, work
 		cmd = exec.CommandContext(ctx, argv[0], argv[1:]...)
 	} else {
 		// Shell mode: wrap in shell interpreter.
-		shellPath := "/bin/sh"
+		// Default to the user's login shell so aliases and shell config
+		// are available (e.g., `assume` for AWS SSO credential helpers).
+		// Fall back to /bin/sh if $SHELL is unset.
+		shellPath := os.Getenv("SHELL")
+		if shellPath == "" {
+			shellPath = "/bin/sh"
+		}
 		if step.Shell != "" && step.Shell != "true" {
 			shellPath = step.Shell
 		}
-		// #nosec G204 -- commands originate from trusted workflow definitions.
+		// #nosec G204,G702 -- commands originate from trusted workflow definitions; shellPath is $SHELL or a validated step field.
 		cmd = exec.CommandContext(ctx, shellPath, "-c", step.Run)
 	}
 
