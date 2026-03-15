@@ -90,15 +90,6 @@ trait EnvReaderTrait {
     fn get(&self, key: &str) -> Option<String>;
 }
 
-/// Real environment reader for production use.
-struct RealEnvReader;
-
-impl EnvReaderTrait for RealEnvReader {
-    fn get(&self, key: &str) -> Option<String> {
-        env::var(key).ok()
-    }
-}
-
 /// Environment reader enum for dependency injection in tests.
 enum EnvReader {
     Real,

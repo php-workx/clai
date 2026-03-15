@@ -278,7 +278,7 @@ The parser must handle escape sequences split across `read()` buffers.
 - Accept both `\x07` (BEL) and `\x1b\\` (ST - String Terminator) as valid terminators
 - When injecting OSC sequences in init scripts, use `\x07` for maximum compatibility
 
-### 3.5 Concurrency Model
+### 3.6 Concurrency Model
 
 - Dedicated threads:
   - Thread A: read stdin, hotkey detection, forward bytes
@@ -424,7 +424,7 @@ Required commands (must pass):
 ### 6.1 Launching the Shell
 
 - Determine shell path:
-  - Unix: `$SHELL` else fallback to `/bin/bash` (configurable)
+  - Unix: `$SHELL` else fallback to `/bin/sh` (configurable; `/bin/sh` is guaranteed on all POSIX systems unlike `/bin/bash`)
   - Windows: configurable default (PowerShell, cmd, or Git Bash), but primary target is PowerShell
 - Launch mode:
   - Login shell (`-l`) when supported/configured
@@ -941,7 +941,9 @@ Orphaned temp directories may remain after crashes. Handle cleanup:
 
 ### 8.2 Passthrough Fallback
 
-If `clai-wrap` does not detect an OSC 133 Sequence within 500ms of startup (e.g., user heavily customized prompt overrides us), it enters **Passthrough Mode**.
+If `clai-wrap` does not detect an OSC 133 Sequence within 3 seconds of startup (e.g., user heavily customized prompt overrides us), it enters **Passthrough Mode**.
+
+**Rationale:** 500ms was originally specified but is too aggressive. Common shell startup (oh-my-zsh, plugin managers, mise/nvm/rbenv init) routinely takes 700ms–2s. The 3s timeout accommodates slow startups while still detecting injection failures promptly.
 
 **Behavior:** Disables output capture features. Logs a warning. Acts as a transparent pipe with picker UI still available.
 
@@ -995,25 +997,28 @@ $
 
 Phase 2 adds strict storage for captured logs.
 
-### Table: `command_events`
+### Table: `pty_command_event`
+
+> **Note:** Renamed from `command_events` to avoid collision with the V2 suggestions database `command_event` table. See `specs/storage-v1-v2-merge.md` for the unified schema migration plan.
 
 ```sql
-CREATE TABLE command_events (
-  id INTEGER PRIMARY KEY,
+CREATE TABLE pty_command_event (
+  command_id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
-  command_id TEXT NOT NULL,
   exit_code INTEGER,
   start_ts INTEGER,
   end_ts INTEGER,
-  is_sensitive BOOLEAN DEFAULT 0,  -- Triggered by Denylist or Echo-Gap
-  captured_bytes INTEGER
+  is_sensitive INTEGER DEFAULT 0,  -- Triggered by Denylist or Echo-Gap
+  captured_bytes INTEGER DEFAULT 0
 );
 ```
 
-### Table: `command_output`
+### Table: `pty_command_output`
+
+> **Note:** Renamed from `command_output` for the same reason as above.
 
 ```sql
-CREATE TABLE command_output (
+CREATE TABLE pty_command_output (
   id INTEGER PRIMARY KEY,
   command_id TEXT NOT NULL,
   stdout_blob BLOB,      -- Stored only if not sensitive
@@ -1022,7 +1027,7 @@ CREATE TABLE command_output (
   expires_at INTEGER     -- Auto-prune policy (e.g., 7 days)
 );
 
-CREATE INDEX IF NOT EXISTS idx_command_output_expires ON command_output(expires_at);
+CREATE INDEX IF NOT EXISTS idx_pty_command_output_expires ON pty_command_output(expires_at);
 ```
 
 ---
@@ -1350,10 +1355,10 @@ These assumptions underpin the design. If any prove false, the indicated mitigat
 |------------|--------------|------------|
 | `vte` crate handles all common escape sequences | Exotic sequences may corrupt parser state or panic | Pin vte version; add integration tests with edge-case sequences; catch panics in vte callbacks |
 | 50ms trailing-edge debounce is sufficient for resize | Aggressive resize patterns may still cause issues | Make debounce interval configurable via `CLAI_RESIZE_DEBOUNCE_MS` |
-| User shell sources `~/.zshrc` / `~/.bashrc` | Non-standard setups (minimal containers, custom ZDOTDIR) break injection | Document prerequisites; detect injection failure within 500ms and warn |
+| User shell sources `~/.zshrc` / `~/.bashrc` | Non-standard setups (minimal containers, custom ZDOTDIR) break injection | Document prerequisites; detect injection failure within 3s and warn |
 | Daemon socket path is always accessible | Permissions, SELinux, or sandboxing may block | Check write permission on socket directory at startup; clear error message |
 | UTF-8 lossy conversion is acceptable | User may need exact bytes (binary protocols, debugging) | Add `--raw-mode` flag that disables vte parsing and shows hex dump |
-| Shell will emit OSC 133 after injection | User's prompt customization may override | Detect missing OSC 133 within 500ms; enter passthrough mode with warning |
+| Shell will emit OSC 133 after injection | User's prompt customization may override | Detect missing OSC 133 within 3s; enter passthrough mode with warning |
 | `portable-pty` handles all PTY edge cases | Platform-specific bugs may exist | Pin version; maintain integration tests on all platforms |
 | Ring buffer 4MB is sufficient for error context | Very long build outputs may exceed buffer | Log warning when truncation occurs; document `--buffer-cap` option |
 
@@ -1370,7 +1375,21 @@ These assumptions underpin the design. If any prove false, the indicated mitigat
 - Nested `clai-wrap` instances: Undefined behavior; hotkey chord may be intercepted by outer wrapper. Detect via `CLAI_WRAP=1` and warn.
 - cmd.exe on Windows: No OSC 133 support; operates in passthrough mode only.
 
-### 16.1 Edge Cases and Handling
+### 17.1 Workflow Runner Interaction
+
+When `clai w run` (the workflow runner) executes inside `clai-wrap`, both compete for terminal I/O. The workflow runner supports an `interactive: true` step field that connects `os.Stdin`, `os.Stdout`, and `os.Stderr` directly to the process — inside `clai-wrap`, these map to the PTY master, which is correct behavior.
+
+| Scenario | Behavior |
+|----------|----------|
+| Non-interactive step inside wrapper | Runner captures stdout/stderr into buffers; wrapper sees no output (command runs silently) |
+| Interactive step inside wrapper | Runner connects to real stdin/stdout/stderr; wrapper sees output and passes through normally |
+| Interactive step needing browser auth (e.g., `assume`) | Browser opens normally; user authenticates; credentials exported to subsequent steps |
+
+**Design constraint:** The workflow runner uses `$SHELL` (with `/bin/sh` fallback) as the default shell for steps, matching the wrapper's shell launch behavior. This ensures shell aliases (e.g., `alias assume="source assume"`) are available in workflow steps without requiring explicit `shell: zsh` configuration.
+
+**No special coordination required:** The wrapper and runner are independent — the runner spawns its own subprocesses that inherit the terminal via the PTY. The wrapper's hotkey detection, output capture, and picker UI continue to function normally during workflow execution.
+
+### 17.2 Edge Cases and Handling
 
 | Edge Case | Impact | Handling |
 |-----------|--------|----------|

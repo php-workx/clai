@@ -603,8 +603,28 @@ mod tests {
         use std::io::Read;
         use std::time::Duration;
 
+        /// Check if PTY process spawning is available in this environment.
+        fn can_spawn_pty_process() -> bool {
+            let size = PtySize {
+                rows: 24,
+                cols: 80,
+                pixel_width: 0,
+                pixel_height: 0,
+            };
+            let pty_system = native_pty_system();
+            let Ok(pair) = pty_system.openpty(size) else {
+                return false;
+            };
+            let cmd = CommandBuilder::new("echo");
+            pair.slave.spawn_command(cmd).is_ok()
+        }
+
         #[test]
         fn test_passthrough_mode_creation() {
+            if !can_spawn_pty_process() {
+                eprintln!("Skipping: PTY process spawning not available in this environment");
+                return;
+            }
             // Test creating passthrough mode with echo command
             // We can't easily test with a real shell in unit tests
             let path = PathBuf::from("/bin/sh");
@@ -618,6 +638,10 @@ mod tests {
 
         #[test]
         fn test_passthrough_mode_child_pid() {
+            if !can_spawn_pty_process() {
+                eprintln!("Skipping: PTY process spawning not available in this environment");
+                return;
+            }
             let path = PathBuf::from("/bin/sh");
             let result = PassthroughMode::new(&path);
             assert!(result.is_ok());
@@ -632,6 +656,10 @@ mod tests {
 
         #[test]
         fn test_passthrough_mode_shutdown_flag() {
+            if !can_spawn_pty_process() {
+                eprintln!("Skipping: PTY process spawning not available in this environment");
+                return;
+            }
             let path = PathBuf::from("/bin/sh");
             let result = PassthroughMode::new(&path);
             assert!(result.is_ok());
@@ -651,6 +679,10 @@ mod tests {
 
         #[test]
         fn test_passthrough_exit_status_propagation() {
+            if !can_spawn_pty_process() {
+                eprintln!("Skipping: PTY process spawning not available in this environment");
+                return;
+            }
             // Test that exit status is correctly propagated
             let size = PtySize {
                 rows: 24,
@@ -675,6 +707,10 @@ mod tests {
 
         #[test]
         fn test_passthrough_io_forwarding() {
+            if !can_spawn_pty_process() {
+                eprintln!("Skipping: PTY process spawning not available in this environment");
+                return;
+            }
             // Test basic I/O forwarding
             let size = PtySize {
                 rows: 24,

@@ -102,20 +102,34 @@ impl DaemonClient {
     /// 3. Legacy runtime/temp fallback
     #[must_use]
     pub fn default_socket_path() -> Option<PathBuf> {
+        Self::resolve_socket_path(
+            std::env::var("CLAI_HOME").ok().as_deref(),
+            std::env::var("HOME").ok().as_deref(),
+            std::env::var("XDG_RUNTIME_DIR").ok().as_deref(),
+        )
+    }
+
+    /// Resolves the socket path from the given environment values.
+    /// Extracted for testability (avoids mutating global env in tests).
+    fn resolve_socket_path(
+        clai_home: Option<&str>,
+        home: Option<&str>,
+        xdg_runtime: Option<&str>,
+    ) -> Option<PathBuf> {
         // Preferred: CLAI_HOME override (matches daemon paths).
-        if let Ok(clai_home) = std::env::var("CLAI_HOME") {
+        if let Some(clai_home) = clai_home {
             let path = PathBuf::from(clai_home).join("daemon.sock");
             return Some(path);
         }
 
         // Preferred default: ~/.clai/daemon.sock.
-        if let Ok(home) = std::env::var("HOME") {
+        if let Some(home) = home {
             let path = PathBuf::from(home).join(".clai").join("daemon.sock");
             return Some(path);
         }
 
         // Legacy compatibility: XDG runtime socket.
-        if let Ok(xdg_runtime) = std::env::var("XDG_RUNTIME_DIR") {
+        if let Some(xdg_runtime) = xdg_runtime {
             let path = PathBuf::from(xdg_runtime).join("clai").join("daemon.sock");
             return Some(path);
         }
@@ -471,44 +485,22 @@ mod tests {
 
     #[test]
     fn test_default_socket_path_with_clai_home() {
-        let original_clai_home = std::env::var("CLAI_HOME").ok();
-        let original_home = std::env::var("HOME").ok();
-
-        std::env::set_var("CLAI_HOME", "/custom/clai");
-        std::env::set_var("HOME", "/home/tester");
-
-        let path = DaemonClient::default_socket_path();
+        let path = DaemonClient::resolve_socket_path(
+            Some("/custom/clai"),
+            Some("/home/tester"),
+            None,
+        );
         assert_eq!(path, Some(PathBuf::from("/custom/clai/daemon.sock")));
-
-        match original_clai_home {
-            Some(val) => std::env::set_var("CLAI_HOME", val),
-            None => std::env::remove_var("CLAI_HOME"),
-        }
-        match original_home {
-            Some(val) => std::env::set_var("HOME", val),
-            None => std::env::remove_var("HOME"),
-        }
     }
 
     #[test]
     fn test_default_socket_path_with_home_fallback() {
-        let original_clai_home = std::env::var("CLAI_HOME").ok();
-        let original_home = std::env::var("HOME").ok();
-
-        std::env::remove_var("CLAI_HOME");
-        std::env::set_var("HOME", "/home/tester");
-
-        let path = DaemonClient::default_socket_path();
+        let path = DaemonClient::resolve_socket_path(
+            None,
+            Some("/home/tester"),
+            None,
+        );
         assert_eq!(path, Some(PathBuf::from("/home/tester/.clai/daemon.sock")));
-
-        match original_clai_home {
-            Some(val) => std::env::set_var("CLAI_HOME", val),
-            None => std::env::remove_var("CLAI_HOME"),
-        }
-        match original_home {
-            Some(val) => std::env::set_var("HOME", val),
-            None => std::env::remove_var("HOME"),
-        }
     }
 
     // =========================================================================
