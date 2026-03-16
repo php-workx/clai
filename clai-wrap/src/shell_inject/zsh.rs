@@ -166,8 +166,7 @@ __CLAI_ZDOTDIR="$ZDOTDIR"
         })?;
 
         let content = format!(
-            "# clai-wrap: Zsh shell integration wrapper\n# This file is auto-generated and sources the user's real {name}\n\n[[ -f \"${{HOME}}/{name}\" ]] && source \"${{HOME}}/{name}\"\n",
-            name = file_name
+            "# clai-wrap: Zsh shell integration wrapper\n# This file is auto-generated and sources the user's real {file_name}\n\n[[ -f \"${{HOME}}/{file_name}\" ]] && source \"${{HOME}}/{file_name}\"\n"
         );
 
         file.write_all(content.as_bytes())

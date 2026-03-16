@@ -31,7 +31,7 @@ use crate::picker::{Picker, PickerItem};
 /// Default maximum number of history entries to load.
 const DEFAULT_MAX_ENTRIES: usize = 10_000;
 
-/// Errors that can occur when creating a HistoryPicker.
+/// Errors that can occur when creating a `HistoryPicker`.
 #[derive(Debug, Error)]
 pub enum HistoryPickerError {
     /// Failed to parse history file.
@@ -72,8 +72,9 @@ impl HistoryPicker {
     /// 3. Limited to `DEFAULT_MAX_ENTRIES`
     /// 4. Converted to `PickerItem`s
     #[must_use]
+    #[allow(clippy::needless_pass_by_value)]
     pub fn from_history(entries: Vec<HistoryEntry>) -> Self {
-        let processed = process_history_entries(entries, DEFAULT_MAX_ENTRIES);
+        let processed = process_history_entries(&entries, DEFAULT_MAX_ENTRIES);
         let items = entries_to_picker_items(&processed);
         let picker = Picker::new(items);
 
@@ -88,8 +89,9 @@ impl HistoryPicker {
     /// The entries are processed the same as `from_history`, and the picker
     /// is initialized with the given search query.
     #[must_use]
+    #[allow(clippy::needless_pass_by_value)]
     pub fn from_history_with_query(entries: Vec<HistoryEntry>, query: impl Into<String>) -> Self {
-        let processed = process_history_entries(entries, DEFAULT_MAX_ENTRIES);
+        let processed = process_history_entries(&entries, DEFAULT_MAX_ENTRIES);
         let items = entries_to_picker_items(&processed);
         let picker = Picker::with_query(items, query);
 
@@ -180,12 +182,12 @@ impl HistoryPicker {
     }
 
     /// Moves the selection to the previous item (up).
-    pub fn select_prev(&mut self) {
+    pub const fn select_prev(&mut self) {
         self.picker.select_prev();
     }
 
     /// Moves the selection to the next item (down).
-    pub fn select_next(&mut self) {
+    pub const fn select_next(&mut self) {
         self.picker.select_next();
     }
 
@@ -212,36 +214,36 @@ impl HistoryPicker {
 
     /// Returns the number of items matching the current filter.
     #[must_use]
-    pub fn filtered_count(&self) -> usize {
+    pub const fn filtered_count(&self) -> usize {
         self.picker.filtered_count()
     }
 
     /// Returns the total number of history entries.
     #[must_use]
-    pub fn total_count(&self) -> usize {
+    pub const fn total_count(&self) -> usize {
         self.picker.total_count()
     }
 
     /// Returns true if there are no history entries.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.picker.is_empty()
     }
 
     /// Returns true if no items match the current filter.
     #[must_use]
-    pub fn is_filtered_empty(&self) -> bool {
+    pub const fn is_filtered_empty(&self) -> bool {
         self.picker.is_filtered_empty()
     }
 
     /// Returns a reference to the underlying picker for rendering.
     #[must_use]
-    pub fn picker(&self) -> &Picker {
+    pub const fn picker(&self) -> &Picker {
         &self.picker
     }
 
     /// Returns a mutable reference to the underlying picker for rendering.
-    pub fn picker_mut(&mut self) -> &mut Picker {
+    pub const fn picker_mut(&mut self) -> &mut Picker {
         &mut self.picker
     }
 
@@ -269,7 +271,7 @@ fn default_history_path(shell: &str) -> Result<PathBuf, HistoryPickerError> {
 /// Gets the user's home directory.
 fn home_dir() -> Option<PathBuf> {
     // Try HOME environment variable first (works on Unix and sometimes Windows)
-    std::env::var_os("HOME").map(PathBuf::from).or_else(|| {
+    std::env::var_os("HOME").map(PathBuf::from).or({
         // Fallback for Windows
         #[cfg(windows)]
         {
@@ -287,8 +289,8 @@ fn home_dir() -> Option<PathBuf> {
 /// This function:
 /// 1. Reverses the entries (most recent first)
 /// 2. Removes consecutive duplicates
-/// 3. Limits to max_entries
-fn process_history_entries(entries: Vec<HistoryEntry>, max_entries: usize) -> Vec<HistoryEntry> {
+/// 3. Limits to `max_entries`
+fn process_history_entries(entries: &[HistoryEntry], max_entries: usize) -> Vec<HistoryEntry> {
     let mut result = Vec::with_capacity(entries.len().min(max_entries));
     let mut seen: HashSet<&str> = HashSet::new();
 
@@ -320,12 +322,13 @@ fn entries_to_picker_items(entries: &[HistoryEntry]) -> Vec<PickerItem> {
     entries
         .iter()
         .map(|entry| {
-            if let Some(ts) = entry.timestamp {
-                let formatted = format_timestamp(ts);
-                PickerItem::with_metadata(&entry.command, formatted)
-            } else {
-                PickerItem::new(&entry.command)
-            }
+            entry.timestamp.map_or_else(
+                || PickerItem::new(&entry.command),
+                |ts| {
+                    let formatted = format_timestamp(ts);
+                    PickerItem::with_metadata(&entry.command, formatted)
+                },
+            )
         })
         .collect()
 }
@@ -335,10 +338,11 @@ fn format_timestamp(timestamp: i64) -> String {
     // Use a simple relative time format
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-    let now = SystemTime::now()
+    let now_secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap_or(Duration::ZERO)
-        .as_secs() as i64;
+        .as_secs();
+    let now = i64::try_from(now_secs).unwrap_or(i64::MAX);
 
     let diff = now - timestamp;
 
@@ -346,7 +350,7 @@ fn format_timestamp(timestamp: i64) -> String {
         return "future".to_string();
     }
 
-    let diff = diff as u64;
+    let diff = diff.cast_unsigned();
 
     if diff < 60 {
         "just now".to_string()

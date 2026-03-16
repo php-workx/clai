@@ -296,7 +296,7 @@ impl PassthroughMode {
                             }
                         }
                         Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
-                            continue;
+
                         }
                         Err(_) => {
                             break;
@@ -332,12 +332,12 @@ impl PassthroughMode {
                             }
                         }
                         Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
-                            continue;
+
                         }
                         Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                             // Non-blocking read returned nothing
                             thread::sleep(Duration::from_millis(1));
-                            continue;
+
                         }
                         Err(_) => {
                             break;

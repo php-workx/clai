@@ -115,7 +115,7 @@ impl StandaloneState {
     ///
     /// The warning is not logged immediately; call `log_warning()` to log it.
     #[must_use]
-    pub fn new(reason: StandaloneReason) -> Self {
+    pub const fn new(reason: StandaloneReason) -> Self {
         Self {
             reason,
             history_entries: Vec::new(),
@@ -258,13 +258,13 @@ impl StandaloneState {
 
     /// Returns the number of history entries loaded.
     #[must_use]
-    pub fn history_count(&self) -> usize {
+    pub const fn history_count(&self) -> usize {
         self.history_entries.len()
     }
 
     /// Returns true if history has been loaded.
     #[must_use]
-    pub fn has_history(&self) -> bool {
+    pub const fn has_history(&self) -> bool {
         !self.history_entries.is_empty()
     }
 }

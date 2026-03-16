@@ -80,13 +80,13 @@ impl CapturedOutput {
 
     /// Returns `true` if the captured data is empty.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
     /// Returns the number of captured bytes.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.data.len()
     }
 }
@@ -252,7 +252,7 @@ impl OutputCapture {
     ///
     /// `true` if a capture session is in progress, `false` otherwise.
     #[must_use]
-    pub fn is_capturing(&self) -> bool {
+    pub const fn is_capturing(&self) -> bool {
         self.current_command.is_some()
     }
 
@@ -262,7 +262,7 @@ impl OutputCapture {
     ///
     /// `true` if capture is enabled (privacy gate not active), `false` otherwise.
     #[must_use]
-    pub fn is_enabled(&self) -> bool {
+    pub const fn is_enabled(&self) -> bool {
         self.enabled
     }
 
@@ -318,13 +318,13 @@ impl OutputCapture {
     /// capture.enable();
     /// assert!(capture.is_enabled());
     /// ```
-    pub fn enable(&mut self) {
+    pub const fn enable(&mut self) {
         self.enabled = true;
     }
 
     /// Returns the buffer capacity.
     #[must_use]
-    pub fn capacity(&self) -> usize {
+    pub const fn capacity(&self) -> usize {
         self.buffer.capacity()
     }
 

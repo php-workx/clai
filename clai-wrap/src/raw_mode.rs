@@ -304,7 +304,7 @@ mod unix {
     ///
     /// This is equivalent to `cfmakeraw()` but implemented manually for clarity
     /// and control over exactly which flags are set.
-    fn make_raw(termios: &mut libc::termios) {
+    const fn make_raw(termios: &mut libc::termios) {
         // Input modes: disable break signal, CR to NL, parity check, strip 8th bit,
         // and software flow control
         termios.c_iflag &= !(libc::IGNBRK

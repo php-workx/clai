@@ -323,6 +323,7 @@ pub struct ExitStatus {
 
 impl ExitStatus {
     /// Creates an `ExitStatus` from a `portable_pty::ExitStatus`.
+    #[allow(clippy::needless_pass_by_value)]
     fn from_portable_pty(status: portable_pty::ExitStatus) -> Self {
         Self {
             code: status.exit_code(),

@@ -84,7 +84,7 @@ impl SelectionInjector {
     /// # Arguments
     ///
     /// * `enabled` - Whether to enable bracketed paste mode.
-    pub fn set_bracketed_paste(&mut self, enabled: bool) {
+    pub const fn set_bracketed_paste(&mut self, enabled: bool) {
         self.use_bracketed_paste = enabled;
     }
 
@@ -102,7 +102,7 @@ impl SelectionInjector {
     /// # Arguments
     ///
     /// * `tracker` - The `BracketedPasteTracker` to sync state from.
-    pub fn sync_with_tracker(&mut self, tracker: &BracketedPasteTracker) {
+    pub const fn sync_with_tracker(&mut self, tracker: &BracketedPasteTracker) {
         self.use_bracketed_paste = tracker.is_enabled();
     }
 

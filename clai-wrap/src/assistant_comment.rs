@@ -20,7 +20,7 @@
 //! | Shell | Comment Prefix |
 //! |-------|---------------|
 //! | bash/zsh/fish | `#` |
-//! | PowerShell | `#` |
+//! | `PowerShell` | `#` |
 //! | cmd.exe | `REM ` |
 //! | Other/unknown | `#` (fallback) |
 //!
@@ -121,10 +121,10 @@ impl std::fmt::Display for CommentType {
 impl From<SuggestionType> for CommentType {
     fn from(st: SuggestionType) -> Self {
         match st {
-            SuggestionType::CommandFix => Self::Suggestion,
-            SuggestionType::CommandCompletion => Self::Suggestion,
+            SuggestionType::CommandFix
+            | SuggestionType::CommandCompletion
+            | SuggestionType::HistorySuggestion => Self::Suggestion,
             SuggestionType::CommandExplanation => Self::Explanation,
-            SuggestionType::HistorySuggestion => Self::Suggestion,
         }
     }
 }
@@ -139,7 +139,7 @@ pub enum Shell {
     Zsh,
     /// Fish shell (uses `#` comments).
     Fish,
-    /// PowerShell (uses `#` comments).
+    /// `PowerShell` (uses `#` comments).
     PowerShell,
     /// Windows cmd.exe (uses `REM ` comments).
     Cmd,
@@ -514,7 +514,7 @@ impl CommentRenderer {
     /// Calculates the required height for a comment widget.
     #[must_use]
     #[allow(clippy::cast_possible_truncation)]
-    pub fn required_height(&self, comment: &AssistantComment, width: u16) -> u16 {
+    pub const fn required_height(&self, comment: &AssistantComment, width: u16) -> u16 {
         // Border: 2 lines (top + bottom)
         // Text: 1 line
         // Explanation: wrapped lines based on width
@@ -556,7 +556,7 @@ impl CommentManager {
 
     /// Creates a comment manager with a specific renderer.
     #[must_use]
-    pub fn with_renderer(renderer: CommentRenderer) -> Self {
+    pub const fn with_renderer(renderer: CommentRenderer) -> Self {
         Self {
             comments: Vec::new(),
             renderer,
@@ -607,13 +607,13 @@ impl CommentManager {
 
     /// Returns the number of comments.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.comments.len()
     }
 
     /// Returns true if there are no comments.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.comments.is_empty()
     }
 

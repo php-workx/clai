@@ -59,10 +59,11 @@ pub const MAX_SUGGESTIONS_PER_COMMAND: usize = 10;
 pub const MAX_TOTAL_SUGGESTIONS: usize = 100;
 
 /// The type of suggestion received from the daemon.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SuggestionType {
     /// Fix for a failed command (e.g., typo correction).
+    #[default]
     CommandFix,
     /// Completion for a partially typed command.
     CommandCompletion,
@@ -96,11 +97,6 @@ impl SuggestionType {
     }
 }
 
-impl Default for SuggestionType {
-    fn default() -> Self {
-        Self::CommandFix
-    }
-}
 
 impl std::fmt::Display for SuggestionType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -126,7 +122,7 @@ pub struct Suggestion {
     pub confidence: f32,
 }
 
-fn default_confidence() -> f32 {
+const fn default_confidence() -> f32 {
     1.0
 }
 
@@ -199,7 +195,7 @@ impl Suggestion {
 
     /// Sets the confidence score.
     #[must_use]
-    pub fn with_confidence(mut self, confidence: f32) -> Self {
+    pub const fn with_confidence(mut self, confidence: f32) -> Self {
         self.confidence = confidence.clamp(0.0, 1.0);
         self
     }
@@ -211,6 +207,7 @@ impl Suggestion {
     pub fn sort_priority(&self) -> (u8, i32) {
         // Primary sort by type priority, secondary by inverse confidence
         // (multiply by 100 to preserve precision when converting to int)
+        #[allow(clippy::cast_possible_truncation)]
         let confidence_inverse = ((1.0 - self.confidence) * 100.0) as i32;
         (self.suggestion_type.priority(), confidence_inverse)
     }
@@ -284,6 +281,7 @@ impl SuggestionReceiver {
     }
 
     /// Parses a suggestion from a notification's params.
+    #[allow(clippy::unused_self)]
     fn parse_suggestion_notification(
         &self,
         notification: &Notification,
@@ -314,11 +312,11 @@ impl SuggestionReceiver {
             .and_then(|v| v.as_str())
             .map(String::from);
 
+        #[allow(clippy::cast_possible_truncation)]
         let confidence = params
             .get("confidence")
-            .and_then(|v| v.as_f64())
-            .map(|c| c as f32)
-            .unwrap_or(1.0);
+            .and_then(serde_json::Value::as_f64)
+            .map_or(1.0, |c| c as f32);
 
         Ok(Suggestion {
             command_id,
@@ -364,7 +362,7 @@ impl SuggestionReceiver {
     fn sort_suggestions(&mut self) {
         // Convert to Vec for sorting, then back to VecDeque
         let mut vec: Vec<_> = self.suggestions.drain(..).collect();
-        vec.sort_by(|a, b| a.sort_priority().cmp(&b.sort_priority()));
+        vec.sort_by_key(Suggestion::sort_priority);
         self.suggestions = vec.into();
     }
 
@@ -435,7 +433,7 @@ impl SuggestionReceiver {
     /// Returns true if new suggestions are available since last check.
     ///
     /// This flag is reset after calling this method.
-    pub fn has_new_suggestions(&mut self) -> bool {
+    pub const fn has_new_suggestions(&mut self) -> bool {
         let result = self.has_new_suggestions;
         self.has_new_suggestions = false;
         result

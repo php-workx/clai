@@ -69,7 +69,7 @@ pub enum ConfigError {
 }
 
 /// Configuration file structure (TOML)
-#[derive(Debug, Clone, Default, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 #[serde(default)]
 pub struct ConfigFile {
     /// Hotkey chord to trigger picker (e.g., "ctrl-\\ h")
@@ -227,10 +227,10 @@ impl Config {
     /// Returns a default configuration if no file is found.
     #[must_use]
     pub fn load_default() -> Self {
-        match find_config_file() {
-            Some(path) => match ConfigFile::load(&path) {
+        find_config_file().map_or_else(Self::default, |path| {
+            match ConfigFile::load(&path) {
                 Ok(file_config) => {
-                    let mut config = Self::from_file(file_config);
+                    let mut config = Self::from_file(&file_config);
                     config.config_path = Some(path);
                     config
                 }
@@ -238,9 +238,8 @@ impl Config {
                     tracing::warn!("Failed to load config file: {e}");
                     Self::default()
                 }
-            },
-            None => Self::default(),
-        }
+            }
+        })
     }
 
     /// Load configuration from a specific file path
@@ -250,13 +249,13 @@ impl Config {
     /// Returns an error if the file cannot be read or parsed.
     pub fn load_from_path(path: &Path) -> Result<Self, ConfigError> {
         let file_config = ConfigFile::load(path)?;
-        let mut config = Self::from_file(file_config);
+        let mut config = Self::from_file(&file_config);
         config.config_path = Some(path.to_path_buf());
         Ok(config)
     }
 
     /// Create configuration from a loaded config file
-    fn from_file(file: ConfigFile) -> Self {
+    fn from_file(file: &ConfigFile) -> Self {
         let mut config = Self::default();
 
         if let Some(ref hotkey) = file.hotkey {
@@ -627,7 +626,7 @@ hotkey = "ctrl-b"
             denylist: Some(vec!["custom-app".to_string()]),
         };
 
-        let config = Config::from_file(file_config);
+        let config = Config::from_file(&file_config);
 
         assert_eq!(config.hotkey, "ctrl-x");
         assert_eq!(config.buffer_capacity, 1_000_000);
@@ -646,7 +645,7 @@ hotkey = "ctrl-b"
             ..Default::default()
         };
 
-        let config = Config::from_file(file_config);
+        let config = Config::from_file(&file_config);
 
         assert_eq!(config.hotkey, "ctrl-y");
         // Other values should be defaults
@@ -747,7 +746,7 @@ hotkey = "ctrl-b"
             denylist: Some(vec!["file-app".to_string()]),
         };
 
-        let mut config = Config::from_file(file_config);
+        let mut config = Config::from_file(&file_config);
 
         let cli = Cli::parse_from_args([
             "clai-wrap",

@@ -5,6 +5,9 @@ edition = "2021"
 description = "PTY wrapper for clai terminal assistant"
 license = "MIT"
 readme = "README.md"
+repository = "https://github.com/clai-group/clai"
+keywords = ["terminal", "pty", "shell", "cli"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 clap = { version = "4", features = ["derive", "env"] }
@@ -61,15 +64,21 @@ harness = false
 tty_tests = []
 
 [lints.rust]
-unsafe_code = "warn"
+# Unsafe blocks are reviewed and annotated with // SAFETY: comments
+unsafe_code = "allow"
 
 [lints.clippy]
-all = "warn"
-pedantic = "warn"
-nursery = "warn"
-cargo = "warn"
+# Groups need lower priority than individual lints
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
 # Allow common patterns
 module_name_repetitions = "allow"
 must_use_candidate = "allow"
 missing_errors_doc = "allow"
 missing_panics_doc = "allow"
+# Transitive dependency version conflicts we can't control
+multiple_crate_versions = "allow"
+# Large stack arrays are intentional for I/O buffers
+large_stack_arrays = "allow"

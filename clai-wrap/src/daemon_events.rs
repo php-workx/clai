@@ -274,7 +274,7 @@ impl DaemonEventForwarder {
 
     /// Returns whether the forwarder is connected to the daemon.
     #[must_use]
-    pub fn is_connected(&self) -> bool {
+    pub const fn is_connected(&self) -> bool {
         #[cfg(unix)]
         {
             self.client.is_some() && self.standalone_state.is_none()
@@ -287,7 +287,7 @@ impl DaemonEventForwarder {
 
     /// Returns whether the forwarder is in standalone mode.
     #[must_use]
-    pub fn is_standalone(&self) -> bool {
+    pub const fn is_standalone(&self) -> bool {
         self.standalone_state.is_some()
     }
 
@@ -305,7 +305,7 @@ impl DaemonEventForwarder {
 
     /// Returns whether a command is currently being tracked.
     #[must_use]
-    pub fn is_tracking_command(&self) -> bool {
+    pub const fn is_tracking_command(&self) -> bool {
         self.current_command.is_some()
     }
 
@@ -372,7 +372,7 @@ impl DaemonEventForwarder {
         if let Some(ref mut client) = self.client {
             if let Some(ref command) = self.current_command {
                 if let Err(e) = client.send_output(&command.command_id, data, false) {
-                    self.handle_daemon_error(e);
+                    self.handle_daemon_error(&e);
                 }
             }
         }
@@ -395,7 +395,7 @@ impl DaemonEventForwarder {
         if let Some(ref mut client) = self.client {
             if let Some(ref command) = self.current_command {
                 if let Err(e) = client.send_output(&command.command_id, data, true) {
-                    self.handle_daemon_error(e);
+                    self.handle_daemon_error(&e);
                 }
             }
         }
@@ -422,7 +422,7 @@ impl DaemonEventForwarder {
         #[cfg(unix)]
         if let Some(ref mut client) = self.client {
             if let Err(e) = client.command_start(&self.config.session_id, &command_id) {
-                self.handle_daemon_error(e);
+                self.handle_daemon_error(&e);
             }
         }
     }
@@ -443,7 +443,7 @@ impl DaemonEventForwarder {
             "Command ended: {} (exit_code={}, captured={} bytes)",
             command_state.command_id,
             exit_code,
-            captured.as_ref().map_or(0, |c| c.len())
+            captured.as_ref().map_or(0, CapturedOutput::len)
         );
 
         // Forward to daemon if connected
@@ -460,14 +460,14 @@ impl DaemonEventForwarder {
 
             // Send command.end event
             if let Err(e) = client.command_end(&command_state.command_id, exit_code) {
-                self.handle_daemon_error(e);
+                self.handle_daemon_error(&e);
             }
         }
     }
 
     /// Returns and clears the most recently finished command id.
     #[must_use]
-    pub fn take_finished_command_id(&mut self) -> Option<String> {
+    pub const fn take_finished_command_id(&mut self) -> Option<String> {
         self.last_finished_command_id.take()
     }
 
@@ -480,7 +480,7 @@ impl DaemonEventForwarder {
             match client.poll_notifications() {
                 Ok(notification) => notification,
                 Err(err) => {
-                    self.handle_daemon_error(err);
+                    self.handle_daemon_error(&err);
                     None
                 }
             }
@@ -494,7 +494,7 @@ impl DaemonEventForwarder {
     /// This method attempts reconnection if configured, and falls back to
     /// standalone mode if reconnection fails.
     #[cfg(unix)]
-    fn handle_daemon_error(&mut self, error: DaemonClientError) {
+    fn handle_daemon_error(&mut self, error: &DaemonClientError) {
         warn!("Daemon communication error: {error}");
 
         // Attempt reconnection if configured
@@ -586,29 +586,26 @@ impl DaemonEventForwarder {
 
     /// Returns whether output capture is enabled.
     #[must_use]
-    pub fn is_capture_enabled(&self) -> bool {
+    pub const fn is_capture_enabled(&self) -> bool {
         self.output_capture.is_enabled()
     }
 
     /// Checks if a feature is available based on current mode.
     #[must_use]
     pub fn feature_available(&self, feature: Feature) -> bool {
-        if let Some(ref standalone) = self.standalone_state {
-            standalone.feature_available(feature)
-        } else {
-            // When connected, all features are available
-            true
-        }
+        self.standalone_state
+            .as_ref()
+            .is_none_or(|standalone| standalone.feature_available(feature))
     }
 
     /// Returns the standalone state if in standalone mode.
     #[must_use]
-    pub fn standalone_state(&self) -> Option<&StandaloneState> {
+    pub const fn standalone_state(&self) -> Option<&StandaloneState> {
         self.standalone_state.as_ref()
     }
 
     /// Returns the mutable standalone state if in standalone mode.
-    pub fn standalone_state_mut(&mut self) -> Option<&mut StandaloneState> {
+    pub const fn standalone_state_mut(&mut self) -> Option<&mut StandaloneState> {
         self.standalone_state.as_mut()
     }
 
@@ -635,7 +632,7 @@ impl std::fmt::Debug for DaemonEventForwarder {
             .field("is_standalone", &self.is_standalone())
             .field("current_command", &self.current_command_id())
             .field("osc_state", &self.previous_osc_state)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

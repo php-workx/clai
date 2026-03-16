@@ -16,8 +16,6 @@
 //! - **SIGQUIT**: Set to `SIG_IGN` (Ctrl-\ collision with hotkey)
 //! - **SIGPIPE**: Ignored (handle `EPIPE` in write)
 
-#![cfg(unix)]
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::sync::Arc;

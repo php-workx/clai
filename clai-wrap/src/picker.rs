@@ -125,7 +125,7 @@ impl Picker {
     /// Moves the selection up by one item.
     ///
     /// If at the top, wraps to the bottom.
-    pub fn select_prev(&mut self) {
+    pub const fn select_prev(&mut self) {
         if self.filtered_indices.is_empty() {
             return;
         }
@@ -143,7 +143,7 @@ impl Picker {
     /// Moves the selection down by one item.
     ///
     /// If at the bottom, wraps to the top.
-    pub fn select_next(&mut self) {
+    pub const fn select_next(&mut self) {
         if self.filtered_indices.is_empty() {
             return;
         }
@@ -199,25 +199,25 @@ impl Picker {
 
     /// Returns the number of items matching the current filter.
     #[must_use]
-    pub fn filtered_count(&self) -> usize {
+    pub const fn filtered_count(&self) -> usize {
         self.filtered_indices.len()
     }
 
     /// Returns the total number of items (unfiltered).
     #[must_use]
-    pub fn total_count(&self) -> usize {
+    pub const fn total_count(&self) -> usize {
         self.items.len()
     }
 
     /// Returns true if the picker has no items.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
 
     /// Returns true if no items match the current filter.
     #[must_use]
-    pub fn is_filtered_empty(&self) -> bool {
+    pub const fn is_filtered_empty(&self) -> bool {
         self.filtered_indices.is_empty()
     }
 
@@ -321,7 +321,7 @@ impl Picker {
     }
 
     /// Adjusts the scroll offset to keep the selection visible.
-    fn adjust_scroll_offset(&mut self) {
+    const fn adjust_scroll_offset(&mut self) {
         // This is handled by ratatui's ListState, but we track scroll_offset
         // for potential future use or custom rendering
         if self.selected < self.scroll_offset {
@@ -332,7 +332,7 @@ impl Picker {
 
     /// Adjusts the scroll offset based on the visible viewport height.
     #[allow(dead_code)]
-    pub fn adjust_scroll_for_viewport(&mut self, viewport_height: usize) {
+    pub const fn adjust_scroll_for_viewport(&mut self, viewport_height: usize) {
         if viewport_height == 0 {
             return;
         }

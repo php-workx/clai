@@ -61,7 +61,7 @@ impl InputRouter {
     /// * `config` - Configuration for hotkey detection
     /// * `event_tx` - Channel sender for emitting input events
     #[must_use]
-    pub fn new(config: HotkeyConfig, event_tx: Sender<InputEvent>) -> Self {
+    pub const fn new(config: HotkeyConfig, event_tx: Sender<InputEvent>) -> Self {
         Self {
             hotkey_parser: HotkeyParser::with_config(config),
             event_tx,
@@ -166,7 +166,7 @@ impl InputRouter {
         };
         self.event_tx
             .send(input_event)
-            .map_err(|e| anyhow::anyhow!("Failed to send input event: {}", e))
+            .map_err(|e| anyhow::anyhow!("Failed to send input event: {e}"))
     }
 }
 

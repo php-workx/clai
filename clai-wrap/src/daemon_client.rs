@@ -97,8 +97,8 @@ impl DaemonClient {
     /// Resolves the default socket path.
     ///
     /// Returns the socket path based on:
-    /// 1. `$CLAI_HOME/daemon.sock` if CLAI_HOME is set
-    /// 2. `$HOME/.clai/daemon.sock` if HOME is set
+    /// 1. `$CLAI_HOME/daemon.sock` if `CLAI_HOME` is set
+    /// 2. `$HOME/.clai/daemon.sock` if `HOME` is set
     /// 3. Legacy runtime/temp fallback
     #[must_use]
     pub fn default_socket_path() -> Option<PathBuf> {
@@ -111,6 +111,7 @@ impl DaemonClient {
 
     /// Resolves the socket path from the given environment values.
     /// Extracted for testability (avoids mutating global env in tests).
+    #[allow(clippy::unnecessary_wraps)]
     fn resolve_socket_path(
         clai_home: Option<&str>,
         home: Option<&str>,
@@ -234,9 +235,9 @@ impl DaemonClient {
 
     /// Handles stale socket detection and cleanup.
     ///
-    /// On ECONNREFUSED:
-    /// 1. stat() the socket file
-    /// 2. If owned by current user: unlink and return Ok
+    /// On `ECONNREFUSED`:
+    /// 1. `stat()` the socket file
+    /// 2. If owned by current user: unlink and return `Ok`
     /// 3. If owned by different user: return error
     fn handle_stale_socket(socket_path: &Path) -> Result<()> {
         use std::fs;
@@ -443,8 +444,7 @@ impl DaemonClient {
     /// Returns the socket path this client is connected to.
     ///
     /// Note: This information is not stored by the client, so this method
-    /// returns None. Use the path you passed to connect() if you need it.
-    #[must_use]
+    /// returns `None`. Use the path you passed to `connect()` if you need it.
     pub fn peer_addr(&self) -> std::io::Result<std::os::unix::net::SocketAddr> {
         self.stream.peer_addr()
     }

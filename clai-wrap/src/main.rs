@@ -139,6 +139,7 @@ fn main() -> Result<()> {
 }
 
 /// Initialize logging based on CLI options
+#[allow(clippy::unnecessary_wraps)]
 fn init_logging(cli: &Cli) -> Result<()> {
     let level = if cli.is_debug() {
         Level::DEBUG
@@ -206,7 +207,6 @@ fn run_full_mode(cli: &Cli) -> Result<()> {
     let config = Config::load_and_merge(cli);
     let socket_path = config
         .daemon_socket
-        .clone()
         .or_else(DaemonClient::default_socket_path)
         .context("No daemon socket path configured")?;
 
@@ -274,6 +274,7 @@ fn run_standalone_mode(cli: &Cli) -> Result<()> {
 }
 
 #[cfg(unix)]
+#[allow(clippy::too_many_lines)]
 fn run_unix_mode(
     cli: &Cli,
     mut daemon_forwarder: Option<DaemonEventForwarder>,
@@ -510,7 +511,7 @@ fn run_unix_mode(
                 &config,
                 hotkey_enabled,
                 picker_enabled,
-                daemon_capture_enabled(&daemon_forwarder, osc133_watchdog_fired),
+                daemon_capture_enabled(daemon_forwarder.as_ref(), osc133_watchdog_fired),
                 master_fd,
                 &denylist,
                 &mut io_threads,
@@ -540,7 +541,7 @@ fn run_unix_mode(
                 &config,
                 hotkey_enabled,
                 picker_enabled,
-                daemon_capture_enabled(&daemon_forwarder, osc133_watchdog_fired),
+                daemon_capture_enabled(daemon_forwarder.as_ref(), osc133_watchdog_fired),
                 master_fd,
                 &denylist,
                 &mut io_threads,
@@ -632,7 +633,7 @@ fn run_unix_mode(
 }
 
 #[cfg(unix)]
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 fn handle_io_event(
     event: IoEvent,
     _cli: &Cli,
@@ -679,6 +680,7 @@ fn handle_io_event(
                 match new_osc_state {
                     Osc133State::Output => {
                         // Command started executing — check denylist
+                        #[allow(clippy::option_if_let_else)]
                         let denied = if let Some(fd) = master_fd {
                             let fg_process = get_foreground_process_or(fd, "shell");
                             let is_denied = denylist.is_denied(&fg_process);
@@ -851,7 +853,7 @@ fn process_input_router_events(
                     "forwarding {} byte(s) from input router to PTY",
                     bytes.len()
                 );
-                io_threads.send_to_pty(bytes)?
+                io_threads.send_to_pty(bytes)?;
             }
             InputEvent::OpenHistoryPicker => {
                 debug!("hotkey triggered history picker");
@@ -1112,7 +1114,7 @@ impl PickerInputParser {
                     self.pending.drain(..1);
                     keys.push(PickerKey::Backspace);
                 }
-                b if b >= 0x20 && b < 0x80 => {
+                b if (0x20..0x80).contains(&b) => {
                     self.pending.drain(..1);
                     keys.push(PickerKey::Char(char::from(b)));
                 }
@@ -1144,7 +1146,7 @@ impl PickerInputParser {
 }
 
 #[cfg(unix)]
-fn utf8_expected_len(first: u8) -> Option<usize> {
+const fn utf8_expected_len(first: u8) -> Option<usize> {
     match first {
         0xC2..=0xDF => Some(2),
         0xE0..=0xEF => Some(3),
@@ -1310,7 +1312,7 @@ fn init_standalone_history(
     if let Some(history_path) = cli.history_file.as_deref() {
         state
             .load_history_from(history_path)
-            .with_context(|| format!("failed to load history file {:?}", history_path))?;
+            .with_context(|| format!("failed to load history file {}", history_path.display()))?;
         return Ok(state);
     }
 
@@ -1325,14 +1327,13 @@ fn init_standalone_history(
 
 #[cfg(unix)]
 fn daemon_capture_enabled(
-    daemon_forwarder: &Option<DaemonEventForwarder>,
+    daemon_forwarder: Option<&DaemonEventForwarder>,
     osc133_watchdog_fired: bool,
 ) -> bool {
     if osc133_watchdog_fired {
         return false;
     }
     daemon_forwarder
-        .as_ref()
         .is_some_and(|forwarder| !forwarder.is_standalone())
 }
 

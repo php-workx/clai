@@ -233,7 +233,7 @@ impl OutputBuffer {
     }
 
     /// Clears the buffer.
-    pub fn clear(&mut self) {
+    pub const fn clear(&mut self) {
         self.write_pos = 0;
         self.len = 0;
     }
@@ -510,7 +510,6 @@ fn stdin_reader_thread(state: &IoState, event_tx: &Sender<IoEvent>) {
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
                 // Interrupted by signal, continue
-                continue;
             }
             Err(e) => {
                 let _ = event_tx.send(IoEvent::StdinReadError(e.to_string()));
@@ -545,7 +544,6 @@ fn pty_writer_thread(state: &IoState, mut writer: Box<dyn Write + Send>, rx: &Re
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
                 // Check shutdown and continue
-                continue;
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 // Sender dropped, exit
@@ -596,12 +594,10 @@ fn pty_reader_thread(
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {
                 // Interrupted by signal, continue
-                continue;
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 // Non-blocking read returned would-block, yield and retry
                 thread::yield_now();
-                continue;
             }
             Err(e) => {
                 let _ = event_tx.send(IoEvent::PtyReadError(e.to_string()));

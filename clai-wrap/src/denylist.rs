@@ -231,13 +231,13 @@ impl Denylist {
 
     /// Returns the number of patterns in the denylist.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.patterns.len()
     }
 
     /// Returns `true` if the denylist has no patterns.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.patterns.is_empty()
     }
 
@@ -275,7 +275,7 @@ impl Denylist {
         // Strip path prefix (take basename)
         // Handle both Unix (/) and Windows (\) path separators
         let basename = command
-            .rsplit(|c| c == '/' || c == '\\')
+            .rsplit(['/', '\\'])
             .next()
             .unwrap_or(command);
 
