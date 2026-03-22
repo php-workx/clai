@@ -499,13 +499,13 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
-			fmt.Fprintln(os.Stderr, result)
+			fmt.Fprintln(os.Stderr, result) //nolint:gosec // G705: result is internal picker output, not user-controlled web content
 		}
 		return code
 	}
 
 	if result != "" {
-		fmt.Fprintln(os.Stdout, result)
+		fmt.Fprintln(os.Stdout, result) //nolint:gosec // G705: result is internal picker output, not user-controlled web content
 	}
 
 	return exitSuccess
@@ -517,7 +517,7 @@ func dispatchSuggest(cfg *config.Config, opts *pickerOpts) int {
 	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
-			fmt.Fprintln(os.Stderr, result)
+			fmt.Fprintln(os.Stderr, result) //nolint:gosec // G705: result is internal picker output, not user-controlled web content
 		}
 		return code
 	}

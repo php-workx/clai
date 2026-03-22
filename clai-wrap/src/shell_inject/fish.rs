@@ -451,6 +451,15 @@ mod tests {
 
     #[test]
     fn test_for_shell_path_detects_version() {
+        // Skip if fish is not installed
+        if std::process::Command::new("fish")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            eprintln!("Skipping: fish not installed");
+            return;
+        }
         let injector = FishInjector::for_shell_path(Path::new("fish"));
         assert!(
             injector.is_ok(),

@@ -765,6 +765,7 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
+    #[ignore] // Requires real TTY — run with: cargo test --features tty_tests -- --ignored
     fn test_new_with_login_disabled_does_not_pass_login_flag() {
         if !can_spawn_pty_process() {
             eprintln!("Skipping: PTY process spawning not available in this environment");
