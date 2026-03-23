@@ -161,7 +161,7 @@ func (t *AnalysisTransport) analyzeViaDirect(ctx context.Context, req *AnalysisR
 	for attempt := 0; attempt < maxAttempts; attempt++ {
 		if attempt > 0 {
 			// Exponential backoff: 1s, 2s, 4s, ...
-			backoff := time.Duration(1<<min(uint(attempt-1), 30)) * time.Second //nolint:gosec // G115: attempt is bounded by maxAttempts (small int)
+			backoff := time.Duration(1<<min(uint(attempt-1), 30)) * time.Second
 			slog.Info("retrying LLM analysis", "attempt", attempt+1, "backoff", backoff)
 			select {
 			case <-ctx.Done():
