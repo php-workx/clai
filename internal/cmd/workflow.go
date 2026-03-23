@@ -397,14 +397,14 @@ func runAdHocCommand(ctx context.Context, command, workDir string, env []string)
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		//nolint:gosec // G204: command is explicitly provided by the human reviewer at runtime.
-		cmd = exec.CommandContext(ctx, "cmd.exe", "/C", command)
+		cmd = exec.CommandContext(ctx, "cmd.exe", "/C", command) // nosemgrep: dangerous-exec-command
 	} else {
 		shellPath := os.Getenv("SHELL")
 		if shellPath == "" {
 			shellPath = "/bin/sh"
 		}
 		//nolint:gosec // command is explicitly provided by the human reviewer at runtime.
-		cmd = exec.CommandContext(ctx, shellPath, "-c", command)
+		cmd = exec.CommandContext(ctx, shellPath, "-c", command) // nosemgrep: dangerous-exec-command
 	}
 
 	cmd.Dir = workDir

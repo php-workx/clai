@@ -95,7 +95,7 @@ func (r *Runner) Run(ctx context.Context, command string, args ...string) (*Runn
 
 	// Create command
 	//nolint:gosec // command/args are built from fixed discovery adapters.
-	cmd := exec.CommandContext(runCtx, command, args...)
+	cmd := exec.CommandContext(runCtx, command, args...) // nosemgrep: dangerous-exec-command
 
 	// Set working directory
 	if r.cfg.WorkingDir != "" {

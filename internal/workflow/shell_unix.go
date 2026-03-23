@@ -36,7 +36,7 @@ func (a *unixShellAdapter) BuildCommand(ctx context.Context, step *StepDef, work
 			return nil, fmt.Errorf("command produced empty argv")
 		}
 		// #nosec G204 -- commands originate from trusted workflow definitions.
-		cmd = exec.CommandContext(ctx, argv[0], argv[1:]...)
+		cmd = exec.CommandContext(ctx, argv[0], argv[1:]...) // nosemgrep: dangerous-exec-command
 	} else {
 		// Shell mode: wrap in shell interpreter.
 		// Default to the user's login shell so aliases and shell config
@@ -50,7 +50,7 @@ func (a *unixShellAdapter) BuildCommand(ctx context.Context, step *StepDef, work
 			shellPath = step.Shell
 		}
 		// #nosec G204,G702 -- commands originate from trusted workflow definitions; shellPath is $SHELL or a validated step field.
-		cmd = exec.CommandContext(ctx, shellPath, "-c", step.Run)
+		cmd = exec.CommandContext(ctx, shellPath, "-c", step.Run) // nosemgrep: dangerous-exec-command
 	}
 
 	cmd.Dir = workDir

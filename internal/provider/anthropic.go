@@ -150,7 +150,7 @@ func (p *AnthropicProvider) query(ctx context.Context, prompt string) (string, e
 	// Custom model requested — must use direct CLI to pass --model flag
 	args := []string{"--print", "--model", p.model}
 
-	cmd := exec.CommandContext(ctx, p.cliPath, args...) //nolint:gosec // G204: cliPath is Claude CLI binary
+	cmd := exec.CommandContext(ctx, p.cliPath, args...) //nolint:gosec // G204: cliPath is Claude CLI binary // nosemgrep: dangerous-exec-command
 	cmd.Env = claude.FilterEnv(os.Environ(), "CLAUDECODE")
 	cmd.Stdin = strings.NewReader(prompt)
 
