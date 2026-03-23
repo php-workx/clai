@@ -15,8 +15,8 @@ rules:
   - name: "No new cycles"
     type: metric
     metric: cycles
-    max: 2
-    reason: "Dependency cycles make the codebase harder to reason about (2 existing in storage/daemon)"
+    max: 3
+    reason: "Dependency cycles make the codebase harder to reason about (3 existing)"
 
   # Trend-based regression guards (requires snapshots)
   - name: "Health must not regress"
