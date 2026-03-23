@@ -14,6 +14,7 @@ use std::io::{Read, Write};
 #[cfg(unix)]
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::mpsc;
 use std::time::{Duration, Instant};
 #[cfg(unix)]
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -32,6 +33,110 @@ const PTY_TIMEOUT: Duration = Duration::from_secs(5);
 /// Buffer size for reading PTY output.
 const READ_BUFFER_SIZE: usize = 4096;
 
+/// Deadline-enforced PTY reader that reads in a background thread.
+///
+/// Standard PTY reads are blocking syscalls. If a test expects output that
+/// never arrives, `reader.read()` blocks forever and the timeout in
+/// `read_until_marker` is never checked. This wrapper moves the blocking
+/// reads to a detached background thread and uses channel `recv_timeout`
+/// to enforce deadlines reliably.
+///
+/// The background thread exits when:
+/// - The PTY slave closes (child exits), causing `read()` to return EOF
+/// - The PTY master is dropped, causing `read()` to return an error
+struct PtyTestReader {
+    rx: mpsc::Receiver<Vec<u8>>,
+}
+
+impl PtyTestReader {
+    fn new(mut reader: Box<dyn Read + Send>) -> Self {
+        let (tx, rx) = mpsc::sync_channel(128);
+        std::thread::spawn(move || {
+            let mut buf = [0u8; READ_BUFFER_SIZE];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) => break, // EOF
+                    Ok(n) => {
+                        if tx.send(buf[..n].to_vec()).is_err() {
+                            break; // receiver dropped
+                        }
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+                    Err(_) => break,
+                }
+            }
+        });
+        Self { rx }
+    }
+
+    /// Read until `marker` is found in accumulated output, or deadline expires.
+    fn read_until_marker(&self, marker: &str, timeout: Duration) -> Result<String, String> {
+        let mut output = String::new();
+        let deadline = Instant::now() + timeout;
+
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+
+            match self.rx.recv_timeout(remaining) {
+                Ok(data) => {
+                    output.push_str(&String::from_utf8_lossy(&data));
+                    if output.contains(marker) {
+                        return Ok(output);
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Timeout | mpsc::RecvTimeoutError::Disconnected) => {
+                    break
+                }
+            }
+        }
+
+        if output.contains(marker) {
+            Ok(output)
+        } else {
+            Err(format!(
+                "Timeout waiting for marker '{marker}'. Got: {output}"
+            ))
+        }
+    }
+
+    /// Drain available output up to `max_duration`. Stops early if no new
+    /// data arrives for 100ms after some output was already collected.
+    fn drain(&self, max_duration: Duration) -> String {
+        let mut output = String::new();
+        let deadline = Instant::now() + max_duration;
+
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                break;
+            }
+
+            match self
+                .rx
+                .recv_timeout(remaining.min(Duration::from_millis(100)))
+            {
+                Ok(data) => {
+                    output.push_str(&String::from_utf8_lossy(&data));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    if !output.is_empty() {
+                        break;
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => break,
+            }
+        }
+
+        output
+    }
+}
+
 /// Default PTY size for tests.
 const fn default_pty_size() -> PtySize {
     PtySize {
@@ -43,6 +148,8 @@ const fn default_pty_size() -> PtySize {
 }
 
 /// Helper to read output from PTY until a marker is found or timeout.
+/// Used by tests that send Ctrl-C (0x03) — `PtyTestReader`'s background
+/// reader thread conflicts with concurrent PTY writes during signal delivery.
 fn read_until_marker(
     reader: &mut dyn Read,
     marker: &str,
@@ -81,6 +188,7 @@ fn read_until_marker(
 }
 
 /// Helper to drain remaining output from PTY (non-blocking).
+#[allow(dead_code)]
 fn drain_output(reader: &mut dyn Read, max_duration: Duration) -> String {
     let mut output = String::new();
     let mut buf = [0u8; READ_BUFFER_SIZE];
@@ -276,12 +384,14 @@ fn test_pty_spawn_echo_command() {
 
     let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn echo");
 
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
 
-    let output = read_until_marker(&mut *reader, "hello_e2e_test", PTY_TIMEOUT)
+    let output = reader
+        .read_until_marker("hello_e2e_test", PTY_TIMEOUT)
         .expect("Failed to read output");
 
     assert!(
@@ -330,10 +440,7 @@ fn test_pty_io_passthrough_basic() {
 
     // Use cat to echo back input
     #[cfg(unix)]
-    let cmd = {
-        
-        CommandBuilder::new("cat")
-    };
+    let cmd = { CommandBuilder::new("cat") };
 
     #[cfg(windows)]
     let cmd = {
@@ -345,10 +452,11 @@ fn test_pty_io_passthrough_basic() {
 
     let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn cat");
 
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
     let mut writer = pair.master.take_writer().expect("Failed to get writer");
 
     // Write test input
@@ -359,7 +467,7 @@ fn test_pty_io_passthrough_basic() {
     writer.flush().expect("Failed to flush");
 
     // Read output (cat should echo it back)
-    let output = read_until_marker(&mut *reader, "e2e_passthrough_test", PTY_TIMEOUT);
+    let output = reader.read_until_marker("e2e_passthrough_test", PTY_TIMEOUT);
 
     // Kill the child
     let _ = child.kill();
@@ -501,13 +609,15 @@ fn test_pty_clai_wrap_env_var() {
 
     let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn");
 
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
 
-    let output =
-        read_until_marker(&mut *reader, "CLAI_WRAP=1", PTY_TIMEOUT).expect("Failed to read output");
+    let output = reader
+        .read_until_marker("CLAI_WRAP=1", PTY_TIMEOUT)
+        .expect("Failed to read output");
 
     let _ = child.wait();
 
@@ -545,13 +655,15 @@ fn test_pty_env_inheritance() {
 
     let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn");
 
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
 
-    let output =
-        read_until_marker(&mut *reader, test_value, PTY_TIMEOUT).expect("Failed to read output");
+    let output = reader
+        .read_until_marker(test_value, PTY_TIMEOUT)
+        .expect("Failed to read output");
 
     let _ = child.wait();
 
@@ -581,12 +693,14 @@ fn test_pty_spawn_sh_shell() {
         .spawn_command(cmd)
         .expect("Failed to spawn shell");
 
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
 
-    let output = read_until_marker(&mut *reader, "shell_spawn_test", PTY_TIMEOUT)
+    let output = reader
+        .read_until_marker("shell_spawn_test", PTY_TIMEOUT)
         .expect("Failed to read output");
 
     let status = child.wait().expect("Failed to wait");
@@ -615,12 +729,14 @@ fn test_pty_spawn_bash_if_available() {
 
     let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn bash");
 
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
 
-    let output = read_until_marker(&mut *reader, "bash_e2e_test", PTY_TIMEOUT)
+    let output = reader
+        .read_until_marker("bash_e2e_test", PTY_TIMEOUT)
         .expect("Failed to read output");
 
     let _ = child.wait();
@@ -656,12 +772,15 @@ fn test_clai_wrap_login_shell_disabled_does_not_pass_l_flag() {
         .slave
         .spawn_command(cmd)
         .expect("Failed to spawn clai-wrap");
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
 
-    let output = read_until_marker(&mut *reader, "ARGC=", PTY_TIMEOUT).expect("Failed to read");
+    let output = reader
+        .read_until_marker("ARGC=", PTY_TIMEOUT)
+        .expect("Failed to read");
     let status = wait_for_exit_or_kill(&mut *child, Duration::from_secs(5));
 
     assert!(
@@ -705,17 +824,18 @@ fn test_clai_wrap_warns_on_nested_wrapper_env() {
         .slave
         .spawn_command(cmd)
         .expect("Failed to spawn clai-wrap");
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
 
-    let output = read_until_marker(
-        &mut *reader,
-        "clai-wrap: nested wrapper detected (CLAI_WRAP already set)",
-        PTY_TIMEOUT,
-    )
-    .expect("Failed to read nested warning");
+    let output = reader
+        .read_until_marker(
+            "clai-wrap: nested wrapper detected (CLAI_WRAP already set)",
+            PTY_TIMEOUT,
+        )
+        .expect("Failed to read nested warning");
     let status = wait_for_exit_or_kill(&mut *child, Duration::from_secs(5));
 
     assert!(
@@ -750,12 +870,14 @@ fn test_clai_wrap_fails_fast_with_invalid_history_file() {
         .slave
         .spawn_command(cmd)
         .expect("Failed to spawn clai-wrap");
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
 
-    let output = read_until_marker(&mut *reader, "failed to load history file", PTY_TIMEOUT)
+    let output = reader
+        .read_until_marker("failed to load history file", PTY_TIMEOUT)
         .expect("Failed to read error output");
     let status = wait_for_exit_or_kill(&mut *child, Duration::from_secs(5));
 
@@ -857,7 +979,7 @@ fn test_clai_wrap_fullscreen_vim_open_close_resume_shell() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
@@ -865,7 +987,8 @@ fn test_clai_wrap_fullscreen_vim_open_close_resume_shell() {
         .expect("write vim command");
     writer.flush().expect("flush vim command");
 
-    let output = read_until_marker(&mut *reader, "AFTER_VIM", Duration::from_secs(12))
+    let output = reader
+        .read_until_marker("AFTER_VIM", Duration::from_secs(12))
         .expect("Expected shell to recover after vim exits");
 
     let _ = child.kill();
@@ -886,7 +1009,7 @@ fn test_clai_wrap_fullscreen_less_quit_resume_shell() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
@@ -902,7 +1025,8 @@ fn test_clai_wrap_fullscreen_less_quit_resume_shell() {
         .expect("write post-less marker");
     writer.flush().expect("flush post-less marker");
 
-    let output = read_until_marker(&mut *reader, "AFTER_LESS", Duration::from_secs(12))
+    let output = reader
+        .read_until_marker("AFTER_LESS", Duration::from_secs(12))
         .expect("Expected shell to recover after less quits");
 
     let _ = child.kill();
@@ -923,7 +1047,7 @@ fn test_clai_wrap_fullscreen_top_snapshot_resume_shell() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
@@ -933,7 +1057,8 @@ fn test_clai_wrap_fullscreen_top_snapshot_resume_shell() {
         .expect("write top snapshot command");
     writer.flush().expect("flush top snapshot command");
 
-    let output = read_until_marker(&mut *reader, "AFTER_TOP", Duration::from_secs(12))
+    let output = reader
+        .read_until_marker("AFTER_TOP", Duration::from_secs(12))
         .expect("Expected shell to recover after top snapshot");
 
     let _ = child.kill();
@@ -954,7 +1079,7 @@ fn test_clai_wrap_fullscreen_man_quit_resume_shell() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer.write_all(b"man sh\n").expect("write man command");
@@ -968,7 +1093,8 @@ fn test_clai_wrap_fullscreen_man_quit_resume_shell() {
         .expect("write post-man marker");
     writer.flush().expect("flush post-man marker");
 
-    let output = read_until_marker(&mut *reader, "AFTER_MAN", Duration::from_secs(12))
+    let output = reader
+        .read_until_marker("AFTER_MAN", Duration::from_secs(12))
         .expect("Expected shell to recover after man exits");
 
     let _ = child.kill();
@@ -993,7 +1119,7 @@ fn test_clai_wrap_ssh_localhost_command_resume_shell() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
@@ -1003,7 +1129,8 @@ fn test_clai_wrap_ssh_localhost_command_resume_shell() {
         .expect("write ssh command");
     writer.flush().expect("flush ssh command");
 
-    let ssh_output = read_until_marker(&mut *reader, "SSH_WRAP_OK", Duration::from_secs(12))
+    let ssh_output = reader
+        .read_until_marker("SSH_WRAP_OK", Duration::from_secs(12))
         .expect("Expected SSH command marker");
     assert!(ssh_output.contains("SSH_WRAP_OK"), "Output: {ssh_output}");
 
@@ -1012,7 +1139,8 @@ fn test_clai_wrap_ssh_localhost_command_resume_shell() {
         .expect("write post-ssh marker");
     writer.flush().expect("flush post-ssh marker");
 
-    let output = read_until_marker(&mut *reader, "AFTER_SSH", Duration::from_secs(8))
+    let output = reader
+        .read_until_marker("AFTER_SSH", Duration::from_secs(8))
         .expect("Expected shell to continue after SSH command");
 
     let _ = child.kill();
@@ -1029,7 +1157,7 @@ fn test_clai_wrap_io_simple_echo_passthrough() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
@@ -1037,8 +1165,9 @@ fn test_clai_wrap_io_simple_echo_passthrough() {
         .expect("Failed to write");
     writer.flush().expect("Failed to flush");
 
-    let output =
-        read_until_marker(&mut *reader, "io_passthrough_ok", PTY_TIMEOUT).expect("read output");
+    let output = reader
+        .read_until_marker("io_passthrough_ok", PTY_TIMEOUT)
+        .expect("read output");
 
     let _ = child.kill();
     let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
@@ -1054,7 +1183,7 @@ fn test_clai_wrap_io_interactive_read_input() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
@@ -1068,7 +1197,8 @@ fn test_clai_wrap_io_interactive_read_input() {
         .expect("Failed to write input");
     writer.flush().expect("Failed to flush input");
 
-    let output = read_until_marker(&mut *reader, "VALUE:typed_value", PTY_TIMEOUT)
+    let output = reader
+        .read_until_marker("VALUE:typed_value", PTY_TIMEOUT)
         .expect("Failed to read interactive output");
 
     let _ = child.kill();
@@ -1085,7 +1215,7 @@ fn test_clai_wrap_io_ansi_color_passthrough() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
@@ -1093,7 +1223,8 @@ fn test_clai_wrap_io_ansi_color_passthrough() {
         .expect("Failed to write command");
     writer.flush().expect("Failed to flush command");
 
-    let output = read_until_marker(&mut *reader, "\u{1b}[31mRED_TEXT", PTY_TIMEOUT)
+    let output = reader
+        .read_until_marker("\u{1b}[31mRED_TEXT", PTY_TIMEOUT)
         .expect("Failed to read ANSI output");
 
     let _ = child.kill();
@@ -1165,7 +1296,7 @@ fn test_clai_wrap_io_tab_completion_completes_filename() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     let tempdir = tempfile::tempdir().expect("create temp dir");
@@ -1188,7 +1319,8 @@ fn test_clai_wrap_io_tab_completion_completes_filename() {
         .expect("write tab completion command");
     writer.flush().expect("flush tab completion command");
 
-    let output = read_until_marker(&mut *reader, "TAB_COMPLETION_OK", Duration::from_secs(8))
+    let output = reader
+        .read_until_marker("TAB_COMPLETION_OK", Duration::from_secs(8))
         .expect("Expected filename tab completion to work");
 
     let _ = child.kill();
@@ -1208,7 +1340,7 @@ fn test_clai_wrap_io_line_editing_arrows_backspace_ctrl_a_ctrl_e() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
@@ -1218,14 +1350,16 @@ fn test_clai_wrap_io_line_editing_arrows_backspace_ctrl_a_ctrl_e() {
         .write_all(b"\x1b[D\x08ll\n")
         .expect("write arrow/backspace edits");
     writer.flush().expect("flush arrow/backspace edits");
-    let output_hello = read_until_marker(&mut *reader, "hello", Duration::from_secs(8))
+    let output_hello = reader
+        .read_until_marker("hello", Duration::from_secs(8))
         .expect("Expected edited line to become 'hello'");
 
     writer
         .write_all(b"echo core\x01printf 'CTRL_A_OK '; \x05; echo CTRL_E_OK\n")
         .expect("write ctrl-a/ctrl-e edits");
     writer.flush().expect("flush ctrl-a/ctrl-e edits");
-    let output_ctrl = read_until_marker(&mut *reader, "CTRL_E_OK", Duration::from_secs(8))
+    let output_ctrl = reader
+        .read_until_marker("CTRL_E_OK", Duration::from_secs(8))
         .expect("Expected ctrl-a/ctrl-e edited command output");
 
     let _ = child.kill();
@@ -1246,7 +1380,7 @@ fn test_clai_wrap_signal_sigpipe_does_not_break_shell() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
@@ -1254,7 +1388,8 @@ fn test_clai_wrap_signal_sigpipe_does_not_break_shell() {
         .expect("write pipeline");
     writer.flush().expect("flush pipeline");
 
-    let output = read_until_marker(&mut *reader, "AFTER_SIGPIPE", Duration::from_secs(8))
+    let output = reader
+        .read_until_marker("AFTER_SIGPIPE", Duration::from_secs(8))
         .expect("Expected shell to continue after SIGPIPE in pipeline");
 
     let _ = child.kill();
@@ -1368,14 +1503,15 @@ fn test_clai_wrap_signal_sigtstp_sigcont_resume() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     writer
         .write_all(b"echo BEFORE_STOP\n")
         .expect("write BEFORE_STOP");
     writer.flush().expect("flush BEFORE_STOP");
-    let _ = read_until_marker(&mut *reader, "BEFORE_STOP", Duration::from_secs(8))
+    let _ = reader
+        .read_until_marker("BEFORE_STOP", Duration::from_secs(8))
         .expect("Expected pre-stop marker");
 
     let Some(pid) = child.process_id() else {
@@ -1402,7 +1538,8 @@ fn test_clai_wrap_signal_sigtstp_sigcont_resume() {
         .expect("write AFTER_CONT");
     writer.flush().expect("flush AFTER_CONT");
 
-    let output = read_until_marker(&mut *reader, "AFTER_CONT", Duration::from_secs(8))
+    let output = reader
+        .read_until_marker("AFTER_CONT", Duration::from_secs(8))
         .expect("Expected shell to resume after SIGCONT");
 
     let _ = child.kill();
@@ -1419,7 +1556,7 @@ fn test_clai_wrap_resize_propagates_to_child_stty_size() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     master
@@ -1434,11 +1571,15 @@ fn test_clai_wrap_resize_propagates_to_child_stty_size() {
     writer.write_all(b"stty size\n").expect("write stty size");
     writer.flush().expect("flush stty size");
 
-    let output = read_until_marker(&mut *reader, "41 123", Duration::from_secs(8))
+    let output = reader
+        .read_until_marker("41 123", Duration::from_secs(8))
         .expect("Expected resized terminal dimensions in child");
 
-    let _ = child.kill();
-    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+    // Clean shutdown: send exit and wait, so the child shell is fully reaped
+    // before the next test spawns a new one.
+    writer.write_all(b"exit\n").expect("write exit");
+    writer.flush().expect("flush exit");
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(3));
 
     assert!(output.contains("41 123"), "Output: {output}");
 }
@@ -1451,7 +1592,7 @@ fn test_clai_wrap_resize_rapid_updates_keep_trailing_size() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     for (rows, cols) in [(30, 90), (35, 100), (37, 110), (39, 115), (40, 120)] {
@@ -1466,14 +1607,20 @@ fn test_clai_wrap_resize_rapid_updates_keep_trailing_size() {
         std::thread::sleep(Duration::from_millis(5));
     }
 
+    // Allow SIGWINCH handlers to settle after rapid resizes.
+    std::thread::sleep(Duration::from_millis(100));
+
     writer.write_all(b"stty size\n").expect("write stty size");
     writer.flush().expect("flush stty size");
 
-    let output = read_until_marker(&mut *reader, "40 120", Duration::from_secs(8))
+    let output = reader
+        .read_until_marker("40 120", Duration::from_secs(8))
         .expect("Expected trailing resize dimensions in child");
 
-    let _ = child.kill();
-    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+    // Clean shutdown: send exit and wait, so the child shell is fully reaped.
+    writer.write_all(b"exit\n").expect("write exit");
+    writer.flush().expect("flush exit");
+    let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(3));
 
     assert!(output.contains("40 120"), "Output: {output}");
 }
@@ -1486,7 +1633,7 @@ fn test_clai_wrap_encoding_utf8_passthrough() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     // UTF-8 bytes for "é✓" in octal escapes.
@@ -1495,7 +1642,8 @@ fn test_clai_wrap_encoding_utf8_passthrough() {
         .expect("write utf8 command");
     writer.flush().expect("flush utf8 command");
 
-    let output = read_until_marker(&mut *reader, "UTF8_OK:", Duration::from_secs(8))
+    let output = reader
+        .read_until_marker("UTF8_OK:", Duration::from_secs(8))
         .expect("Expected UTF-8 payload to pass through");
 
     let _ = child.kill();
@@ -1515,7 +1663,7 @@ fn test_clai_wrap_encoding_invalid_utf8_bytes_do_not_crash() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("Failed to get reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("Failed to get reader"));
     let mut writer = master.take_writer().expect("Failed to get writer");
 
     // Emit bytes that are invalid standalone UTF-8 and then verify session stays alive.
@@ -1524,7 +1672,8 @@ fn test_clai_wrap_encoding_invalid_utf8_bytes_do_not_crash() {
         .expect("write invalid utf8 command");
     writer.flush().expect("flush invalid utf8 command");
 
-    let output = read_until_marker(&mut *reader, "AFTER_INVALID_UTF8", Duration::from_secs(8))
+    let output = reader
+        .read_until_marker("AFTER_INVALID_UTF8", Duration::from_secs(8))
         .expect("Expected shell to continue after invalid UTF-8 bytes");
 
     let _ = child.kill();
@@ -1600,13 +1749,14 @@ fn test_pty_high_output_volume() {
 
     let mut child = pair.slave.spawn_command(cmd).expect("Failed to spawn");
 
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
 
     // Drain all output
-    let output = drain_output(&mut *reader, Duration::from_secs(10));
+    let output = reader.drain(Duration::from_secs(10));
 
     let status = child.wait().expect("Failed to wait");
 
@@ -1674,15 +1824,16 @@ fn test_interactive_shell_session() {
         .spawn_command(cmd)
         .expect("Failed to spawn shell");
 
-    let mut reader = pair
-        .master
-        .try_clone_reader()
-        .expect("Failed to get reader");
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to get reader"),
+    );
     let mut writer = pair.master.take_writer().expect("Failed to get writer");
 
     // Wait for prompt
     std::thread::sleep(Duration::from_millis(500));
-    let _ = drain_output(&mut *reader, Duration::from_millis(500));
+    let _ = reader.drain(Duration::from_millis(500));
 
     // Send a command
     writer
@@ -1691,7 +1842,8 @@ fn test_interactive_shell_session() {
     writer.flush().expect("Failed to flush");
 
     // Read response
-    let output = read_until_marker(&mut *reader, "interactive_test", PTY_TIMEOUT)
+    let output = reader
+        .read_until_marker("interactive_test", PTY_TIMEOUT)
         .expect("Failed to read output");
 
     // Exit the shell
@@ -1763,7 +1915,7 @@ fn test_pty_signal_handling() {
 fn collect_osc133_output(shell_path: &Path) -> Option<String> {
     let (master, mut child) = spawn_clai_wrap_shell_path(shell_path)?;
 
-    let mut reader = master.try_clone_reader().expect("reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("reader"));
     let mut writer = master.take_writer().expect("writer");
 
     // Wait for clai-wrap to start and enter raw mode + shell to display first prompt.
@@ -1792,12 +1944,9 @@ fn collect_osc133_output(shell_path: &Path) -> Option<String> {
     writer.flush().expect("flush final");
 
     // Read all accumulated output until the final marker
-    let output = read_until_marker(
-        &mut *reader,
-        "xQ9_OSC133_FINAL_7kR",
-        Duration::from_secs(15),
-    )
-    .unwrap_or_default();
+    let output = reader
+        .read_until_marker("xQ9_OSC133_FINAL_7kR", Duration::from_secs(15))
+        .unwrap_or_default();
 
     writer.write_all(b"exit\n").expect("exit");
     writer.flush().expect("flush exit");
@@ -1867,7 +2016,7 @@ fn test_clai_wrap_osc133_zsh_emits_all_sequences() {
         return;
     };
 
-    let mut reader = master.try_clone_reader().expect("reader");
+    let reader = PtyTestReader::new(master.try_clone_reader().expect("reader"));
     let mut writer = master.take_writer().expect("writer");
 
     // Zsh with plugins can take 3+ seconds to initialize
@@ -1897,8 +2046,9 @@ fn test_clai_wrap_osc133_zsh_emits_all_sequences() {
     writer.write_all(final_cmd.as_bytes()).expect("write");
     writer.flush().expect("flush");
 
-    let output =
-        read_until_marker(&mut *reader, &final_marker, Duration::from_secs(15)).unwrap_or_default();
+    let output = reader
+        .read_until_marker(&final_marker, Duration::from_secs(15))
+        .unwrap_or_default();
 
     writer.write_all(b"exit\n").expect("exit");
     writer.flush().expect("flush exit");
