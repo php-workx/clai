@@ -4,7 +4,10 @@
       "Bash(make:*)",
       "Bash(fieldalignment:*)",
       "Bash(python3:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(gh run:*)",
+      "Bash(cargo test:*)"
     ]
   }
 }
