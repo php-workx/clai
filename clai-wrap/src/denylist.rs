@@ -274,10 +274,7 @@ impl Denylist {
 
         // Strip path prefix (take basename)
         // Handle both Unix (/) and Windows (\) path separators
-        let basename = command
-            .rsplit(['/', '\\'])
-            .next()
-            .unwrap_or(command);
+        let basename = command.rsplit(['/', '\\']).next().unwrap_or(command);
 
         // Strip .exe extension (common on Windows) - case insensitive
         // We check the lowercase version of the basename to handle any case variation

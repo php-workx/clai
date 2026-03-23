@@ -357,7 +357,6 @@ pub fn parse_fish_history(content: &str) -> Vec<HistoryEntry> {
             }
         } else if trimmed.starts_with("paths:") {
             // Fish also stores paths for some commands - skip these
-
         } else if !trimmed.is_empty() && !trimmed.starts_with('-') {
             // Could be continuation of a multi-line value or other metadata
             // For now, we ignore unknown lines

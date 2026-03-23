@@ -295,9 +295,7 @@ impl PassthroughMode {
                                 break;
                             }
                         }
-                        Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
-
-                        }
+                        Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
                         Err(_) => {
                             break;
                         }
@@ -331,13 +329,10 @@ impl PassthroughMode {
                                 break;
                             }
                         }
-                        Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
-
-                        }
+                        Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
                         Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                             // Non-blocking read returned nothing
                             thread::sleep(Duration::from_millis(1));
-
                         }
                         Err(_) => {
                             break;

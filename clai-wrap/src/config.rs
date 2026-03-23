@@ -227,17 +227,15 @@ impl Config {
     /// Returns a default configuration if no file is found.
     #[must_use]
     pub fn load_default() -> Self {
-        find_config_file().map_or_else(Self::default, |path| {
-            match ConfigFile::load(&path) {
-                Ok(file_config) => {
-                    let mut config = Self::from_file(&file_config);
-                    config.config_path = Some(path);
-                    config
-                }
-                Err(e) => {
-                    tracing::warn!("Failed to load config file: {e}");
-                    Self::default()
-                }
+        find_config_file().map_or_else(Self::default, |path| match ConfigFile::load(&path) {
+            Ok(file_config) => {
+                let mut config = Self::from_file(&file_config);
+                config.config_path = Some(path);
+                config
+            }
+            Err(e) => {
+                tracing::warn!("Failed to load config file: {e}");
+                Self::default()
             }
         })
     }
@@ -873,10 +871,7 @@ buffer_capacity = 3000000
         {
             if let Ok(home) = std::env::var("HOME") {
                 let path = get_legacy_config_path();
-                assert_eq!(
-                    path,
-                    Some(PathBuf::from(format!("{home}/.clai-wrap.toml")))
-                );
+                assert_eq!(path, Some(PathBuf::from(format!("{home}/.clai-wrap.toml"))));
             }
         }
     }

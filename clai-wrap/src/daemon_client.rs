@@ -485,21 +485,14 @@ mod tests {
 
     #[test]
     fn test_default_socket_path_with_clai_home() {
-        let path = DaemonClient::resolve_socket_path(
-            Some("/custom/clai"),
-            Some("/home/tester"),
-            None,
-        );
+        let path =
+            DaemonClient::resolve_socket_path(Some("/custom/clai"), Some("/home/tester"), None);
         assert_eq!(path, Some(PathBuf::from("/custom/clai/daemon.sock")));
     }
 
     #[test]
     fn test_default_socket_path_with_home_fallback() {
-        let path = DaemonClient::resolve_socket_path(
-            None,
-            Some("/home/tester"),
-            None,
-        );
+        let path = DaemonClient::resolve_socket_path(None, Some("/home/tester"), None);
         assert_eq!(path, Some(PathBuf::from("/home/tester/.clai/daemon.sock")));
     }
 

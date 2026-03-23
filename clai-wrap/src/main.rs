@@ -1333,8 +1333,7 @@ fn daemon_capture_enabled(
     if osc133_watchdog_fired {
         return false;
     }
-    daemon_forwarder
-        .is_some_and(|forwarder| !forwarder.is_standalone())
+    daemon_forwarder.is_some_and(|forwarder| !forwarder.is_standalone())
 }
 
 #[cfg(unix)]
