@@ -11,7 +11,7 @@ use clai_wrap::SpscRingBuffer;
 fn bench_small_writes(c: &mut Criterion) {
     let mut group = c.benchmark_group("ring_buffer_small_writes");
 
-    for size in [64, 256, 1024, 4096].iter() {
+    for size in &[64, 256, 1024, 4096] {
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let mut buffer = SpscRingBuffer::new(1024 * 1024); // 1MB buffer
@@ -29,7 +29,7 @@ fn bench_small_writes(c: &mut Criterion) {
 fn bench_bulk_writes(c: &mut Criterion) {
     let mut group = c.benchmark_group("ring_buffer_bulk_writes");
 
-    for size in [4 * 1024, 16 * 1024, 64 * 1024, 256 * 1024].iter() {
+    for size in &[4 * 1024, 16 * 1024, 64 * 1024, 256 * 1024] {
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let mut buffer = SpscRingBuffer::new(2 * 1024 * 1024); // 2MB buffer
@@ -47,7 +47,7 @@ fn bench_bulk_writes(c: &mut Criterion) {
 fn bench_write_drain_cycle(c: &mut Criterion) {
     let mut group = c.benchmark_group("ring_buffer_write_drain_cycle");
 
-    for size in [1024, 4096, 16384, 65536].iter() {
+    for size in &[1024, 4096, 16384, 65536] {
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             let mut buffer = SpscRingBuffer::new(1024 * 1024);
@@ -69,7 +69,7 @@ fn bench_overflow_writes(c: &mut Criterion) {
     // Test with small buffer to force overflow
     let buffer_capacity = 64 * 1024; // 64KB
 
-    for write_size in [32 * 1024, 64 * 1024, 128 * 1024].iter() {
+    for write_size in &[32 * 1024, 64 * 1024, 128 * 1024] {
         group.throughput(Throughput::Bytes(*write_size as u64));
         group.bench_with_input(
             BenchmarkId::from_parameter(write_size),
@@ -93,7 +93,7 @@ fn bench_accumulated_small_writes(c: &mut Criterion) {
 
     // Simulate 100 small writes then drain
     let num_writes = 100;
-    for chunk_size in [64, 128, 256, 512].iter() {
+    for chunk_size in &[64, 128, 256, 512] {
         let total_bytes = *chunk_size * num_writes;
         group.throughput(Throughput::Bytes(total_bytes as u64));
         group.bench_with_input(
@@ -119,7 +119,7 @@ fn bench_accumulated_small_writes(c: &mut Criterion) {
 fn bench_drain_sizes(c: &mut Criterion) {
     let mut group = c.benchmark_group("ring_buffer_drain");
 
-    for size in [1024, 4096, 16384, 65536, 262144].iter() {
+    for size in &[1024, 4096, 16_384, 65_536, 262_144] {
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             b.iter_batched(

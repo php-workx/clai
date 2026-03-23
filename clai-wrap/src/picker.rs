@@ -764,7 +764,7 @@ mod tests {
     #[test]
     fn test_very_long_item() {
         let long_text = "x".repeat(10_000);
-        let items = vec![PickerItem::new(long_text.clone())];
+        let items = vec![PickerItem::new(long_text)];
         let picker = Picker::new(items);
 
         assert_eq!(picker.selected_item().map(|i| i.text.len()), Some(10_000));

@@ -367,8 +367,7 @@ mod tests {
         let dir_mode = dir_metadata.permissions().mode() & 0o777;
         assert_eq!(
             dir_mode, 0o700,
-            "temp directory should have 0700 permissions, got {:o}",
-            dir_mode
+            "temp directory should have 0700 permissions, got {dir_mode:o}"
         );
 
         // Check file permissions (should be 0600)
@@ -376,8 +375,7 @@ mod tests {
         let file_mode = file_metadata.permissions().mode() & 0o777;
         assert_eq!(
             file_mode, 0o600,
-            "rcfile should have 0600 permissions, got {:o}",
-            file_mode
+            "rcfile should have 0600 permissions, got {file_mode:o}"
         );
     }
 
@@ -423,7 +421,7 @@ mod tests {
 
         // Check for function definition pattern
         assert!(
-            content.contains("() {") && content.contains("}"),
+            content.contains("() {") && content.contains('}'),
             "should have properly defined function"
         );
 

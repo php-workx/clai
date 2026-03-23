@@ -575,13 +575,13 @@ mod tests {
         }
 
         impl Write for FailingWriter {
-            fn write(&mut self, _buf: &[u8]) -> Result<usize> {
+            fn write(&mut self, buf: &[u8]) -> Result<usize> {
                 self.write_count += 1;
                 // Fail on the second write (the content)
                 if self.write_count > 1 {
                     Err(Error::new(ErrorKind::BrokenPipe, "write failed"))
                 } else {
-                    Ok(_buf.len())
+                    Ok(buf.len())
                 }
             }
 

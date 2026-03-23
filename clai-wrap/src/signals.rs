@@ -185,7 +185,7 @@ impl SignalHandler {
     ///
     /// This is primarily useful for testing.
     #[cfg(test)]
-    pub fn is_sigquit_ignored(&self) -> bool {
+    pub const fn is_sigquit_ignored(&self) -> bool {
         // The signal is ignored as long as our handler is registered
         true
     }
@@ -261,7 +261,7 @@ mod tests {
         while std::time::Instant::now() < deadline {
             match handler.try_recv() {
                 Ok(Some(event)) if event == expected => return true,
-                Ok(Some(_)) => continue, // Got a different signal, keep looking
+                Ok(Some(_)) => {} // Got a different signal, keep looking
                 Ok(None) => {
                     thread::sleep(Duration::from_millis(5));
                 }

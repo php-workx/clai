@@ -678,7 +678,7 @@ fn test_full_picker_flow() {
 /// Test the full hotkey -> picker -> inject flow.
 /// Requires an interactive TTY.
 #[test]
-#[ignore]
+#[ignore = "requires interactive TTY"]
 fn test_interactive_picker_ui() {
     // This test would require spawning a PTY and testing the full UI flow
     // It's marked as ignored because it requires interactive TTY

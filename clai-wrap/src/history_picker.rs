@@ -429,8 +429,8 @@ mod tests {
     #[test]
     fn test_from_history_with_timestamps() {
         let entries = vec![
-            HistoryEntry::with_timestamp("old command", 1000000000),
-            HistoryEntry::with_timestamp("new command", 1700000000),
+            HistoryEntry::with_timestamp("old command", 1_000_000_000),
+            HistoryEntry::with_timestamp("new command", 1_700_000_000),
         ];
         let picker = HistoryPicker::from_history(entries);
 
@@ -677,6 +677,7 @@ mod tests {
     #[test]
     fn test_format_timestamp_just_now() {
         use std::time::{SystemTime, UNIX_EPOCH};
+        #[allow(clippy::cast_possible_wrap)]
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -689,6 +690,7 @@ mod tests {
     #[test]
     fn test_format_timestamp_minutes() {
         use std::time::{SystemTime, UNIX_EPOCH};
+        #[allow(clippy::cast_possible_wrap)]
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -704,6 +706,7 @@ mod tests {
     #[test]
     fn test_format_timestamp_hours() {
         use std::time::{SystemTime, UNIX_EPOCH};
+        #[allow(clippy::cast_possible_wrap)]
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -719,6 +722,7 @@ mod tests {
     #[test]
     fn test_format_timestamp_days() {
         use std::time::{SystemTime, UNIX_EPOCH};
+        #[allow(clippy::cast_possible_wrap)]
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -727,13 +731,14 @@ mod tests {
         let formatted = format_timestamp(now - 86400);
         assert_eq!(formatted, "1 day ago");
 
-        let formatted = format_timestamp(now - 172800);
+        let formatted = format_timestamp(now - 172_800);
         assert_eq!(formatted, "2 days ago");
     }
 
     #[test]
     fn test_format_timestamp_future() {
         use std::time::{SystemTime, UNIX_EPOCH};
+        #[allow(clippy::cast_possible_wrap)]
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()

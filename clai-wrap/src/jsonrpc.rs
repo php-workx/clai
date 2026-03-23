@@ -615,7 +615,7 @@ mod tests {
             serde_json::json!({
                 "session_id": "sess1",
                 "command_id": "cmd1",
-                "timestamp": 1234567890
+                "timestamp": 1_234_567_890
             }),
         );
         let json = serde_json::to_string(&original).unwrap();
@@ -792,25 +792,25 @@ mod tests {
 
     #[test]
     fn test_command_start_request() {
-        let request = command_start_request(1, "session-123", "cmd-456", 1234567890);
+        let request = command_start_request(1, "session-123", "cmd-456", 1_234_567_890);
         assert_eq!(request.method, "command.start");
         assert_eq!(request.params["session_id"], "session-123");
         assert_eq!(request.params["command_id"], "cmd-456");
-        assert_eq!(request.params["timestamp"], 1234567890);
+        assert_eq!(request.params["timestamp"], 1_234_567_890);
     }
 
     #[test]
     fn test_command_end_request() {
-        let request = command_end_request(2, "cmd-456", 0, 1234567899);
+        let request = command_end_request(2, "cmd-456", 0, 1_234_567_899);
         assert_eq!(request.method, "command.end");
         assert_eq!(request.params["command_id"], "cmd-456");
         assert_eq!(request.params["exit_code"], 0);
-        assert_eq!(request.params["timestamp"], 1234567899);
+        assert_eq!(request.params["timestamp"], 1_234_567_899);
     }
 
     #[test]
     fn test_command_end_request_with_error_exit() {
-        let request = command_end_request(3, "cmd-789", 1, 1234567899);
+        let request = command_end_request(3, "cmd-789", 1, 1_234_567_899);
         assert_eq!(request.params["exit_code"], 1);
     }
 
@@ -963,13 +963,13 @@ mod tests {
 
     #[test]
     fn test_negative_exit_code() {
-        let request = command_end_request(1, "cmd-1", -1, 1234567890);
+        let request = command_end_request(1, "cmd-1", -1, 1_234_567_890);
         assert_eq!(request.params["exit_code"], -1);
     }
 
     #[test]
     fn test_large_exit_code() {
-        let request = command_end_request(1, "cmd-1", 255, 1234567890);
+        let request = command_end_request(1, "cmd-1", 255, 1_234_567_890);
         assert_eq!(request.params["exit_code"], 255);
     }
 

@@ -37,6 +37,7 @@ fn generate_bash_history(num_entries: usize) -> String {
 }
 
 /// Generate sample bash timestamped history content.
+#[allow(clippy::cast_possible_wrap)]
 fn generate_bash_timestamped_history(num_entries: usize) -> String {
     let commands = [
         "ls -la",
@@ -65,6 +66,7 @@ fn generate_bash_timestamped_history(num_entries: usize) -> String {
 }
 
 /// Generate sample zsh history content.
+#[allow(clippy::cast_possible_wrap)]
 fn generate_zsh_history(num_entries: usize) -> String {
     let commands = [
         "ls -la",
@@ -93,6 +95,7 @@ fn generate_zsh_history(num_entries: usize) -> String {
 }
 
 /// Generate sample fish history content.
+#[allow(clippy::cast_possible_wrap)]
 fn generate_fish_history(num_entries: usize) -> String {
     let commands = [
         "ls -la",
@@ -124,7 +127,7 @@ fn generate_fish_history(num_entries: usize) -> String {
 fn bench_parse_bash_history(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_bash_plain");
 
-    for num_entries in [100, 500, 1000, 5000, 10000].iter() {
+    for num_entries in &[100, 500, 1000, 5000, 10000] {
         let content = generate_bash_history(*num_entries);
         group.throughput(Throughput::Bytes(content.len() as u64));
         group.bench_with_input(
@@ -145,7 +148,7 @@ fn bench_parse_bash_history(c: &mut Criterion) {
 fn bench_parse_bash_timestamped(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_bash_timestamped");
 
-    for num_entries in [100, 500, 1000, 5000, 10000].iter() {
+    for num_entries in &[100, 500, 1000, 5000, 10000] {
         let content = generate_bash_timestamped_history(*num_entries);
         group.throughput(Throughput::Bytes(content.len() as u64));
         group.bench_with_input(
@@ -166,7 +169,7 @@ fn bench_parse_bash_timestamped(c: &mut Criterion) {
 fn bench_parse_zsh_history(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_zsh_history");
 
-    for num_entries in [100, 500, 1000, 5000, 10000].iter() {
+    for num_entries in &[100, 500, 1000, 5000, 10000] {
         let content = generate_zsh_history(*num_entries);
         group.throughput(Throughput::Bytes(content.len() as u64));
         group.bench_with_input(
@@ -187,7 +190,7 @@ fn bench_parse_zsh_history(c: &mut Criterion) {
 fn bench_parse_fish_history(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_fish_history");
 
-    for num_entries in [100, 500, 1000, 5000, 10000].iter() {
+    for num_entries in &[100, 500, 1000, 5000, 10000] {
         let content = generate_fish_history(*num_entries);
         group.throughput(Throughput::Bytes(content.len() as u64));
         group.bench_with_input(
@@ -242,7 +245,7 @@ fn generate_picker_items(num_items: usize) -> Vec<PickerItem> {
 fn bench_picker_creation(c: &mut Criterion) {
     let mut group = c.benchmark_group("picker_creation");
 
-    for num_items in [100, 500, 1000, 5000, 10000].iter() {
+    for num_items in &[100, 500, 1000, 5000, 10000] {
         let items = generate_picker_items(*num_items);
         group.bench_with_input(
             BenchmarkId::from_parameter(num_items),
@@ -272,7 +275,7 @@ fn bench_picker_filter_query_length(c: &mut Criterion) {
         ("long", "git commit"),
     ];
 
-    for (name, query) in queries.iter() {
+    for (name, query) in &queries {
         group.bench_function(*name, |b| {
             let mut picker = Picker::new(items.clone());
             b.iter(|| {
@@ -290,7 +293,7 @@ fn bench_picker_filter_item_count(c: &mut Criterion) {
 
     let query = "git";
 
-    for num_items in [100, 500, 1000, 5000, 10000].iter() {
+    for num_items in &[100, 500, 1000, 5000, 10000] {
         let items = generate_picker_items(*num_items);
         group.bench_with_input(
             BenchmarkId::from_parameter(num_items),
@@ -370,7 +373,7 @@ fn bench_picker_case_insensitive(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("picker_case_insensitive");
 
-    for (name, query) in queries.iter() {
+    for (name, query) in &queries {
         group.bench_function(*name, |b| {
             let mut picker = Picker::new(items.clone());
             b.iter(|| {

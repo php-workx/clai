@@ -614,8 +614,7 @@ mod tests {
         let session_name = manager.session_dir().file_name().unwrap().to_str().unwrap();
         assert!(
             session_name.starts_with("test-"),
-            "test session directory should start with 'test-', got: {}",
-            session_name
+            "test session directory should start with 'test-', got: {session_name}"
         );
     }
 
@@ -777,8 +776,7 @@ mod tests {
         let base_mode = base_meta.permissions().mode() & 0o777;
         assert_eq!(
             base_mode, 0o700,
-            "base directory should have 0700 permissions, got {:o}",
-            base_mode
+            "base directory should have 0700 permissions, got {base_mode:o}"
         );
 
         // Check session directory permissions
@@ -787,20 +785,18 @@ mod tests {
         let session_mode = session_meta.permissions().mode() & 0o777;
         assert_eq!(
             session_mode, 0o700,
-            "session directory should have 0700 permissions, got {:o}",
-            session_mode
+            "session directory should have 0700 permissions, got {session_mode:o}"
         );
 
         // Check shell subdirectory permissions
-        let bash_dir = manager
+        let shell_dir = manager
             .shell_dir("bash")
             .expect("failed to create bash dir");
-        let bash_meta = fs::metadata(&bash_dir).expect("failed to get bash metadata");
-        let bash_mode = bash_meta.permissions().mode() & 0o777;
+        let shell_meta = fs::metadata(&shell_dir).expect("failed to get bash metadata");
+        let shell_mode = shell_meta.permissions().mode() & 0o777;
         assert_eq!(
-            bash_mode, 0o700,
-            "shell directory should have 0700 permissions, got {:o}",
-            bash_mode
+            shell_mode, 0o700,
+            "shell directory should have 0700 permissions, got {shell_mode:o}"
         );
     }
 

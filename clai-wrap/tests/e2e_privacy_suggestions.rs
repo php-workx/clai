@@ -3,7 +3,7 @@
 //!
 //! These tests verify:
 //! - Denylist + echo-gap + output capture integration through OSC 133 state machine
-//! - SuggestionReceiver -> CommentManager -> CommentRenderer pipeline
+//! - `SuggestionReceiver` -> `CommentManager` -> `CommentRenderer` pipeline
 //! - Shell-specific comment rendering for all shell types
 //!
 //! Covers beads issues: ai-terminal-39t (Privacy & Output Capture)
@@ -56,7 +56,7 @@ fn test_capture_lifecycle_through_osc133_states() {
     let captured = capture.stop_capture().expect("should have captured output");
     assert_eq!(captured.command_id, "cmd-1");
     assert!(!captured.truncated);
-    assert!(captured.len() > 0);
+    assert!(!captured.is_empty());
     let output_text = captured.as_string_lossy();
     assert!(output_text.contains("total 42"));
     assert!(output_text.contains("file.txt"));
@@ -90,7 +90,7 @@ fn test_denylist_disables_capture_on_output_state() {
     capture.push(b"output data");
     let captured = capture.stop_capture().unwrap();
     assert_eq!(captured.command_id, "cmd-2");
-    assert!(captured.len() > 0);
+    assert!(!captured.is_empty());
 }
 
 #[test]

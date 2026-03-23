@@ -1020,8 +1020,8 @@ mod tests {
         let ts = current_timestamp();
 
         // Should be after 2020-01-01 and before 2100-01-01
-        assert!(ts > 1577836800, "timestamp should be after 2020");
-        assert!(ts < 4102444800, "timestamp should be before 2100");
+        assert!(ts > 1_577_836_800, "timestamp should be after 2020");
+        assert!(ts < 4_102_444_800, "timestamp should be before 2100");
     }
 
     // =========================================================================

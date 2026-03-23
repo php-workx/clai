@@ -554,8 +554,8 @@ mod tests {
         assert_eq!(state.history_count(), 2);
 
         let entries = state.history_entries();
-        assert_eq!(entries[0].timestamp, Some(1234567890));
-        assert_eq!(entries[1].timestamp, Some(1234567891));
+        assert_eq!(entries[0].timestamp, Some(1_234_567_890));
+        assert_eq!(entries[1].timestamp, Some(1_234_567_891));
     }
 
     // ========== Picker Creation Tests ==========
@@ -661,11 +661,9 @@ mod tests {
         let result1 = find_history_file("/bin/bash");
         let result2 = find_history_file("bash");
 
-        // Both should look for the same file
-        match (result1, result2) {
-            (Ok(p1), Ok(p2)) => assert_eq!(p1, p2),
-            (Err(_), Err(_)) => {} // Both failed (file doesn't exist) - that's ok
-            _ => {}                // One succeeded, one failed - unexpected but ok for test
+        // Both should look for the same file (if both exist)
+        if let (Ok(p1), Ok(p2)) = (result1, result2) {
+            assert_eq!(p1, p2);
         }
     }
 
@@ -681,26 +679,30 @@ mod tests {
             .as_secs();
 
         // Just now (within 60 seconds)
+        #[allow(clippy::cast_possible_wrap)]
         let recent = format_timestamp((now_secs - 30) as i64);
         assert_eq!(recent, "just now");
 
         // Minutes ago
+        #[allow(clippy::cast_possible_wrap)]
         let mins_ago = format_timestamp((now_secs - 300) as i64);
         assert!(mins_ago.ends_with("m ago"));
 
         // Hours ago
+        #[allow(clippy::cast_possible_wrap)]
         let hours_ago = format_timestamp((now_secs - 7200) as i64);
         assert!(hours_ago.ends_with("h ago"));
 
         // Days ago
-        let days_ago = format_timestamp((now_secs - 172800) as i64);
+        #[allow(clippy::cast_possible_wrap)]
+        let days_ago = format_timestamp((now_secs - 172_800) as i64);
         assert!(days_ago.ends_with("d ago"));
     }
 
     #[test]
     fn test_format_timestamp_old() {
         // Very old timestamp
-        let old = format_timestamp(1234567890);
+        let old = format_timestamp(1_234_567_890);
         assert!(old.starts_with("ts:") || old.ends_with("d ago"));
     }
 

@@ -140,7 +140,7 @@ fn bench_osc133_interleaved(c: &mut Criterion) {
 fn bench_osc133_plain_text(c: &mut Criterion) {
     let mut group = c.benchmark_group("osc133_plain_text");
 
-    for size in [100, 1000, 10000].iter() {
+    for size in &[100, 1000, 10000] {
         let plain_text: Vec<u8> = vec![b'x'; *size];
         group.throughput(Throughput::Bytes(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, _| {
@@ -278,7 +278,7 @@ fn bench_hotkey_mixed_input(c: &mut Criterion) {
     });
 }
 
-/// Benchmark check_timeout (called periodically).
+/// Benchmark `check_timeout` (called periodically).
 fn bench_hotkey_timeout_check(c: &mut Criterion) {
     let mut group = c.benchmark_group("hotkey_timeout");
 
@@ -347,7 +347,7 @@ fn bench_hotkey_reset(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark is_waiting query (called frequently).
+/// Benchmark `is_waiting` query (called frequently).
 fn bench_hotkey_is_waiting(c: &mut Criterion) {
     c.bench_function("hotkey_is_waiting", |b| {
         let parser = HotkeyParser::new();

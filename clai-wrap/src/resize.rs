@@ -398,8 +398,8 @@ mod tests {
         // After all resizes and sufficient time, we should have gotten the final size
         // The exact size depends on timing, but it should be one of the sizes we sent
         if let Some((cols, rows)) = final_size {
-            assert!(cols >= 80 && cols <= 89);
-            assert!(rows >= 24 && rows <= 33);
+            assert!((80..=89).contains(&cols));
+            assert!((24..=33).contains(&rows));
         }
     }
 

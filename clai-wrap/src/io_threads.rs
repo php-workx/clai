@@ -771,6 +771,7 @@ mod tests {
     }
 
     impl MockReader {
+        #[allow(clippy::new_ret_no_self)]
         fn new(data: Vec<u8>) -> Box<dyn Read + Send> {
             Box::new(Self {
                 data: Cursor::new(data),
@@ -790,6 +791,7 @@ mod tests {
     }
 
     impl MockWriter {
+        #[allow(clippy::new_ret_no_self)]
         fn new() -> (
             Box<dyn Write + Send>,
             std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
@@ -845,9 +847,6 @@ mod tests {
 
     #[test]
     fn test_pty_reader_thread_shutdown() {
-        let state = IoState::new();
-        let (event_tx, _event_rx) = mpsc::channel();
-
         // Reader that blocks forever
         struct BlockingReader;
         impl Read for BlockingReader {
@@ -856,6 +855,9 @@ mod tests {
                 Ok(0)
             }
         }
+
+        let state = IoState::new();
+        let (event_tx, _event_rx) = mpsc::channel();
 
         let reader: Box<dyn Read + Send> = Box::new(BlockingReader);
         let state_clone = Arc::clone(&state);
@@ -903,6 +905,7 @@ mod tests {
         // Verify written data
         let data = written.lock().unwrap();
         assert_eq!(&*data, b"hello world");
+        drop(data);
     }
 
     #[test]

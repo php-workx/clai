@@ -692,8 +692,8 @@ mod tests {
 
         assert!(fix < completion);
 
-        let mut suggestions = vec![completion.clone(), fix.clone()];
-        suggestions.sort_by(|a, b| a.sort_priority().cmp(&b.sort_priority()));
+        let mut suggestions = [completion, fix];
+        suggestions.sort_by_key(super::Suggestion::sort_priority);
         assert_eq!(suggestions[0].text, "fix");
         assert_eq!(suggestions[1].text, "completion");
     }

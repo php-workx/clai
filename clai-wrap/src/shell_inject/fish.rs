@@ -554,7 +554,7 @@ mod tests {
     #[test]
     fn test_debug_impl() {
         let injector = FishInjector::with_version(3, 6);
-        let debug_str = format!("{:?}", injector);
+        let debug_str = format!("{injector:?}");
 
         assert!(debug_str.contains("FishInjector"));
         assert!(debug_str.contains("fish_version"));

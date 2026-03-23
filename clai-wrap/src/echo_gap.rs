@@ -627,6 +627,7 @@ mod tests {
 
         // Overflow the pending input queue
         for i in 0..300u16 {
+            #[allow(clippy::cast_possible_truncation)]
             detector.record_input(i as u8, now);
         }
 

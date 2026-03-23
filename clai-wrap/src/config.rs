@@ -601,7 +601,7 @@ hotkey = "ctrl-b"
         let file_config = ConfigFile {
             denylist: Some(vec![
                 "ssh".to_string(),
-                "".to_string(),
+                String::new(),
                 "  ".to_string(),
                 "exact:".to_string(),
                 "mysql".to_string(),
@@ -871,11 +871,11 @@ buffer_capacity = 3000000
     fn test_get_legacy_config_path() {
         #[cfg(unix)]
         {
-            if let Some(home) = std::env::var("HOME").ok() {
+            if let Ok(home) = std::env::var("HOME") {
                 let path = get_legacy_config_path();
                 assert_eq!(
                     path,
-                    Some(PathBuf::from(format!("{}/.clai-wrap.toml", home)))
+                    Some(PathBuf::from(format!("{home}/.clai-wrap.toml")))
                 );
             }
         }

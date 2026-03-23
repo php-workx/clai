@@ -604,9 +604,9 @@ mod tests {
 
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].command, "ls -la");
-        assert_eq!(entries[0].timestamp, Some(1234567890));
+        assert_eq!(entries[0].timestamp, Some(1_234_567_890));
         assert_eq!(entries[1].command, "git status");
-        assert_eq!(entries[1].timestamp, Some(1234567891));
+        assert_eq!(entries[1].timestamp, Some(1_234_567_891));
     }
 
     #[test]
@@ -616,7 +616,7 @@ mod tests {
         let entries = parse_bash_history(content);
 
         assert_eq!(entries.len(), 2);
-        assert_eq!(entries[0].timestamp, Some(1234567890));
+        assert_eq!(entries[0].timestamp, Some(1_234_567_890));
     }
 
     #[test]
@@ -636,7 +636,7 @@ mod tests {
         // First timestamp has no command, second one does
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].command, "git status");
-        assert_eq!(entries[0].timestamp, Some(1234567891));
+        assert_eq!(entries[0].timestamp, Some(1_234_567_891));
     }
 
     #[test]
@@ -650,7 +650,7 @@ mod tests {
         assert_eq!(entries[0].command, "ls -la");
         assert_eq!(entries[0].timestamp, None);
         assert_eq!(entries[1].command, "git status");
-        assert_eq!(entries[1].timestamp, Some(1234567890));
+        assert_eq!(entries[1].timestamp, Some(1_234_567_890));
     }
 
     // ========== Zsh Extended Format Tests ==========
@@ -662,9 +662,9 @@ mod tests {
 
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].command, "ls -la");
-        assert_eq!(entries[0].timestamp, Some(1234567890));
+        assert_eq!(entries[0].timestamp, Some(1_234_567_890));
         assert_eq!(entries[1].command, "git status");
-        assert_eq!(entries[1].timestamp, Some(1234567891));
+        assert_eq!(entries[1].timestamp, Some(1_234_567_891));
     }
 
     #[test]
@@ -674,7 +674,7 @@ mod tests {
 
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].command, "ls -la");
-        assert_eq!(entries[0].timestamp, Some(1234567890));
+        assert_eq!(entries[0].timestamp, Some(1_234_567_890));
     }
 
     #[test]
@@ -707,11 +707,11 @@ mod tests {
 
         assert_eq!(entries.len(), 3);
         assert_eq!(entries[0].command, "ls -la");
-        assert_eq!(entries[0].timestamp, Some(1234567890));
+        assert_eq!(entries[0].timestamp, Some(1_234_567_890));
         assert_eq!(entries[1].command, "git status");
         assert_eq!(entries[1].timestamp, None);
         assert_eq!(entries[2].command, "echo hi");
-        assert_eq!(entries[2].timestamp, Some(1234567891));
+        assert_eq!(entries[2].timestamp, Some(1_234_567_891));
     }
 
     #[test]
@@ -743,9 +743,9 @@ mod tests {
 
         assert_eq!(entries.len(), 2);
         assert_eq!(entries[0].command, "ls -la");
-        assert_eq!(entries[0].timestamp, Some(1234567890));
+        assert_eq!(entries[0].timestamp, Some(1_234_567_890));
         assert_eq!(entries[1].command, "git status");
-        assert_eq!(entries[1].timestamp, Some(1234567891));
+        assert_eq!(entries[1].timestamp, Some(1_234_567_891));
     }
 
     #[test]
@@ -861,7 +861,7 @@ mod tests {
         let entries = parse_fish_history(content);
 
         // Should parse what it can
-        assert!(entries.len() >= 1);
+        assert!(!entries.is_empty());
     }
 
     // ========== Detection Tests ==========
@@ -914,7 +914,7 @@ mod tests {
 
         let entries = detect_and_parse(file.path()).unwrap();
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].timestamp, Some(1234567890));
+        assert_eq!(entries[0].timestamp, Some(1_234_567_890));
     }
 
     #[test]
@@ -953,7 +953,7 @@ mod tests {
     #[test]
     fn test_very_long_command() {
         let long_cmd = "x".repeat(10_000);
-        let content = format!("{long_cmd}");
+        let content = long_cmd;
         let entries = parse_bash_history(&content);
 
         assert_eq!(entries.len(), 1);
@@ -976,9 +976,9 @@ mod tests {
         assert_eq!(e1.command, "ls -la");
         assert_eq!(e1.timestamp, None);
 
-        let e2 = HistoryEntry::with_timestamp("git status", 1234567890);
+        let e2 = HistoryEntry::with_timestamp("git status", 1_234_567_890);
         assert_eq!(e2.command, "git status");
-        assert_eq!(e2.timestamp, Some(1234567890));
+        assert_eq!(e2.timestamp, Some(1_234_567_890));
     }
 
     #[test]
@@ -999,7 +999,7 @@ mod tests {
         let entries = parse_zsh_history(content);
 
         assert_eq!(entries.len(), 1);
-        assert_eq!(entries[0].timestamp, Some(4102444800));
+        assert_eq!(entries[0].timestamp, Some(4_102_444_800));
     }
 
     #[test]
@@ -1012,6 +1012,6 @@ mod tests {
         // Large timestamp
         let content = "#9999999999999\nls";
         let entries = parse_bash_timestamped(content);
-        assert_eq!(entries[0].timestamp, Some(9999999999999));
+        assert_eq!(entries[0].timestamp, Some(9_999_999_999_999));
     }
 }

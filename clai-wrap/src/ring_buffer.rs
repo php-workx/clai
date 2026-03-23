@@ -275,7 +275,9 @@ mod tests {
         // Verify data integrity
         assert_eq!(received.len(), 100);
         for (i, &byte) in received.iter().enumerate() {
-            assert_eq!(byte, i as u8);
+            #[allow(clippy::cast_possible_truncation)]
+            let expected = i as u8;
+            assert_eq!(byte, expected);
         }
     }
 

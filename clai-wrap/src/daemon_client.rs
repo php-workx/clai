@@ -623,7 +623,7 @@ mod tests {
     #[test]
     fn test_command_start_request_format() {
         let id = 42;
-        let request = jsonrpc::command_start_request(id, "session-123", "cmd-456", 1234567890);
+        let request = jsonrpc::command_start_request(id, "session-123", "cmd-456", 1_234_567_890);
 
         let json = serde_json::to_value(&request).unwrap();
         assert_eq!(json["jsonrpc"], "2.0");
@@ -631,13 +631,13 @@ mod tests {
         assert_eq!(json["method"], "command.start");
         assert_eq!(json["params"]["session_id"], "session-123");
         assert_eq!(json["params"]["command_id"], "cmd-456");
-        assert_eq!(json["params"]["timestamp"], 1234567890);
+        assert_eq!(json["params"]["timestamp"], 1_234_567_890);
     }
 
     #[test]
     fn test_command_end_request_format() {
         let id = 43;
-        let request = jsonrpc::command_end_request(id, "cmd-456", 1, 1234567899);
+        let request = jsonrpc::command_end_request(id, "cmd-456", 1, 1_234_567_899);
 
         let json = serde_json::to_value(&request).unwrap();
         assert_eq!(json["jsonrpc"], "2.0");
@@ -645,7 +645,7 @@ mod tests {
         assert_eq!(json["method"], "command.end");
         assert_eq!(json["params"]["command_id"], "cmd-456");
         assert_eq!(json["params"]["exit_code"], 1);
-        assert_eq!(json["params"]["timestamp"], 1234567899);
+        assert_eq!(json["params"]["timestamp"], 1_234_567_899);
     }
 
     #[test]

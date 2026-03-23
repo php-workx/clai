@@ -3,7 +3,7 @@
 //! These tests verify:
 //! - Shell spawning and basic I/O passthrough
 //! - Resize propagation to child PTY
-//! - Environment variable inheritance (CLAI_WRAP=1)
+//! - Environment variable inheritance (`CLAI_WRAP=1`)
 //! - Exit status propagation
 //! - Non-blocking I/O behavior
 //!
@@ -33,7 +33,7 @@ const PTY_TIMEOUT: Duration = Duration::from_secs(5);
 const READ_BUFFER_SIZE: usize = 4096;
 
 /// Default PTY size for tests.
-fn default_pty_size() -> PtySize {
+const fn default_pty_size() -> PtySize {
     PtySize {
         rows: 24,
         cols: 80,
@@ -63,11 +63,8 @@ fn read_until_marker(
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
                 std::thread::sleep(Duration::from_millis(10));
-                continue;
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {
-                continue;
-            }
+            Err(ref e) if e.kind() == std::io::ErrorKind::Interrupted => {}
             Err(e) => {
                 return Err(format!("Read error: {e}"));
             }
@@ -78,8 +75,7 @@ fn read_until_marker(
         Ok(output)
     } else {
         Err(format!(
-            "Timeout waiting for marker '{}'. Got: {}",
-            marker, output
+            "Timeout waiting for marker '{marker}'. Got: {output}"
         ))
     }
 }
@@ -105,7 +101,6 @@ fn drain_output(reader: &mut dyn Read, max_duration: Duration) -> String {
                 if !output.is_empty() {
                     break;
                 }
-                continue;
             }
             Err(_) => break,
         }
@@ -291,8 +286,7 @@ fn test_pty_spawn_echo_command() {
 
     assert!(
         output.contains("hello_e2e_test"),
-        "Expected output to contain 'hello_e2e_test', got: {}",
-        output
+        "Expected output to contain 'hello_e2e_test', got: {output}"
     );
 
     let status = child.wait().expect("Failed to wait for child");
@@ -337,8 +331,8 @@ fn test_pty_io_passthrough_basic() {
     // Use cat to echo back input
     #[cfg(unix)]
     let cmd = {
-        let cmd = CommandBuilder::new("cat");
-        cmd
+        
+        CommandBuilder::new("cat")
     };
 
     #[cfg(windows)]
@@ -446,6 +440,7 @@ fn test_pty_rapid_resize() {
 
     // Perform rapid resizes (10 in 100ms as per spec)
     for i in 0..10 {
+        #[allow(clippy::cast_sign_loss)]
         let size = PtySize {
             rows: 20 + (i % 10) as u16,
             cols: 80 + (i % 20) as u16,
@@ -518,8 +513,7 @@ fn test_pty_clai_wrap_env_var() {
 
     assert!(
         output.contains("CLAI_WRAP=1"),
-        "Expected CLAI_WRAP=1 in output, got: {}",
-        output
+        "Expected CLAI_WRAP=1 in output, got: {output}"
     );
 }
 
@@ -563,8 +557,7 @@ fn test_pty_env_inheritance() {
 
     assert!(
         output.contains(test_value),
-        "Expected test value in output, got: {}",
-        output
+        "Expected test value in output, got: {output}"
     );
 }
 
@@ -598,7 +591,7 @@ fn test_pty_spawn_sh_shell() {
 
     let status = child.wait().expect("Failed to wait");
 
-    assert!(output.contains("shell_spawn_test"), "Output: {}", output);
+    assert!(output.contains("shell_spawn_test"), "Output: {output}");
     assert!(status.success());
 }
 
@@ -632,7 +625,7 @@ fn test_pty_spawn_bash_if_available() {
 
     let _ = child.wait();
 
-    assert!(output.contains("bash_e2e_test"), "Output: {}", output);
+    assert!(output.contains("bash_e2e_test"), "Output: {output}");
 }
 
 #[test]
@@ -1659,7 +1652,7 @@ fn test_pty_child_pid() {
 /// Test interactive shell session.
 /// This test requires an interactive TTY and should be run manually.
 #[test]
-#[ignore]
+#[ignore = "requires interactive TTY"]
 fn test_interactive_shell_session() {
     let pty_system = native_pty_system();
     let pair = pty_system
@@ -1707,14 +1700,14 @@ fn test_interactive_shell_session() {
 
     let status = child.wait().expect("Failed to wait");
 
-    assert!(output.contains("interactive_test"), "Output: {}", output);
+    assert!(output.contains("interactive_test"), "Output: {output}");
     assert!(status.success());
 }
 
 /// Test that PTY handles signal-like situations.
 /// This test requires an interactive TTY.
 #[test]
-#[ignore]
+#[ignore = "requires interactive TTY"]
 #[cfg(unix)]
 fn test_pty_signal_handling() {
     let pty_system = native_pty_system();
@@ -1832,12 +1825,9 @@ fn test_clai_wrap_osc133_bash_emits_all_sequences() {
         return;
     }
 
-    let output = match collect_osc133_output(&bash) {
-        Some(o) => o,
-        None => {
-            eprintln!("Skipping: failed to spawn clai-wrap with bash");
-            return;
-        }
+    let Some(output) = collect_osc133_output(&bash) else {
+        eprintln!("Skipping: failed to spawn clai-wrap with bash");
+        return;
     };
 
     assert!(
@@ -1948,12 +1938,9 @@ fn test_clai_wrap_osc133_fish_emits_all_sequences() {
         return;
     };
 
-    let output = match collect_osc133_output(fish_path) {
-        Some(o) => o,
-        None => {
-            eprintln!("Skipping: failed to spawn clai-wrap with fish");
-            return;
-        }
+    let Some(output) = collect_osc133_output(fish_path) else {
+        eprintln!("Skipping: failed to spawn clai-wrap with fish");
+        return;
     };
 
     assert!(
@@ -1985,12 +1972,9 @@ fn test_clai_wrap_osc133_sh_passthrough_behavior() {
         return;
     }
 
-    let output = match collect_osc133_output(&sh) {
-        Some(o) => o,
-        None => {
-            eprintln!("Skipping: failed to spawn clai-wrap with sh");
-            return;
-        }
+    let Some(output) = collect_osc133_output(&sh) else {
+        eprintln!("Skipping: failed to spawn clai-wrap with sh");
+        return;
     };
 
     if has_osc133(&output, 'A') {

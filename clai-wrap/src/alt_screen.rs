@@ -441,7 +441,7 @@ mod tests {
         }
     }
 
-    /// Tests for the write_sequence helper
+    /// Tests for the `write_sequence` helper
     mod write_tests {
         use super::*;
 

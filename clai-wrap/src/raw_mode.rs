@@ -439,8 +439,8 @@ mod tests {
                 // SAFETY: openpty() is called with valid pointers for master/slave fds.
                 let result = unsafe {
                     libc::openpty(
-                        &mut master,
-                        &mut slave,
+                        &raw mut master,
+                        &raw mut slave,
                         std::ptr::null_mut(),
                         std::ptr::null_mut(),
                         std::ptr::null_mut(),
@@ -469,7 +469,7 @@ mod tests {
             let mut termios = std::mem::MaybeUninit::<libc::termios>::uninit();
             // SAFETY: tcgetattr() is called with a valid fd and output pointer.
             let result = unsafe { libc::tcgetattr(fd, termios.as_mut_ptr()) };
-            assert_eq!(result, 0, "Failed to get termios for fd {}", fd);
+            assert_eq!(result, 0, "Failed to get termios for fd {fd}");
             // SAFETY: tcgetattr succeeded and initialized termios.
             unsafe { termios.assume_init() }
         }
@@ -477,7 +477,7 @@ mod tests {
         fn set_termios_now(fd: RawFd, termios: &libc::termios) {
             // SAFETY: tcsetattr() is called with a valid fd and termios pointer.
             let result = unsafe { libc::tcsetattr(fd, libc::TCSANOW, termios) };
-            assert_eq!(result, 0, "Failed to set termios for fd {}", fd);
+            assert_eq!(result, 0, "Failed to set termios for fd {fd}");
         }
 
         #[test]

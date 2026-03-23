@@ -78,8 +78,8 @@ impl PtyPair {
         let mut slave: libc::c_int = -1;
         let result = unsafe {
             libc::openpty(
-                &mut master,
-                &mut slave,
+                &raw mut master,
+                &raw mut slave,
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
                 std::ptr::null_mut(),
@@ -569,16 +569,12 @@ fn test_term_environment_handling() {
         if should_be_dumb {
             assert!(
                 matches!(reason, PassthroughReason::DumbTerminal),
-                "TERM={} should be DumbTerminal, got {:?}",
-                term_value,
-                reason
+                "TERM={term_value} should be DumbTerminal, got {reason:?}"
             );
         } else {
             assert!(
                 !matches!(reason, PassthroughReason::DumbTerminal),
-                "TERM={} should NOT be DumbTerminal, got {:?}",
-                term_value,
-                reason
+                "TERM={term_value} should NOT be DumbTerminal, got {reason:?}"
             );
         }
     }
@@ -741,7 +737,7 @@ fn test_reset_terminal_restores_termios_on_corrupted_tty() {
 /// Test full mode detection with real TTY.
 /// Requires interactive TTY environment.
 #[test]
-#[ignore]
+#[ignore = "requires interactive TTY"]
 fn test_interactive_mode_detection() {
     // In a real TTY, detect_tty should return all true
     let status = detect_tty();
@@ -764,15 +760,14 @@ fn test_interactive_mode_detection() {
     let reason = should_use_passthrough();
     assert!(
         matches!(reason, PassthroughReason::NotNeeded),
-        "With TTY, should not need passthrough: {:?}",
-        reason
+        "With TTY, should not need passthrough: {reason:?}"
     );
 }
 
 /// Test passthrough mode with real shell.
 /// Requires interactive TTY environment.
 #[test]
-#[ignore]
+#[ignore = "requires interactive TTY"]
 #[cfg(unix)]
 fn test_interactive_passthrough_mode() {
     use clai_wrap::passthrough::PassthroughMode;
@@ -801,13 +796,13 @@ fn test_interactive_passthrough_mode() {
 /// Test full workflow: detect mode -> enter standalone -> use picker.
 /// Requires interactive TTY environment.
 #[test]
-#[ignore]
+#[ignore = "requires interactive TTY"]
 fn test_interactive_full_workflow() {
     use std::io::Write;
 
     // 1. Check if we need passthrough
     let passthrough_reason = should_use_passthrough();
-    println!("Passthrough reason: {:?}", passthrough_reason);
+    println!("Passthrough reason: {passthrough_reason:?}");
 
     // 2. Enter standalone mode (simulating daemon unavailable)
     let mut state = StandaloneState::new(StandaloneReason::DaemonUnavailable);

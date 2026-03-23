@@ -253,8 +253,7 @@ mod tests {
             assert_eq!(
                 detect_color_support_from_env(&env),
                 ColorSupport::Colors256,
-                "Failed for TERM={}",
-                term
+                "Failed for TERM={term}"
             );
         }
     }
@@ -308,8 +307,7 @@ mod tests {
             assert_eq!(
                 detect_color_support_from_env(&env),
                 ColorSupport::Basic16,
-                "Failed for TERM={}",
-                term
+                "Failed for TERM={term}"
             );
         }
     }

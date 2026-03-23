@@ -393,7 +393,7 @@ mod tests {
     /// This test is ignored by default and can be run with:
     /// `cargo test --lib -- --ignored test_with_real_pty`
     #[test]
-    #[ignore]
+    #[ignore = "requires real PTY"]
     fn test_with_real_pty() {
         use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 

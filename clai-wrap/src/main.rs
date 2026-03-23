@@ -1521,8 +1521,8 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_init_standalone_history_uses_history_file_cli_option() {
-        let mut history = NamedTempFile::new().expect("create temp history");
         use std::io::Write as _;
+        let mut history = NamedTempFile::new().expect("create temp history");
         writeln!(history, "git status").expect("write history entry");
         writeln!(history, "cargo test").expect("write history entry");
         history.flush().expect("flush history file");
