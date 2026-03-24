@@ -16,8 +16,8 @@ GOLANGCI_LINT_VER?=v2.10.1
 GOVULNCHECK_VER?=v1.1.4
 
 # Suppression budgets — ratchet down over time
-NOLINT_BUDGET?=137
-NOSEC_BUDGET?=3
+NOLINT_BUDGET?=136
+NOSEC_BUDGET?=10
 
 .PHONY: all build install install-dev setup clean help
 .PHONY: fmt format go-fmt rust-fmt go-fmt-check rust-fmt-check
