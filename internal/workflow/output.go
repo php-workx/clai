@@ -44,7 +44,7 @@ func ParseOutputFile(path string) (map[string]string, error) {
 		// Split on first '='.
 		idx := strings.IndexByte(trimmed, '=')
 		if idx < 0 {
-			slog.Warn("output: skipping malformed line (no '=')", "path", path, "line", lineNum) //#nosec G706 -- controlled workflow output
+			slog.Warn("output: skipping malformed line (no '=')", "path", path, "line", lineNum)
 			continue
 		}
 
@@ -52,7 +52,7 @@ func ParseOutputFile(path string) (map[string]string, error) {
 		value := trimmed[idx+1:]
 
 		if !validKeyRe.MatchString(key) {
-			slog.Warn("output: skipping invalid key", "path", path, "line", lineNum, "key", key) //#nosec G706 -- controlled workflow output
+			slog.Warn("output: skipping invalid key", "path", path, "line", lineNum, "key", key)
 			continue
 		}
 

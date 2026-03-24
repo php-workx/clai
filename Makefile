@@ -12,12 +12,12 @@ LDFLAGS=-ldflags "-X github.com/runger/clai/internal/cmd.Version=$(VERSION) -X g
 PICKER_LDFLAGS=-ldflags "-X main.Version=$(VERSION) -X main.GitCommit=$(GIT_COMMIT) -X main.BuildDate=$(BUILD_DATE)"
 
 # Pinned tool versions — keep in sync with CI (.github/workflows/ci.yml)
-GOLANGCI_LINT_VER?=v2.10.1
+GOLANGCI_LINT_VER?=v2.11.3
 GOVULNCHECK_VER?=v1.1.4
 
 # Suppression budgets — ratchet down over time
 NOLINT_BUDGET?=136
-NOSEC_BUDGET?=10
+NOSEC_BUDGET?=3
 
 .PHONY: all build install install-dev setup clean help
 .PHONY: fmt format go-fmt rust-fmt go-fmt-check rust-fmt-check

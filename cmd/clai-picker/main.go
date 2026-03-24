@@ -499,13 +499,13 @@ func dispatchBuiltin(cfg *config.Config, opts *pickerOpts) int {
 	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
-			fmt.Fprintln(os.Stderr, result) //#nosec G705 -- CLI TUI output, XSS not applicable
+			fmt.Fprintln(os.Stderr, result)
 		}
 		return code
 	}
 
 	if result != "" {
-		fmt.Fprintln(os.Stdout, result) //#nosec G705 -- CLI TUI output, XSS not applicable
+		fmt.Fprintln(os.Stdout, result)
 	}
 
 	return exitSuccess
@@ -517,13 +517,13 @@ func dispatchSuggest(cfg *config.Config, opts *pickerOpts) int {
 	code, result := runTUIFn(model)
 	if code != exitSuccess {
 		if code == exitFallback && result != "" {
-			fmt.Fprintln(os.Stderr, result) //#nosec G705 -- CLI TUI output, XSS not applicable
+			fmt.Fprintln(os.Stderr, result)
 		}
 		return code
 	}
 
 	if result != "" {
-		fmt.Fprintln(os.Stdout, result) //#nosec G705 -- CLI TUI output, XSS not applicable
+		fmt.Fprintln(os.Stdout, result)
 	}
 	return exitSuccess
 }
@@ -576,8 +576,7 @@ func dispatchFzf(cfg *config.Config, opts *pickerOpts) int {
 	if result == "" {
 		return exitCancelled
 	}
-	fmt.Fprintln(os.Stdout, result) //#nosec G705 -- CLI TUI output, XSS not applicable
-
+	fmt.Fprintln(os.Stdout, result)
 	return exitSuccess
 }
 
