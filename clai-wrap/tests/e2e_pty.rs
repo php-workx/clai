@@ -752,7 +752,11 @@ fn test_clai_wrap_login_shell_disabled_does_not_pass_l_flag() {
         return;
     };
 
-    let script = create_shell_script("#!/bin/sh\nprintf 'ARGC=%s\\nARG1=%s\\n' \"$#\" \"$1\"\n");
+    // Script prints args then sleeps briefly so clai-wrap's I/O threads
+    // can start before the child exits. An immediate exit races against
+    // raw_mode setup and causes a fatal abort on Linux CI.
+    let script =
+        create_shell_script("#!/bin/sh\nprintf 'ARGC=%s\\nARG1=%s\\n' \"$#\" \"$1\"\nsleep 0.2\n");
 
     let pty_system = native_pty_system();
     let pair = pty_system
