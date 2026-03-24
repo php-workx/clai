@@ -843,8 +843,14 @@ buffer_capacity = 3000000
         assert!(invalid_err.to_string().contains("test error"));
     }
 
+    /// Mutex to serialize tests that mutate process-global env vars.
+    /// `std::env::set_var` is not thread-safe; without this, concurrent
+    /// tests race on `HOME` / `XDG_CONFIG_HOME` and produce flaky results.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     #[test]
     fn test_get_xdg_config_path_with_env() {
+        let _lock = ENV_LOCK.lock().unwrap();
         // Save current env vars
         let original_xdg = std::env::var("XDG_CONFIG_HOME").ok();
 
@@ -878,6 +884,7 @@ buffer_capacity = 3000000
 
     #[test]
     fn test_find_config_file_not_found() {
+        let _lock = ENV_LOCK.lock().unwrap();
         // Save current env vars
         let original_xdg = std::env::var("XDG_CONFIG_HOME").ok();
         let original_home = std::env::var("HOME").ok();
@@ -904,6 +911,7 @@ buffer_capacity = 3000000
 
     #[test]
     fn test_find_config_file_xdg_priority() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let temp_dir = TempDir::new().unwrap();
 
         // Create XDG config path
@@ -945,6 +953,7 @@ buffer_capacity = 3000000
 
     #[test]
     fn test_find_config_file_legacy_fallback() {
+        let _lock = ENV_LOCK.lock().unwrap();
         let temp_dir = TempDir::new().unwrap();
 
         // Create only legacy config path (no XDG)
