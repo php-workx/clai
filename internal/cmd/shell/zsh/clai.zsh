@@ -32,7 +32,7 @@ CLAI_UP_ARROW_DOUBLE_WINDOW_MS={{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}
 if [[ "{{CLAI_PTY_ENABLED}}" == "true" ]]; then
     if [[ -o interactive && -z "${CLAI_WRAP:-}" && "${CLAI_PTY_DISABLE:-0}" != "1" && -t 0 && -t 1 ]]; then
         if command -v clai-wrap >/dev/null 2>&1; then
-            exec clai-wrap --shell "${SHELL:-/bin/zsh}"
+            exec clai-wrap --shell "${commands[zsh]:-/bin/zsh}"
         fi
     fi
 fi

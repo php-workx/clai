@@ -32,7 +32,7 @@ if [[ "{{CLAI_PTY_ENABLED}}" == "true" ]]; then
         *i*)
             if [[ -z "${CLAI_WRAP:-}" && "${CLAI_PTY_DISABLE:-0}" != "1" && -t 0 && -t 1 ]]; then
                 if command -v clai-wrap >/dev/null 2>&1; then
-                    exec clai-wrap --shell "${SHELL:-/bin/bash}"
+                    exec clai-wrap --shell "${BASH:-/bin/bash}"
                 fi
             fi
             ;;
