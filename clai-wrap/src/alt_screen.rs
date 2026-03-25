@@ -151,14 +151,15 @@ pub fn enter_alt_screen() -> Result<AltScreenGuard> {
 /// Exit the alternate screen buffer (internal implementation).
 ///
 /// This restores the previous screen buffer and shows the cursor.
+/// Combined exit alt-screen + show cursor sequence for atomic write.
+const EXIT_AND_SHOW: &[u8] = b"\x1b[?1049l\x1b[?25h";
+
 fn exit_alt_screen_impl() -> Result<()> {
     let mut stdout = io::stdout().lock();
 
-    // Exit alternate screen buffer (restore previous screen)
-    stdout.write_all(EXIT_ALT_SCREEN)?;
-
-    // Show cursor
-    stdout.write_all(SHOW_CURSOR)?;
+    // Write exit alt-screen and show cursor as a single atomic write so
+    // partial failure can't leave the cursor hidden.
+    stdout.write_all(EXIT_AND_SHOW)?;
 
     // Ensure all bytes are written
     stdout.flush()?;

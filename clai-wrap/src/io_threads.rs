@@ -248,6 +248,8 @@ pub struct IoThreads {
     stdin_handle: Option<JoinHandle<()>>,
     /// Handle for the PTY output reader thread.
     pty_handle: Option<JoinHandle<()>>,
+    /// Handle for the PTY writer thread.
+    pty_writer_handle: Option<JoinHandle<()>>,
     /// Shared state for thread coordination.
     state: Arc<IoState>,
     /// Channel for sending data to the PTY.
@@ -297,7 +299,7 @@ impl IoThreads {
 
         // Start PTY writer thread (receives from stdin reader via channel)
         let pty_writer_state = Arc::clone(&state);
-        let _pty_writer_handle = thread::Builder::new()
+        let pty_writer_handle = thread::Builder::new()
             .name("pty-writer".to_string())
             .spawn(move || pty_writer_thread(&pty_writer_state, pty_writer, &pty_rx))
             .context("Failed to spawn PTY writer thread")?;
@@ -312,6 +314,7 @@ impl IoThreads {
         Ok(Self {
             stdin_handle: Some(stdin_handle),
             pty_handle: Some(pty_handle),
+            pty_writer_handle: Some(pty_writer_handle),
             state,
             pty_tx: Some(pty_tx),
             event_rx,
@@ -452,7 +455,14 @@ impl IoThreads {
         if let Some(handle) = self.pty_handle.take() {
             match handle.join() {
                 Ok(()) => {}
-                Err(_) => errors.push("PTY thread panicked".to_string()),
+                Err(_) => errors.push("PTY reader thread panicked".to_string()),
+            }
+        }
+
+        if let Some(handle) = self.pty_writer_handle.take() {
+            match handle.join() {
+                Ok(()) => {}
+                Err(_) => errors.push("PTY writer thread panicked".to_string()),
             }
         }
 
@@ -475,6 +485,16 @@ impl Drop for IoThreads {
 /// Reads from stdin and sends events to the main thread.
 /// The actual writing to PTY is done by a separate writer thread
 /// to avoid blocking this thread.
+///
+/// # Thread Leak (Accepted)
+///
+/// This thread blocks on `stdin.lock().read()` which cannot be interrupted
+/// by the shutdown flag — there is no portable, safe way to cancel a
+/// blocking stdin read in Rust without `poll`/`select` on the raw fd.
+/// The thread is intentionally leaked on shutdown because
+/// `std::process::exit()` terminates it. Adding poll/select would add
+/// platform-specific complexity for no practical benefit since the process
+/// is exiting anyway.
 fn stdin_reader_thread(state: &IoState, event_tx: &Sender<IoEvent>) {
     let stdin = std::io::stdin();
     let mut buffer = [0u8; STDIN_READ_BUFFER_SIZE];

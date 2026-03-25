@@ -289,9 +289,10 @@ mod unix {
 
     /// Restore terminal attributes.
     pub fn restore_termios(fd: RawFd, termios: &libc::termios) -> Result<()> {
-        // Use TCSAFLUSH to discard any pending input/output
+        // Use TCSANOW to restore immediately. TCSAFLUSH blocks waiting for
+        // output drain on closed PTY slaves, causing 10s hangs.
         // SAFETY: We're passing a valid pointer to an initialized termios struct
-        let result = unsafe { libc::tcsetattr(fd, libc::TCSAFLUSH, termios) };
+        let result = unsafe { libc::tcsetattr(fd, libc::TCSANOW, termios) };
 
         if result == -1 {
             return Err(RawModeError::SetAttrFailed(std::io::Error::last_os_error()));

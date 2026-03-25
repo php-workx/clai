@@ -120,7 +120,7 @@ impl DaemonClient {
         // Preferred: CLAI_HOME override (matches daemon paths).
         if let Some(clai_home) = clai_home {
             let path = PathBuf::from(clai_home).join("daemon.sock");
-            return Some(path);
+            return Self::validate_socket_path(path, home, xdg_runtime);
         }
 
         // Preferred default: ~/.clai/daemon.sock.
@@ -148,6 +148,51 @@ impl DaemonClient {
         {
             None
         }
+    }
+
+    /// Validates that a CLAI_HOME-derived socket path doesn't escape trusted
+    /// directories via path traversal (e.g., `../../tmp/attacker`).
+    ///
+    /// Canonicalizes the parent directory of the socket path and checks that it
+    /// resides under the user's home directory or `XDG_RUNTIME_DIR`. Returns
+    /// `None` (with a warning log) if traversal is detected.
+    fn validate_socket_path(
+        path: PathBuf,
+        home: Option<&str>,
+        xdg_runtime: Option<&str>,
+    ) -> Option<PathBuf> {
+        // Canonicalize the parent directory (the socket file may not exist yet)
+        let parent = path.parent()?;
+        let Ok(canonical) = parent.canonicalize() else {
+            // Parent doesn't exist yet — that's fine for a fresh install
+            return Some(path);
+        };
+
+        // Check if the canonical path is under a trusted prefix
+        let trusted = |prefix: &str| -> bool {
+            let Ok(canon_prefix) = Path::new(prefix).canonicalize() else {
+                return false;
+            };
+            canonical.starts_with(&canon_prefix)
+        };
+
+        if let Some(h) = home {
+            if trusted(h) {
+                return Some(path);
+            }
+        }
+
+        if let Some(xdg) = xdg_runtime {
+            if trusted(xdg) {
+                return Some(path);
+            }
+        }
+
+        tracing::warn!(
+            "CLAI_HOME socket path {:?} resolves outside trusted directories; ignoring",
+            path
+        );
+        None
     }
 
     /// Connects to the daemon at the default socket path with default timeout.

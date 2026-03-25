@@ -243,6 +243,35 @@ mod tests {
     }
 
     #[test]
+    fn test_nul_at_last_byte() {
+        // NUL as the final byte: position should be len-1
+        let content = b"hello\x00";
+        let result = BracketedPasteTracker::wrap_content(content);
+        assert_eq!(
+            result,
+            Err(PasteError::ContainsNul {
+                position: content.len() - 1
+            })
+        );
+    }
+
+    #[test]
+    fn test_multiple_nuls_reports_first_position() {
+        // Multiple NUL bytes: the reported position must be the FIRST occurrence
+        let content = b"a\x00b\x00c";
+        let result = BracketedPasteTracker::wrap_content(content);
+        assert_eq!(result, Err(PasteError::ContainsNul { position: 1 }));
+    }
+
+    #[test]
+    fn test_all_nuls_reports_position_zero() {
+        // Content consisting entirely of NUL bytes
+        let content = b"\x00\x00\x00";
+        let result = BracketedPasteTracker::wrap_content(content);
+        assert_eq!(result, Err(PasteError::ContainsNul { position: 0 }));
+    }
+
+    #[test]
     fn test_noise_between_sequences() {
         let mut tracker = BracketedPasteTracker::new();
 
