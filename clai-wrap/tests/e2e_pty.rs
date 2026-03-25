@@ -807,7 +807,6 @@ fn test_clai_wrap_login_shell_disabled_does_not_pass_l_flag() {
 
 #[test]
 #[cfg(unix)]
-#[ignore = "Can block in PTY read loop on some runners; covered by unit tests for warning message"]
 fn test_clai_wrap_warns_on_nested_wrapper_env() {
     let Some(binary) = clai_wrap_binary() else {
         eprintln!("Skipping test: CARGO_BIN_EXE_clai-wrap not available");
@@ -858,7 +857,6 @@ fn test_clai_wrap_warns_on_nested_wrapper_env() {
 
 #[test]
 #[cfg(unix)]
-#[ignore = "Can block in PTY read loop on some runners; behavior covered by CLI/unit tests"]
 fn test_clai_wrap_fails_fast_with_invalid_history_file() {
     let Some(binary) = clai_wrap_binary() else {
         eprintln!("Skipping test: CARGO_BIN_EXE_clai-wrap not available");

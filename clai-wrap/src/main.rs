@@ -368,7 +368,7 @@ fn run_unix_mode(
     }
 
     // Enter raw mode only when stdin is interactive.
-    let _raw_guard = if tty_status.stdin {
+    let raw_guard = if tty_status.stdin {
         Some(enter_raw_mode().context("Failed to enter raw mode")?)
     } else {
         None
@@ -459,10 +459,26 @@ fn run_unix_mode(
                             &mut stdout,
                         )?;
                     }
+                    // Restore terminal before suspending so the parent
+                    // shell gets a usable terminal while we're stopped.
+                    if let Some(ref guard) = raw_guard {
+                        let _ = guard.restore();
+                    }
+                    // Actually suspend the process (SIGSTOP cannot be
+                    // caught, but raising it achieves the same effect).
+                    // SAFETY: raise(SIGSTOP) is async-signal-safe.
+                    unsafe {
+                        libc::raise(libc::SIGSTOP);
+                    }
                 }
                 SignalEvent::Continue => {
-                    // Re-enter raw mode handled automatically
                     debug!("Resumed from suspend");
+                    // Re-enter raw mode after resume. The guard still
+                    // holds the original pre-raw-mode termios, so
+                    // future restore/drop will do the right thing.
+                    if let Some(ref guard) = raw_guard {
+                        let _ = guard.re_enter_raw();
+                    }
                 }
             }
         }
@@ -623,13 +639,17 @@ fn run_unix_mode(
         )?;
     }
 
+    // Collect child exit status before teardown.
+    let final_status = child_exit_status.or_else(|| pty_host.try_wait().ok().flatten());
+
     io_threads.shutdown();
 
-    if let Some(status) = child_exit_status.or_else(|| pty_host.try_wait().ok().flatten()) {
-        std::process::exit(status.as_exit_code());
-    }
+    // Restore terminal before exit — process::exit() skips destructors,
+    // so the RAII RawModeGuard would never run Drop.
+    drop(raw_guard);
 
-    Ok(())
+    let exit_code = final_status.map_or(1, |s| s.as_exit_code());
+    std::process::exit(exit_code)
 }
 
 #[cfg(unix)]

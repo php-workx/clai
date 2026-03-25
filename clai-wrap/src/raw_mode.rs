@@ -138,10 +138,49 @@ impl RawModeGuard {
     /// Manually restore the terminal to its original settings.
     ///
     /// This is automatically called on drop, but can be called manually
-    /// if needed. After calling this, the guard is still valid and will
-    /// attempt to restore again on drop (which is harmless).
+    /// if needed (e.g., before SIGSTOP for job control). After calling
+    /// this, the guard is still valid and will attempt to restore again
+    /// on drop (which is harmless). Use `re_enter_raw()` to resume raw
+    /// mode after a suspend/resume cycle.
     pub fn restore(&self) -> Result<()> {
         unix::restore_termios(self.fd, &self.original_termios)
+    }
+
+    /// Re-enter raw mode after a `restore()` call.
+    ///
+    /// This preserves the original termios saved when the guard was
+    /// created, so subsequent `restore()` or `drop()` still restores
+    /// to the correct pre-raw-mode state. Used for SIGTSTP/SIGCONT
+    /// job control: restore before SIGSTOP, re-enter after SIGCONT.
+    #[cfg(unix)]
+    pub fn re_enter_raw(&self) -> Result<()> {
+        use std::os::unix::io::RawFd;
+
+        let fd: RawFd = self.fd;
+        let mut raw = self.original_termios;
+
+        // Apply same raw mode flags as enter_raw_mode
+        raw.c_iflag &= !(libc::IGNBRK
+            | libc::BRKINT
+            | libc::PARMRK
+            | libc::ISTRIP
+            | libc::INLCR
+            | libc::IGNCR
+            | libc::ICRNL
+            | libc::IXON);
+        raw.c_oflag &= !libc::OPOST;
+        raw.c_lflag &= !(libc::ECHO | libc::ECHONL | libc::ICANON | libc::ISIG | libc::IEXTEN);
+        raw.c_cflag &= !(libc::CSIZE | libc::PARENB);
+        raw.c_cflag |= libc::CS8;
+        raw.c_cc[libc::VMIN] = 1;
+        raw.c_cc[libc::VTIME] = 0;
+
+        // SAFETY: valid fd and initialized termios struct
+        let result = unsafe { libc::tcsetattr(fd, libc::TCSANOW, std::ptr::addr_of!(raw)) };
+        if result == -1 {
+            return Err(RawModeError::SetAttrFailed(std::io::Error::last_os_error()));
+        }
+        Ok(())
     }
 }
 

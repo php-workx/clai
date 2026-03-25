@@ -428,10 +428,33 @@ fn get_uid() -> Result<u32> {
 /// Gets the base directory for clai temp files.
 #[allow(clippy::unnecessary_wraps)] // Returns Result for API consistency
 fn get_base_dir(uid: u32) -> Result<PathBuf> {
-    // Try XDG_RUNTIME_DIR first (usually /run/user/{uid}/)
+    // Try XDG_RUNTIME_DIR first (usually /run/user/{uid}/).
+    // Validate ownership to prevent redirection via malicious env var.
     if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
-        let path = PathBuf::from(runtime_dir).join("clai");
-        return Ok(path);
+        let runtime_path = PathBuf::from(&runtime_dir);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            if let Ok(meta) = std::fs::metadata(&runtime_path) {
+                if meta.uid() == uid {
+                    return Ok(runtime_path.join("clai"));
+                }
+                tracing::warn!(
+                    "XDG_RUNTIME_DIR={} owned by uid {} (expected {}); falling back to /tmp",
+                    runtime_dir,
+                    meta.uid(),
+                    uid
+                );
+            } else {
+                // Directory doesn't exist yet — trust the env var, it
+                // will be created with correct ownership by create_dir_secure
+                return Ok(runtime_path.join("clai"));
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            return Ok(runtime_path.join("clai"));
+        }
     }
 
     // Fall back to /tmp/clai-{uid}/
