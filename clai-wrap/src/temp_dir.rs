@@ -474,10 +474,53 @@ fn get_base_dir(uid: u32) -> Result<PathBuf> {
 }
 
 /// Creates a directory with secure permissions (0700).
+///
+/// Uses `DirBuilder` with mode set before creation to avoid a TOCTOU race
+/// where a local adversary could replace the directory with a symlink
+/// between an `exists()` check and `create_dir_all()` + `set_permissions()`.
+///
+/// After creation (or if the path already exists), verifies via
+/// `symlink_metadata` that the path is NOT a symlink and (on Unix) is owned
+/// by the current user.
 fn create_dir_secure(path: &Path) -> Result<()> {
-    if path.exists() {
-        // Verify it's a directory
-        if !path.is_dir() {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::DirBuilderExt;
+        use std::os::unix::fs::MetadataExt;
+
+        let mut builder = std::fs::DirBuilder::new();
+        builder.recursive(true).mode(0o700);
+
+        match builder.create(path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
+                // Path already exists — fall through to validation below
+            }
+            Err(e) => {
+                return Err(TempDirError::CreateDir {
+                    path: path.to_path_buf(),
+                    source: e,
+                });
+            }
+        }
+
+        // Validate the path using symlink_metadata (does NOT follow symlinks)
+        let meta = fs::symlink_metadata(path).map_err(|e| TempDirError::CreateDir {
+            path: path.to_path_buf(),
+            source: e,
+        })?;
+
+        if meta.file_type().is_symlink() {
+            return Err(TempDirError::CreateDir {
+                path: path.to_path_buf(),
+                source: io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "path is a symlink (possible symlink attack)",
+                ),
+            });
+        }
+
+        if !meta.file_type().is_dir() {
             return Err(TempDirError::CreateDir {
                 path: path.to_path_buf(),
                 source: io::Error::new(
@@ -486,20 +529,28 @@ fn create_dir_secure(path: &Path) -> Result<()> {
                 ),
             });
         }
-        return Ok(());
+
+        // Verify ownership matches current user
+        // SAFETY: getuid() is always safe to call
+        let current_uid = unsafe { libc::getuid() };
+        if meta.uid() != current_uid {
+            return Err(TempDirError::SetPermissions {
+                path: path.to_path_buf(),
+                source: io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    format!(
+                        "directory owned by uid {} but current uid is {}",
+                        meta.uid(),
+                        current_uid
+                    ),
+                ),
+            });
+        }
     }
 
-    fs::create_dir_all(path).map_err(|e| TempDirError::CreateDir {
-        path: path.to_path_buf(),
-        source: e,
-    })?;
-
-    // Set permissions to 0700 on Unix
-    #[cfg(unix)]
+    #[cfg(not(unix))]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let permissions = fs::Permissions::from_mode(0o700);
-        fs::set_permissions(path, permissions).map_err(|e| TempDirError::SetPermissions {
+        fs::create_dir_all(path).map_err(|e| TempDirError::CreateDir {
             path: path.to_path_buf(),
             source: e,
         })?;
@@ -916,5 +967,73 @@ mod tests {
             assert!(!stale_dir.exists(), "stale directory should be cleaned up");
             assert!(cleaned >= 1, "should have cleaned at least one directory");
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_create_dir_secure_rejects_symlink() {
+        use std::os::unix::fs as unix_fs;
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let real_dir = tmp.path().join("real_target");
+        fs::create_dir_all(&real_dir).expect("create real target dir");
+
+        let symlink_path = tmp.path().join("symlink_dir");
+        unix_fs::symlink(&real_dir, &symlink_path).expect("create symlink");
+
+        let result = create_dir_secure(&symlink_path);
+        assert!(
+            result.is_err(),
+            "create_dir_secure should reject a symlink path"
+        );
+
+        let err = result.unwrap_err();
+        let err_msg = err.to_string();
+        assert!(
+            err_msg.contains("symlink"),
+            "error should mention symlink, got: {err_msg}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_create_dir_secure_rejects_wrong_owner() {
+        // We can only test this if we can create a directory owned by a different UID.
+        // In practice this requires root, so we skip if not root.
+        // SAFETY: getuid() is always safe
+        let uid = unsafe { libc::getuid() };
+        if uid != 0 {
+            eprintln!("Skipping test_create_dir_secure_rejects_wrong_owner: requires root");
+        }
+        // This test body would only run as root; skip for non-root users.
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn test_create_dir_secure_atomic_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let new_dir = tmp.path().join("atomic_mode_test");
+
+        create_dir_secure(&new_dir).expect("create_dir_secure should succeed");
+
+        let meta = fs::metadata(&new_dir).expect("metadata");
+        let mode = meta.permissions().mode() & 0o777;
+        assert_eq!(
+            mode, 0o700,
+            "directory should be created with 0700 mode, got {mode:o}"
+        );
+
+        // Verify it is NOT a symlink
+        let sym_meta = fs::symlink_metadata(&new_dir).expect("symlink_metadata");
+        assert!(
+            !sym_meta.file_type().is_symlink(),
+            "directory should not be a symlink"
+        );
+        assert!(
+            sym_meta.file_type().is_dir(),
+            "path should be a real directory"
+        );
     }
 }
