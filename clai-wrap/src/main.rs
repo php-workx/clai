@@ -1250,6 +1250,8 @@ fn run_passthrough_mode(cli: &Cli) -> Result<()> {
 fn get_terminal_size() -> Option<(u16, u16)> {
     use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 
+    // SAFETY: ioctl with TIOCGWINSZ is safe when passed a valid fd
+    // and a properly sized winsize struct.
     unsafe {
         let mut ws: winsize = std::mem::zeroed();
         if ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut ws) == 0 {

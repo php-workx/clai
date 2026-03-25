@@ -120,6 +120,18 @@ impl ZshInjector {
         self.zdotdir.as_path()
     }
 
+    /// Sets file permissions to 0600 (owner read/write only).
+    #[cfg(unix)]
+    fn secure_permissions(path: &Path, file_name: &'static str) -> Result<(), ZshInjectorError> {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)).map_err(|e| {
+            ZshInjectorError::FileWrite {
+                file: file_name,
+                source: e,
+            }
+        })
+    }
+
     /// Writes the wrapper .zshenv file.
     ///
     /// The .zshenv file is sourced for ALL Zsh invocations (interactive,
@@ -129,7 +141,7 @@ impl ZshInjector {
     /// 2. Sources the user's real `${HOME}/.zshenv` if it exists
     fn write_zshenv(dir: &Path) -> Result<(), ZshInjectorError> {
         let path = dir.join(".zshenv");
-        let mut file = File::create(path).map_err(|e| ZshInjectorError::FileWrite {
+        let mut file = File::create(&path).map_err(|e| ZshInjectorError::FileWrite {
             file: ".zshenv",
             source: e,
         })?;
@@ -151,6 +163,9 @@ __CLAI_ZDOTDIR="$ZDOTDIR"
                 source: e,
             })?;
 
+        #[cfg(unix)]
+        Self::secure_permissions(&path, ".zshenv")?;
+
         Ok(())
     }
 
@@ -160,7 +175,7 @@ __CLAI_ZDOTDIR="$ZDOTDIR"
         file_name: &'static str,
     ) -> Result<(), ZshInjectorError> {
         let path = dir.join(file_name);
-        let mut file = File::create(path).map_err(|e| ZshInjectorError::FileWrite {
+        let mut file = File::create(&path).map_err(|e| ZshInjectorError::FileWrite {
             file: file_name,
             source: e,
         })?;
@@ -174,6 +189,9 @@ __CLAI_ZDOTDIR="$ZDOTDIR"
                 file: file_name,
                 source: e,
             })?;
+
+        #[cfg(unix)]
+        Self::secure_permissions(&path, file_name)?;
 
         Ok(())
     }
@@ -199,7 +217,7 @@ __CLAI_ZDOTDIR="$ZDOTDIR"
     ///    run after any user prompt customization)
     fn write_zshrc(dir: &Path) -> Result<(), ZshInjectorError> {
         let path = dir.join(".zshrc");
-        let mut file = File::create(path).map_err(|e| ZshInjectorError::FileWrite {
+        let mut file = File::create(&path).map_err(|e| ZshInjectorError::FileWrite {
             file: ".zshrc",
             source: e,
         })?;
@@ -314,6 +332,9 @@ fi
                 file: ".zshrc",
                 source: e,
             })?;
+
+        #[cfg(unix)]
+        Self::secure_permissions(&path, ".zshrc")?;
 
         Ok(())
     }

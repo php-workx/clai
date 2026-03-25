@@ -278,7 +278,7 @@ impl PassthroughMode {
                 let mut buf = [0u8; IO_BUFFER_SIZE];
 
                 loop {
-                    if shutdown_stdin.load(Ordering::Relaxed) {
+                    if shutdown_stdin.load(Ordering::Acquire) {
                         break;
                     }
 
@@ -312,7 +312,7 @@ impl PassthroughMode {
                 let mut buf = [0u8; IO_BUFFER_SIZE];
 
                 loop {
-                    if shutdown_stdout.load(Ordering::Relaxed) {
+                    if shutdown_stdout.load(Ordering::Acquire) {
                         break;
                     }
 
@@ -349,7 +349,7 @@ impl PassthroughMode {
             .context("Failed to wait for child process")?;
 
         // Signal shutdown to threads
-        shutdown.store(true, Ordering::Relaxed);
+        shutdown.store(true, Ordering::Release);
 
         // Wait for threads to finish (with timeout)
         let _ = stdin_handle.join();
@@ -384,7 +384,7 @@ impl PassthroughMode {
     ///
     /// Returns an error if termination fails.
     pub fn kill(&mut self) -> Result<()> {
-        self.shutdown.store(true, Ordering::Relaxed);
+        self.shutdown.store(true, Ordering::Release);
         self.pty.kill()
     }
 }
@@ -663,11 +663,11 @@ mod tests {
             let flag = mode.shutdown_flag();
 
             // Flag should initially be false
-            assert!(!flag.load(Ordering::Relaxed));
+            assert!(!flag.load(Ordering::Acquire));
 
             // Setting it should work
-            flag.store(true, Ordering::Relaxed);
-            assert!(flag.load(Ordering::Relaxed));
+            flag.store(true, Ordering::Release);
+            assert!(flag.load(Ordering::Acquire));
 
             let _ = mode.kill();
         }

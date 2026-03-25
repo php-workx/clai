@@ -43,7 +43,10 @@ use std::time::{Duration, Instant};
 pub const DEFAULT_DEBOUNCE_MS: u64 = 50;
 
 /// Sentinel value indicating no pending resize.
-const NO_PENDING: u32 = 0;
+///
+/// Uses `u32::MAX` to avoid collision with valid packed sizes.
+/// `pack_size(0, 0)` returns 0, which is a valid (if pathological) dimension.
+const NO_PENDING: u32 = u32::MAX;
 
 /// Handles terminal resize events with trailing-edge debounce.
 ///
