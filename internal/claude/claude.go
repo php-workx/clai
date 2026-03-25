@@ -43,7 +43,20 @@ func QueryWithContext(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("failed to get response from Claude: %w", err)
 	}
 
-	return strings.TrimSpace(stdout.String()), nil
+	result := strings.TrimSpace(stdout.String())
+
+	// Claude CLI can exit 0 with empty output when not authenticated or
+	// when the API call silently fails. Treat empty response as an error
+	// so callers don't proceed with a blank result.
+	if result == "" {
+		stderrMsg := strings.TrimSpace(stderr.String())
+		if stderrMsg != "" {
+			return "", fmt.Errorf("claude returned empty response: %s", stderrMsg)
+		}
+		return "", fmt.Errorf("claude returned empty response (possible auth issue — run 'claude /login')")
+	}
+
+	return result, nil
 }
 
 // FilterEnv returns a copy of env with the named variables removed.
