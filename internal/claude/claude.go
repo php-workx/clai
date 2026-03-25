@@ -4,6 +4,7 @@ package claude
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,15 +17,23 @@ func Query(prompt string) (string, error) {
 	return QueryWithContext(context.Background(), prompt)
 }
 
-// QueryWithContext sends a prompt to Claude CLI with context support for cancellation
-// Use this when you need to support Ctrl+C interruption
+// jsonResult is the structure returned by `claude --print --output-format json`.
+type jsonResult struct {
+	Result  string `json:"result"`
+	IsError bool   `json:"is_error"`
+}
+
+// QueryWithContext sends a prompt to Claude CLI with context support for cancellation.
+// Uses --output-format json to reliably capture the response text. Plain --print mode
+// can return empty stdout in some Claude Code versions even when the model produces
+// output (text goes into assistant messages but not into the result stream).
 func QueryWithContext(ctx context.Context, prompt string) (string, error) {
 	// Check if claude CLI is available
 	if _, err := exec.LookPath("claude"); err != nil {
 		return "", fmt.Errorf("'claude' CLI not found. Install Claude Code: https://docs.anthropic.com/en/docs/claude-code")
 	}
 
-	cmd := exec.CommandContext(ctx, "claude", "--print")
+	cmd := exec.CommandContext(ctx, "claude", "--print", "--output-format", "json", "--max-turns", "1")
 	cmd.Env = FilterEnv(os.Environ(), "CLAUDECODE")
 	cmd.Stdin = strings.NewReader(prompt)
 
@@ -33,7 +42,6 @@ func QueryWithContext(ctx context.Context, prompt string) (string, error) {
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
-		// Check if context was cancelled (user pressed Ctrl+C)
 		if ctx.Err() == context.Canceled {
 			return "", fmt.Errorf("interrupted")
 		}
@@ -43,17 +51,50 @@ func QueryWithContext(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("failed to get response from Claude: %w", err)
 	}
 
-	result := strings.TrimSpace(stdout.String())
+	raw := stdout.String()
 
-	// Claude CLI can exit 0 with empty output when not authenticated or
-	// when the API call silently fails. Treat empty response as an error
-	// so callers don't proceed with a blank result.
-	if result == "" {
-		stderrMsg := strings.TrimSpace(stderr.String())
-		if stderrMsg != "" {
-			return "", fmt.Errorf("claude returned empty response: %s", stderrMsg)
+	// Parse JSON envelope to extract the result text.
+	var jr jsonResult
+	if err := json.Unmarshal([]byte(raw), &jr); err != nil {
+		// If JSON parsing fails, fall back to treating raw output as the response.
+		result := strings.TrimSpace(raw)
+		if result == "" {
+			return "", fmt.Errorf("claude returned unparseable empty response")
 		}
-		return "", fmt.Errorf("claude returned empty response (possible auth issue — run 'claude /login')")
+		return result, nil
+	}
+
+	if jr.IsError {
+		return "", fmt.Errorf("claude returned error: %s", jr.Result)
+	}
+
+	result := strings.TrimSpace(jr.Result)
+	if result == "" {
+		return "", fmt.Errorf("claude returned empty result (model produced no text output)")
+	}
+
+	return result, nil
+}
+
+// ExtractJSONResult parses the JSON envelope from `claude --print --output-format json`
+// and returns the result text. Falls back to treating raw input as plain text.
+func ExtractJSONResult(raw string) (string, error) {
+	var jr jsonResult
+	if err := json.Unmarshal([]byte(raw), &jr); err != nil {
+		result := strings.TrimSpace(raw)
+		if result == "" {
+			return "", fmt.Errorf("claude returned unparseable empty response")
+		}
+		return result, nil
+	}
+
+	if jr.IsError {
+		return "", fmt.Errorf("claude returned error: %s", jr.Result)
+	}
+
+	result := strings.TrimSpace(jr.Result)
+	if result == "" {
+		return "", fmt.Errorf("claude returned empty result (model produced no text output)")
 	}
 
 	return result, nil
