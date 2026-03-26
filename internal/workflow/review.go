@@ -33,21 +33,41 @@ func NewTerminalReviewer(reader io.Reader, writer io.Writer) *TerminalReviewer {
 	return &TerminalReviewer{reader: reader, writer: writer}
 }
 
-// scanOrError reads the next line from the scanner, returning an error on failure.
-func scanOrError(scanner *bufio.Scanner) (string, error) {
-	if !scanner.Scan() {
-		if err := scanner.Err(); err != nil {
-			return "", err
+// scanResult holds the result of a non-blocking scanner read.
+type scanResult struct {
+	err  error
+	text string
+}
+
+// scanWithContext reads the next line from the scanner, but returns early
+// if the context is cancelled. This prevents Ctrl-C from being swallowed
+// by a blocking stdin read.
+func scanWithContext(ctx context.Context, scanner *bufio.Scanner) (string, error) {
+	ch := make(chan scanResult, 1)
+	go func() {
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				ch <- scanResult{err: err}
+			} else {
+				ch <- scanResult{err: io.ErrUnexpectedEOF}
+			}
+			return
 		}
-		return "", io.ErrUnexpectedEOF
+		ch <- scanResult{text: scanner.Text()}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return "", ctx.Err()
+	case r := <-ch:
+		return r.text, r.err
 	}
-	return scanner.Text(), nil
 }
 
 // readInputDecision prompts for additional input and returns a decision with that input.
-func (t *TerminalReviewer) readInputDecision(scanner *bufio.Scanner, prompt, action string) (*ReviewDecision, error) {
+func (t *TerminalReviewer) readInputDecision(ctx context.Context, scanner *bufio.Scanner, prompt, action string) (*ReviewDecision, error) {
 	fmt.Fprint(t.writer, prompt)
-	text, err := scanOrError(scanner)
+	text, err := scanWithContext(ctx, scanner)
 	if err != nil {
 		return nil, err
 	}
@@ -61,15 +81,9 @@ func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, an
 	scanner := bufio.NewScanner(t.reader)
 
 	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
 		fmt.Fprint(t.writer, "  [a]pprove  [r]eject  [i]nspect  [c]ommand  [q]uestion > ")
 
-		choice, err := scanOrError(scanner)
+		choice, err := scanWithContext(ctx, scanner)
 		if err != nil {
 			return nil, err
 		}
@@ -82,9 +96,9 @@ func (t *TerminalReviewer) PromptReview(ctx context.Context, stepName string, an
 		case "i":
 			fmt.Fprintf(t.writer, "\n%s\n\n", output)
 		case "c":
-			return t.readInputDecision(scanner, "Command: ", string(ActionCommand))
+			return t.readInputDecision(ctx, scanner, "Command: ", string(ActionCommand))
 		case "q":
-			return t.readInputDecision(scanner, "Question: ", string(ActionQuestion))
+			return t.readInputDecision(ctx, scanner, "Question: ", string(ActionQuestion))
 		}
 	}
 }
