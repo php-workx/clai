@@ -243,7 +243,7 @@ func (s *Server) CommandEnded(ctx context.Context, req *pb.CommandEndRequest) (*
 	}
 
 	// Update command in database
-	if err := ops.UpdateCommandEnd(ctx, s.db, req.CommandId, int(req.ExitCode), tsEnd.UnixMilli(), req.DurationMs); err != nil {
+	if err := ops.UpdateCommandEnd(ctx, s.db, req.CommandId, int(req.ExitCode), req.DurationMs); err != nil {
 		s.logger.Warn("failed to update command end",
 			"command_id", req.CommandId,
 			"session_id", req.SessionId,
@@ -602,13 +602,21 @@ func (s *Server) applyFeedbackUpdates(ctx context.Context, req *pb.RecordFeedbac
 		}
 		switch req.Action {
 		case "dismissed":
-			_ = s.dismissalStore.RecordDismissal(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID, nowMs)
+			if err := s.dismissalStore.RecordDismissal(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID, nowMs); err != nil {
+				s.logger.Debug("dismissal record failed", "action", "dismissed", "error", err)
+			}
 		case "accepted", "edited":
-			_ = s.dismissalStore.RecordAcceptance(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID)
+			if err := s.dismissalStore.RecordAcceptance(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID); err != nil {
+				s.logger.Debug("dismissal record failed", "action", "accepted", "error", err)
+			}
 		case "never":
-			_ = s.dismissalStore.RecordNever(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID, nowMs)
+			if err := s.dismissalStore.RecordNever(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID, nowMs); err != nil {
+				s.logger.Debug("dismissal record failed", "action", "never", "error", err)
+			}
 		case "unblock":
-			_ = s.dismissalStore.RecordUnblock(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID)
+			if err := s.dismissalStore.RecordUnblock(ctx, scope, snapshot.Context.LastTemplateID, dismissedTemplateID); err != nil {
+				s.logger.Debug("dismissal record failed", "action", "unblock", "error", err)
+			}
 		default:
 			// Unknown action; no dismissal update.
 		}

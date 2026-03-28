@@ -268,6 +268,7 @@ func startClaudeProcess(ctx context.Context) (*claudeProcess, error) {
 
 	if err := cmd.Start(); err != nil {
 		stdin.Close()
+		_ = stdout.Close()
 		return nil, fmt.Errorf("failed to start claude: %w", err)
 	}
 
@@ -307,32 +308,56 @@ func sendInitMessage(stdin io.Writer) error {
 	return nil
 }
 
-// waitForInit reads stream lines until the system init message is received
+// initTimeout is how long to wait for Claude to send the system init message.
+const initTimeout = 30 * time.Second
+
+// waitForInit reads stream lines until the system init message is received.
+// Returns an error if the init message is not received within initTimeout.
 func waitForInit(scanner *bufio.Scanner) error {
 	fmt.Println("Waiting for Claude initialization...")
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		logLine := line
-		if len(logLine) > 200 {
-			logLine = logLine[:200] + "..."
+	type scanLine struct {
+		text string
+		ok   bool
+	}
+	ch := make(chan scanLine, 1)
+	go func() {
+		for scanner.Scan() {
+			ch <- scanLine{text: scanner.Text(), ok: true}
 		}
-		fmt.Printf("Init: %s\n", logLine)
+		ch <- scanLine{ok: false}
+	}()
 
-		var resp StreamResponse
-		if err := json.Unmarshal([]byte(line), &resp); err != nil {
-			continue
-		}
-		if resp.Type == "system" && resp.Subtype == "init" {
-			fmt.Println("Claude initialized successfully")
-			return nil
+	timer := time.NewTimer(initTimeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			return fmt.Errorf("claude initialization timed out after %v", initTimeout)
+		case line := <-ch:
+			if !line.ok {
+				if err := scanner.Err(); err != nil {
+					return fmt.Errorf("scanner error during init: %w", err)
+				}
+				return fmt.Errorf("claude initialization failed: unexpected end of stream")
+			}
+			logLine := line.text
+			if len(logLine) > 200 {
+				logLine = logLine[:200] + "..."
+			}
+			fmt.Printf("Init: %s\n", logLine)
+
+			var resp StreamResponse
+			if err := json.Unmarshal([]byte(line.text), &resp); err != nil {
+				continue
+			}
+			if resp.Type == "system" && resp.Subtype == "init" {
+				fmt.Println("Claude initialized successfully")
+				return nil
+			}
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanner error during init: %w", err)
-	}
-	return fmt.Errorf("claude initialization failed: unexpected end of stream")
 }
 
 // waitForResult reads stream lines until the result message is received

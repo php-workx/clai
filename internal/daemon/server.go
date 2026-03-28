@@ -49,6 +49,11 @@ type suggestSnapshot struct {
 	ShownAtMs   int64
 }
 
+type capturedEntry struct {
+	createdAt time.Time
+	size      int64
+}
+
 // Server is the main daemon server that handles all gRPC requests.
 type Server struct {
 	pb.UnimplementedClaiServiceServer
@@ -81,7 +86,7 @@ type Server struct {
 	db                   *suggestdb.DB
 	workflowMiner        *workflow.Miner
 	learningStore        *learning.Store
-	capturedSize         map[string]int64
+	capturedSize         map[string]capturedEntry
 	aliasStore           *alias.Store
 	wg                   sync.WaitGroup
 	idleTimeout          time.Duration
@@ -158,7 +163,7 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		lastActivity:         now,
 		idleTimeout:          idleTimeout,
 		shutdownChan:         make(chan struct{}),
-		capturedSize:         make(map[string]int64),
+		capturedSize:         make(map[string]capturedEntry),
 		maintenanceRunner:    cfg.MaintenanceRunner,
 		diagnosticsMux:       diagMux,
 		batchWriter:          bw,
@@ -295,7 +300,9 @@ func resolveLearner(store *learning.Store) *learning.Learner {
 	}
 	w := learning.DefaultWeights()
 	l := learning.NewLearner(&w, learning.DefaultConfig(), store)
-	_, _ = l.LoadFromStore(context.Background(), "global")
+	if _, err := l.LoadFromStore(context.Background(), "global"); err != nil {
+		slog.Warn("failed to load learning weights from store, using defaults", "error", err)
+	}
 	return l
 }
 
@@ -643,6 +650,8 @@ func (s *Server) pruneCacheLoop(ctx context.Context) {
 	}
 }
 
+const maxCapturedEntryAge = 2 * time.Hour
+
 // pruneCache removes expired cache entries.
 func (s *Server) pruneCache(ctx context.Context) {
 	pruned, err := ops.PruneExpiredCache(ctx, s.db)
@@ -658,24 +667,50 @@ func (s *Server) pruneCache(ctx context.Context) {
 	} else if outputPruned > 0 {
 		s.logger.Info("pruned expired command output rows", "count", outputPruned)
 	}
+
+	// Prune stale suggest snapshots for crashed/orphaned sessions.
+	nowMs := time.Now().UnixMilli()
+	cutoffMs := nowMs - maxSuggestSnapshotAge.Milliseconds()
+	s.snapshotMu.Lock()
+	for sid := range s.lastSuggestSnapshots {
+		if s.lastSuggestSnapshots[sid].ShownAtMs < cutoffMs {
+			delete(s.lastSuggestSnapshots, sid)
+		}
+	}
+	s.snapshotMu.Unlock()
+
+	// Prune orphaned capturedSize entries (command.start without command.end).
+	capturedCutoff := time.Now().Add(-maxCapturedEntryAge)
+	s.captureMu.Lock()
+	for cid, entry := range s.capturedSize {
+		if entry.createdAt.Before(capturedCutoff) {
+			delete(s.capturedSize, cid)
+		}
+	}
+	s.captureMu.Unlock()
 }
 
 func (s *Server) setCapturedBytes(commandID string, value int64) {
 	s.captureMu.Lock()
 	defer s.captureMu.Unlock()
-	s.capturedSize[commandID] = value
+	s.capturedSize[commandID] = capturedEntry{size: value, createdAt: time.Now()}
 }
 
 func (s *Server) addCapturedBytes(commandID string, delta int64) {
 	s.captureMu.Lock()
 	defer s.captureMu.Unlock()
-	s.capturedSize[commandID] += delta
+	entry := s.capturedSize[commandID]
+	entry.size += delta
+	if entry.createdAt.IsZero() {
+		entry.createdAt = time.Now()
+	}
+	s.capturedSize[commandID] = entry
 }
 
 func (s *Server) popCapturedBytes(commandID string) int64 {
 	s.captureMu.Lock()
 	defer s.captureMu.Unlock()
-	value := s.capturedSize[commandID]
+	value := s.capturedSize[commandID].size
 	delete(s.capturedSize, commandID)
 	return value
 }

@@ -110,6 +110,11 @@ func (s *Server) cachedLoadWeights(ctx context.Context, scope string) *learning.
 	if s.weightsCache == nil {
 		s.weightsCache = make(map[string]cachedWeights)
 	}
+	// Double-checked locking: another goroutine may have populated while we were loading.
+	if existing, ok := s.weightsCache[scope]; ok && now.Sub(existing.fetchedAt) < weightsCacheTTL {
+		s.weightsCacheMu.Unlock()
+		return existing.profile
+	}
 	s.weightsCache[scope] = cachedWeights{profile: profile, fetchedAt: now}
 	s.weightsCacheMu.Unlock()
 

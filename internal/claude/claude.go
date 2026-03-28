@@ -33,6 +33,9 @@ func QueryWithContext(ctx context.Context, prompt string) (string, error) {
 		return "", fmt.Errorf("'claude' CLI not found. Install Claude Code: https://docs.anthropic.com/en/docs/claude-code")
 	}
 
+	// --output-format json requires Claude Code CLI >= 1.0.3.
+	// Older versions produce plain text; the JSON parse below falls back gracefully.
+	// --max-turns 1 prevents multi-turn conversations in non-interactive mode.
 	cmd := exec.CommandContext(ctx, "claude", "--print", "--output-format", "json", "--max-turns", "1")
 	cmd.Env = FilterEnv(os.Environ(), "CLAUDECODE")
 	cmd.Stdin = strings.NewReader(prompt)

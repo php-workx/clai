@@ -175,3 +175,47 @@ func TestQuery_ClaudeError(t *testing.T) {
 		}
 	})
 }
+
+func TestExtractJSONResult_ValidJSON(t *testing.T) {
+	result, err := ExtractJSONResult(`{"result":"hello world","is_error":false}`)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "hello world" {
+		t.Errorf("expected 'hello world', got %q", result)
+	}
+}
+
+func TestExtractJSONResult_ErrorJSON(t *testing.T) {
+	_, err := ExtractJSONResult(`{"result":"auth failed","is_error":true}`)
+	if err == nil {
+		t.Fatal("expected error for is_error:true")
+	}
+	if !strings.Contains(err.Error(), "auth failed") {
+		t.Errorf("error should contain reason, got: %v", err)
+	}
+}
+
+func TestExtractJSONResult_PlainTextFallback(t *testing.T) {
+	result, err := ExtractJSONResult("plain text response")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != "plain text response" {
+		t.Errorf("expected plain text fallback, got %q", result)
+	}
+}
+
+func TestExtractJSONResult_EmptyInput(t *testing.T) {
+	_, err := ExtractJSONResult("")
+	if err == nil {
+		t.Fatal("expected error for empty input")
+	}
+}
+
+func TestExtractJSONResult_EmptyResult(t *testing.T) {
+	_, err := ExtractJSONResult(`{"result":"","is_error":false}`)
+	if err == nil {
+		t.Fatal("expected error for empty result field")
+	}
+}
