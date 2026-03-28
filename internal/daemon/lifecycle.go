@@ -38,18 +38,16 @@ func Run(ctx context.Context, cfg *ServerConfig) error {
 		return fmt.Errorf("failed to ensure secure base directory: %w", err)
 	}
 
-	// Kill any sibling claid processes that predate the lockfile mechanism
-	// (or somehow survived without holding the lock). This prevents zombie
-	// accumulation from legacy daemon versions.
-	killSiblingDaemons()
-
-	// Acquire lock file to prevent double-start
+	// Acquire lock file BEFORE killing siblings so the winner is protected.
 	lockPath := LockFilePath(paths.BaseDir)
 	lockFile := NewLockFile(lockPath)
 	if err = lockFile.Acquire(); err != nil {
 		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
 	defer lockFile.Release()
+
+	// Kill any sibling claid processes that predate the lockfile mechanism.
+	killSiblingDaemons()
 
 	server, err := NewServer(cfg)
 	if err != nil {

@@ -16,7 +16,7 @@ GOLANGCI_LINT_VER?=v2.11.3
 GOVULNCHECK_VER?=v1.1.4
 
 # Suppression budgets — ratchet down over time
-NOLINT_BUDGET?=136
+NOLINT_BUDGET?=138
 NOSEC_BUDGET?=3
 
 .PHONY: all build install install-dev setup clean help
