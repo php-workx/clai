@@ -3,6 +3,7 @@ package ops
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"runtime"
 	"time"
 
@@ -96,6 +97,7 @@ func ImportHistory(ctx context.Context, db *suggestdb.DB, entries []history.Impo
 			sessionID, tsStart, "/",
 			entry.Command, norm, uuid.New().String(),
 		); execErr != nil {
+			slog.Debug("history import: skipped entry", "error", execErr)
 			continue // Skip individual failures
 		}
 		imported++

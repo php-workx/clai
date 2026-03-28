@@ -100,8 +100,8 @@ func CreateCommand(ctx context.Context, db *suggestdb.DB, cmd *Command) error {
 	return nil
 }
 
-// UpdateCommandEnd updates a command's end time, duration, and exit code.
-func UpdateCommandEnd(ctx context.Context, db *suggestdb.DB, commandID string, exitCode int, endTimeMs, durationMs int64) error {
+// UpdateCommandEnd updates a command's duration and exit code.
+func UpdateCommandEnd(ctx context.Context, db *suggestdb.DB, commandID string, exitCode int, durationMs int64) error {
 	if commandID == "" {
 		return errors.New("command_id is required")
 	}

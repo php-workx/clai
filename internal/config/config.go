@@ -441,6 +441,9 @@ func LoadFromFile(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
+	// Detect deprecated scorer_version field.
+	checkDeprecatedScorerVersion(data)
+
 	cfg.ApplyEnvOverrides()
 
 	if err := cfg.Validate(); err != nil {
@@ -1074,6 +1077,23 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// checkDeprecatedScorerVersion logs a warning if the raw YAML contains the
+// removed scorer_version key. The field was dropped but yaml.v3 silently
+// ignores unknown keys, so users are never told their setting has no effect.
+func checkDeprecatedScorerVersion(data []byte) {
+	var raw map[string]interface{}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return
+	}
+	if suggestions, ok := raw["suggestions"]; ok {
+		if m, ok := suggestions.(map[string]interface{}); ok {
+			if _, found := m["scorer_version"]; found {
+				slog.Warn("config: suggestions.scorer_version is deprecated and has no effect; please remove it from your config file")
+			}
+		}
+	}
 }
 
 func isValidLogLevel(level string) bool {

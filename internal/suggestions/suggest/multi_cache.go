@@ -255,7 +255,7 @@ func (mc *MultiCache) TriggerPrecompute(
 			return
 		}
 
-		mc.Set(ctx, sessionID, lastEventID, repoKey, prefixHash, contextHash, suggestions)
+		mc.Set(context.Background(), sessionID, lastEventID, repoKey, prefixHash, contextHash, suggestions)
 	}()
 }
 
