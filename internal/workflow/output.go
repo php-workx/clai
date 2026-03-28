@@ -56,6 +56,11 @@ func ParseOutputFile(path string) (map[string]string, error) {
 			continue
 		}
 
+		if IsDangerousEnvKey(key) {
+			slog.Warn("output: skipping dangerous env key", "path", path, "line", lineNum, "key", key)
+			continue
+		}
+
 		result[key] = value
 	}
 	if err := scanner.Err(); err != nil {

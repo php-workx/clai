@@ -669,6 +669,36 @@ func TestRunner_VarOverridesMatrix(t *testing.T) {
 		"--var should override matrix, job, and workflow env")
 }
 
+func TestRunner_StepCallback_StartErrorHaltsExecution(t *testing.T) {
+	skipOnWindows(t)
+
+	cfg := RunnerConfig{
+		WorkDir: t.TempDir(),
+		OnStep: func(ev StepEvent, stepDef *StepDef, _ *StepResult) error {
+			if ev == StepEventStart && stepDef.ID == "step2" {
+				return fmt.Errorf("pre-check rejected step2")
+			}
+			return nil
+		},
+	}
+	runner := NewRunner(cfg)
+
+	steps := []*StepDef{
+		shellStep("step1", "Step 1", "echo one"),
+		shellStep("step2", "Step 2", "echo two"),
+		shellStep("step3", "Step 3", "echo three"),
+	}
+
+	result := runner.Run(context.Background(), steps)
+
+	assert.Equal(t, "failed", result.Status)
+	assert.Contains(t, result.Error.Error(), "pre-check rejected step2")
+	require.Len(t, result.Steps, 3)
+	assert.Equal(t, "passed", result.Steps[0].Status)
+	assert.Equal(t, "failed", result.Steps[1].Status, "step2 should be failed from start callback error")
+	assert.Equal(t, "skipped", result.Steps[2].Status, "step3 should be skipped")
+}
+
 func TestRunner_WorkDir(t *testing.T) {
 	skipOnWindows(t)
 

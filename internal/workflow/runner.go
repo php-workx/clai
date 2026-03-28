@@ -148,7 +148,18 @@ func (r *Runner) Run(ctx context.Context, steps []*StepDef) *RunResult {
 		}
 
 		if r.config.OnStep != nil {
-			_ = r.config.OnStep(StepEventStart, step, nil)
+			if cbErr := r.config.OnStep(StepEventStart, step, nil); cbErr != nil {
+				failed = true
+				result.Status = string(RunFailed)
+				result.Error = cbErr
+				result.Steps = append(result.Steps, &StepResult{
+					StepID: step.ID,
+					Name:   step.Name,
+					Status: string(StepFailed),
+					Error:  cbErr,
+				})
+				continue
+			}
 		}
 
 		stepResult := r.executeStep(ctx, step, stepOutputs, stepOutputEnv)

@@ -142,6 +142,35 @@ func TestParseOutputFile_UnderscoreKey(t *testing.T) {
 	}
 }
 
+func TestParseOutputFile_DangerousKeysSkipped(t *testing.T) {
+	content := "PATH=/evil/bin\nRESULT=42\nLD_PRELOAD=/evil.so\nHOME=/evil\nSAFE_VAR=ok\n"
+	path := writeTempFile(t, content)
+	got, err := ParseOutputFile(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Dangerous keys should be filtered out.
+	if _, ok := got["PATH"]; ok {
+		t.Error("PATH should be blocked as dangerous")
+	}
+	if _, ok := got["LD_PRELOAD"]; ok {
+		t.Error("LD_PRELOAD should be blocked as dangerous")
+	}
+	if _, ok := got["HOME"]; ok {
+		t.Error("HOME should be blocked as dangerous")
+	}
+	// Safe keys should still be present.
+	if got["RESULT"] != "42" {
+		t.Errorf("RESULT = %q, want %q", got["RESULT"], "42")
+	}
+	if got["SAFE_VAR"] != "ok" {
+		t.Errorf("SAFE_VAR = %q, want %q", got["SAFE_VAR"], "ok")
+	}
+	if len(got) != 2 {
+		t.Errorf("len = %d, want 2 (only non-dangerous keys)", len(got))
+	}
+}
+
 func writeTempFile(t *testing.T, content string) string {
 	t.Helper()
 	dir := t.TempDir()

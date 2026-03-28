@@ -232,7 +232,11 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 
 	// Parse --var flags into env overrides (highest precedence).
 	vars, _ := cmd.Flags().GetStringSlice("var")
-	varEnv := parseVarFlags(vars)
+	varEnv, varErr := parseVarFlags(vars)
+	if varErr != nil {
+		slog.Error("invalid --var flag", "error", varErr)
+		return &jobExecutionResult{overallStatus: string(workflow.RunFailed), validationErr: true}
+	}
 
 	matrixCombinations := expandMatrix(job)
 
@@ -595,14 +599,18 @@ func matrixKeyString(vars map[string]string) string {
 	return strings.Join(parts, ",")
 }
 
-func parseVarFlags(vars []string) map[string]string {
+func parseVarFlags(vars []string) (map[string]string, error) {
 	result := map[string]string{}
 	for _, v := range vars {
 		if idx := strings.IndexByte(v, '='); idx >= 0 {
-			result[v[:idx]] = v[idx+1:]
+			key := v[:idx]
+			if workflow.IsDangerousEnvKey(key) {
+				return nil, fmt.Errorf("--var cannot override system variable %q", key)
+			}
+			result[key] = v[idx+1:]
 		}
 	}
-	return result
+	return result, nil
 }
 
 func mergeMaps(base, override map[string]string) map[string]string {
