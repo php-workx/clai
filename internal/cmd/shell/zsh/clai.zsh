@@ -273,18 +273,67 @@ _clai_hist_accept() {
     _clai_hist_reset
 }
 
-# Update suggestion based on current buffer
+# ---- Async suggestion infrastructure ----
+_CLAI_ASYNC_FD=""
+_CLAI_ASYNC_BUFFER=""
+
+_clai_async_cancel() {
+    if [[ -n "$_CLAI_ASYNC_FD" ]]; then
+        zle -F "$_CLAI_ASYNC_FD" 2>/dev/null
+        exec {_CLAI_ASYNC_FD}<&- 2>/dev/null
+        _CLAI_ASYNC_FD=""
+    fi
+}
+
+_clai_async_response() {
+    local fd="$1"
+    local out=""
+    read -r -u "$fd" out 2>/dev/null
+    zle -F "$fd" 2>/dev/null
+    exec {fd}<&- 2>/dev/null
+    [[ "$_CLAI_ASYNC_FD" == "$fd" ]] && _CLAI_ASYNC_FD=""
+    [[ "$BUFFER" != "$_CLAI_ASYNC_BUFFER" ]] && return
+    [[ "$CLAI_OFF" == "1" ]] && return
+    [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] && return
+    _clai_apply_suggestion "$out"
+}
+zle -N _clai_async_response
+
+_clai_apply_suggestion() {
+    local out="$1"
+    local suggestion="${out%%$'\t'*}"
+    local meta=""
+    if [[ "$out" == *$'\t'* ]]; then
+        meta="${out#*$'\t'}"
+    fi
+    if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" && "$suggestion" == "$BUFFER"* ]]; then
+        _CLAI_CURRENT_SUGGESTION="$suggestion"
+        _CLAI_GHOST_META="$meta"
+        local ghost="${suggestion:${#BUFFER}}"
+        local display="${ghost}"
+        if [[ -n "$meta" ]]; then
+            display="${ghost}  ${meta}"
+        fi
+        POSTDISPLAY="${display}"
+        _clai_remove_ghost_highlight
+        _CLAI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#display})) fg=242"
+        region_highlight+=("$_CLAI_GHOST_HIGHLIGHT")
+    else
+        _CLAI_CURRENT_SUGGESTION=""
+        _CLAI_GHOST_META=""
+        POSTDISPLAY=""
+        _clai_remove_ghost_highlight
+    fi
+    zle reset-prompt
+}
+
+# Update suggestion based on current buffer (non-blocking async)
 _clai_update_suggestion() {
-    # Don't overwrite history prefix ghost text
     [[ "$_CLAI_HIST_ACTIVE" == "1" ]] && return
 
-    local suggestion=""
-    local meta=""
-
-    # Hide ghost text when disabled, picker active, buffer empty, or cursor not at EOL
     if [[ "$CLAI_OFF" == "1" ]] || _clai_session_off || [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] || [[ -z "$BUFFER" ]] || [[ $CURSOR -ne ${#BUFFER} ]]; then
+        _clai_async_cancel
         _clai_zsh_autosuggest_restore
-        # Dismiss feedback if suggestion was visible and buffer changed
         if [[ -n "$_CLAI_CURRENT_SUGGESTION" ]]; then
             (clai suggest-feedback --action=dismissed --suggested="$_CLAI_CURRENT_SUGGESTION" >/dev/null 2>&1 &)
         fi
@@ -296,36 +345,10 @@ _clai_update_suggestion() {
     fi
 
     _clai_zsh_autosuggest_disable
-    # Has content - clai handles daemon vs history fallback
-    local out=""
-    out=$(clai suggest --format ghost --limit 1 "$BUFFER" 2>/dev/null)
-    suggestion="${out%%$'\t'*}"
-    if [[ "$out" == *$'\t'* ]]; then
-        meta="${out#*$'\t'}"
-    fi
-
-    if [[ -n "$suggestion" && "$suggestion" != "$BUFFER" && "$suggestion" == "$BUFFER"* ]]; then
-        _CLAI_CURRENT_SUGGESTION="$suggestion"
-        _CLAI_GHOST_META="$meta"
-        local ghost="${suggestion:${#BUFFER}}"
-        local display="${ghost}"
-        if [[ -n "$meta" ]]; then
-            display="${ghost}  ${meta}"
-        fi
-        POSTDISPLAY="${display}"
-        # region_highlight colors POSTDISPLAY; positions past ${#BUFFER} target it.
-        # Preserve any existing region_highlight from other plugins (e.g. zsh-syntax-highlighting).
-        _clai_remove_ghost_highlight
-        _CLAI_GHOST_HIGHLIGHT="${#BUFFER} $((${#BUFFER} + ${#display})) fg=242"
-        region_highlight+=("$_CLAI_GHOST_HIGHLIGHT")
-    else
-        _CLAI_CURRENT_SUGGESTION=""
-        _CLAI_GHOST_META=""
-        POSTDISPLAY=""
-        _clai_remove_ghost_highlight
-    fi
-
-    [[ -n "$WIDGET" ]] && zle reset-prompt
+    _clai_async_cancel
+    _CLAI_ASYNC_BUFFER="$BUFFER"
+    exec {_CLAI_ASYNC_FD}< <(clai suggest --format ghost --limit 1 "$BUFFER" 2>/dev/null)
+    zle -F "$_CLAI_ASYNC_FD" _clai_async_response
 }
 
 # ZLE widget: Update suggestion after each character

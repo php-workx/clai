@@ -829,6 +829,9 @@ _clai_check_nl_prefix() {
 # Hook into DEBUG trap to catch ? prefix before execution and log commands
 # Note: extdebug must be enabled for the trap to block command execution
 _clai_debug_trap() {
+    # Skip in subshells to avoid aborting scripts that use set -e.
+    [[ "${BASH_SUBSHELL:-0}" -gt 0 ]] && return 0
+
     # Check for natural language prefix first
     if _clai_check_nl_prefix "$BASH_COMMAND"; then
         # Prevent the original command from running (requires extdebug)
