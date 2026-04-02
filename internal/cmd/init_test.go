@@ -759,15 +759,15 @@ func TestZshScript_AcceptLineClearsGhostText(t *testing.T) {
 
 	output := string(content)
 
-	// Find the _clai_voice_accept_line function body up to its zle -N registration
-	start := strings.Index(output, "_clai_voice_accept_line()")
+	// Find the _clai_accept_line function body up to its zle -N registration
+	start := strings.Index(output, "_clai_accept_line()")
 	if start == -1 {
-		t.Fatal("_clai_voice_accept_line() not found in zsh script")
+		t.Fatal("_clai_accept_line() not found in zsh script")
 	}
 	rest := output[start:]
-	end := strings.Index(rest, "zle -N _clai_voice_accept_line")
+	end := strings.Index(rest, "zle -N _clai_accept_line")
 	if end == -1 {
-		t.Fatal("could not find end of _clai_voice_accept_line function")
+		t.Fatal("could not find end of _clai_accept_line function")
 	}
 	body := rest[:end]
 
@@ -1241,11 +1241,11 @@ func TestZshScript_FeedbackTracksLastAccepted(t *testing.T) {
 	}
 
 	// Must clear _CLAI_LAST_ACCEPTED on accept-line
-	body := extractFunctionBody(script, "_clai_voice_accept_line")
+	body := extractFunctionBody(script, "_clai_accept_line")
 	if body == "" {
-		t.Fatal("_clai_voice_accept_line() not found in zsh script")
+		t.Fatal("_clai_accept_line() not found in zsh script")
 	}
 	if !strings.Contains(body, `_CLAI_LAST_ACCEPTED=""`) {
-		t.Error("_clai_voice_accept_line() should clear _CLAI_LAST_ACCEPTED after checking for edits")
+		t.Error("_clai_accept_line() should clear _CLAI_LAST_ACCEPTED after checking for edits")
 	}
 }

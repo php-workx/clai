@@ -274,32 +274,23 @@ _clai_hist_accept() {
 }
 
 # ---- Async suggestion infrastructure ----
-_CLAI_ASYNC_FD=""
+# The background `clai suggest` writes to a cache file.  The next keystroke
+# reads the cache synchronously — no zle callbacks, no display mutations
+# from async context, no prompt corruption.
+_CLAI_ASYNC_PID=""
 _CLAI_ASYNC_BUFFER=""
+_CLAI_SUGGEST_CACHE="$CLAI_CACHE/ghost_suggest"
 
 _clai_async_cancel() {
-    if [[ -n "$_CLAI_ASYNC_FD" ]]; then
-        zle -F "$_CLAI_ASYNC_FD" 2>/dev/null
-        exec {_CLAI_ASYNC_FD}<&- 2>/dev/null
-        _CLAI_ASYNC_FD=""
+    if [[ -n "$_CLAI_ASYNC_PID" ]]; then
+        kill "$_CLAI_ASYNC_PID" 2>/dev/null
+        _CLAI_ASYNC_PID=""
     fi
 }
 
-_clai_async_response() {
-    local fd="$1"
-    local out=""
-    read -r -u "$fd" out 2>/dev/null
-    zle -F "$fd" 2>/dev/null
-    exec {fd}<&- 2>/dev/null
-    [[ "$_CLAI_ASYNC_FD" == "$fd" ]] && _CLAI_ASYNC_FD=""
-    [[ "$BUFFER" != "$_CLAI_ASYNC_BUFFER" ]] && return
-    [[ "$CLAI_OFF" == "1" ]] && return
-    [[ "$_CLAI_PICKER_ACTIVE" == "true" ]] && return
-    _clai_apply_suggestion "$out"
-}
-zle -N _clai_async_response
-
-_clai_apply_suggestion() {
+# Apply a cached suggestion result to the display (called synchronously
+# from _clai_update_suggestion, never from an async callback).
+_clai_apply_cached_suggestion() {
     local out="$1"
     local suggestion="${out%%$'\t'*}"
     local meta=""
@@ -324,10 +315,12 @@ _clai_apply_suggestion() {
         POSTDISPLAY=""
         _clai_remove_ghost_highlight
     fi
-    zle reset-prompt
 }
 
-# Update suggestion based on current buffer (non-blocking async)
+# Update suggestion based on current buffer.
+# 1. If a previous async result is ready and matches, apply it immediately.
+# 2. Spawn a new background suggest and return — the NEXT keystroke will
+#    pick up the result.  No zle callbacks, no async display mutations.
 _clai_update_suggestion() {
     [[ "$_CLAI_HIST_ACTIVE" == "1" ]] && return
 
@@ -345,10 +338,28 @@ _clai_update_suggestion() {
     fi
 
     _clai_zsh_autosuggest_disable
+
+    # Check if the previous async result is ready and still relevant.
+    if [[ -f "$_CLAI_SUGGEST_CACHE" ]]; then
+        local cached_buffer cached_result
+        cached_buffer=$(head -1 "$_CLAI_SUGGEST_CACHE" 2>/dev/null)
+        if [[ "$cached_buffer" == "$BUFFER" ]]; then
+            cached_result=$(tail -1 "$_CLAI_SUGGEST_CACHE" 2>/dev/null)
+            _clai_apply_cached_suggestion "$cached_result"
+            return
+        fi
+    fi
+
+    # Spawn a new background suggest.  It writes to the cache file;
+    # the next keystroke will read it.
     _clai_async_cancel
     _CLAI_ASYNC_BUFFER="$BUFFER"
-    exec {_CLAI_ASYNC_FD}< <(clai suggest --format ghost --limit 1 "$BUFFER" 2>/dev/null)
-    zle -F "$_CLAI_ASYNC_FD" _clai_async_response
+    (
+        local result
+        result=$(clai suggest --format ghost --limit 1 "$_CLAI_ASYNC_BUFFER" 2>/dev/null)
+        printf '%s\n%s\n' "$_CLAI_ASYNC_BUFFER" "$result" > "$_CLAI_SUGGEST_CACHE"
+    ) &!
+    _CLAI_ASYNC_PID=$!
 }
 
 # ZLE widget: Update suggestion after each character
@@ -473,6 +484,12 @@ _clai_up_line_or_history() {
         _CLAI_HIST_PREFIX="$BUFFER"
         _CLAI_HIST_ACTIVE=1
         _CLAI_HIST_IDX=0
+        _CLAI_HIST_MATCHES=()
+        _CLAI_HIST_SEEN=()
+        _CLAI_HIST_SESS_OFFSET=0
+        _CLAI_HIST_GLOB_OFFSET=0
+        _CLAI_HIST_SESS_DONE=""
+        _CLAI_HIST_GLOB_DONE=""
         _clai_hist_fetch_page
     fi
 
@@ -498,7 +515,7 @@ _clai_up_line_or_history() {
         CURSOR=${#BUFFER}
         _clai_hist_apply_ghost
     else
-        # No prefix: show full command as regular text
+        # No prefix: show full command as regular text.
         POSTDISPLAY=""
         _clai_remove_ghost_highlight
         BUFFER="$_CLAI_HIST_MATCH"
@@ -563,6 +580,11 @@ zle -N backward-delete-char _clai_backward_delete_char
 
 # ZLE widget: Update suggestion after cursor movement
 _clai_backward_char() {
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" ]]; then
+        POSTDISPLAY=""
+        _clai_remove_ghost_highlight
+        _clai_hist_reset
+    fi
     _clai_dismiss_picker
     # Left-arrow should never "accept" a suggestion. Clear ghost text so cursor
     # movement doesn't feel like it jumps behind POSTDISPLAY.
@@ -573,6 +595,11 @@ _clai_backward_char() {
 zle -N backward-char _clai_backward_char
 
 _clai_beginning_of_line() {
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" ]]; then
+        POSTDISPLAY=""
+        _clai_remove_ghost_highlight
+        _clai_hist_reset
+    fi
     _clai_dismiss_picker
     zle .beginning-of-line
     _clai_update_suggestion
@@ -704,10 +731,21 @@ _clai_enter_voice_mode() {
 zle -N _clai_enter_voice_mode
 
 # ZLE widget: Execute with voice conversion if in voice mode or ? prefix
-_clai_voice_accept_line() {
-    # Accept history prefix match before running the command
-    if [[ "$_CLAI_HIST_ACTIVE" == "1" && -n "$_CLAI_HIST_MATCH" ]]; then
-        _clai_hist_accept
+_clai_accept_line() {
+    # Accept history prefix match before running the command — but only
+    # when the buffer is the unmodified prefix.  If the user moved the
+    # cursor and edited the buffer (delete, Ctrl-K, etc.) we must run
+    # what they actually typed, not overwrite it with the original match.
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" ]]; then
+        if [[ -n "$_CLAI_HIST_MATCH" && -n "$_CLAI_HIST_PREFIX" && "$BUFFER" == "$_CLAI_HIST_PREFIX" ]]; then
+            # Prefix-ghost mode: buffer is still just the prefix → accept full match
+            _clai_hist_accept
+        fi
+        # Always exit history mode before executing — otherwise the next Up
+        # press skips re-initialization and shows stale results.
+        POSTDISPLAY=""
+        _clai_remove_ghost_highlight
+        _clai_hist_reset
     fi
 
     # Check for ? prefix (natural language marker)
@@ -762,10 +800,10 @@ _clai_voice_accept_line() {
     _clai_remove_ghost_highlight
     zle accept-line
 }
-zle -N _clai_voice_accept_line
+zle -N _clai_accept_line
 
 # Bind Enter to voice-aware accept
-bindkey '^M' _clai_voice_accept_line    # Enter
+bindkey '^M' _clai_accept_line    # Enter
 
 # Bind Ctrl+V for voice mode (Cmd+Ctrl doesn't produce a terminal sequence)
 # Users can rebind this or use their speech-to-text tool's hotkey
@@ -1206,7 +1244,7 @@ _clai_picker_accept() {
         _clai_update_suggestion
         zle redisplay
     else
-        _clai_voice_accept_line
+        _clai_accept_line
     fi
 }
 
@@ -1263,7 +1301,16 @@ _clai_picker_up() {
         return
     fi
 
-    # Double-tap confirmed — open picker
+    # Double-tap confirmed — open picker.
+    # Fully exit history mode first (the first Up may have entered it).
+    if [[ "$_CLAI_HIST_ACTIVE" == "1" ]]; then
+        POSTDISPLAY=""
+        _clai_remove_ghost_highlight
+        _clai_hist_reset
+        # Restore original buffer from before history navigation started
+        BUFFER="$_CLAI_HIST_PREFIX"
+        CURSOR=${#BUFFER}
+    fi
     if [[ "$CLAI_PICKER_OPEN_ON_EMPTY" != "true" && -z "$BUFFER" ]]; then
         _clai_up_line_or_history
         return
@@ -1523,7 +1570,7 @@ _clai_disable() {
     # Restore native history command
     unfunction history 2>/dev/null
 
-    echo "clai disabled — native shell restored"
+    echo "clai disabled — native shell restored (use 'clai on' to re-enable with latest code)"
 }
 
 _clai_enable() {
