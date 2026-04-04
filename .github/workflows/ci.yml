@@ -24,10 +24,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Read Rust toolchain
+        id: toolchain
+        run: |
+          echo "version=$(grep 'channel' clai-wrap/rust-toolchain.toml | sed 's/.*=\s*"//;s/"//g')" >> $GITHUB_OUTPUT
+
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.93.0
+          toolchain: ${{ steps.toolchain.outputs.version }}
           components: rustfmt
 
       - name: Install goimports
@@ -49,10 +54,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Read Rust toolchain
+        id: toolchain
+        run: |
+          echo "version=$(grep 'channel' clai-wrap/rust-toolchain.toml | sed 's/.*=\s*"//;s/"//g')" >> $GITHUB_OUTPUT
+
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.93.0
+          toolchain: ${{ steps.toolchain.outputs.version }}
           components: clippy
 
       - name: golangci-lint
@@ -79,10 +89,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Read Rust toolchain
+        id: toolchain
+        run: |
+          echo "version=$(grep 'channel' clai-wrap/rust-toolchain.toml | sed 's/.*=\s*"//;s/"//g')" >> $GITHUB_OUTPUT
+
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.93.0
+          toolchain: ${{ steps.toolchain.outputs.version }}
 
       - name: Download dependencies
         run: go mod download
@@ -119,10 +134,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Read Rust toolchain
+        id: toolchain
+        run: |
+          echo "version=$(grep 'channel' clai-wrap/rust-toolchain.toml | sed 's/.*=\s*"//;s/"//g')" >> $GITHUB_OUTPUT
+
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@631a55b12751854ce901bb631d5902ceb48146f7 # stable
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.93.0
+          toolchain: ${{ steps.toolchain.outputs.version }}
 
       - name: Scan vulnerabilities
         run: |
