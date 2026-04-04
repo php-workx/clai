@@ -45,10 +45,10 @@ type CommandQuery struct {
 
 // HistoryRow represents a deduplicated command history entry.
 type HistoryRow struct {
+	ExitCode    *int // keep pointer first to minimize GC bitmap (32 vs 48 bytes)
 	Command     string
-	TimestampMs int64
 	CWD         string
-	ExitCode    *int
+	TimestampMs int64
 }
 
 // ErrCommandNotFound is returned when a command is not found.

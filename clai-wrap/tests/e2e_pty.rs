@@ -298,6 +298,16 @@ fn spawn_clai_wrap_shell_path(
     Box<dyn portable_pty::MasterPty + Send>,
     Box<dyn portable_pty::Child + Send + Sync>,
 )> {
+    spawn_clai_wrap_shell_path_with_env(shell_path, &[])
+}
+
+fn spawn_clai_wrap_shell_path_with_env(
+    shell_path: &Path,
+    extra_env: &[(&str, &str)],
+) -> Option<(
+    Box<dyn portable_pty::MasterPty + Send>,
+    Box<dyn portable_pty::Child + Send + Sync>,
+)> {
     let binary = clai_wrap_binary()?;
     if !shell_path.exists() {
         return None;
@@ -315,6 +325,9 @@ fn spawn_clai_wrap_shell_path(
         "false",
         "--no-ui",
     ]);
+    for (key, val) in extra_env {
+        cmd.env(key, val);
+    }
 
     let child = pair.slave.spawn_command(cmd).ok()?;
     Some((pair.master, child))
@@ -910,7 +923,15 @@ fn test_clai_wrap_cross_shell_matrix_echo_smoke() {
     }
 
     for (shell_name, shell_path) in shells {
-        let Some((master, mut child)) = spawn_clai_wrap_shell_path(&shell_path) else {
+        // Fish 4.x sends terminal capability queries on startup; TERM=dumb prevents the
+        // 10-second query timeout from exceeding the test's 8-second marker timeout.
+        let env: &[(&str, &str)] = if shell_name == "fish" {
+            &[("TERM", "dumb")]
+        } else {
+            &[]
+        };
+        let Some((master, mut child)) = spawn_clai_wrap_shell_path_with_env(&shell_path, env)
+        else {
             eprintln!("Skipping shell {shell_name}: failed to spawn clai-wrap");
             continue;
         };
@@ -944,7 +965,15 @@ fn test_clai_wrap_cross_shell_matrix_ctrl_c_interrupts() {
     }
 
     for (shell_name, shell_path) in shells {
-        let Some((master, mut child)) = spawn_clai_wrap_shell_path(&shell_path) else {
+        // Fish 4.x sends terminal capability queries on startup; TERM=dumb prevents the
+        // 10-second query timeout from exceeding the test's 8-second marker timeout.
+        let env: &[(&str, &str)] = if shell_name == "fish" {
+            &[("TERM", "dumb")]
+        } else {
+            &[]
+        };
+        let Some((master, mut child)) = spawn_clai_wrap_shell_path_with_env(&shell_path, env)
+        else {
             eprintln!("Skipping shell {shell_name}: failed to spawn clai-wrap");
             continue;
         };
@@ -1385,8 +1414,12 @@ fn test_clai_wrap_io_line_editing_arrows_backspace_ctrl_a_ctrl_e() {
     let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
 
     assert!(output_hello.contains("hello"), "Output: {output_hello}");
+    // When bash inserts characters in the middle of a line, readline may emit
+    // CSI 1 @ (insert character) sequences between each character. Strip them so
+    // "CTRL_A_OK" appears as a contiguous substring regardless of insert mode.
+    let clean_ctrl = output_ctrl.replace("\x1b[1@", "");
     assert!(
-        output_ctrl.contains("CTRL_A_OK") && output_ctrl.contains("CTRL_E_OK"),
+        clean_ctrl.contains("CTRL_A_OK") && clean_ctrl.contains("CTRL_E_OK"),
         "Expected ctrl-a/ctrl-e markers, got: {output_ctrl}"
     );
 }
@@ -1748,8 +1781,7 @@ fn test_clai_wrap_encoding_non_utf8_locale_warning() {
 
     assert!(
         output.contains("non-UTF-8") || output.contains("locale") || output.contains("UTF"),
-        "Expected locale/encoding warning in output, got: {:?}",
-        output
+        "Expected locale/encoding warning in output, got: {output:?}"
     );
 }
 

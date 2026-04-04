@@ -92,7 +92,7 @@ function _clai_accept_suggestion
             commandline -f end-of-line
             # Record accepted feedback (fire and forget)
             clai suggest-feedback --action=accepted --suggested="$suggestion" >/dev/null 2>&1 &
-            disown %1 2>/dev/null
+            jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
             # Clear the suggestion
             echo -n "" > $_CLAI_SUGGEST_FILE
             return
@@ -114,7 +114,7 @@ function _clai_clear_suggestion
         if test -n "$suggestion"
             # Record dismissed feedback (fire and forget)
             clai suggest-feedback --action=dismissed --suggested="$suggestion" >/dev/null 2>&1 &
-            disown %1 2>/dev/null
+            jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
         end
     end
     echo -n "" > $_CLAI_SUGGEST_FILE
@@ -634,7 +634,7 @@ function _clai_voice_execute
         set -l selected $_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX]
         if test -n "$selected"
             clai suggest-feedback --action=accepted --suggested="$selected" >/dev/null 2>&1 &
-            disown %1 2>/dev/null
+            jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
         end
         _clai_picker_close
         return
@@ -791,7 +791,7 @@ function _clai_preexec --on-event fish_preexec
 
     # Fire and forget - log command start to daemon
     clai-shim log-start --session-id="$CLAI_SESSION_ID" --command-id="$_CLAI_COMMAND_ID" --cwd="$PWD" --command="$cmd" >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 end
 
 # Log command end (runs after each command)
@@ -816,7 +816,7 @@ function _clai_postexec --on-event fish_postexec
 
     # Fire and forget - log command end to daemon
     clai-shim log-end --session-id="$CLAI_SESSION_ID" --command-id="$_CLAI_COMMAND_ID" --exit-code="$exit_code" --duration="$duration" >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 
     # Clear command tracking state
     set -g _CLAI_COMMAND_ID ""
@@ -983,16 +983,16 @@ if status is-interactive; and not set -q _CLAI_REINIT
     # Register session with daemon (fire and forget)
     # This notifies the daemon of the new shell session
     clai-shim session-start --session-id="$CLAI_SESSION_ID" --cwd="$PWD" --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 
     # Sync fish abbreviations as alias snapshot for V2 ingest.
     abbr --show | clai-shim alias-sync --session-id="$CLAI_SESSION_ID" --shell="$CLAI_CURRENT_SHELL" --stdin >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 
     # Import shell history on first init (fire and forget)
     # This is idempotent: --if-not-exists skips if already imported
     clai-shim import-history --shell="$CLAI_CURRENT_SHELL" --if-not-exists >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 
     set -l short_id (string sub -l 8 -- $CLAI_SESSION_ID)
     set -l locale ""
