@@ -367,36 +367,35 @@ impl SuggestionReceiver {
 
     /// Enforces the per-command suggestion limit.
     fn enforce_per_command_limit(&mut self) {
-        use std::collections::{HashMap, HashSet};
+        use std::collections::HashMap;
 
-        // Count suggestions per command (borrows suggestions only for this block).
-        let over_limit: HashSet<String> = {
-            let mut counts: HashMap<&str, usize> = HashMap::new();
-            for suggestion in &self.suggestions {
-                *counts.entry(suggestion.command_id.as_str()).or_insert(0) += 1;
-            }
-            counts
-                .into_iter()
-                .filter(|(_, count)| *count > MAX_SUGGESTIONS_PER_COMMAND)
-                .map(|(id, _)| id.to_owned())
-                .collect()
-        }; // borrow of self.suggestions ends here
+        // First pass: count suggestions per command.
+        let mut per_cmd_count: HashMap<&str, usize> = HashMap::new();
+        for s in &self.suggestions {
+            *per_cmd_count.entry(s.command_id.as_str()).or_insert(0) += 1;
+        }
 
-        if over_limit.is_empty() {
+        // Build a retain-counter map only for over-limit commands, converting keys
+        // to owned Strings so the borrow on self.suggestions ends before retain().
+        let mut retain_counts: HashMap<String, usize> = per_cmd_count
+            .into_iter()
+            .filter(|(_, count)| *count > MAX_SUGGESTIONS_PER_COMMAND)
+            .map(|(cmd_id, _)| (cmd_id.to_owned(), 0usize))
+            .collect();
+
+        if retain_counts.is_empty() {
             return;
         }
 
         // Single-pass retain with per-command counter (highest-priority first, since
         // sort_suggestions() runs before this function).
-        let mut keep_counts: HashMap<String, usize> = HashMap::new();
         self.suggestions.retain(|s| {
-            if over_limit.contains(&s.command_id) {
-                let count = keep_counts.entry(s.command_id.clone()).or_insert(0);
-                *count += 1;
-                *count <= MAX_SUGGESTIONS_PER_COMMAND
-            } else {
-                true
-            }
+            retain_counts
+                .get_mut(s.command_id.as_str())
+                .is_none_or(|count| {
+                    *count += 1;
+                    *count <= MAX_SUGGESTIONS_PER_COMMAND
+                })
         });
     }
 

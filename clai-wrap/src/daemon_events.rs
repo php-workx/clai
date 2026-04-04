@@ -842,18 +842,16 @@ mod tests {
     fn test_forwarder_output_capture_disabled_in_standalone() {
         let mut forwarder = DaemonEventForwarder::standalone(ForwarderConfig::default());
 
-        // Start a command
-        forwarder.on_osc133_state_change(&Osc133State::Output);
+        // Capture must be disabled from construction — standalone mode has no daemon
+        // to forward data to, so buffering terminal bytes would waste memory.
+        assert!(!forwarder.is_capture_enabled());
 
-        // In standalone mode, output capture is disabled
-        // The output_capture internal state may still work, but it's disabled
-        // because we called disable() in enter_standalone_mode()
-        // Actually, standalone() calls the constructor which doesn't disable capture
-        // Let's verify standalone mode doesn't automatically disable capture
+        // Start a command — output should not be buffered even with an active command.
+        forwarder.on_osc133_state_change(&Osc133State::Output);
+        assert!(forwarder.is_tracking_command());
 
         forwarder.forward_output(b"test output");
-        // Since we're in standalone mode but capture wasn't explicitly disabled,
-        // the output might still be captured locally
+        assert_eq!(forwarder.buffered_len(), 0);
     }
 
     // =========================================================================
