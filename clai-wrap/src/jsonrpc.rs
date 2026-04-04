@@ -39,6 +39,10 @@ pub enum JsonRpcError {
     /// Message is not valid UTF-8.
     #[error("message is not valid UTF-8: {0}")]
     InvalidUtf8(#[from] std::string::FromUtf8Error),
+
+    /// Response has both result and error, or neither (violates JSON-RPC spec).
+    #[error("{0}")]
+    InvalidResponse(&'static str),
 }
 
 /// Standard JSON-RPC 2.0 error codes.
@@ -268,7 +272,16 @@ impl Response {
         if s.len() > MAX_MESSAGE_SIZE {
             return Err(JsonRpcError::MessageTooLarge(s.len()));
         }
-        Ok(serde_json::from_str(s)?)
+        let resp: Self = serde_json::from_str(s)?;
+        match (&resp.result, &resp.error) {
+            (Some(_), Some(_)) => Err(JsonRpcError::InvalidResponse(
+                "JSON-RPC response has both result and error",
+            )),
+            (None, None) => Err(JsonRpcError::InvalidResponse(
+                "JSON-RPC response has neither result nor error",
+            )),
+            _ => Ok(resp),
+        }
     }
 }
 
@@ -722,6 +735,40 @@ mod tests {
         let json = r#"{"jsonrpc":"2.0","id":1,"result":{"ok":true},"extra":"ignored"}"#;
         let response = Response::parse(json).unwrap();
         assert!(response.is_success());
+    }
+
+    #[test]
+    fn test_response_parse_result_only_ok() {
+        let json = r#"{"jsonrpc":"2.0","id":1,"result":{"pong":true}}"#;
+        let response = Response::parse(json).unwrap();
+        assert!(response.is_success());
+    }
+
+    #[test]
+    fn test_response_parse_error_only_ok() {
+        let json =
+            r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"Method not found"}}"#;
+        let response = Response::parse(json).unwrap();
+        assert!(response.is_error());
+    }
+
+    #[test]
+    fn test_response_parse_both_result_and_error_err() {
+        let json =
+            r#"{"jsonrpc":"2.0","id":1,"result":{},"error":{"code":-32600,"message":"bad"}}"#;
+        let result = Response::parse(json);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("both result and error"));
+    }
+
+    #[test]
+    fn test_response_parse_neither_result_nor_error_err() {
+        let json = r#"{"jsonrpc":"2.0","id":1}"#;
+        let result = Response::parse(json);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("neither result nor error"));
     }
 
     // =========================================================================

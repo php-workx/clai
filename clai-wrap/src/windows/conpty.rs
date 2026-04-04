@@ -111,8 +111,14 @@ pub fn is_conpty_available() -> bool {
             return false;
         }
 
-        // Restore original mode
-        SetConsoleMode(handle, mode);
+        // Restore original mode.
+        // SAFETY: We attempt to restore the original mode. If restoration fails, we
+        // log a warning but still return the correct availability result. The console
+        // may be left in a modified state, but this is preferable to panicking.
+        let restore_result = SetConsoleMode(handle, mode);
+        if restore_result == FALSE {
+            tracing::warn!("Failed to restore original console mode after ConPTY detection");
+        }
 
         true
     }

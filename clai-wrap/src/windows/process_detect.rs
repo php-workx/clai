@@ -265,18 +265,16 @@ fn find_leaf_process(
         return None;
     }
 
-    // Find processes that have no children among the descendants
+    // Build the set of PIDs that appear as a parent within the descendant set.
+    // A process is a leaf if it is not in this parent set. O(N) vs the naive O(N²).
+    let parent_pids: HashSet<u32> = descendants
+        .iter()
+        .filter_map(|&pid| processes.get(&pid).map(|info| info.parent_pid))
+        .collect();
     let mut leaves: Vec<u32> = descendants
         .iter()
         .copied()
-        .filter(|&pid| {
-            // A process is a leaf if none of the other descendants have it as parent
-            !descendants.iter().any(|&other_pid| {
-                processes
-                    .get(&other_pid)
-                    .is_some_and(|info| info.parent_pid == pid)
-            })
-        })
+        .filter(|pid| !parent_pids.contains(pid))
         .collect();
 
     // Sort by PID (highest first) - most recently spawned is likely foreground
@@ -714,6 +712,62 @@ mod tests {
 
         let leaf = find_leaf_process(&processes, &descendants);
         assert!(leaf.is_none());
+    }
+
+    #[test]
+    fn test_find_leaf_process_linear_chain() {
+        // Chain: 1 -> 2 -> 3; leaf must be 3
+        let mut processes = HashMap::new();
+        for (pid, parent) in [(1u32, 0u32), (2, 1), (3, 2)] {
+            processes.insert(
+                pid,
+                ProcessInfo {
+                    pid,
+                    parent_pid: parent,
+                    exe_name: format!("{}.exe", pid),
+                },
+            );
+        }
+        let descendants: HashSet<u32> = [2, 3].into();
+        let leaf = find_leaf_process(&processes, &descendants);
+        assert_eq!(leaf, Some(3));
+    }
+
+    #[test]
+    fn test_find_leaf_process_fork() {
+        // Fork: 1 -> 2 and 1 -> 3; both 2 and 3 are leaves (highest PID wins)
+        let mut processes = HashMap::new();
+        for (pid, parent) in [(1u32, 0u32), (2, 1), (3, 1)] {
+            processes.insert(
+                pid,
+                ProcessInfo {
+                    pid,
+                    parent_pid: parent,
+                    exe_name: format!("{}.exe", pid),
+                },
+            );
+        }
+        let descendants: HashSet<u32> = [2, 3].into();
+        let leaf = find_leaf_process(&processes, &descendants);
+        // Both are leaves; sort_by highest PID first, so result is 3
+        assert_eq!(leaf, Some(3));
+    }
+
+    #[test]
+    fn test_find_leaf_process_single() {
+        // Single descendant with no children — it is the leaf
+        let mut processes = HashMap::new();
+        processes.insert(
+            42u32,
+            ProcessInfo {
+                pid: 42,
+                parent_pid: 1,
+                exe_name: "solo.exe".to_string(),
+            },
+        );
+        let descendants: HashSet<u32> = [42].into();
+        let leaf = find_leaf_process(&processes, &descendants);
+        assert_eq!(leaf, Some(42));
     }
 
     #[test]

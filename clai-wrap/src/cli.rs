@@ -224,6 +224,24 @@ impl Cli {
             }
         }
 
+        // Validate daemon socket path if specified
+        if let Some(ref path) = self.daemon_socket {
+            if path.as_os_str().is_empty() {
+                return Err(CliError::InvalidDaemonSocket(
+                    "daemon socket path cannot be empty".to_string(),
+                ));
+            }
+        }
+
+        // Validate history file path if specified
+        if let Some(ref path) = self.history_file {
+            if path.as_os_str().is_empty() {
+                return Err(CliError::InvalidHistoryFile(
+                    "history file path cannot be empty".to_string(),
+                ));
+            }
+        }
+
         Ok(())
     }
 }
@@ -263,6 +281,14 @@ pub enum CliError {
     /// Invalid hotkey specification
     #[error("invalid hotkey: {0}")]
     InvalidHotkey(String),
+
+    /// Invalid daemon socket path
+    #[error("invalid daemon socket path: {0}")]
+    InvalidDaemonSocket(String),
+
+    /// Invalid history file path
+    #[error("invalid history file path: {0}")]
+    InvalidHistoryFile(String),
 }
 
 #[cfg(test)]
@@ -533,5 +559,56 @@ mod tests {
         let result = Cli::try_parse_from_args(["clai-wrap", "--debug"]);
         assert!(result.is_ok());
         assert!(result.unwrap().debug);
+    }
+    #[test]
+    fn test_validate_empty_daemon_socket() {
+        let mut cli = Cli::parse_from_args(["clai-wrap"]);
+        cli.daemon_socket = Some(PathBuf::from(""));
+        let result = cli.validate();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CliError::InvalidDaemonSocket(_)
+        ));
+    }
+
+    #[test]
+    fn test_validate_empty_history_file() {
+        let mut cli = Cli::parse_from_args(["clai-wrap"]);
+        cli.history_file = Some(PathBuf::from(""));
+        let result = cli.validate();
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            CliError::InvalidHistoryFile(_)
+        ));
+    }
+
+    #[test]
+    fn test_validate_none_daemon_socket_ok() {
+        let mut cli = Cli::parse_from_args(["clai-wrap"]);
+        cli.daemon_socket = None;
+        assert!(cli.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_none_history_file_ok() {
+        let mut cli = Cli::parse_from_args(["clai-wrap"]);
+        cli.history_file = None;
+        assert!(cli.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_valid_daemon_socket() {
+        let mut cli = Cli::parse_from_args(["clai-wrap"]);
+        cli.daemon_socket = Some(PathBuf::from("/tmp/clai.sock"));
+        assert!(cli.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_valid_history_file() {
+        let mut cli = Cli::parse_from_args(["clai-wrap"]);
+        cli.history_file = Some(PathBuf::from("/tmp/clai_history"));
+        assert!(cli.validate().is_ok());
     }
 }

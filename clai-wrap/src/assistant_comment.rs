@@ -52,6 +52,8 @@ use ratatui::{
     Frame,
 };
 
+use unicode_width::UnicodeWidthStr;
+
 use crate::color_detect::ColorSupport;
 use crate::suggestion_receiver::{Suggestion, SuggestionType};
 
@@ -514,16 +516,17 @@ impl CommentRenderer {
     /// Calculates the required height for a comment widget.
     #[must_use]
     #[allow(clippy::cast_possible_truncation)]
-    pub const fn required_height(&self, comment: &AssistantComment, width: u16) -> u16 {
+    pub fn required_height(&self, comment: &AssistantComment, width: u16) -> u16 {
         // Border: 2 lines (top + bottom)
         // Text: 1 line
-        // Explanation: wrapped lines based on width
+        // Explanation: wrapped lines based on display width (unicode-aware)
         let mut height: u16 = 3; // 2 border + 1 text
 
         if let Some(ref explanation) = comment.explanation {
             let inner_width = width.saturating_sub(2) as usize; // Account for borders
             if inner_width > 0 {
-                let wrapped_lines = explanation.len().div_ceil(inner_width);
+                let display_width = explanation.width();
+                let wrapped_lines = display_width.div_ceil(inner_width);
                 height += wrapped_lines as u16;
             }
         }
@@ -1083,6 +1086,33 @@ mod tests {
         let height_narrow = renderer.required_height(&comment, 20);
 
         assert!(height_narrow > height_wide);
+    }
+
+    #[test]
+    fn test_comment_height_unicode() {
+        let renderer = CommentRenderer::new(Shell::Bash);
+
+        // CJK: 4 chars but 8 display cols → fits in 1 line with width 80
+        let comment = AssistantComment::suggestion("cmd", "git push").with_explanation("你好世界"); // 4 CJK chars = 8 display cols
+        let height = renderer.required_height(&comment, 80);
+        assert_eq!(height, 4); // 3 base + 1 wrapped line
+
+        // Emoji: 3 chars but 6 display cols → 2 lines with inner_width 4
+        let comment = AssistantComment::suggestion("cmd", "git push")
+            .with_explanation("\u{1F600}\u{1F601}\u{1F602}"); // 3 emoji = 6 display cols
+        let height = renderer.required_height(&comment, 6); // inner_width = 4
+        assert_eq!(height, 5); // 3 base + 2 wrapped lines (6 cols / 4 = 2)
+
+        // ASCII: 5 chars → 1 line with width 80
+        let comment = AssistantComment::suggestion("cmd", "git push").with_explanation("hello");
+        let height = renderer.required_height(&comment, 80);
+        assert_eq!(height, 4); // 3 base + 1 wrapped line
+
+        // Mixed: "Hi 你好" → 7 display cols (2 ascii + 1 space + 2*2 CJK) → 2 lines with width 5
+        let comment =
+            AssistantComment::suggestion("cmd", "git push").with_explanation("Hi \u{4F60}\u{597D}"); // 7 display cols
+        let height = renderer.required_height(&comment, 7); // inner_width = 5
+        assert_eq!(height, 5); // 3 base + 2 wrapped lines (7 cols / 5 = 2)
     }
 
     // =========================================================================

@@ -195,7 +195,7 @@ impl DaemonEventForwarder {
     #[must_use]
     pub fn standalone(config: ForwarderConfig) -> Self {
         let standalone_state = StandaloneState::new(StandaloneReason::DaemonUnavailable);
-        Self {
+        let mut forwarder = Self {
             output_capture: OutputCapture::new(config.output_buffer_capacity),
             config,
             #[cfg(unix)]
@@ -206,7 +206,11 @@ impl DaemonEventForwarder {
             reconnect_attempts: 0,
             warned_standalone: false,
             last_finished_command_id: None,
-        }
+        };
+        // Standalone mode never forwards to a daemon, so output capture serves no
+        // purpose and must be disabled to avoid retaining terminal data in memory.
+        forwarder.output_capture.disable();
+        forwarder
     }
 
     /// Creates a new forwarder with an existing daemon client connection.
@@ -730,6 +734,14 @@ mod tests {
         // These features are not available
         assert!(!forwarder.feature_available(Feature::OutputCapture));
         assert!(!forwarder.feature_available(Feature::AiSuggestions));
+    }
+
+    #[test]
+    fn test_standalone_capture_disabled() {
+        // Standalone mode must never capture output: there is no daemon to forward
+        // data to, so retaining terminal bytes in memory is wasteful and unsafe.
+        let forwarder = DaemonEventForwarder::standalone(ForwarderConfig::default());
+        assert!(!forwarder.is_capture_enabled());
     }
 
     // =========================================================================

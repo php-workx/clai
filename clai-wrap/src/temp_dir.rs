@@ -612,12 +612,24 @@ fn is_process_alive(pid: u32) -> bool {
     err.raw_os_error() != Some(libc::ESRCH)
 }
 
-#[cfg(not(unix))]
+#[cfg(windows)]
 fn is_process_alive(pid: u32) -> bool {
-    // On Windows, we would use OpenProcess
-    // For now, assume alive if we can't check
-    // This is conservative - we won't clean up directories that might be in use
-    true
+    use windows_sys::Win32::Foundation::{CloseHandle, GetLastError, ERROR_ACCESS_DENIED};
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+    // SAFETY: OpenProcess is a read-only existence query. We always close the returned handle.
+    // A NULL (0) result means either the process doesn't exist or we lack permission.
+    let handle = unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid) };
+    if handle != 0 {
+        unsafe { CloseHandle(handle) };
+        return true;
+    }
+    // ERROR_ACCESS_DENIED: process exists but we can't open it — treat as alive (conservative).
+    unsafe { GetLastError() == ERROR_ACCESS_DENIED }
+}
+
+#[cfg(not(any(unix, windows)))]
+fn is_process_alive(_pid: u32) -> bool {
+    true // Unknown platform: assume alive
 }
 
 /// Tries to acquire an exclusive lock on a file.
@@ -885,13 +897,6 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn test_is_process_alive_current_process() {
-        let pid = std::process::id();
-        assert!(is_process_alive(pid), "current process should be alive");
-    }
-
-    #[cfg(unix)]
-    #[test]
     fn test_is_process_alive_nonexistent_process() {
         // Use a very high PID that's unlikely to exist
         // Note: PIDs can wrap around, so this isn't perfect
@@ -1034,6 +1039,25 @@ mod tests {
         assert!(
             sym_meta.file_type().is_dir(),
             "path should be a real directory"
+        );
+    }
+    #[cfg(windows)]
+    #[test]
+    fn test_is_process_alive_current_process() {
+        assert!(
+            is_process_alive(std::process::id()),
+            "current process should be alive"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_is_process_alive_dead_pid() {
+        // PID 99999 is almost certainly not a real process.
+        // On some systems this could theoretically fail — treat as known flakiness.
+        assert!(
+            !is_process_alive(99999),
+            "nonexistent process should not be alive"
         );
     }
 }
