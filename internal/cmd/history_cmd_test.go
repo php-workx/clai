@@ -569,3 +569,46 @@ func TestRunHistory_JSON_CWDSource(t *testing.T) {
 func intPtr(v int) *int {
 	return &v
 }
+
+func TestRunHistory_JSON_CWDAndExitCodeInOutput(t *testing.T) {
+	db := setupHistoryStore(t)
+	defer db.Close()
+
+	createSession(t, db, "sess-cwd")
+
+	// Command with known CWD and exit_code
+	createCommand(t, db, ops.Command{
+		CommandID: "cmd-cwd-1",
+		SessionID: "sess-cwd",
+		TSStartMs: 3000,
+		CWD:       "/projects/myapp",
+		CmdRaw:    "make build",
+		ExitCode:  intPtr(0),
+	})
+
+	t.Setenv("CLAI_SESSION_ID", "sess-cwd")
+	withHistoryGlobals(t, historyGlobals{limit: 20, format: "json"})
+
+	output := captureStdout(t, func() {
+		if err := runHistory(historyCmd, nil); err != nil {
+			t.Fatalf("runHistory error: %v", err)
+		}
+	})
+
+	var out []historyOutput
+	if err := json.Unmarshal([]byte(output), &out); err != nil {
+		t.Fatalf("json unmarshal error: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(out))
+	}
+	if out[0].Cwd != "/projects/myapp" {
+		t.Errorf("expected cwd /projects/myapp, got %q", out[0].Cwd)
+	}
+	if out[0].ExitCode == nil {
+		t.Fatal("expected non-nil exit_code")
+	}
+	if *out[0].ExitCode != 0 {
+		t.Errorf("expected exit_code 0, got %d", *out[0].ExitCode)
+	}
+}

@@ -47,6 +47,8 @@ type CommandQuery struct {
 type HistoryRow struct {
 	Command     string
 	TimestampMs int64
+	CWD         string
+	ExitCode    *int
 }
 
 // ErrCommandNotFound is returned when a command is not found.
@@ -166,14 +168,17 @@ func QueryCommands(ctx context.Context, db *suggestdb.DB, q CommandQuery) ([]Com
 func QueryHistoryCommands(ctx context.Context, db *suggestdb.DB, q CommandQuery) ([]HistoryRow, error) {
 	q.Deduplicate = true
 
-	query := `
-		SELECT cmd_raw, MAX(ts_ms) as latest_ts
-		FROM command_event
-		WHERE 1=1
-	`
+	inner := `SELECT cmd_raw, MAX(ts_ms) as latest_ts FROM command_event WHERE 1=1`
 	args := make([]interface{}, 0)
-	query, args = appendQueryFilters(query, args, &q)
-	query += " GROUP BY cmd_raw ORDER BY latest_ts DESC"
+	inner, args = appendQueryFilters(inner, args, &q)
+	inner += " GROUP BY cmd_raw"
+
+	query := fmt.Sprintf(`
+		SELECT e.cmd_raw, e.ts_ms, e.cwd, e.exit_code
+		FROM command_event e
+		INNER JOIN (%s) g ON e.cmd_raw = g.cmd_raw AND e.ts_ms = g.latest_ts
+		ORDER BY e.ts_ms DESC`,
+		inner)
 	query, args = appendLimitOffset(query, args, q.Limit, q.Offset)
 
 	rows, err := db.QueryContext(ctx, query, args...)
@@ -185,8 +190,13 @@ func QueryHistoryCommands(ctx context.Context, db *suggestdb.DB, q CommandQuery)
 	var results []HistoryRow
 	for rows.Next() {
 		var row HistoryRow
-		if err := rows.Scan(&row.Command, &row.TimestampMs); err != nil {
+		var exitCode sql.NullInt32
+		if err := rows.Scan(&row.Command, &row.TimestampMs, &row.CWD, &exitCode); err != nil {
 			return nil, fmt.Errorf("failed to scan history row: %w", err)
+		}
+		if exitCode.Valid {
+			ec := int(exitCode.Int32)
+			row.ExitCode = &ec
 		}
 		results = append(results, row)
 	}

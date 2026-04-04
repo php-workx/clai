@@ -182,6 +182,8 @@ func outputHistoryRows(rows []ops.HistoryRow) error {
 			entries = append(entries, historyOutput{
 				Text:     rows[i].Command,
 				TSUnixMs: rows[i].TimestampMs,
+				Cwd:      rows[i].CWD,
+				ExitCode: rows[i].ExitCode,
 				Source:   source,
 			})
 		}
