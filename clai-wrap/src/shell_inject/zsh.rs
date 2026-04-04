@@ -266,6 +266,10 @@ if [[ -z "$__CLAI_OSC133_SETUP" ]]; then
         print -Pn '\e]133;D;%?\a'
         # Emit OSC 133;A (prompt start)
         print -Pn '\e]133;A\a'
+        # Re-inject 133;B in case PROMPT was overwritten by dynamic prompt tools
+        if [[ "$PROMPT" != *$'\033]133;B'* ]]; then
+            PROMPT="${PROMPT}%{$(print -Pn '\e]133;B\a')%}"
+        fi
     }
 
     # preexec: Called after command entered, before execution
@@ -477,6 +481,24 @@ mod tests {
         assert!(
             content.contains("add-zsh-hook preexec"),
             "should use add-zsh-hook for preexec"
+        );
+    }
+
+    #[test]
+    fn test_precmd_reinjects_osc133b() {
+        let injector = ZshInjector::new().expect("failed to create injector");
+        let content =
+            fs::read_to_string(injector.zdotdir().join(".zshrc")).expect("failed to read .zshrc");
+
+        // The precmd body must contain the guard that re-appends 133;B when PROMPT
+        // was overwritten by a dynamic prompt tool (e.g. starship, powerlevel10k).
+        assert!(
+            content.contains("Re-inject 133;B in case PROMPT was overwritten"),
+            "precmd should document 133;B re-injection intent"
+        );
+        assert!(
+            content.contains("$'\\033]133;B'"),
+            "precmd should check for 133;B escape in PROMPT"
         );
     }
 

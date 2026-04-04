@@ -1728,12 +1728,29 @@ fn test_clai_wrap_encoding_non_utf8_locale_warning() {
     ]);
     cmd.env("LANG", "C");
     cmd.env("LC_ALL", "C");
+    // Enable logging so the locale warning is emitted to the process stderr (which
+    // surfaces on the PTY).
+    cmd.env("RUST_LOG", "warn");
 
+    let reader = PtyTestReader::new(
+        pair.master
+            .try_clone_reader()
+            .expect("Failed to clone PTY reader"),
+    );
     let mut child = pair.slave.spawn_command(cmd).expect("spawn clai-wrap");
     let mut writer = pair.master.take_writer().expect("writer");
     writer.write_all(b"exit\n").expect("write exit");
     writer.flush().expect("flush exit");
+
+    let output = reader.drain(Duration::from_secs(2));
+
     let _ = wait_for_exit_or_kill(&mut *child, Duration::from_secs(2));
+
+    assert!(
+        output.contains("non-UTF-8") || output.contains("locale") || output.contains("UTF"),
+        "Expected locale/encoding warning in output, got: {:?}",
+        output
+    );
 }
 
 // ============================================================================

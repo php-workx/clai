@@ -86,7 +86,7 @@ pub fn parse_bash_history(content: &str) -> Vec<HistoryEntry> {
     let mut entries = Vec::new();
 
     // Check if this appears to be timestamped format
-    if is_bash_timestamped(&lines) {
+    if is_bash_timestamped(content.lines()) {
         return parse_bash_timestamped_internal(&lines);
     }
 
@@ -172,13 +172,13 @@ fn parse_bash_timestamped_internal(lines: &[&str]) -> Vec<HistoryEntry> {
 }
 
 /// Checks if the bash history appears to be in timestamped format.
-fn is_bash_timestamped(lines: &[&str]) -> bool {
+fn is_bash_timestamped(lines: impl Iterator<Item = impl AsRef<str>>) -> bool {
     // Look at first few non-empty lines to detect format
     let mut timestamp_count = 0;
     let mut checked = 0;
 
     for line in lines {
-        let trimmed = line.trim();
+        let trimmed = line.as_ref().trim();
         if trimmed.is_empty() {
             continue;
         }
@@ -514,8 +514,7 @@ fn detect_format_from_content(content: &str) -> Option<DetectedFormat> {
     }
 
     // Check for bash timestamped format
-    let lines_vec: Vec<&str> = content.lines().collect();
-    if is_bash_timestamped(&lines_vec) {
+    if is_bash_timestamped(content.lines()) {
         return Some(DetectedFormat::BashTimestamped);
     }
 
@@ -650,6 +649,33 @@ mod tests {
         assert_eq!(entries[0].timestamp, None);
         assert_eq!(entries[1].command, "git status");
         assert_eq!(entries[1].timestamp, Some(1_234_567_890));
+    }
+
+    // ========== is_bash_timestamped Direct Tests ==========
+
+    #[test]
+    fn test_is_bash_timestamped_empty_string() {
+        // Empty input must return false — no lines to inspect.
+        assert!(!is_bash_timestamped("".lines()));
+    }
+
+    #[test]
+    fn test_is_bash_timestamped_ten_line_timestamped() {
+        // Ten timestamp+command pairs — must be detected as timestamped.
+        let content = "#1234567890\nls\n#1234567891\ncd /\n#1234567892\npwd\n\
+            #1234567893\necho a\n#1234567894\nwhoami\n#1234567895\ndate\n\
+            #1234567896\nuname\n#1234567897\nid\n#1234567898\ncat /etc/hosts\n#1234567899\nls -la";
+        assert!(is_bash_timestamped(content.lines()));
+    }
+
+    #[test]
+    fn test_is_bash_timestamped_large_file_no_panic() {
+        // 100 000-line timestamped file: must return true and must not panic.
+        // Only the first 10 non-empty lines are examined, so this also verifies
+        // the early-exit bound.
+        let block = "#1234567890\nls -la\n";
+        let large = block.repeat(50_000);
+        assert!(is_bash_timestamped(large.lines()));
     }
 
     // ========== Zsh Extended Format Tests ==========
