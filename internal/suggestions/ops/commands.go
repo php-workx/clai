@@ -45,7 +45,7 @@ type CommandQuery struct {
 
 // HistoryRow represents a deduplicated command history entry.
 type HistoryRow struct {
-	ExitCode    *int // keep pointer first to minimize GC bitmap (32 vs 48 bytes)
+	ExitCode    *int // pointer-free tail: ptrdata shrinks from 48→32 bytes (GC scans 16 fewer bytes per allocation)
 	Command     string
 	CWD         string
 	TimestampMs int64

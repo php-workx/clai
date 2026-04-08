@@ -1415,9 +1415,12 @@ fn test_clai_wrap_io_line_editing_arrows_backspace_ctrl_a_ctrl_e() {
 
     assert!(output_hello.contains("hello"), "Output: {output_hello}");
     // When bash inserts characters in the middle of a line, readline may emit
-    // CSI 1 @ (insert character) sequences between each character. Strip them so
-    // "CTRL_A_OK" appears as a contiguous substring regardless of insert mode.
-    let clean_ctrl = output_ctrl.replace("\x1b[1@", "");
+    // CSI 1 @ (insert character) sequences between each character. Strip both
+    // the explicit-count form (CSI 1 @) and the default form (CSI @, which also
+    // defaults to 1) so "CTRL_A_OK" appears as a contiguous substring.
+    let clean_ctrl = output_ctrl
+        .replace("\x1b[1@", "") // CSI 1 @ — explicit count
+        .replace("\x1b[@", ""); // CSI @ — default count (= 1 per ECMA-48)
     assert!(
         clean_ctrl.contains("CTRL_A_OK") && clean_ctrl.contains("CTRL_E_OK"),
         "Expected ctrl-a/ctrl-e markers, got: {output_ctrl}"
@@ -2174,7 +2177,13 @@ fn test_clai_wrap_hotkey_while_fullscreen_app_running() {
 /// at once. This avoids issues with ZLE autocompletion matching markers early.
 #[cfg(unix)]
 fn collect_osc133_output(shell_path: &Path) -> Option<String> {
-    let (master, mut child) = spawn_clai_wrap_shell_path(shell_path)?;
+    // Fish 4.x sends terminal capability queries on startup and waits up to 10s
+    // for responses. TERM=dumb suppresses these queries, keeping the test fast.
+    // The clai OSC 133 injection writes sequences unconditionally at the shell
+    // function level, so dumb terminals still produce the expected output.
+    let is_fish = shell_path.file_name().is_some_and(|n| n == "fish");
+    let env: &[(&str, &str)] = if is_fish { &[("TERM", "dumb")] } else { &[] };
+    let (master, mut child) = spawn_clai_wrap_shell_path_with_env(shell_path, env)?;
 
     let reader = PtyTestReader::new(master.try_clone_reader().expect("reader"));
     let mut writer = master.take_writer().expect("writer");
