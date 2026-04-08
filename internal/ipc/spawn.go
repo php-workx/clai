@@ -382,10 +382,20 @@ func isLikelyStaleSocketDialError(err error) bool {
 		return true
 	}
 
+	// grpc.WithBlock() retries ECONNREFUSED until the dial context expires,
+	// so a dead Unix socket typically surfaces as DeadlineExceeded rather than
+	// ECONNREFUSED by the time control returns here.
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
 	// Fallback to matching common unix socket dial strings when errors are
 	// stringly-typed / not unwrap-friendly.
 	msg := strings.ToLower(err.Error())
 	if strings.Contains(msg, "connection refused") {
+		return true
+	}
+	if strings.Contains(msg, "context deadline exceeded") {
 		return true
 	}
 
