@@ -23,6 +23,7 @@ type Config struct {
 	Suggestions SuggestionsConfig `yaml:"suggestions"`
 	Client      ClientConfig      `yaml:"client"`
 	Privacy     PrivacyConfig     `yaml:"privacy"`
+	PTY         PTYConfig         `yaml:"pty"`
 }
 
 // DaemonConfig holds daemon-related settings.
@@ -68,7 +69,6 @@ type SuggestionsWeights struct {
 type SuggestionsConfig struct {
 	SocketPath                      string             `yaml:"socket_path"`
 	IncognitoMode                   string             `yaml:"incognito_mode"`
-	ScorerVersion                   string             `yaml:"scorer_version"`
 	SearchTagVocabularyPath         string             `yaml:"search_tag_vocabulary_path"`
 	SearchFTSTokenizer              string             `yaml:"search_fts_tokenizer"`
 	TaskPlaybookPath                string             `yaml:"task_playbook_path"`
@@ -199,6 +199,11 @@ type HistoryConfig struct {
 	UpArrowOpensHistory   bool     `yaml:"up_arrow_opens_history"`
 }
 
+// PTYConfig holds PTY wrapper behavior.
+type PTYConfig struct {
+	Enabled bool `yaml:"enabled"` // Auto-wrap interactive sessions with clai-wrap
+}
+
 // DefaultConfig returns the default configuration.
 func DefaultConfig() *Config {
 	return &Config{
@@ -243,6 +248,9 @@ func DefaultConfig() *Config {
 				{ID: "session", Label: "Session", Provider: "history", Args: map[string]string{"session": "$CLAI_SESSION_ID"}},
 				{ID: "global", Label: "Global", Provider: "history", Args: map[string]string{"global": "true"}},
 			},
+		},
+		PTY: PTYConfig{
+			Enabled: true,
 		},
 	}
 }
@@ -371,9 +379,6 @@ func DefaultSuggestionsConfig() SuggestionsConfig {
 		DirectoryScopingEnabled: true,
 		DirectoryScopeMaxDepth:  3,
 
-		// Scorer version
-		ScorerVersion: "v2",
-
 		// Explainability
 		ExplainEnabled:         true,
 		ExplainMaxReasons:      3,
@@ -436,6 +441,9 @@ func LoadFromFile(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
+	// Detect deprecated scorer_version field.
+	checkDeprecatedScorerVersion(data)
+
 	cfg.ApplyEnvOverrides()
 
 	if err := cfg.Validate(); err != nil {
@@ -496,6 +504,8 @@ func (c *Config) Get(key string) (string, error) {
 		return c.getHistoryField(field)
 	case "workflows":
 		return c.getWorkflowsField(field)
+	case "pty":
+		return c.getPTYField(field)
 	default:
 		return "", fmt.Errorf("unknown section: %s", section)
 	}
@@ -525,6 +535,8 @@ func (c *Config) Set(key, value string) error {
 		return c.setHistoryField(field, value)
 	case "workflows":
 		return c.setWorkflowsField(field, value)
+	case "pty":
+		return c.setPTYField(field, value)
 	default:
 		return fmt.Errorf("unknown section: %s", section)
 	}
@@ -687,8 +699,6 @@ func (c *Config) getSuggestionsField(field string) (string, error) {
 		return strconv.Itoa(c.Suggestions.MaxAI), nil
 	case "show_risk_warning":
 		return strconv.FormatBool(c.Suggestions.ShowRiskWarning), nil
-	case "scorer_version":
-		return c.Suggestions.ScorerVersion, nil
 	case "picker_view":
 		return c.Suggestions.PickerView, nil
 	default:
@@ -706,8 +716,6 @@ func (c *Config) setSuggestionsField(field, value string) error {
 		return c.setSuggestionsMaxAI(value)
 	case "show_risk_warning":
 		return c.setSuggestionsShowRiskWarning(value)
-	case "scorer_version":
-		return c.setSuggestionsScorerVersion(value)
 	case "picker_view":
 		return c.setSuggestionsPickerView(value)
 	default:
@@ -754,14 +762,6 @@ func (c *Config) setSuggestionsShowRiskWarning(value string) error {
 		return fmt.Errorf("invalid value for show_risk_warning: %w", err)
 	}
 	c.Suggestions.ShowRiskWarning = v
-	return nil
-}
-
-func (c *Config) setSuggestionsScorerVersion(value string) error {
-	if !isValidScorerVersion(value) {
-		return fmt.Errorf("invalid scorer_version: %s (must be v1 or v2)", value)
-	}
-	c.Suggestions.ScorerVersion = value
 	return nil
 }
 
@@ -988,6 +988,29 @@ func (c *Config) setWorkflowsField(field, value string) error {
 	return nil
 }
 
+func (c *Config) getPTYField(field string) (string, error) {
+	switch field {
+	case "enabled":
+		return strconv.FormatBool(c.PTY.Enabled), nil
+	default:
+		return "", fmt.Errorf("unknown field: pty.%s", field)
+	}
+}
+
+func (c *Config) setPTYField(field, value string) error {
+	switch field {
+	case "enabled":
+		v, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("invalid value for enabled: %w", err)
+		}
+		c.PTY.Enabled = v
+	default:
+		return fmt.Errorf("unknown field: pty.%s", field)
+	}
+	return nil
+}
+
 // Validate validates the configuration.
 func (c *Config) Validate() error {
 	if c.Daemon.IdleTimeoutMins < 0 {
@@ -1054,6 +1077,23 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// checkDeprecatedScorerVersion logs a warning if the raw YAML contains the
+// removed scorer_version key. The field was dropped but yaml.v3 silently
+// ignores unknown keys, so users are never told their setting has no effect.
+func checkDeprecatedScorerVersion(data []byte) {
+	var raw map[string]interface{}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return
+	}
+	if suggestions, ok := raw["suggestions"]; ok {
+		if m, ok := suggestions.(map[string]interface{}); ok {
+			if _, found := m["scorer_version"]; found {
+				slog.Warn("config: suggestions.scorer_version is deprecated and has no effect; please remove it from your config file")
+			}
+		}
+	}
 }
 
 func isValidLogLevel(level string) bool {
@@ -1131,7 +1171,6 @@ func ListKeys() []string {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
-		"suggestions.scorer_version",
 		"suggestions.picker_view",
 		"history.picker_backend",
 		"history.picker_open_on_empty",
@@ -1139,6 +1178,7 @@ func ListKeys() []string {
 		"history.picker_case_sensitive",
 		"history.up_arrow_trigger",
 		"history.up_arrow_double_window_ms",
+		"pty.enabled",
 	}
 }
 
@@ -1264,10 +1304,6 @@ func (s *SuggestionsConfig) validateEnumFields(warn func(string, string), defaul
 		warn("shim_mode", fmt.Sprintf("must be auto, persistent, or oneshot, got %q; falling back to default %q", s.ShimMode, defaults.ShimMode))
 		s.ShimMode = defaults.ShimMode
 	}
-	if !isValidScorerVersion(s.ScorerVersion) {
-		warn("scorer_version", fmt.Sprintf("must be v1 or v2, got %q; falling back to default %q", s.ScorerVersion, defaults.ScorerVersion))
-		s.ScorerVersion = defaults.ScorerVersion
-	}
 	if !isValidFTSTokenizer(s.SearchFTSTokenizer) {
 		warn(
 			"search_fts_tokenizer",
@@ -1318,15 +1354,6 @@ func isValidShimMode(mode string) bool {
 func isValidFTSTokenizer(tokenizer string) bool {
 	switch tokenizer {
 	case "trigram", "unicode61":
-		return true
-	default:
-		return false
-	}
-}
-
-func isValidScorerVersion(version string) bool {
-	switch version {
-	case "v1", "v2":
 		return true
 	default:
 		return false

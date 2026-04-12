@@ -1,116 +1,16 @@
 // Package db provides SQLite-based storage for the suggestions engine.
-// It implements the V2 schema defined in specs/tech_suggestions_ext_v1.md Section 4.
 package db
 
-// Schema version constants.
+// SchemaVersion is the current supported schema version.
+// The daemon will refuse to run if the DB schema version exceeds this.
 //
 // Version history:
-//   - V1: Original schema (suggestions.db) - 7 tables
-//   - V2: Extended schema (suggestions_v2.db) - 23 tables, separate DB file
-const (
-	// V1SchemaVersion is the schema version for V1 database files (suggestions.db).
-	V1SchemaVersion = 1
+//   - 2: Base schema (suggestions_v2.db) - 23 tables
+//   - 3: Unified schema - adds tables from state.db (ai_cache, pty, ci_workflow, etc.)
+const SchemaVersion = 3
 
-	// SchemaVersion is the current supported schema version (V2).
-	// The daemon will refuse to run if the DB schema version exceeds this.
-	SchemaVersion = 2
-)
-
-// schemaV1 creates the initial V1 schema for the suggestions engine.
-// This schema is retained for reference and for V1 database files.
-// V2 uses a separate database file and does not migrate from V1.
-const schemaV1 = `
--- Sessions table
-CREATE TABLE IF NOT EXISTS session (
-  id            TEXT PRIMARY KEY,
-  created_at    INTEGER NOT NULL,
-  shell         TEXT NOT NULL,
-  host          TEXT,
-  user          TEXT
-);
-
--- Command events table (core history)
-CREATE TABLE IF NOT EXISTS command_event (
-  id            INTEGER PRIMARY KEY AUTOINCREMENT,
-  session_id    TEXT NOT NULL REFERENCES session(id),
-  ts            INTEGER NOT NULL,
-  duration_ms   INTEGER,
-  exit_code     INTEGER,
-  cwd           TEXT NOT NULL,
-  repo_key      TEXT,
-  branch        TEXT,
-  cmd_raw       TEXT NOT NULL,
-  cmd_norm      TEXT NOT NULL,
-  ephemeral     INTEGER NOT NULL DEFAULT 0
-);
-
--- Indexes for command_event per spec Section 4.2
-CREATE INDEX IF NOT EXISTS idx_event_ts ON command_event(ts);
-CREATE INDEX IF NOT EXISTS idx_event_repo_ts ON command_event(repo_key, ts);
-CREATE INDEX IF NOT EXISTS idx_event_cwd_ts ON command_event(cwd, ts);
-CREATE INDEX IF NOT EXISTS idx_event_session_ts ON command_event(session_id, ts);
-CREATE INDEX IF NOT EXISTS idx_event_norm_repo ON command_event(cmd_norm, repo_key);
-
--- Transition table (Markov bigrams)
-CREATE TABLE IF NOT EXISTS transition (
-  scope         TEXT NOT NULL,            -- 'global' or repo_key
-  prev_norm     TEXT NOT NULL,
-  next_norm     TEXT NOT NULL,
-  count         INTEGER NOT NULL,
-  last_ts       INTEGER NOT NULL,
-  PRIMARY KEY(scope, prev_norm, next_norm)
-);
-
-CREATE INDEX IF NOT EXISTS idx_transition_prev ON transition(scope, prev_norm);
-
--- Command score table (decayed frequency)
-CREATE TABLE IF NOT EXISTS command_score (
-  scope         TEXT NOT NULL,            -- 'global' or repo_key
-  cmd_norm      TEXT NOT NULL,
-  score         REAL NOT NULL,
-  last_ts       INTEGER NOT NULL,
-  PRIMARY KEY(scope, cmd_norm)
-);
-
-CREATE INDEX IF NOT EXISTS idx_command_score_scope ON command_score(scope, score DESC);
-
--- Slot value table (semantic slot filling)
-CREATE TABLE IF NOT EXISTS slot_value (
-  scope     TEXT NOT NULL,          -- 'global' or repo_key
-  cmd_norm  TEXT NOT NULL,
-  slot_idx  INTEGER NOT NULL,       -- index among slot tokens
-  value     TEXT NOT NULL,          -- concrete argument value
-  count     REAL NOT NULL,          -- decayed count (float)
-  last_ts   INTEGER NOT NULL,
-  PRIMARY KEY(scope, cmd_norm, slot_idx, value)
-);
-
-CREATE INDEX IF NOT EXISTS idx_slot_value_lookup
-  ON slot_value(scope, cmd_norm, slot_idx, count DESC);
-
--- Project task table (discovered tasks from package.json, Makefile, etc.)
-CREATE TABLE IF NOT EXISTS project_task (
-  repo_key      TEXT NOT NULL,
-  kind          TEXT NOT NULL,            -- built-in or user-defined tool id
-  name          TEXT NOT NULL,
-  command       TEXT NOT NULL,
-  description   TEXT,
-  discovered_ts INTEGER NOT NULL,
-  PRIMARY KEY(repo_key, kind, name)
-);
-
-CREATE INDEX IF NOT EXISTS idx_project_task_repo ON project_task(repo_key);
-
--- Schema migrations tracking
-CREATE TABLE IF NOT EXISTS schema_migrations (
-  version    INTEGER PRIMARY KEY,
-  applied_ts INTEGER NOT NULL
-);
-`
-
-// schemaV2 creates the complete V2 schema for the suggestions engine.
-// V2 uses a separate database file (suggestions_v2.db) and starts fresh.
-// All 23 tables from spec Section 4.1 are created here.
+// schemaV2 is the base schema (migration version 2).
+// Creates 23 tables for the suggestions engine.
 //
 // Tables:
 //  1. session                  - Shell sessions
@@ -438,9 +338,110 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 );
 `
 
-// V2AllTables lists all tables in the V2 schema for validation purposes.
-// This includes all 23 tables from spec Section 4.1.
-var V2AllTables = []string{
+// schemaV3 extends the schema (migration version 3) by adding tables previously
+// stored in state.db (ai_cache, PTY capture, CI workflow, history import meta)
+// and extending existing tables with columns from V1's sessions/commands.
+const schemaV3 = `
+-- Extend session table with V1 fields
+ALTER TABLE session ADD COLUMN os TEXT;
+ALTER TABLE session ADD COLUMN initial_cwd TEXT;
+
+-- Extend command_event with V1's command_id UUID
+ALTER TABLE command_event ADD COLUMN command_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_event_command_id ON command_event(command_id);
+
+-- AI response cache (from state.db ai_cache)
+CREATE TABLE IF NOT EXISTS ai_cache (
+  cache_key         TEXT PRIMARY KEY,
+  response_json     TEXT NOT NULL,
+  provider          TEXT NOT NULL,
+  created_at_ms     INTEGER NOT NULL,
+  expires_at_ms     INTEGER NOT NULL,
+  hit_count         INTEGER DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ai_cache_expires ON ai_cache(expires_at_ms);
+
+-- PTY command events (from state.db command_events, renamed to avoid collision)
+CREATE TABLE IF NOT EXISTS pty_command_event (
+  command_id        TEXT PRIMARY KEY,
+  session_id        TEXT NOT NULL,
+  start_ts          INTEGER,
+  end_ts            INTEGER,
+  exit_code         INTEGER,
+  is_sensitive      INTEGER NOT NULL DEFAULT 0,
+  captured_bytes    INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_pty_command_event_session ON pty_command_event(session_id);
+
+-- PTY command output blobs (from state.db command_output)
+CREATE TABLE IF NOT EXISTS pty_command_output (
+  command_id        TEXT PRIMARY KEY,
+  stdout_blob       BLOB,
+  stderr_blob       BLOB,
+  created_at        INTEGER NOT NULL,
+  expires_at        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pty_command_output_expires ON pty_command_output(expires_at);
+
+-- CI workflow runs (from state.db workflow_runs, renamed)
+CREATE TABLE IF NOT EXISTS ci_workflow_run (
+  run_id            TEXT PRIMARY KEY,
+  workflow_name     TEXT NOT NULL,
+  workflow_hash     TEXT NOT NULL,
+  workflow_path     TEXT NOT NULL,
+  status            TEXT NOT NULL DEFAULT 'running',
+  started_at        INTEGER NOT NULL,
+  ended_at          INTEGER NOT NULL DEFAULT 0,
+  duration_ms       INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_run_name ON ci_workflow_run(workflow_name);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_run_status ON ci_workflow_run(status);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_run_started ON ci_workflow_run(started_at DESC);
+
+-- CI workflow steps (from state.db workflow_steps, renamed)
+CREATE TABLE IF NOT EXISTS ci_workflow_step (
+  run_id            TEXT NOT NULL REFERENCES ci_workflow_run(run_id),
+  step_id           TEXT NOT NULL,
+  matrix_key        TEXT NOT NULL DEFAULT '',
+  status            TEXT NOT NULL DEFAULT 'running',
+  command           TEXT NOT NULL DEFAULT '',
+  exit_code         INTEGER NOT NULL DEFAULT 0,
+  duration_ms       INTEGER NOT NULL DEFAULT 0,
+  stdout_tail       TEXT NOT NULL DEFAULT '',
+  stderr_tail       TEXT NOT NULL DEFAULT '',
+  outputs_json      TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (run_id, step_id, matrix_key)
+);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_step_run ON ci_workflow_step(run_id);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_step_status ON ci_workflow_step(status);
+
+-- CI workflow analyses (from state.db workflow_analyses, renamed)
+CREATE TABLE IF NOT EXISTS ci_workflow_analysis (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id            TEXT NOT NULL,
+  step_id           TEXT NOT NULL,
+  matrix_key        TEXT NOT NULL DEFAULT '',
+  decision          TEXT NOT NULL,
+  reasoning         TEXT NOT NULL DEFAULT '',
+  flags_json        TEXT NOT NULL DEFAULT '{}',
+  prompt            TEXT NOT NULL DEFAULT '',
+  raw_response      TEXT NOT NULL DEFAULT '',
+  duration_ms       INTEGER NOT NULL DEFAULT 0,
+  analyzed_at       INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_analysis_step ON ci_workflow_analysis(run_id, step_id, matrix_key);
+CREATE INDEX IF NOT EXISTS idx_ci_workflow_analysis_decision ON ci_workflow_analysis(decision);
+
+-- History import metadata (replaces V1 convention of session_id = 'imported-<shell>')
+CREATE TABLE IF NOT EXISTS history_import_meta (
+  shell             TEXT PRIMARY KEY,
+  imported_at_ms    INTEGER NOT NULL,
+  entry_count       INTEGER NOT NULL DEFAULT 0
+);
+`
+
+// AllTables lists all tables in the schema for validation purposes.
+var AllTables = []string{
 	"session",
 	"command_event",
 	"command_template",
@@ -464,10 +465,18 @@ var V2AllTables = []string{
 	"rank_weight_profile",
 	"command_event_fts",
 	"schema_migrations",
+	// V3 additions
+	"ai_cache",
+	"pty_command_event",
+	"pty_command_output",
+	"ci_workflow_run",
+	"ci_workflow_step",
+	"ci_workflow_analysis",
+	"history_import_meta",
 }
 
-// V2AllIndexes lists all indexes in the V2 schema for validation purposes.
-var V2AllIndexes = []string{
+// AllIndexes lists all indexes in the schema for validation purposes.
+var AllIndexes = []string{
 	"idx_event_ts",
 	"idx_event_repo_ts",
 	"idx_event_cwd_ts",
@@ -480,36 +489,22 @@ var V2AllIndexes = []string{
 	"idx_workflow_step_template",
 	"idx_task_candidate_repo",
 	"idx_feedback_session",
+	// V3 additions
+	"idx_event_command_id",
+	"idx_ai_cache_expires",
+	"idx_pty_command_event_session",
+	"idx_pty_command_output_expires",
+	"idx_ci_workflow_run_name",
+	"idx_ci_workflow_run_status",
+	"idx_ci_workflow_run_started",
+	"idx_ci_workflow_step_run",
+	"idx_ci_workflow_step_status",
+	"idx_ci_workflow_analysis_step",
+	"idx_ci_workflow_analysis_decision",
 }
 
-// V2AllTriggers lists all triggers in the V2 schema for validation purposes.
-var V2AllTriggers = []string{
+// AllTriggers lists all triggers in the schema for validation purposes.
+var AllTriggers = []string{
 	"command_event_ai",
 	"command_event_ad",
-}
-
-// AllTables lists all tables in the V1 schema for validation purposes.
-// Retained for backward compatibility with V1 database files.
-var AllTables = []string{
-	"session",
-	"command_event",
-	"transition",
-	"command_score",
-	"slot_value",
-	"project_task",
-	"schema_migrations",
-}
-
-// AllIndexes lists all indexes in the V1 schema for validation purposes.
-// Retained for backward compatibility with V1 database files.
-var AllIndexes = []string{
-	"idx_event_ts",
-	"idx_event_repo_ts",
-	"idx_event_cwd_ts",
-	"idx_event_session_ts",
-	"idx_event_norm_repo",
-	"idx_transition_prev",
-	"idx_command_score_scope",
-	"idx_slot_value_lookup",
-	"idx_project_task_repo",
 }

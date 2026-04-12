@@ -38,13 +38,16 @@ func Run(ctx context.Context, cfg *ServerConfig) error {
 		return fmt.Errorf("failed to ensure secure base directory: %w", err)
 	}
 
-	// Acquire lock file to prevent double-start
+	// Acquire lock file BEFORE killing siblings so the winner is protected.
 	lockPath := LockFilePath(paths.BaseDir)
 	lockFile := NewLockFile(lockPath)
 	if err = lockFile.Acquire(); err != nil {
 		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
 	defer lockFile.Release()
+
+	// Kill any sibling claid processes that predate the lockfile mechanism.
+	killSiblingDaemons()
 
 	server, err := NewServer(cfg)
 	if err != nil {
@@ -150,6 +153,7 @@ func reExec() {
 		return
 	}
 	// syscall.Exec replaces the current process
+	// nosemgrep: dangerous-syscall-exec
 	_ = syscall.Exec(exe, os.Args, os.Environ()) //nolint:gosec // G204: exe is current binary path from os.Executable
 }
 
@@ -288,6 +292,12 @@ func CleanupStaleWithPaths(paths *config.Paths) error {
 	socketPath := paths.SocketFile()
 	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove socket: %w", err)
+	}
+
+	// Remove JSON-RPC socket
+	jsonSocketPath := paths.JSONRPCSocketFile()
+	if err := os.Remove(jsonSocketPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove json-rpc socket: %w", err)
 	}
 
 	// Remove PID file

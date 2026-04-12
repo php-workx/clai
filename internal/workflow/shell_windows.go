@@ -34,15 +34,15 @@ func (a *windowsShellAdapter) BuildCommand(ctx context.Context, step *StepDef, w
 		if len(argv) == 0 {
 			return nil, fmt.Errorf("command produced empty argv")
 		}
-		cmd = exec.CommandContext(ctx, argv[0], argv[1:]...)
+		cmd = exec.CommandContext(ctx, argv[0], argv[1:]...) // nosemgrep: dangerous-exec-command
 	} else {
 		// Shell mode: wrap in shell interpreter.
 		switch step.Shell {
 		case "", "true", "cmd":
-			cmd = exec.CommandContext(ctx, "cmd.exe", "/C", step.Run)
+			cmd = exec.CommandContext(ctx, "cmd.exe", "/C", step.Run) // nosemgrep: dangerous-exec-command
 		default:
 			// Explicit shell (e.g. "pwsh", "bash")
-			cmd = exec.CommandContext(ctx, step.Shell, "-c", step.Run)
+			cmd = exec.CommandContext(ctx, step.Shell, "-c", step.Run) // nosemgrep: dangerous-exec-command
 		}
 	}
 

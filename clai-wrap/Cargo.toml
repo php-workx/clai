@@ -1,0 +1,85 @@
+[package]
+name = "clai-wrap"
+version = "0.1.0"
+edition = "2021"
+description = "PTY wrapper for clai terminal assistant"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/clai-group/clai"
+keywords = ["terminal", "pty", "shell", "cli"]
+categories = ["command-line-utilities"]
+
+[dependencies]
+clap = { version = "4", features = ["derive", "env"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+thiserror = "1"
+ringbuf = "0.4"
+vte = "0.13"
+portable-pty = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+ratatui = "0.30"
+unicode-width = "0.2"
+crossterm = "0.28"
+
+[target.'cfg(unix)'.dependencies]
+signal-hook = "0.3"
+signal-hook-registry = "1.4"
+libc = "0.2"
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Console",
+    "Win32_System_Threading",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_ProcessStatus",
+    "Win32_Security",
+] }
+
+[dependencies.tempfile]
+version = "3"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "ring_buffer"
+harness = false
+
+[[bench]]
+name = "parsing"
+harness = false
+
+[[bench]]
+name = "picker"
+harness = false
+
+[features]
+# Enable tests that require a real TTY (run manually with `cargo test --features tty_tests`)
+tty_tests = []
+
+[lints.rust]
+# Unsafe blocks are reviewed and annotated with // SAFETY: comments
+unsafe_code = "allow"
+
+[lints.clippy]
+# Groups need lower priority than individual lints
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+# Allow common patterns
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+# Transitive dependency version conflicts we can't control
+multiple_crate_versions = "allow"
+# Large stack arrays are intentional for I/O buffers
+large_stack_arrays = "allow"

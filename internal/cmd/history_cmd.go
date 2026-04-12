@@ -11,9 +11,9 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/ipc"
-	"github.com/runger/clai/internal/storage"
+	suggestdb "github.com/runger/clai/internal/suggestions/db"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 var (
@@ -68,17 +68,15 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		historyFormat = "json"
 	}
 
-	paths := config.DefaultPaths()
-
-	store, err := storage.NewSQLiteStore(paths.DatabaseFile())
-	if err != nil {
-		fmt.Printf("No history available. Database not found at: %s\n", paths.DatabaseFile())
-		return nil
-	}
-	defer store.Close()
-
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	db, err := suggestdb.Open(ctx, suggestdb.Options{ReadOnly: true, SkipLock: true})
+	if err != nil {
+		fmt.Println("No history available. Database not found.")
+		return nil
+	}
+	defer db.Close()
 
 	sessionID := historySession
 	if sessionID == "" && !historyGlobal {
@@ -86,7 +84,7 @@ func runHistory(cmd *cobra.Command, args []string) error {
 	}
 
 	if sessionID != "" {
-		sessionID, err = resolveSessionID(ctx, store, sessionID)
+		sessionID, err = resolveSessionID(ctx, db, sessionID)
 		if err != nil {
 			return err
 		}
@@ -100,47 +98,47 @@ func runHistory(cmd *cobra.Command, args []string) error {
 		query.SessionID = &sessionID
 	}
 
-	commands, err := store.QueryCommands(ctx, query)
+	rows, err := ops.QueryHistoryCommands(ctx, db, query)
 	if err != nil {
 		return fmt.Errorf("failed to query history: %w", err)
 	}
 
-	return outputHistory(commands)
+	return outputHistoryRows(rows)
 }
 
-func resolveSessionID(ctx context.Context, store *storage.SQLiteStore, rawID string) (string, error) {
-	session, err := store.GetSession(ctx, rawID)
+func resolveSessionID(ctx context.Context, db *suggestdb.DB, rawID string) (string, error) {
+	session, err := ops.GetSession(ctx, db, rawID)
 	if err == nil {
 		return session.SessionID, nil
 	}
-	if !errors.Is(err, storage.ErrSessionNotFound) {
+	if !errors.Is(err, ops.ErrSessionNotFound) {
 		return "", err
 	}
 	if len(rawID) >= 36 {
-		return "", fmt.Errorf("session not found (%s): %w", rawID, storage.ErrSessionNotFound)
+		return "", fmt.Errorf("session not found (%s): %w", rawID, ops.ErrSessionNotFound)
 	}
-	session, err = store.GetSessionByPrefix(ctx, rawID)
+	session, err = ops.GetSessionByPrefix(ctx, db, rawID)
 	if err == nil {
 		return session.SessionID, nil
 	}
-	if errors.Is(err, storage.ErrSessionNotFound) {
-		return "", fmt.Errorf("session not found (%s): %w", rawID, storage.ErrSessionNotFound)
+	if errors.Is(err, ops.ErrSessionNotFound) {
+		return "", fmt.Errorf("session not found (%s): %w", rawID, ops.ErrSessionNotFound)
 	}
-	if errors.Is(err, storage.ErrAmbiguousSession) {
-		return "", fmt.Errorf("ambiguous session prefix (%s): %w", rawID, storage.ErrAmbiguousSession)
+	if errors.Is(err, ops.ErrAmbiguousSession) {
+		return "", fmt.Errorf("ambiguous session prefix (%s): %w", rawID, ops.ErrAmbiguousSession)
 	}
 	return "", err
 }
 
-func buildHistoryQuery(args []string) (storage.CommandQuery, error) {
+func buildHistoryQuery(args []string) (ops.CommandQuery, error) {
 	if historyLimit < 0 {
-		return storage.CommandQuery{}, fmt.Errorf("invalid limit: must be >= 0")
+		return ops.CommandQuery{}, fmt.Errorf("invalid limit: must be >= 0")
 	}
 	if historyOffset < 0 {
-		return storage.CommandQuery{}, fmt.Errorf("invalid offset: must be >= 0")
+		return ops.CommandQuery{}, fmt.Errorf("invalid offset: must be >= 0")
 	}
 
-	query := storage.CommandQuery{
+	query := ops.CommandQuery{
 		Limit:  historyLimit,
 		Offset: historyOffset,
 	}
@@ -166,26 +164,26 @@ func buildHistoryQuery(args []string) (storage.CommandQuery, error) {
 	return query, nil
 }
 
-func outputHistory(commands []storage.Command) error {
+func outputHistoryRows(rows []ops.HistoryRow) error {
 	format := strings.ToLower(strings.TrimSpace(historyFormat))
 	if format == "" {
 		format = "raw"
 	}
 	switch format {
 	case "raw":
-		for i := range commands {
-			fmt.Println(commands[i].Command)
+		for i := range rows {
+			fmt.Println(rows[i].Command)
 		}
 		return nil
 	case "json":
-		entries := make([]historyOutput, 0, len(commands))
+		entries := make([]historyOutput, 0, len(rows))
 		source := historySource(historyGlobal, historyCWD, historySession)
-		for i := range commands {
+		for i := range rows {
 			entries = append(entries, historyOutput{
-				Text:     commands[i].Command,
-				Cwd:      commands[i].CWD,
-				TSUnixMs: commands[i].TSStartUnixMs,
-				ExitCode: commands[i].ExitCode,
+				Text:     rows[i].Command,
+				TSUnixMs: rows[i].TimestampMs,
+				Cwd:      rows[i].CWD,
+				ExitCode: rows[i].ExitCode,
 				Source:   source,
 			})
 		}

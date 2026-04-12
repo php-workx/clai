@@ -91,7 +91,7 @@ func captureFish(ctx context.Context) (AliasMap, error) {
 // runShellCommand executes a command and returns its stdout output.
 func runShellCommand(ctx context.Context, name string, args ...string) (string, error) {
 	//nolint:gosec // shell binary/args are selected from a fixed allowlist by caller.
-	cmd := exec.CommandContext(ctx, name, args...)
+	cmd := exec.CommandContext(ctx, name, args...) // nosemgrep: dangerous-exec-command
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

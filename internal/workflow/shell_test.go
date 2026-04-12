@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"os"
 	"runtime"
 	"strings"
 	"testing"
@@ -21,7 +22,12 @@ func assertShellArgs(t *testing.T, cmdArgs []string, script string) {
 		assert.Equal(t, []string{"cmd.exe", "/C", script}, cmdArgs)
 		return
 	}
-	assert.Equal(t, []string{"/bin/sh", "-c", script}, cmdArgs)
+	// Default shell is $SHELL (falling back to /bin/sh).
+	expectedShell := os.Getenv("SHELL")
+	if expectedShell == "" {
+		expectedShell = "/bin/sh"
+	}
+	assert.Equal(t, []string{expectedShell, "-c", script}, cmdArgs)
 }
 
 func TestBuildCommand_ArgvMode(t *testing.T) {

@@ -16,7 +16,8 @@ func TestRunSearch_HistoryFallback_NoDaemon(t *testing.T) {
 		searchLimit = 20
 	})
 
-	histFile := filepath.Join(t.TempDir(), "zsh_history")
+	tmpDir := t.TempDir()
+	histFile := filepath.Join(tmpDir, "zsh_history")
 	content := strings.Join([]string{
 		": 1700000000:0;echo hello",
 		": 1700000001:0;git status",
@@ -26,6 +27,10 @@ func TestRunSearch_HistoryFallback_NoDaemon(t *testing.T) {
 		t.Fatalf("WriteFile error: %v", err)
 	}
 	t.Setenv("HISTFILE", histFile)
+	// Point HOME to a clean temp dir so searchCommandsFromDB finds no
+	// existing suggest DB (~/.clai/suggestions_v2.db) and falls back
+	// to history file search.
+	t.Setenv("HOME", tmpDir)
 
 	output := captureStdout(t, func() {
 		if err := runSearch(searchCmd, []string{"git"}); err != nil {

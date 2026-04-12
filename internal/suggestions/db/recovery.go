@@ -230,7 +230,7 @@ func recoverAndReopen(ctx context.Context, dbPath string, corruptDB *sql.DB, rea
 	}
 
 	// Step 4: Run V2 migrations on the fresh database
-	if err := RunV2Migrations(ctx, newDB); err != nil {
+	if err := RunMigrations(ctx, newDB); err != nil {
 		newDB.Close()
 		return nil, fmt.Errorf("failed to run migrations on fresh database: %w", err)
 	}

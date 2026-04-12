@@ -80,6 +80,9 @@ func TestIsRunningWithPaths_NotRunning(t *testing.T) {
 }
 
 func TestIsRunningWithPaths_StalePID(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("signal tests not applicable on Windows")
+	}
 	t.Parallel()
 
 	tmpDir := t.TempDir()
@@ -121,6 +124,9 @@ func TestIsRunningWithPaths_LockHeldPIDFallback(t *testing.T) {
 }
 
 func TestCleanupStaleWithPaths(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("signal tests not applicable on Windows")
+	}
 	t.Parallel()
 
 	tmpDir := t.TempDir()

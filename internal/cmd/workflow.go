@@ -232,7 +232,11 @@ func executeJob(cmd *cobra.Command, rc *workflowRunContext, def *workflow.Workfl
 
 	// Parse --var flags into env overrides (highest precedence).
 	vars, _ := cmd.Flags().GetStringSlice("var")
-	varEnv := parseVarFlags(vars)
+	varEnv, varErr := parseVarFlags(vars)
+	if varErr != nil {
+		slog.Error("invalid --var flag", "error", varErr)
+		return &jobExecutionResult{overallStatus: string(workflow.RunFailed), validationErr: true}
+	}
 
 	matrixCombinations := expandMatrix(job)
 
@@ -397,14 +401,14 @@ func runAdHocCommand(ctx context.Context, command, workDir string, env []string)
 	var cmd *exec.Cmd
 	if runtime.GOOS == "windows" {
 		//nolint:gosec // G204: command is explicitly provided by the human reviewer at runtime.
-		cmd = exec.CommandContext(ctx, "cmd.exe", "/C", command)
+		cmd = exec.CommandContext(ctx, "cmd.exe", "/C", command) // nosemgrep: dangerous-exec-command
 	} else {
 		shellPath := os.Getenv("SHELL")
 		if shellPath == "" {
 			shellPath = "/bin/sh"
 		}
 		//nolint:gosec // command is explicitly provided by the human reviewer at runtime.
-		cmd = exec.CommandContext(ctx, shellPath, "-c", command)
+		cmd = exec.CommandContext(ctx, shellPath, "-c", command) // nosemgrep: dangerous-exec-command
 	}
 
 	cmd.Dir = workDir
@@ -595,14 +599,18 @@ func matrixKeyString(vars map[string]string) string {
 	return strings.Join(parts, ",")
 }
 
-func parseVarFlags(vars []string) map[string]string {
+func parseVarFlags(vars []string) (map[string]string, error) {
 	result := map[string]string{}
 	for _, v := range vars {
 		if idx := strings.IndexByte(v, '='); idx >= 0 {
-			result[v[:idx]] = v[idx+1:]
+			key := v[:idx]
+			if workflow.IsDangerousEnvKey(key) {
+				return nil, fmt.Errorf("--var cannot override system variable %q", key)
+			}
+			result[key] = v[idx+1:]
 		}
 	}
-	return result
+	return result, nil
 }
 
 func mergeMaps(base, override map[string]string) map[string]string {

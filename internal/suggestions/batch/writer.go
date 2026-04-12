@@ -35,7 +35,7 @@ const (
 // Options configures the batch writer.
 type Options struct {
 	// WritePathConfig configures the ingest.WritePath call per event.
-	// When set, each event in the batch also populates V2 aggregate tables
+	// When set, each event in the batch also populates aggregate tables
 	// (command_template, command_stat, transition_stat, etc.) via WritePath.
 	WritePathConfig *ingest.WritePathConfig
 
@@ -189,7 +189,24 @@ func (w *Writer) writeLoop() {
 			return
 		}
 
-		if err := w.writeBatch(batch); err != nil {
+		batchLen := len(batch)
+		if w.opts.WritePathConfig != nil {
+			successes, err := w.writeBatchWithStats(batch)
+			if err != nil {
+				w.mu.Lock()
+				w.writeErrors++
+				w.lastWriteError = err
+				w.lastErrorTime = time.Now()
+				w.mu.Unlock()
+			} else {
+				w.mu.Lock()
+				w.eventsWritten += int64(successes)
+				w.batchesWritten++
+				w.lastFlushTime = time.Now()
+				w.lastBatchSize = batchLen
+				w.mu.Unlock()
+			}
+		} else if err := w.writeBatchRaw(batch); err != nil {
 			w.mu.Lock()
 			w.writeErrors++
 			w.lastWriteError = err
@@ -197,10 +214,10 @@ func (w *Writer) writeLoop() {
 			w.mu.Unlock()
 		} else {
 			w.mu.Lock()
-			w.eventsWritten += int64(len(batch))
+			w.eventsWritten += int64(batchLen)
 			w.batchesWritten++
 			w.lastFlushTime = time.Now()
-			w.lastBatchSize = len(batch)
+			w.lastBatchSize = batchLen
 			w.mu.Unlock()
 		}
 
@@ -240,27 +257,13 @@ func (w *Writer) writeLoop() {
 	}
 }
 
-// writeBatch writes a batch of events to the database.
-// When WritePathConfig is set, each event is processed through ingest.WritePath
-// which populates all V2 aggregate tables atomically. WritePath errors for
-// individual events are logged but do not fail the entire batch.
-// When WritePathConfig is nil, events are written as raw INSERTs only.
-func (w *Writer) writeBatch(batch []*event.CommandEvent) error {
-	if len(batch) == 0 {
-		return nil
-	}
-
-	if w.opts.WritePathConfig != nil {
-		return w.writeBatchV2(batch)
-	}
-	return w.writeBatchRaw(batch)
-}
-
-// writeBatchV2 processes each event through ingest.WritePath, populating
-// all V2 aggregate tables. Per-session lastTemplateID is tracked for
+// writeBatchWithStats processes each event through ingest.WritePath, populating
+// all aggregate tables. Per-session lastTemplateID is tracked for
 // transition support across batches.
-func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
+// Returns the number of successfully written events.
+func (w *Writer) writeBatchWithStats(batch []*event.CommandEvent) (int, error) {
 	ctx := context.Background()
+	successes := 0
 
 	for _, ev := range batch {
 		// Look up per-session state for transition tracking
@@ -288,8 +291,13 @@ func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
 				"cmd_raw", ev.CmdRaw,
 				"error", err,
 			)
+			w.mu.Lock()
+			w.writeErrors++
+			w.mu.Unlock()
 			continue // Skip this event, don't fail the batch
 		}
+
+		successes++
 
 		// Update per-session state for next event's transitions
 		sess.lastTemplateID = result.TemplateID
@@ -303,7 +311,7 @@ func (w *Writer) writeBatchV2(batch []*event.CommandEvent) error {
 		w.evictStaleSessions()
 	}
 
-	return nil
+	return successes, nil
 }
 
 // evictStaleSessions removes the oldest half of session entries when the map exceeds bounds.
@@ -327,7 +335,7 @@ func (w *Writer) evictStaleSessions() {
 		}
 	}
 	// If still over limit, remove oldest half
-	if len(w.sessions) > maxSessionEntries && removed == 0 {
+	if len(w.sessions) > maxSessionEntries {
 		count := 0
 		target := len(w.sessions) / 2
 		for id := range w.sessions {
@@ -352,7 +360,7 @@ func (w *Writer) writeBatchRaw(batch []*event.CommandEvent) error {
 	defer tx.Rollback() //nolint:errcheck // Rollback is best-effort after commit
 
 	// Prepare statement within transaction for better performance.
-	// Columns match V2 schema: command_event table (no shell column; ts -> ts_ms).
+	// Columns match command_event table schema (no shell column; ts -> ts_ms).
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO command_event (
 			session_id, ts_ms, cwd, repo_key, branch,

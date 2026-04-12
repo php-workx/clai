@@ -6,6 +6,19 @@ import (
 	"strings"
 )
 
+func validateEnvKeys(context string, env map[string]string) []ValidationError {
+	var errs []ValidationError
+	for key := range env {
+		if IsDangerousEnvKey(key) {
+			errs = append(errs, ValidationError{
+				Field:   context + "." + key,
+				Message: fmt.Sprintf("env key %q is a dangerous system variable and cannot be overridden", key),
+			})
+		}
+	}
+	return errs
+}
+
 // containsExpression returns true if s contains a well-formed ${{ ... }} expression.
 func containsExpression(s string) bool {
 	return exprPattern.MatchString(s)
@@ -79,6 +92,19 @@ func ValidateWorkflow(wf *WorkflowDef) []ValidationError {
 				Field:   fmt.Sprintf("requires[%d]", i),
 				Message: "requires entry must not be empty",
 			})
+		}
+	}
+
+	// Validate env keys at all levels.
+	errs = append(errs, validateEnvKeys("env", wf.Env)...)
+	for jobName, job := range wf.Jobs {
+		if job != nil {
+			errs = append(errs, validateEnvKeys(fmt.Sprintf("jobs.%s.env", jobName), job.Env)...)
+			for i, step := range job.Steps {
+				if step != nil {
+					errs = append(errs, validateEnvKeys(fmt.Sprintf("jobs.%s.steps[%d].env", jobName, i), step.Env)...)
+				}
+			}
 		}
 	}
 

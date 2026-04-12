@@ -243,8 +243,7 @@ func (mc *MultiCache) TriggerPrecompute(
 		return // Already in-flight
 	}
 
-	//nolint:gosec // G118: goroutine intentionally outlives the request; uses detached context.
-	go func() {
+	go func() { //#nosec G118 -- goroutine intentionally outlives request; uses detached context
 		preCtx, cancel := context.WithTimeout(context.Background(), HardTimeout)
 		defer cancel()
 
@@ -256,7 +255,7 @@ func (mc *MultiCache) TriggerPrecompute(
 			return
 		}
 
-		mc.Set(ctx, sessionID, lastEventID, repoKey, prefixHash, contextHash, suggestions)
+		mc.Set(context.Background(), sessionID, lastEventID, repoKey, prefixHash, contextHash, suggestions)
 	}()
 }
 

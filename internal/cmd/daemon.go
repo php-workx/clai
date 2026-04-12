@@ -76,7 +76,7 @@ var daemonStopCmd = &cobra.Command{
 		fmt.Print("Stopping daemon...")
 		err := daemon.Stop()
 		if err != nil {
-			fmt.Printf(daemonFailedFmt, colorRed, colorReset)
+			fmt.Printf(" %sfailed%s\n", colorRed, colorReset)
 			return err
 		}
 		fmt.Printf(" %sstopped%s\n", colorGreen, colorReset)
@@ -92,7 +92,7 @@ var daemonRestartCmd = &cobra.Command{
 		if daemon.IsRunning() {
 			fmt.Print("Stopping daemon...")
 			if err := daemon.Stop(); err != nil {
-				fmt.Printf(daemonFailedFmt, colorRed, colorReset)
+				fmt.Printf(" %sfailed%s\n", colorRed, colorReset)
 				return err
 			}
 			fmt.Printf(" %sstopped%s\n", colorGreen, colorReset)
@@ -102,7 +102,7 @@ var daemonRestartCmd = &cobra.Command{
 		fmt.Print("Starting daemon...")
 		err := ipc.SpawnAndWaitContext(cmd.Context(), 5*time.Second)
 		if err != nil {
-			fmt.Printf(daemonFailedFmt, colorRed, colorReset)
+			fmt.Printf(" %sfailed%s\n", colorRed, colorReset)
 			return err
 		}
 		fmt.Printf(" %srunning%s\n", colorGreen, colorReset)

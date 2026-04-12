@@ -6,7 +6,7 @@ import (
 	"time"
 
 	pb "github.com/runger/clai/gen/clai/v1"
-	"github.com/runger/clai/internal/storage"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 // TestCP1_BasicIPC verifies that basic IPC communication works (ping).
@@ -445,10 +445,8 @@ func TestE2E_DestructiveCommandRiskFlag(t *testing.T) {
 		t.Fatalf("CommandEnded returned ok=false: %s", endResp.Error)
 	}
 
-	// The destructive risk flag is applied by the suggestion handler,
-	// which calls sanitize.IsDestructive(). We verify the command was stored
-	// by querying commands directly.
-	commands, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
+	// Verify the command was stored by querying commands directly.
+	commands, err := ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 		SessionID: &sessionID,
 		Limit:     10,
 	})
@@ -458,7 +456,7 @@ func TestE2E_DestructiveCommandRiskFlag(t *testing.T) {
 
 	found := false
 	for _, cmd := range commands {
-		if cmd.Command == "rm -rf /" {
+		if cmd.CmdRaw == "rm -rf /" {
 			found = true
 			break
 		}

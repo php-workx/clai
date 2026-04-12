@@ -250,7 +250,8 @@ func TestParseVarFlags(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := parseVarFlags(tc.input)
+			result, err := parseVarFlags(tc.input)
+			assert.NoError(t, err)
 			assert.Equal(t, tc.expect, result)
 		})
 	}

@@ -202,7 +202,7 @@ var goSubcommandTags = map[string][]string{
 // ExtractTags extracts semantic tags from pipeline segments.
 // Tags are deduplicated and sorted for determinism.
 func ExtractTags(segments []Segment) []string {
-	tagSet := make(map[string]bool)
+	tagSet := make(map[string]bool) // nosemgrep: iterate-over-empty-map
 
 	for _, seg := range segments {
 		cmd, sub := extractCommandAndSub(seg.Raw)

@@ -419,10 +419,10 @@ func copyToClipboard(text string) tea.Cmd {
 		case "darwin":
 			cmd = exec.Command("pbcopy")
 		case "linux":
-			if path, err := exec.LookPath("xclip"); err == nil {
-				cmd = exec.Command(path, "-selection", "clipboard") //nolint:gosec // G204: path from LookPath
-			} else if path, err := exec.LookPath("xsel"); err == nil {
-				cmd = exec.Command(path, "--clipboard", "--input") //nolint:gosec // G204: path from LookPath
+			if clipPath, err := exec.LookPath("xclip"); err == nil {
+				cmd = exec.Command(clipPath, "-selection", "clipboard") //nolint:gosec // clipPath is from LookPath, not user input
+			} else if clipPath, err := exec.LookPath("xsel"); err == nil {
+				cmd = exec.Command(clipPath, "--clipboard", "--input") //nolint:gosec // clipPath is from LookPath, not user input
 			} else {
 				return clipboardMsg{err: fmt.Errorf("no clipboard tool found")}
 			}
@@ -465,6 +465,8 @@ func (m Model) listHeight() int { //nolint:gocritic // hugeParam: bubbletea tea.
 	if m.layout == LayoutBottomUp {
 		chrome++ // +1 for separator line between items and query
 	}
+	// Footer detail lines (multi-line expansion, item details) reduce list space.
+	chrome += len(m.footerDetailLines())
 	h := m.height - chrome
 	if h < 1 {
 		h = 20 // Sensible default before first WindowSizeMsg
@@ -574,18 +576,34 @@ func (m Model) footerDetailLines() []string { //nolint:gocritic // hugeParam: bu
 	if m.state != stateLoaded || len(m.items) == 0 || m.selection < 0 || m.selection >= len(m.items) {
 		return nil
 	}
-	details := m.items[m.selection].Details
-	if len(details) == 0 {
-		return nil
+
+	cw := m.contentWidth()
+	var lines []string
+
+	// Show expanded multi-line command when selected.
+	item := m.items[m.selection]
+	raw := StripANSI(item.displayText())
+	if strings.Contains(raw, "\n") {
+		cmdLines := strings.Split(raw, "\n")
+		const maxExpanded = 5
+		for i, cl := range cmdLines {
+			if i >= maxExpanded {
+				lines = append(lines, dimStyle.Render(truncateFooterDetail(
+					fmt.Sprintf("  ... (%d more lines)", len(cmdLines)-maxExpanded), cw)))
+				break
+			}
+			lines = append(lines, dimStyle.Render(truncateFooterDetail("  "+cl, cw)))
+		}
 	}
+
+	details := item.Details
 	if len(details) > 2 {
 		details = details[:2]
 	}
-	cw := m.contentWidth()
-	lines := make([]string, 0, len(details))
 	for _, d := range details {
 		lines = append(lines, dimStyle.Render(truncateFooterDetail(d, cw)))
 	}
+
 	return lines
 }
 
@@ -670,6 +688,10 @@ func (m Model) renderListLine(i int) string { //nolint:gocritic // hugeParam: bu
 
 func (m Model) prepareDisplayForLine(i int) string { //nolint:gocritic // hugeParam: bubbletea tea.Model requires value receiver
 	display := StripANSI(m.items[i].displayText())
+	// Collapse multi-line commands into a single visual line for the list.
+	if strings.Contains(display, "\n") {
+		display = strings.ReplaceAll(display, "\n", " \\ ")
+	}
 	maxDisplayWidth := m.contentWidth() - lineReservedWidth(i == m.selection)
 	if maxDisplayWidth < 0 {
 		maxDisplayWidth = 0

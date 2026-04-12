@@ -70,10 +70,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 		sessionID = uuid.New().String()
 	}
 
-	// Init must be extremely fast; avoid disk I/O (config file read) here.
-	// Users can override via env vars before sourcing, and other commands read
-	// config normally.
-	cfg := config.DefaultConfig()
+	// Load user config so `clai config` settings take effect in shell init.
+	// Fall back to defaults if config file is missing or unreadable.
+	cfg, err := config.LoadFromFile(config.DefaultPaths().ConfigFile())
+	if err != nil {
+		cfg = config.DefaultConfig()
+	}
 	cfg.ApplyEnvOverrides()
 
 	// Replace placeholders with actual values.
@@ -83,6 +85,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		"{{CLAI_UP_ARROW_HISTORY}}", strconv.FormatBool(cfg.History.UpArrowOpensHistory),
 		"{{CLAI_UP_ARROW_TRIGGER}}", cfg.History.UpArrowTrigger,
 		"{{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}", strconv.Itoa(cfg.History.UpArrowDoubleWindowMs),
+		"{{CLAI_PTY_ENABLED}}", strconv.FormatBool(cfg.PTY.Enabled),
 	)
 	fmt.Print(replacer.Replace(string(content)))
 	return nil

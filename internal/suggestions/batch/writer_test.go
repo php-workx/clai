@@ -3,6 +3,7 @@ package batch
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,7 +32,7 @@ func createTestDB(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Close() })
 
-	// Create minimal schema for testing (matches V2 command_event columns)
+	// Create minimal schema for testing (matches command_event columns)
 	_, err = db.Exec(`
 		CREATE TABLE command_event (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -400,10 +401,10 @@ func TestWriter_Stats(t *testing.T) {
 	assert.False(t, stats.LastFlushTime.IsZero())
 }
 
-// --- WritePath V2 integration tests ---
+// --- WritePath integration tests ---
 
-// createTestV2DB creates a V2 SQLite database with the full schema for WritePath tests.
-func createTestV2DB(t *testing.T) *sql.DB {
+// createFullSchemaTestDB creates a SQLite database with the full schema for WritePath tests.
+func createFullSchemaTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
 	tmpDir := t.TempDir()
@@ -428,7 +429,7 @@ func createTestV2DB(t *testing.T) *sql.DB {
 func TestBatchWriter_CallsWritePath(t *testing.T) {
 	t.Parallel()
 
-	db := createTestV2DB(t)
+	db := createFullSchemaTestDB(t)
 	w := NewWriter(db, Options{
 		FlushInterval:   1 * time.Hour, // Rely on explicit flush
 		MaxBatchSize:    100,
@@ -485,7 +486,7 @@ func TestBatchWriter_CallsWritePath(t *testing.T) {
 func TestBatchWriter_WritePath_ErrorSkipsEvent(t *testing.T) {
 	t.Parallel()
 
-	db := createTestV2DB(t)
+	db := createFullSchemaTestDB(t)
 	w := NewWriter(db, Options{
 		FlushInterval:   1 * time.Hour,
 		MaxBatchSize:    100,
@@ -543,9 +544,9 @@ func TestBatchWriter_WritePath_ErrorSkipsEvent(t *testing.T) {
 	// The batch should not have failed entirely. At minimum, event 1 and event 3
 	// should be written. Event 2 may or may not succeed (empty cmd is still valid
 	// input to WritePath). The point is the batch did not fail.
+	// With per-event error tracking, eventsWritten only counts successes.
 	stats := w.Stats()
-	assert.Equal(t, int64(3), stats.EventsWritten, "batch should report all 3 events written")
-	assert.Equal(t, int64(0), stats.WriteErrors, "no batch-level write errors expected")
+	assert.GreaterOrEqual(t, stats.EventsWritten, int64(2), "at least 2 events should be counted as written")
 
 	// Verify command_events were inserted
 	var eventCount int
@@ -557,7 +558,7 @@ func TestBatchWriter_WritePath_ErrorSkipsEvent(t *testing.T) {
 func TestBatchWriter_TransitionsAcrossBatches(t *testing.T) {
 	t.Parallel()
 
-	db := createTestV2DB(t)
+	db := createFullSchemaTestDB(t)
 	w := NewWriter(db, Options{
 		FlushInterval:   1 * time.Hour,
 		MaxBatchSize:    100,
@@ -632,4 +633,82 @@ func TestBatchWriter_TransitionsAcrossBatches(t *testing.T) {
 	err = db.QueryRow("SELECT COUNT(*) FROM command_template").Scan(&templateCount)
 	require.NoError(t, err)
 	assert.Equal(t, 2, templateCount, "two distinct command templates should exist")
+}
+
+func TestWriteBatchWithStats_CountsSuccessesOnly(t *testing.T) {
+	t.Parallel()
+
+	db := createFullSchemaTestDB(t)
+	w := NewWriter(db, Options{
+		FlushInterval:   1 * time.Hour,
+		MaxBatchSize:    100,
+		QueueSize:       100,
+		WritePathConfig: &ingest.WritePathConfig{},
+	})
+
+	// Directly call writeBatchWithStats to test return value.
+	batch := []*event.CommandEvent{
+		{
+			Version:   1,
+			Type:      event.EventTypeCommandEnd,
+			TS:        1700000000000,
+			SessionID: "test-session",
+			Shell:     event.ShellZsh,
+			Cwd:       "/home/user",
+			CmdRaw:    "ls",
+			ExitCode:  0,
+		},
+		{
+			Version:   1,
+			Type:      event.EventTypeCommandEnd,
+			TS:        1700000001000,
+			SessionID: "test-session",
+			Shell:     event.ShellZsh,
+			Cwd:       "/home/user",
+			CmdRaw:    "pwd",
+			ExitCode:  0,
+		},
+	}
+
+	successes, err := w.writeBatchWithStats(batch)
+	require.NoError(t, err)
+	assert.Equal(t, 2, successes, "both events should succeed")
+}
+
+func TestEvictStaleSessions_EvictsWhenSomeRemoved(t *testing.T) {
+	t.Parallel()
+
+	db := createFullSchemaTestDB(t)
+	w := NewWriter(db, Options{
+		FlushInterval:   1 * time.Hour,
+		MaxBatchSize:    100,
+		QueueSize:       100,
+		WritePathConfig: &ingest.WritePathConfig{},
+	})
+
+	// Fill the sessions map well above maxSessionEntries.
+	// Half are stale (> 1 hour old), half are recent.
+	total := maxSessionEntries + 100
+	halfCount := total / 2
+
+	for i := 0; i < halfCount; i++ {
+		// Stale session (2 hours old)
+		w.sessions[fmt.Sprintf("stale-%d", i)] = &sessionState{
+			lastSeen: time.Now().Add(-2 * time.Hour),
+		}
+	}
+	for i := 0; i < total-halfCount; i++ {
+		// Recent session
+		w.sessions[fmt.Sprintf("recent-%d", i)] = &sessionState{
+			lastSeen: time.Now(),
+		}
+	}
+
+	// Before fix: with removed > 0 and still over limit, the oldest-half
+	// eviction would NOT run because of the `removed == 0` guard.
+	// After fix: it should still evict the oldest half if over limit.
+	w.evictStaleSessions()
+
+	assert.LessOrEqual(t, len(w.sessions), maxSessionEntries,
+		"sessions should be at or below maxSessionEntries after eviction")
 }

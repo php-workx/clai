@@ -334,7 +334,7 @@ func TestZsh_EscapeNotBound(t *testing.T) {
 	require.NoError(t, err)
 	output, err := session.ExpectTimeout("ESC_BIND_DONE", 3*time.Second)
 	require.NoError(t, err)
-	assert.NotContains(t, output, "_ai_cancel_voice_mode")
+	assert.NotContains(t, output, "_clai_cancel_voice_mode")
 
 	session.SendKey(KeyCtrlC)
 }

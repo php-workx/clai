@@ -354,6 +354,54 @@ func TestRemoveStaleSocketDoesNotDeleteForUnknownDialError(t *testing.T) {
 	}
 }
 
+// TestRemoveStaleSocketDeadlineExceeded covers the real-world case where
+// grpc.WithBlock() retries ECONNREFUSED on a dead Unix socket until the 50ms
+// DialTimeout expires, returning context.DeadlineExceeded instead of
+// ECONNREFUSED.  Previously isLikelyStaleSocketDialError did not recognise
+// this error class, so removeStaleSocket returned an error instead of
+// cleaning up the orphaned socket.
+func TestRemoveStaleSocketDeadlineExceeded(t *testing.T) {
+	oldQuickDial := quickDialFn
+	oldSocketExists := socketExistsFn
+	oldSocketPath := socketPathFn
+	oldRemove := removeFileFn
+	oldDaemonLock := daemonLockFn
+	oldAttempts := staleSocketDialAttempts
+	oldDelay := staleSocketRetryDelay
+	t.Cleanup(func() {
+		quickDialFn = oldQuickDial
+		socketExistsFn = oldSocketExists
+		socketPathFn = oldSocketPath
+		removeFileFn = oldRemove
+		daemonLockFn = oldDaemonLock
+		staleSocketDialAttempts = oldAttempts
+		staleSocketRetryDelay = oldDelay
+	})
+
+	socketExistsFn = func() bool { return true }
+	socketPathFn = func() string { return "/tmp/fake-clai.sock" }
+	daemonLockFn = func() (int, bool, error) { return 0, false, nil }
+	staleSocketDialAttempts = 2
+	staleSocketRetryDelay = 0
+	// Simulate grpc.WithBlock() timing out on a dead socket.
+	quickDialFn = func() (io.Closer, error) {
+		return nil, fmt.Errorf("failed to dial: %w", context.DeadlineExceeded)
+	}
+
+	removeCalls := 0
+	removeFileFn = func(_ string) error {
+		removeCalls++
+		return nil
+	}
+
+	if err := removeStaleSocket(context.Background()); err != nil {
+		t.Fatalf("removeStaleSocket() error = %v, want nil (stale socket removed)", err)
+	}
+	if removeCalls != 1 {
+		t.Fatalf("removeStaleSocket() remove calls = %d, want 1", removeCalls)
+	}
+}
+
 func TestRemoveStaleSocketHonorsCancellation(t *testing.T) {
 	oldQuickDial := quickDialFn
 	oldSocketExists := socketExistsFn

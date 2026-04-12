@@ -1604,7 +1604,7 @@ func TestSanitizer_Sanitize(t *testing.T) {
         },
         {
             name:     "JWT token",
-            input:    "curl -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwidGVzdCI6dHJ1ZX0.XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'",
+            input:    "curl -H 'Authorization: Bearer eyXXX.eyXXX.XXXXX-fake-jwt-for-spec-example'",
             expected: "curl -H 'Authorization: Bearer [REDACTED]'",
         },
         {

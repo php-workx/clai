@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	pb "github.com/runger/clai/gen/clai/v1"
-	"github.com/runger/clai/internal/storage"
+	"github.com/runger/clai/internal/suggestions/ops"
 )
 
 func TestCommandStarted_StoresGitBranch(t *testing.T) {
@@ -41,7 +41,7 @@ func TestCommandStarted_StoresGitBranch(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	commands, err := env.Store.QueryCommands(ctx, storage.CommandQuery{
+	commands, err := ops.QueryCommands(ctx, env.DB, ops.CommandQuery{
 		SessionID: &sessionID,
 		Limit:     5,
 	})

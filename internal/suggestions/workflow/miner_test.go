@@ -13,7 +13,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// createTestDB creates a test database with the V2 schema tables needed for workflow.
+// createTestDB creates a test database with the schema tables needed for workflow.
 func createTestDB(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -26,7 +26,7 @@ func createTestDB(t *testing.T) *sql.DB {
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 
-	// Create minimal V2 tables needed for workflow tests.
+	// Create minimal tables needed for workflow tests.
 	_, err = db.Exec(`
 		CREATE TABLE command_event (
 			id              INTEGER PRIMARY KEY AUTOINCREMENT,

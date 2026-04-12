@@ -45,6 +45,11 @@ var (
 	staleSocketRetryDelay   = 25 * time.Millisecond
 )
 
+// spawnLockTimeout is how long a caller waits for the spawn lock before
+// giving up.  This serialises daemon spawn attempts across terminals so
+// only one actually starts the daemon.
+const spawnLockTimeout = 2 * time.Second
+
 // EnsureDaemon ensures the daemon is running, spawning it if necessary.
 // Returns nil if daemon is available, error otherwise.
 func EnsureDaemon() error {
@@ -52,6 +57,23 @@ func EnsureDaemon() error {
 	if ready || err != nil {
 		return err
 	}
+
+	// Acquire a spawn lock so that only one process attempts to start the
+	// daemon at a time.  Other callers block briefly and then re-check the
+	// socket – they will find it healthy once the winner finishes spawning.
+	unlock, lockErr := acquireSpawnLock()
+	if lockErr != nil {
+		recoverMissingSocketDaemon()
+		return SpawnDaemon()
+	}
+	defer unlock()
+
+	// Re-check after acquiring the lock.
+	ready, err = ensureHealthySocket()
+	if ready || err != nil {
+		return err
+	}
+
 	recoverMissingSocketDaemon()
 	return SpawnDaemon()
 }
@@ -360,10 +382,20 @@ func isLikelyStaleSocketDialError(err error) bool {
 		return true
 	}
 
+	// grpc.WithBlock() retries ECONNREFUSED until the dial context expires,
+	// so a dead Unix socket typically surfaces as DeadlineExceeded rather than
+	// ECONNREFUSED by the time control returns here.
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
 	// Fallback to matching common unix socket dial strings when errors are
 	// stringly-typed / not unwrap-friendly.
 	msg := strings.ToLower(err.Error())
 	if strings.Contains(msg, "connection refused") {
+		return true
+	}
+	if strings.Contains(msg, "context deadline exceeded") {
 		return true
 	}
 
@@ -374,6 +406,39 @@ func isLikelyStaleSocketDialError(err error) bool {
 	}
 
 	return false
+}
+
+// acquireSpawnLock takes an exclusive flock on a spawn-specific lock file.
+func acquireSpawnLock() (unlock func(), err error) {
+	lockPath := filepath.Join(RunDir(), "clai.spawn.lock")
+	if mkErr := os.MkdirAll(filepath.Dir(lockPath), 0o750); mkErr != nil {
+		return nil, mkErr
+	}
+	f, openErr := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0o600) //nolint:gosec // G304: trusted path
+	if openErr != nil {
+		return nil, openErr
+	}
+
+	fd := int(f.Fd()) //nolint:gosec // G115: fd fits in int on all supported platforms
+	deadline := time.Now().Add(spawnLockTimeout)
+	for {
+		flockErr := syscall.Flock(fd, syscall.LOCK_EX|syscall.LOCK_NB)
+		if flockErr == nil {
+			return func() {
+				_ = syscall.Flock(fd, syscall.LOCK_UN)
+				f.Close()
+			}, nil
+		}
+		if !errors.Is(flockErr, syscall.EWOULDBLOCK) && !errors.Is(flockErr, syscall.EAGAIN) {
+			f.Close()
+			return nil, flockErr
+		}
+		if time.Now().After(deadline) {
+			f.Close()
+			return nil, fmt.Errorf("spawn lock acquisition timed out")
+		}
+		time.Sleep(25 * time.Millisecond)
+	}
 }
 
 func daemonLockHeldPID() (pid int, held bool, err error) {

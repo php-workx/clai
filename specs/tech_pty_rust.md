@@ -1,4 +1,7 @@
-# clai-wrap (Rust) — Technical Specification
+# clai-wrap (Rust) — Technical Specification (Phase 1)
+
+> **SUPERSEDED:** This spec has been replaced by [`tech_pty_design.md`](tech_pty_design.md) (Phase 2), which extends this design with daemon integration, output capture, AI suggestions, and privacy gates. This document is retained for historical reference only.
+
 Version: 0.1 (Draft for rigorous review)
 Scope: PTY wrapper enabling instant, hotkey-triggered history/autocomplete UI without composited overlays.
 Non-scope (explicit): tmux integration, composited/background overlays, prompt-anchored popups, remote-agent on SSH hosts.
@@ -193,7 +196,7 @@ Required commands (must pass):
 
 ### 6.1 Launching the Shell
 - Determine shell path:
-	- Unix: `$SHELL` else fallback to `/bin/bash` (configurable)
+	- Unix: `$SHELL` else fallback to `/bin/sh` (configurable)
 	- Windows: configurable default (PowerShell, cmd, or Git Bash), but primary target is PowerShell
 - Launch mode:
 	- login shell (`-l`) when supported/configured

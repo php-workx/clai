@@ -122,8 +122,11 @@ func (a *Analyzer) BuildPrompt(stepName, riskLevel, context, customPrompt string
 		fmt.Fprintf(&b, "Analysis instructions: %s\n\n", customPrompt)
 	}
 
+	// Escape triple backticks in output to prevent code fence breakout
+	// that could enable prompt injection.
+	safeContext := strings.ReplaceAll(context, "```", "` ` `")
 	b.WriteString("Output:\n```\n")
-	b.WriteString(context)
+	b.WriteString(safeContext)
 	b.WriteString("\n```\n\n")
 
 	b.WriteString("Respond ONLY with a JSON object, no other text:\n")

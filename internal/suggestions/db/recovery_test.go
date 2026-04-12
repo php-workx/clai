@@ -224,7 +224,7 @@ func TestRotateCorruptDB_NoFiles(t *testing.T) {
 func TestRunIntegrityCheck_HealthyDB(t *testing.T) {
 	t.Parallel()
 
-	db := newTestV2DB(t)
+	db := newTestDB(t)
 	defer db.Close()
 
 	err := RunIntegrityCheck(context.Background(), db.DB())
@@ -432,9 +432,9 @@ func TestRecoverAndReopen_SuccessfulRecovery(t *testing.T) {
 	}
 
 	// Verify all V2 tables exist
-	err = ValidateV2Schema(context.Background(), recoveredDB)
+	err = ValidateSchema(context.Background(), recoveredDB)
 	if err != nil {
-		t.Errorf("ValidateV2Schema() on recovered DB error = %v", err)
+		t.Errorf("ValidateSchema() on recovered DB error = %v", err)
 	}
 
 	// Verify corruption backup exists
@@ -479,9 +479,9 @@ func TestOpen_WithRecovery_CorruptDB(t *testing.T) {
 	defer db.Close()
 
 	// Verify the DB is functional
-	err = db.ValidateV2(context.Background())
+	err = db.Validate(context.Background())
 	if err != nil {
-		t.Errorf("ValidateV2() after recovery error = %v", err)
+		t.Errorf("Validate() after recovery error = %v", err)
 	}
 
 	// Verify backup was created
@@ -521,9 +521,9 @@ func TestOpen_WithRecovery_IntegrityCheck(t *testing.T) {
 	}
 	defer db.Close()
 
-	err = db.ValidateV2(context.Background())
+	err = db.Validate(context.Background())
 	if err != nil {
-		t.Errorf("ValidateV2() after integrity check error = %v", err)
+		t.Errorf("Validate() after integrity check error = %v", err)
 	}
 }
 
@@ -548,27 +548,6 @@ func TestOpen_WithoutRecovery_CorruptDB(t *testing.T) {
 	}
 }
 
-func TestOpen_V1DB_NoRecovery(t *testing.T) {
-	t.Parallel()
-	tmpDir := t.TempDir()
-	dbPath := filepath.Join(tmpDir, "suggestions.db")
-
-	// Recovery should not be attempted for V1 databases
-	if err := os.WriteFile(dbPath, []byte("garbage"), 0644); err != nil {
-		t.Fatalf("Failed to create corrupt file: %v", err)
-	}
-
-	_, err := Open(context.Background(), Options{
-		Path:           dbPath,
-		SkipLock:       true,
-		UseV1:          true,
-		EnableRecovery: true, // Should be ignored for V1
-	})
-	if err == nil {
-		t.Fatal("Open() V1 with recovery should still fail (recovery not supported for V1)")
-	}
-}
-
 func TestOpen_WithRecovery_FreshDB(t *testing.T) {
 	t.Parallel()
 	tmpDir := t.TempDir()
@@ -585,9 +564,9 @@ func TestOpen_WithRecovery_FreshDB(t *testing.T) {
 	}
 	defer db.Close()
 
-	err = db.ValidateV2(context.Background())
+	err = db.Validate(context.Background())
 	if err != nil {
-		t.Errorf("ValidateV2() on fresh DB error = %v", err)
+		t.Errorf("Validate() on fresh DB error = %v", err)
 	}
 
 	// No backup files should be created
@@ -744,8 +723,8 @@ func TestOpen_WithRecovery_MultipleCycles(t *testing.T) {
 		}
 
 		// Verify DB is functional
-		if err := db.ValidateV2(context.Background()); err != nil {
-			t.Errorf("Cycle %d: ValidateV2() error = %v", i, err)
+		if err := db.Validate(context.Background()); err != nil {
+			t.Errorf("Cycle %d: Validate() error = %v", i, err)
 		}
 
 		db.Close()

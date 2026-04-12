@@ -58,6 +58,11 @@ func (p *Paths) SocketFile() string {
 	return filepath.Join(p.BaseDir, "clai.sock")
 }
 
+// JSONRPCSocketFile returns the path to the JSON-RPC Unix domain socket.
+func (p *Paths) JSONRPCSocketFile() string {
+	return filepath.Join(p.BaseDir, "daemon.sock")
+}
+
 // PIDFile returns the path to the daemon PID file.
 func (p *Paths) PIDFile() string {
 	return filepath.Join(p.BaseDir, "clai.pid")

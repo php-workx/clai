@@ -1,7 +1,4 @@
-.agents/reviews
-.agents/compaction-snapshots
-.agents/tooling
-.agents/ao
+.agents
 .claude/worktrees
 .idea
 .DS_Store
@@ -11,13 +8,14 @@ bin/
 # Built binaries in project root
 /clai
 /clai-shim
+/clai-picker
 
 # Test coverage
 coverage.out
 coverage.html
 
 # Beads export state (machine-specific paths)
-/.beads/export-state/
+.beads/export-state/
 .beads/.jsonl.lock
 .scannerwork
 .sonarqube
@@ -28,3 +26,5 @@ coverage.html
 .auto-claude/
 /tests/integration/.agents/
 /tests/e2e/node_modules/
+.env
+.env.*

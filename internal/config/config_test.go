@@ -42,6 +42,9 @@ func TestDefaultConfig(t *testing.T) {
 	if !cfg.Privacy.SanitizeAICalls {
 		t.Error("Expected sanitize_ai_calls=true")
 	}
+	if !cfg.PTY.Enabled {
+		t.Error("Expected pty.enabled=true")
+	}
 }
 
 // ============================================================================
@@ -1004,7 +1007,6 @@ func TestListKeys(t *testing.T) {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
-		"suggestions.scorer_version",
 		"suggestions.picker_view",
 		"history.picker_backend",
 		"history.picker_open_on_empty",
@@ -1012,6 +1014,7 @@ func TestListKeys(t *testing.T) {
 		"history.picker_case_sensitive",
 		"history.up_arrow_trigger",
 		"history.up_arrow_double_window_ms",
+		"pty.enabled",
 	}
 
 	if len(keys) != len(expectedKeys) {
@@ -1051,7 +1054,6 @@ func TestListKeysAllSettable(t *testing.T) {
 		"suggestions.enabled":               "false",
 		"suggestions.max_history":           "10",
 		"suggestions.show_risk_warning":     "false",
-		"suggestions.scorer_version":        "v2",
 		"suggestions.picker_view":           "compact",
 		"history.picker_backend":            "fzf",
 		"history.picker_open_on_empty":      "true",
@@ -1059,6 +1061,7 @@ func TestListKeysAllSettable(t *testing.T) {
 		"history.picker_case_sensitive":     "true",
 		"history.up_arrow_trigger":          "double",
 		"history.up_arrow_double_window_ms": "300",
+		"pty.enabled":                       "false",
 	}
 
 	for _, key := range keys {

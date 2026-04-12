@@ -15,7 +15,6 @@ func TestConfigCmd_List(t *testing.T) {
 		"suggestions.enabled",
 		"suggestions.max_history",
 		"suggestions.show_risk_warning",
-		"suggestions.scorer_version",
 		"suggestions.picker_view",
 		"history.picker_backend",
 		"history.picker_open_on_empty",
@@ -23,6 +22,7 @@ func TestConfigCmd_List(t *testing.T) {
 		"history.picker_case_sensitive",
 		"history.up_arrow_trigger",
 		"history.up_arrow_double_window_ms",
+		"pty.enabled",
 	}
 
 	if len(keys) != len(expectedKeys) {

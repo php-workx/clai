@@ -268,6 +268,7 @@ func startClaudeProcess(ctx context.Context) (*claudeProcess, error) {
 
 	if err := cmd.Start(); err != nil {
 		stdin.Close()
+		_ = stdout.Close()
 		return nil, fmt.Errorf("failed to start claude: %w", err)
 	}
 
@@ -307,32 +308,56 @@ func sendInitMessage(stdin io.Writer) error {
 	return nil
 }
 
-// waitForInit reads stream lines until the system init message is received
+// initTimeout is how long to wait for Claude to send the system init message.
+const initTimeout = 30 * time.Second
+
+// waitForInit reads stream lines until the system init message is received.
+// Returns an error if the init message is not received within initTimeout.
 func waitForInit(scanner *bufio.Scanner) error {
 	fmt.Println("Waiting for Claude initialization...")
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		logLine := line
-		if len(logLine) > 200 {
-			logLine = logLine[:200] + "..."
+	type scanLine struct {
+		text string
+		ok   bool
+	}
+	ch := make(chan scanLine, 1)
+	go func() {
+		for scanner.Scan() {
+			ch <- scanLine{text: scanner.Text(), ok: true}
 		}
-		fmt.Printf("Init: %s\n", logLine)
+		ch <- scanLine{ok: false}
+	}()
 
-		var resp StreamResponse
-		if err := json.Unmarshal([]byte(line), &resp); err != nil {
-			continue
-		}
-		if resp.Type == "system" && resp.Subtype == "init" {
-			fmt.Println("Claude initialized successfully")
-			return nil
+	timer := time.NewTimer(initTimeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-timer.C:
+			return fmt.Errorf("claude initialization timed out after %v", initTimeout)
+		case line := <-ch:
+			if !line.ok {
+				if err := scanner.Err(); err != nil {
+					return fmt.Errorf("scanner error during init: %w", err)
+				}
+				return fmt.Errorf("claude initialization failed: unexpected end of stream")
+			}
+			logLine := line.text
+			if len(logLine) > 200 {
+				logLine = logLine[:200] + "..."
+			}
+			fmt.Printf("Init: %s\n", logLine)
+
+			var resp StreamResponse
+			if err := json.Unmarshal([]byte(line.text), &resp); err != nil {
+				continue
+			}
+			if resp.Type == "system" && resp.Subtype == "init" {
+				fmt.Println("Claude initialized successfully")
+				return nil
+			}
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanner error during init: %w", err)
-	}
-	return fmt.Errorf("claude initialization failed: unexpected end of stream")
 }
 
 // waitForResult reads stream lines until the result message is received
@@ -353,13 +378,20 @@ func waitForResult(scanner *bufio.Scanner) error {
 	return scanner.Err()
 }
 
-// handleDaemonConn handles a single client connection to the daemon
-func handleDaemonConn(c net.Conn, claude *claudeProcess, activityMu *sync.Mutex, lastActivity *time.Time) {
+// handleDaemonConn handles a single client connection to the daemon.
+// The parent context allows the daemon to cancel in-flight requests
+// during shutdown.
+func handleDaemonConn(ctx context.Context, c net.Conn, claude *claudeProcess, activityMu *sync.Mutex, lastActivity *time.Time) {
 	defer c.Close()
 
 	activityMu.Lock()
 	*lastActivity = time.Now()
 	activityMu.Unlock()
+
+	// Derive a per-connection context with a 60-second timeout so a
+	// single slow query cannot block the daemon indefinitely.
+	connCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
 
 	var req DaemonRequest
 	if err := json.NewDecoder(c).Decode(&req); err != nil {
@@ -373,7 +405,7 @@ func handleDaemonConn(c net.Conn, claude *claudeProcess, activityMu *sync.Mutex,
 	}
 	fmt.Printf("Received request: %s\n", logPrompt)
 
-	result, err := claude.query(req.Prompt)
+	result, err := claude.query(connCtx, req.Prompt)
 	if err != nil {
 		json.NewEncoder(c).Encode(DaemonResponse{Error: err.Error()})
 		return
@@ -442,7 +474,7 @@ func RunDaemon(ctx context.Context) error {
 			return nil
 		}
 
-		go handleDaemonConn(conn, claude, &activityMu, &lastActivity)
+		go handleDaemonConn(ctx, conn, claude, &activityMu, &lastActivity)
 	}
 }
 
@@ -457,10 +489,17 @@ func extractResponseText(resp StreamResponse) string {
 	return text
 }
 
-// query sends a prompt to Claude and returns the response
-func (c *claudeProcess) query(prompt string) (string, error) {
+// query sends a prompt to Claude and returns the response.
+// The context allows the caller to cancel or timeout the query; if the
+// context is done the method returns immediately with the context error.
+func (c *claudeProcess) query(ctx context.Context, prompt string) (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+
+	// Check context before starting work.
+	if err := ctx.Err(); err != nil {
+		return "", fmt.Errorf("query cancelled before send: %w", err)
+	}
 
 	msg := StreamMessage{Type: "user"}
 	msg.Message.Role = "user"
@@ -475,28 +514,44 @@ func (c *claudeProcess) query(prompt string) (string, error) {
 		return "", fmt.Errorf("failed to write to claude: %w", err)
 	}
 
-	var result string
-	for c.scanner.Scan() {
-		var resp StreamResponse
-		if err := json.Unmarshal([]byte(c.scanner.Text()), &resp); err != nil {
-			continue
-		}
+	// Read responses in a goroutine so we can select on context cancellation.
+	type scanResult struct {
+		err  error
+		text string
+	}
+	ch := make(chan scanResult, 1)
 
-		if resp.Type == "assistant" {
-			result += extractResponseText(resp)
-		}
-
-		if resp.Type == "result" {
-			if resp.Result != "" {
-				result = resp.Result
+	go func() {
+		var result string
+		for c.scanner.Scan() {
+			var resp StreamResponse
+			if err := json.Unmarshal([]byte(c.scanner.Text()), &resp); err != nil {
+				continue
 			}
-			break
+
+			if resp.Type == "assistant" {
+				result += extractResponseText(resp)
+			}
+
+			if resp.Type == "result" {
+				if resp.Result != "" {
+					result = resp.Result
+				}
+				ch <- scanResult{text: strings.TrimSpace(result)}
+				return
+			}
 		}
-	}
+		if err := c.scanner.Err(); err != nil {
+			ch <- scanResult{err: fmt.Errorf("scanner error: %w", err)}
+		} else {
+			ch <- scanResult{text: strings.TrimSpace(result)}
+		}
+	}()
 
-	if err := c.scanner.Err(); err != nil {
-		return "", fmt.Errorf("scanner error: %w", err)
+	select {
+	case <-ctx.Done():
+		return "", fmt.Errorf("query cancelled: %w", ctx.Err())
+	case res := <-ch:
+		return res.text, res.err
 	}
-
-	return strings.TrimSpace(result), nil
 }

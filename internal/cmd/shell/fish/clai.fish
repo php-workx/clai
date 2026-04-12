@@ -37,12 +37,33 @@ if not set -q CLAI_UP_ARROW_DOUBLE_WINDOW_MS
     set -gx CLAI_UP_ARROW_DOUBLE_WINDOW_MS {{CLAI_UP_ARROW_DOUBLE_WINDOW_MS}}
 end
 
+# PTY auto-wrap (new sessions only)
+# - Controlled by config value injected at init time
+# - Disabled when already inside clai-wrap (CLAI_WRAP=1)
+# - Requires interactive TTY streams
+if test "{{CLAI_PTY_ENABLED}}" = "true"
+    if status is-interactive
+        if not set -q CLAI_WRAP; and test "$CLAI_PTY_DISABLE" != "1"
+            if isatty stdin; and isatty stdout
+                if type -q clai-wrap
+                    set -l _clai_fish_path (command -s fish 2>/dev/null)
+                    if test -n "$_clai_fish_path"
+                        exec clai-wrap --shell "$_clai_fish_path"
+                    else
+                        exec clai-wrap
+                    end
+                end
+            end
+        end
+    end
+end
+
 # Ensure cache directory exists
 mkdir -p $CLAI_CACHE
 
 # Files
-set -g _AI_SUGGEST_FILE "$CLAI_CACHE/suggestion"
-set -g _AI_LAST_OUTPUT "$CLAI_CACHE/last_output"
+set -g _CLAI_SUGGEST_FILE "$CLAI_CACHE/suggestion"
+set -g _CLAI_LAST_OUTPUT "$CLAI_CACHE/last_output"
 
 # Disable native autosuggestions only when clai is enabled
 # (leave native suggestions working when CLAI_OFF=1 or session-off)
@@ -63,17 +84,17 @@ end
 # ============================================
 
 # Accept suggestion with custom keybinding
-function _ai_accept_suggestion
-    if test -s $_AI_SUGGEST_FILE
-        set -l suggestion (cat $_AI_SUGGEST_FILE)
+function _clai_accept_suggestion
+    if test -s $_CLAI_SUGGEST_FILE
+        set -l suggestion (cat $_CLAI_SUGGEST_FILE)
         if test -n "$suggestion"
             commandline -r $suggestion
             commandline -f end-of-line
             # Record accepted feedback (fire and forget)
             clai suggest-feedback --action=accepted --suggested="$suggestion" >/dev/null 2>&1 &
-            disown %1 2>/dev/null
+            jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
             # Clear the suggestion
-            echo -n "" > $_AI_SUGGEST_FILE
+            echo -n "" > $_CLAI_SUGGEST_FILE
             return
         end
     end
@@ -83,21 +104,21 @@ end
 
 # Bind Alt+Enter to accept suggestion (Tab is used for completions in Fish)
 for mode in default insert visual
-    bind -M $mode \e\r _ai_accept_suggestion
+    bind -M $mode \e\r _clai_accept_suggestion
 end
 
 # Clear suggestion with Escape (dismiss feedback)
-function _ai_clear_suggestion
-    if test -s $_AI_SUGGEST_FILE
-        set -l suggestion (cat $_AI_SUGGEST_FILE)
+function _clai_clear_suggestion
+    if test -s $_CLAI_SUGGEST_FILE
+        set -l suggestion (cat $_CLAI_SUGGEST_FILE)
         if test -n "$suggestion"
             # Record dismissed feedback (fire and forget)
             clai suggest-feedback --action=dismissed --suggested="$suggestion" >/dev/null 2>&1 &
-            disown %1 2>/dev/null
+            jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
         end
     end
-    echo -n "" > $_AI_SUGGEST_FILE
-    set -g _AI_VOICE_MODE false
+    echo -n "" > $_CLAI_SUGGEST_FILE
+    set -g _CLAI_VOICE_MODE false
     commandline -f repaint
 end
 
@@ -106,7 +127,7 @@ function _clai_escape
     if test "$_CLAI_PICKER_ACTIVE" = "true"
         _clai_picker_cancel
     else
-        _ai_clear_suggestion
+        _clai_clear_suggestion
     end
 end
 for mode in default insert visual
@@ -591,6 +612,7 @@ if test "$CLAI_UP_ARROW_HISTORY" = "true"
             bind -M $mode -e \eOA\eOA 2>/dev/null
         end
     end
+    bind \e\[A _clai_up_arrow
 end
 
 # ============================================
@@ -598,21 +620,21 @@ end
 # ============================================
 # When activated, the next Enter press will run the input through voice conversion
 
-set -g _AI_VOICE_MODE false
+set -g _CLAI_VOICE_MODE false
 
-function _ai_enter_voice_mode
-    set -g _AI_VOICE_MODE true
+function _clai_enter_voice_mode
+    set -g _CLAI_VOICE_MODE true
     commandline -f repaint
 end
 
-function _ai_voice_execute
+function _clai_voice_execute
     # If picker is open, accept the current selection (don't execute)
     if test "$_CLAI_PICKER_ACTIVE" = "true"
         # Record accepted feedback for picker selection (fire and forget)
         set -l selected $_CLAI_PICKER_ITEMS[$_CLAI_PICKER_INDEX]
         if test -n "$selected"
             clai suggest-feedback --action=accepted --suggested="$selected" >/dev/null 2>&1 &
-            disown %1 2>/dev/null
+            jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
         end
         _clai_picker_close
         return
@@ -639,9 +661,9 @@ function _ai_voice_execute
     end
 
     # Check for explicit voice mode
-    if test "$_AI_VOICE_MODE" = "true"
+    if test "$_CLAI_VOICE_MODE" = "true"
         and test -n "$current_cmd"
-        set -g _AI_VOICE_MODE false
+        set -g _CLAI_VOICE_MODE false
         commandline -r ""
 
         echo "? $current_cmd"
@@ -656,14 +678,14 @@ function _ai_voice_execute
     end
 
     # Normal execute
-    set -g _AI_VOICE_MODE false
+    set -g _CLAI_VOICE_MODE false
     _clai_picker_clear_menu
     commandline -f execute
 end
 
 # Show voice mode indicator or suggestion in right prompt
 function fish_right_prompt
-    if test "$_AI_VOICE_MODE" = "true"
+    if test "$_CLAI_VOICE_MODE" = "true"
         set_color magenta
         echo -n "🎤 Voice mode"
         set_color normal
@@ -679,9 +701,9 @@ function fish_right_prompt
             echo -n "($current → $suggestion)"
             set_color normal
         end
-    else if test -s $_AI_SUGGEST_FILE
+    else if test -s $_CLAI_SUGGEST_FILE
         # No input - show cached AI suggestion
-        set -l suggestion (cat $_AI_SUGGEST_FILE)
+        set -l suggestion (cat $_CLAI_SUGGEST_FILE)
         if test -n "$suggestion"
             set_color brblack
             echo -n "($suggestion)"
@@ -691,10 +713,10 @@ function fish_right_prompt
 end
 
 # Bind Ctrl+X Ctrl+V to enter voice mode
-bind \cx\cv _ai_enter_voice_mode
+bind \cx\cv _clai_enter_voice_mode
 
 # Bind Enter to voice-aware execute
-bind \r _ai_voice_execute
+bind \r _clai_voice_execute
 
 
 # ============================================
@@ -755,11 +777,11 @@ function _clai_preexec --on-event fish_preexec
 
     # Generate unique command ID
     set -g _CLAI_COMMAND_ID "$CLAI_SESSION_ID-"(date +%s)"-"(random)
-    # Store start time in milliseconds. Use nanoseconds if available.
-    # On macOS/BSD, date +%s%N may output a literal trailing "N".
-    set -l _ns (command date +%s%N 2>/dev/null)
-    if string match -rq '^[0-9]+$' -- $_ns
-        set -g _CLAI_COMMAND_START_TIME (math $_ns / 1000000)
+    # Store start time in milliseconds. Use nanoseconds if available (GNU coreutils).
+    # macOS date outputs literal "%N" instead of nanoseconds, so validate the output is numeric.
+    set -l _clai_ns (command date +%s%N 2>/dev/null)
+    if test -n "$_clai_ns"; and echo "$_clai_ns" | string match -rq '^[0-9]+$'
+        set -g _CLAI_COMMAND_START_TIME (math $_clai_ns / 1000000)
     else
         set -g _CLAI_COMMAND_START_TIME (math (command date +%s) \* 1000)
     end
@@ -769,7 +791,7 @@ function _clai_preexec --on-event fish_preexec
 
     # Fire and forget - log command start to daemon
     clai-shim log-start --session-id="$CLAI_SESSION_ID" --command-id="$_CLAI_COMMAND_ID" --cwd="$PWD" --command="$cmd" >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 end
 
 # Log command end (runs after each command)
@@ -782,10 +804,11 @@ function _clai_postexec --on-event fish_postexec
     end
 
     # Calculate end time in milliseconds. Use nanoseconds if available (GNU coreutils).
+    # macOS date outputs literal "%N" instead of nanoseconds, so validate the output is numeric.
     set -l end_time
-    set -l _ns (command date +%s%N 2>/dev/null)
-    if string match -rq '^[0-9]+$' -- $_ns
-        set end_time (math $_ns / 1000000)
+    set -l _clai_ns (command date +%s%N 2>/dev/null)
+    if test -n "$_clai_ns"; and echo "$_clai_ns" | string match -rq '^[0-9]+$'
+        set end_time (math $_clai_ns / 1000000)
     else
         set end_time (math (command date +%s) \* 1000)
     end
@@ -793,7 +816,7 @@ function _clai_postexec --on-event fish_postexec
 
     # Fire and forget - log command end to daemon
     clai-shim log-end --session-id="$CLAI_SESSION_ID" --command-id="$_CLAI_COMMAND_ID" --exit-code="$exit_code" --duration="$duration" >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 
     # Clear command tracking state
     set -g _CLAI_COMMAND_ID ""
@@ -960,16 +983,16 @@ if status is-interactive; and not set -q _CLAI_REINIT
     # Register session with daemon (fire and forget)
     # This notifies the daemon of the new shell session
     clai-shim session-start --session-id="$CLAI_SESSION_ID" --cwd="$PWD" --shell="$CLAI_CURRENT_SHELL" >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 
     # Sync fish abbreviations as alias snapshot for V2 ingest.
     abbr --show | clai-shim alias-sync --session-id="$CLAI_SESSION_ID" --shell="$CLAI_CURRENT_SHELL" --stdin >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 
     # Import shell history on first init (fire and forget)
     # This is idempotent: --if-not-exists skips if already imported
     clai-shim import-history --shell="$CLAI_CURRENT_SHELL" --if-not-exists >/dev/null 2>&1 &
-    disown %1 2>/dev/null
+    jobs -q %1 2>/dev/null; and disown %1 2>/dev/null
 
     set -l short_id (string sub -l 8 -- $CLAI_SESSION_ID)
     set -l locale ""

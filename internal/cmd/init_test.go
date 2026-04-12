@@ -204,6 +204,34 @@ func TestShellScripts_HistoryPickerDownRestoresOriginal(t *testing.T) {
 	}
 }
 
+func TestRunInit_ReplacesPlaceholders(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("CLAI_HOME", home)
+
+	out := captureStdout(t, func() {
+		if err := runInit(initCmd, []string{"zsh"}); err != nil {
+			t.Fatalf("runInit failed: %v", err)
+		}
+	})
+
+	// All template placeholders must be replaced (runInit uses DefaultConfig defaults).
+	if strings.Contains(out, "{{CLAI_SESSION_ID}}") ||
+		strings.Contains(out, "{{CLAI_UP_ARROW_HISTORY}}") ||
+		strings.Contains(out, "{{CLAI_PTY_ENABLED}}") {
+		t.Fatalf("expected placeholders to be replaced, got output with template markers")
+	}
+
+	// Default: UpArrowOpensHistory=false
+	if !strings.Contains(out, `CLAI_UP_ARROW_HISTORY=false`) {
+		t.Errorf("expected CLAI_UP_ARROW_HISTORY replacement to be false (default)")
+	}
+
+	// Default: PTY.Enabled=true
+	if !strings.Contains(out, `if [[ "true" == "true" ]]; then`) {
+		t.Errorf("expected PTY enabled replacement to be true (default) in zsh script")
+	}
+}
+
 func TestRunInit_UnsupportedShell(t *testing.T) {
 	err := runInit(initCmd, []string{"powershell"})
 	if err == nil {
@@ -408,12 +436,12 @@ func TestZshScript_EditingWidgetsDismissPicker(t *testing.T) {
 	// These widgets modify the buffer or cursor position; they must dismiss
 	// the picker so stale suggestions don't remain visible.
 	widgets := []string{
-		"_ai_self_insert",
-		"_ai_backward_delete_char",
-		"_ai_backward_char",
-		"_ai_beginning_of_line",
-		"_ai_end_of_line",
-		"_ai_bracketed_paste",
+		"_clai_self_insert",
+		"_clai_backward_delete_char",
+		"_clai_backward_char",
+		"_clai_beginning_of_line",
+		"_clai_end_of_line",
+		"_clai_bracketed_paste",
 	}
 
 	for _, widget := range widgets {
@@ -438,16 +466,16 @@ func TestZshScript_BackwardCharDoesNotAcceptSuggestion(t *testing.T) {
 	}
 	script := string(content)
 
-	body := extractFunctionBody(script, "_ai_backward_char")
+	body := extractFunctionBody(script, "_clai_backward_char")
 	if body == "" {
-		t.Fatal("_ai_backward_char() not found")
+		t.Fatal("_clai_backward_char() not found")
 	}
 
 	if strings.Contains(body, "--action=accepted") {
-		t.Fatal("_ai_backward_char() should not accept suggestions (no accepted feedback)")
+		t.Fatal("_clai_backward_char() should not accept suggestions (no accepted feedback)")
 	}
-	if !strings.Contains(body, "_ai_clear_ghost_text") {
-		t.Fatal("_ai_backward_char() should clear ghost text before moving cursor")
+	if !strings.Contains(body, "_clai_clear_ghost_text") {
+		t.Fatal("_clai_backward_char() should clear ghost text before moving cursor")
 	}
 }
 
@@ -460,16 +488,16 @@ func TestZshScript_SelfInsertSkipsSuggestForQueuedInput(t *testing.T) {
 	}
 	script := string(content)
 
-	body := extractFunctionBody(script, "_ai_self_insert")
+	body := extractFunctionBody(script, "_clai_self_insert")
 	if body == "" {
-		t.Fatal("_ai_self_insert() not found")
+		t.Fatal("_clai_self_insert() not found")
 	}
 
 	if !strings.Contains(body, "KEYS_QUEUED_COUNT") {
-		t.Error("_ai_self_insert should guard on KEYS_QUEUED_COUNT to avoid per-char suggest during paste")
+		t.Error("_clai_self_insert should guard on KEYS_QUEUED_COUNT to avoid per-char suggest during paste")
 	}
-	if !strings.Contains(body, `_AI_IN_PASTE`) {
-		t.Error("_ai_self_insert should preserve _AI_IN_PASTE guard")
+	if !strings.Contains(body, `_CLAI_IN_PASTE`) {
+		t.Error("_clai_self_insert should preserve _CLAI_IN_PASTE guard")
 	}
 }
 
@@ -486,7 +514,7 @@ func TestZshScript_RepeatableWidgetsSkipSuggestForQueuedInput(t *testing.T) {
 	script := string(content)
 
 	for _, fn := range []string{
-		"_ai_backward_delete_char",
+		"_clai_backward_delete_char",
 	} {
 		body := extractFunctionBody(script, fn)
 		if body == "" {
@@ -508,18 +536,18 @@ func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
 	script := string(content)
 
 	// Tab completion should clear ghost text before delegating.
-	tabBody := extractFunctionBody(script, "_ai_expand_or_complete")
+	tabBody := extractFunctionBody(script, "_clai_expand_or_complete")
 	if tabBody == "" {
-		t.Fatal("_ai_expand_or_complete() not found")
+		t.Fatal("_clai_expand_or_complete() not found")
 	}
-	if !strings.Contains(tabBody, "_ai_clear_ghost_text") {
-		t.Error("_ai_expand_or_complete() should call _ai_clear_ghost_text before delegating")
+	if !strings.Contains(tabBody, "_clai_clear_ghost_text") {
+		t.Error("_clai_expand_or_complete() should call _clai_clear_ghost_text before delegating")
 	}
 
 	// History navigation uses prefix search with ghost text for the remainder.
-	// _ai_up_line_or_history manages ghost text via _clai_hist_apply_ghost,
-	// _ai_down_line_or_history calls _ai_update_suggestion when exiting history mode.
-	for _, fn := range []string{"_ai_up_line_or_history", "_ai_down_line_or_history"} {
+	// _clai_up_line_or_history manages ghost text via _clai_hist_apply_ghost,
+	// _clai_down_line_or_history calls _clai_update_suggestion when exiting history mode.
+	for _, fn := range []string{"_clai_up_line_or_history", "_clai_down_line_or_history"} {
 		body := extractFunctionBody(script, fn)
 		if body == "" {
 			t.Fatalf("%s() not found", fn)
@@ -530,9 +558,9 @@ func TestZshScript_DefaultCompletionAndHistoryClearGhostText(t *testing.T) {
 	}
 
 	for _, bind := range []string{
-		"zle -N expand-or-complete _ai_expand_or_complete",
-		"zle -N up-line-or-history _ai_up_line_or_history",
-		"zle -N down-line-or-history _ai_down_line_or_history",
+		"zle -N expand-or-complete _clai_expand_or_complete",
+		"zle -N up-line-or-history _clai_up_line_or_history",
+		"zle -N down-line-or-history _clai_down_line_or_history",
 	} {
 		if !strings.Contains(script, bind) {
 			t.Errorf("missing zle binding: %s", bind)
@@ -580,7 +608,7 @@ func TestZshScript_CustomHistoryPathsClearGhostText(t *testing.T) {
 	if breakBody == "" {
 		t.Fatal("_clai_picker_break() not found")
 	}
-	if !strings.Contains(breakBody, "_ai_clear_ghost_text") {
+	if !strings.Contains(breakBody, "_clai_clear_ghost_text") {
 		t.Error("_clai_picker_break() should clear ghost text before delegating to send-break")
 	}
 }
@@ -593,28 +621,28 @@ func TestZshScript_GhostTextInvariantHook(t *testing.T) {
 	script := string(content)
 
 	for _, required := range []string{
-		"_ai_sync_ghost_text()",
-		"_ai_zle_line_pre_redraw()",
+		"_clai_sync_ghost_text()",
+		"_clai_zle_line_pre_redraw()",
 	} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("zsh script missing ghost text invariant hook: %s", required)
 		}
 	}
-	hasLegacy := strings.Contains(script, "zle -N zle-line-pre-redraw _ai_zle_line_pre_redraw")
-	hasHook := strings.Contains(script, "add-zle-hook-widget zle-line-pre-redraw _ai_zle_line_pre_redraw")
+	hasLegacy := strings.Contains(script, "zle -N zle-line-pre-redraw _clai_zle_line_pre_redraw")
+	hasHook := strings.Contains(script, "add-zle-hook-widget zle-line-pre-redraw _clai_zle_line_pre_redraw")
 	if !hasLegacy && !hasHook {
 		t.Fatalf("zsh script missing ghost text invariant hook registration")
 	}
 
-	body := extractFunctionBody(script, "_ai_sync_ghost_text")
+	body := extractFunctionBody(script, "_clai_sync_ghost_text")
 	if body == "" {
-		t.Fatal("_ai_sync_ghost_text() not found")
+		t.Fatal("_clai_sync_ghost_text() not found")
 	}
-	if !strings.Contains(body, `"$_AI_CURRENT_SUGGESTION" != "$BUFFER"*`) {
-		t.Error("_ai_sync_ghost_text() should clear when suggestion is not a prefix of BUFFER")
+	if !strings.Contains(body, `"$_CLAI_CURRENT_SUGGESTION" != "$BUFFER"*`) {
+		t.Error("_clai_sync_ghost_text() should clear when suggestion is not a prefix of BUFFER")
 	}
-	if !strings.Contains(body, "_ai_clear_ghost_text") {
-		t.Error("_ai_sync_ghost_text() should call _ai_clear_ghost_text on mismatch")
+	if !strings.Contains(body, "_clai_clear_ghost_text") {
+		t.Error("_clai_sync_ghost_text() should call _clai_clear_ghost_text on mismatch")
 	}
 }
 
@@ -630,24 +658,24 @@ func TestZshScript_ForwardCharValidatesSuggestionPrefix(t *testing.T) {
 
 	output := string(content)
 
-	// Find the _ai_forward_char function and verify it contains a prefix check.
+	// Find the _clai_forward_char function and verify it contains a prefix check.
 	// The function has nested braces so we look for the pattern between function
 	// start and the next zle -N registration.
-	start := strings.Index(output, "_ai_forward_char()")
+	start := strings.Index(output, "_clai_forward_char()")
 	if start == -1 {
-		t.Fatal("_ai_forward_char() not found in zsh script")
+		t.Fatal("_clai_forward_char() not found in zsh script")
 	}
 
 	// Extract until the next "zle -N" line (function boundary)
 	rest := output[start:]
 	end := strings.Index(rest, "zle -N forward-char")
 	if end == -1 {
-		t.Fatal("could not find end of _ai_forward_char function")
+		t.Fatal("could not find end of _clai_forward_char function")
 	}
 	body := rest[:end]
 
-	if !strings.Contains(body, `"$_AI_CURRENT_SUGGESTION" == "$BUFFER"*`) {
-		t.Error("_ai_forward_char() does not validate suggestion is a prefix of BUFFER; " +
+	if !strings.Contains(body, `"$_CLAI_CURRENT_SUGGESTION" == "$BUFFER"*`) {
+		t.Error("_clai_forward_char() does not validate suggestion is a prefix of BUFFER; " +
 			"stale suggestions after backspace will accept incorrect text")
 	}
 }
@@ -731,20 +759,20 @@ func TestZshScript_AcceptLineClearsGhostText(t *testing.T) {
 
 	output := string(content)
 
-	// Find the _ai_voice_accept_line function body up to its zle -N registration
-	start := strings.Index(output, "_ai_voice_accept_line()")
+	// Find the _clai_accept_line function body up to its zle -N registration
+	start := strings.Index(output, "_clai_accept_line()")
 	if start == -1 {
-		t.Fatal("_ai_voice_accept_line() not found in zsh script")
+		t.Fatal("_clai_accept_line() not found in zsh script")
 	}
 	rest := output[start:]
-	end := strings.Index(rest, "zle -N _ai_voice_accept_line")
+	end := strings.Index(rest, "zle -N _clai_accept_line")
 	if end == -1 {
-		t.Fatal("could not find end of _ai_voice_accept_line function")
+		t.Fatal("could not find end of _clai_accept_line function")
 	}
 	body := rest[:end]
 
 	// The normal accept-line path must clear ghost text state
-	for _, required := range []string{`POSTDISPLAY=""`, "_ai_remove_ghost_highlight"} {
+	for _, required := range []string{`POSTDISPLAY=""`, "_clai_remove_ghost_highlight"} {
 		if !strings.Contains(body, required) {
 			t.Errorf("_ai_voice_accept_line() missing %q before accept-line; "+
 				"ghost text will persist after Enter", required)
@@ -840,8 +868,8 @@ func TestZshScript_PickerUpDoubleTapDetection(t *testing.T) {
 	}
 
 	// Single tap should fall through to history navigation, not open picker
-	if !strings.Contains(upBody, "_ai_up_line_or_history") {
-		t.Error("_clai_picker_up should call _ai_up_line_or_history on single tap")
+	if !strings.Contains(upBody, "_clai_up_line_or_history") {
+		t.Error("_clai_picker_up should call _clai_up_line_or_history on single tap")
 	}
 
 	// Guard: must skip double-tap when EPOCHREALTIME is unavailable
@@ -993,10 +1021,13 @@ func TestShellScripts_DoubleUpSequenceSupport(t *testing.T) {
 		timeouts  []string
 	}{
 		{
+			// zsh uses EPOCHREALTIME timestamp-based double-tap detection
+			// instead of key-sequence bindings (which cause KEYTIMEOUT delay).
+			// Double-up sequences are explicitly removed with bindkey -r.
 			path: "shell/zsh/clai.zsh",
 			sequences: []string{
-				`bindkey '^[[A^[[A' _clai_up_arrow_double`,
-				`bindkey '^[OA^[OA' _clai_up_arrow_double`,
+				`bindkey -M "$_clai_km" -r '^[[A^[[A'`,
+				`bindkey -M "$_clai_km" -r '^[OA^[OA'`,
 			},
 			timeouts: []string{
 				"CLAI_UP_ARROW_DOUBLE_WINDOW_MS",
@@ -1112,14 +1143,14 @@ func TestInitPlaceholderReplacement(t *testing.T) {
 	if strings.Contains(replaced, "{{CLAI_SESSION_ID}}") {
 		t.Error("placeholder {{CLAI_SESSION_ID}} not replaced")
 	}
-	if !strings.Contains(replaced, "CLAI_UP_ARROW_HISTORY:=false") {
-		t.Error("expected CLAI_UP_ARROW_HISTORY:=false after replacement")
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_HISTORY=false") {
+		t.Error("expected CLAI_UP_ARROW_HISTORY=false after replacement")
 	}
-	if !strings.Contains(replaced, "CLAI_UP_ARROW_TRIGGER:=double") {
-		t.Error("expected CLAI_UP_ARROW_TRIGGER:=double after replacement")
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_TRIGGER=double") {
+		t.Error("expected CLAI_UP_ARROW_TRIGGER=double after replacement")
 	}
-	if !strings.Contains(replaced, "CLAI_UP_ARROW_DOUBLE_WINDOW_MS:=250") {
-		t.Error("expected CLAI_UP_ARROW_DOUBLE_WINDOW_MS:=250 after replacement")
+	if !strings.Contains(replaced, "CLAI_UP_ARROW_DOUBLE_WINDOW_MS=250") {
+		t.Error("expected CLAI_UP_ARROW_DOUBLE_WINDOW_MS=250 after replacement")
 	}
 }
 
@@ -1204,17 +1235,17 @@ func TestZshScript_FeedbackTracksLastAccepted(t *testing.T) {
 	}
 	script := string(content)
 
-	// Must have _AI_LAST_ACCEPTED state variable
-	if !strings.Contains(script, "_AI_LAST_ACCEPTED") {
-		t.Error("zsh script missing _AI_LAST_ACCEPTED state variable for edit tracking")
+	// Must have _CLAI_LAST_ACCEPTED state variable
+	if !strings.Contains(script, "_CLAI_LAST_ACCEPTED") {
+		t.Error("zsh script missing _CLAI_LAST_ACCEPTED state variable for edit tracking")
 	}
 
-	// Must clear _AI_LAST_ACCEPTED on accept-line
-	body := extractFunctionBody(script, "_ai_voice_accept_line")
+	// Must clear _CLAI_LAST_ACCEPTED on accept-line
+	body := extractFunctionBody(script, "_clai_accept_line")
 	if body == "" {
-		t.Fatal("_ai_voice_accept_line() not found in zsh script")
+		t.Fatal("_clai_accept_line() not found in zsh script")
 	}
-	if !strings.Contains(body, `_AI_LAST_ACCEPTED=""`) {
-		t.Error("_ai_voice_accept_line() should clear _AI_LAST_ACCEPTED after checking for edits")
+	if !strings.Contains(body, `_CLAI_LAST_ACCEPTED=""`) {
+		t.Error("_clai_accept_line() should clear _CLAI_LAST_ACCEPTED after checking for edits")
 	}
 }

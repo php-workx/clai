@@ -20,6 +20,7 @@ func TestRootCmd_HasCommands(t *testing.T) {
 		"logs",
 		"off",
 		"on",
+		"pty",
 		"status",
 		"suggest",
 		"uninstall",
@@ -98,6 +99,32 @@ func TestRootCmd_CommandGroups(t *testing.T) {
 	}
 }
 
+func TestPtyCmd_HasSubcommands(t *testing.T) {
+	var pty *cobra.Command
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Name() == "pty" {
+			pty = cmd
+			break
+		}
+	}
+
+	if pty == nil {
+		t.Fatal("pty command not found")
+	}
+
+	expectedSubs := []string{"on", "off", "status"}
+	subCmds := make(map[string]bool)
+	for _, cmd := range pty.Commands() {
+		subCmds[cmd.Name()] = true
+	}
+
+	for _, expected := range expectedSubs {
+		if !subCmds[expected] {
+			t.Errorf("Expected pty subcommand %q to be registered", expected)
+		}
+	}
+}
+
 func TestRootCmd_HiddenCommands(t *testing.T) {
 	// These commands should be hidden but still functional
 	hiddenCommands := []string{"daemon", "logs", "doctor"}
@@ -148,7 +175,7 @@ func TestRootCmd_CoreCommandsGrouped(t *testing.T) {
 
 func TestRootCmd_SetupCommandsGrouped(t *testing.T) {
 	// Setup commands should be in the setup group
-	setupCommands := []string{"status", "config", "install", "uninstall", "init", "version"}
+	setupCommands := []string{"status", "config", "install", "uninstall", "init", "pty", "version"}
 
 	for _, name := range setupCommands {
 		var found *cobra.Command

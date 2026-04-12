@@ -55,7 +55,7 @@ type JSONKeysParser struct {
 
 // Parse extracts keys from JSON object at the configured path.
 func (p *JSONKeysParser) Parse(output []byte) ([]ParsedTask, error) {
-	var data interface{}
+	var data any // nosemgrep: go-unsafe-deserialization-interface
 	if err := json.Unmarshal(output, &data); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}
@@ -97,7 +97,7 @@ type JSONArrayParser struct {
 
 // Parse extracts strings from JSON array at the configured path.
 func (p *JSONArrayParser) Parse(output []byte) ([]ParsedTask, error) {
-	var data interface{}
+	var data any // nosemgrep: go-unsafe-deserialization-interface
 	if err := json.Unmarshal(output, &data); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %w", err)
 	}

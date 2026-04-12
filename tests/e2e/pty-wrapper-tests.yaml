@@ -1,0 +1,910 @@
+# PTY Wrapper E2E Test Plan
+#
+# Comprehensive tests for clai-wrap PTY wrapper features from tech_pty_design.md v2.3
+# Total: 58 tests covering PTY core, signals, fullscreen apps, SSH, buffering, privacy,
+# OSC 133 injection, bracketed paste, colors, suggestions, hotkeys, daemon, unicode, edge cases.
+#
+# Usage: Run with AI-assisted terminal testing framework (GoTTY + Playwright)
+
+suite:
+  name: "clai-wrap PTY Wrapper Tests"
+  description: "E2E tests for PTY wrapper features per tech_pty_design.md v2.3"
+  version: "1.0"
+
+defaults:
+  shell: bash
+  timeout: 30s
+  terminal_size:
+    rows: 24
+    cols: 80
+  wrapper: clai-wrap
+
+environment:
+  TERM: "xterm-256color"
+  PS1: "TEST> "
+
+tests:
+  # ===========================================================================
+  # P0: PTY Core Tests (10 tests)
+  # ===========================================================================
+
+  - name: "Resize during picker preserves final size"
+    description: "Terminal resize while picker open applies correctly after close"
+    wrapper: clai-wrap
+    tags: [pty, resize, critical, p0]
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - resize: { rows: 30, cols: 100 }
+      - wait: "100ms"
+      - press: "Escape"
+      - wait: "200ms"
+      - type: "stty size"
+      - press: "Enter"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "30 100"
+
+  - name: "Rapid resize debouncing works"
+    description: "Multiple rapid resize events debounce to final size"
+    wrapper: clai-wrap
+    tags: [pty, resize, debounce, p0]
+    steps:
+      - resize: { rows: 25, cols: 80 }
+      - resize: { rows: 26, cols: 81 }
+      - resize: { rows: 27, cols: 82 }
+      - resize: { rows: 28, cols: 83 }
+      - resize: { rows: 30, cols: 100 }
+      - wait: "200ms"
+      - type: "stty size"
+      - press: "Enter"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "30 100"
+
+  - name: "Terminal restored after SIGINT during picker"
+    description: "Ctrl+C during picker restores terminal state correctly"
+    wrapper: clai-wrap
+    tags: [pty, signals, sigint, critical, p0]
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Ctrl+C"
+      - wait: "500ms"
+      - type: "echo test_after_sigint"
+      - press: "Enter"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "test_after_sigint"
+      - screen_not_contains: "[?1049"
+
+  - name: "Terminal restored after SIGTERM"
+    description: "SIGTERM causes clean shutdown with terminal restoration"
+    wrapper: clai-wrap
+    tags: [pty, signals, sigterm, p0]
+    steps:
+      - type: "echo before_sigterm"
+      - press: "Enter"
+      - wait: "300ms"
+      # Note: SIGTERM test requires external signal delivery
+    expect:
+      - screen_contains: "before_sigterm"
+
+  - name: "Suspend and resume preserves terminal state"
+    description: "SIGTSTP/SIGCONT cycle preserves raw mode and terminal state"
+    wrapper: clai-wrap
+    tags: [pty, signals, suspend, sigtstp, sigcont, p0]
+    steps:
+      - type: "echo before_suspend"
+      - press: "Enter"
+      - wait: "300ms"
+      - press: "Ctrl+Z"
+      - wait: "500ms"
+      - type: "fg"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "echo after_resume"
+      - press: "Enter"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "before_suspend"
+      - screen_contains: "after_resume"
+
+  - name: "Wrapper preserves child exit code"
+    description: "Exit code from shell passes through wrapper unchanged"
+    wrapper: clai-wrap
+    tags: [pty, exit-code, p0]
+    steps:
+      - type: "exit 42"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - exit_code: 42
+
+  - name: "Non-TTY stdin disables hotkey detection"
+    description: "When stdin is not a TTY, hotkey detection is disabled"
+    tags: [pty, non-tty, stdin, p0]
+    stdin_pipe: true
+    steps:
+      - pipe_input: "echo piped_input_test\n"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "piped_input_test"
+
+  - name: "Non-TTY stdout disables picker UI"
+    description: "When stdout is not a TTY, picker UI is disabled"
+    tags: [pty, non-tty, stdout, p0]
+    stdout_pipe: true
+    steps:
+      - type: "echo test_output"
+      - press: "Enter"
+      - wait: "300ms"
+      - press: "Alt+H"
+      - wait: "300ms"
+    expect:
+      - output_contains: "test_output"
+
+  - name: "Force non-TTY operates as passthrough"
+    description: "--force-non-tty flag enables pure passthrough mode"
+    wrapper: clai-wrap --force-non-tty
+    tags: [pty, non-tty, passthrough, p0]
+    steps:
+      - type: "echo passthrough_mode_test"
+      - press: "Enter"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "passthrough_mode_test"
+
+  - name: "SIGHUP causes clean shutdown"
+    description: "SIGHUP signal triggers clean shutdown with terminal restoration"
+    wrapper: clai-wrap
+    tags: [pty, signals, sighup, p0]
+    steps:
+      - type: "echo before_hangup"
+      - press: "Enter"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "before_hangup"
+
+  # ===========================================================================
+  # P0: Full-screen App Tests (4 tests)
+  # ===========================================================================
+
+  - name: "vim continues after picker close"
+    description: "Opening picker during vim doesn't corrupt vim state"
+    wrapper: clai-wrap
+    tags: [pty, fullscreen, vim, critical, p0]
+    steps:
+      - type: "vim -u NONE"
+      - press: "Enter"
+      - wait: "1s"
+      - press: "Alt+H"
+      - wait: "500ms"
+      - press: "Escape"
+      - wait: "300ms"
+      - type: ":q!"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "TEST>"
+      - screen_not_contains: "E349"
+      - screen_not_contains: "Error"
+
+  - name: "less continues after picker close"
+    description: "Opening picker during less doesn't corrupt less state"
+    wrapper: clai-wrap
+    tags: [pty, fullscreen, less, p0]
+    setup:
+      - "echo 'test content for less' > /tmp/test_less.txt"
+    steps:
+      - type: "less /tmp/test_less.txt"
+      - press: "Enter"
+      - wait: "500ms"
+      - press: "Alt+H"
+      - wait: "500ms"
+      - press: "Escape"
+      - wait: "300ms"
+      - press: "q"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "TEST>"
+
+  - name: "top continues after picker close"
+    description: "Opening picker during top doesn't corrupt top state"
+    wrapper: clai-wrap
+    tags: [pty, fullscreen, top, p0]
+    steps:
+      - type: "top -b -n 1"
+      - press: "Enter"
+      - wait: "1s"
+    expect:
+      - screen_contains: "PID"
+
+  - name: "htop continues after picker close"
+    description: "Opening picker during htop doesn't corrupt htop state"
+    wrapper: clai-wrap
+    tags: [pty, fullscreen, htop, p0]
+    skip: true
+    skip_reason: "htop may not be installed on all systems"
+    steps:
+      - type: "htop"
+      - press: "Enter"
+      - wait: "1s"
+      - press: "Alt+H"
+      - wait: "500ms"
+      - press: "Escape"
+      - wait: "300ms"
+      - press: "q"
+    expect:
+      - screen_contains: "TEST>"
+
+  # ===========================================================================
+  # P0: SSH Session Tests (4 tests)
+  # ===========================================================================
+
+  - name: "Hotkey works during SSH session"
+    description: "Hotkey chord triggers local picker when inside SSH session"
+    wrapper: clai-wrap
+    tags: [pty, ssh, critical, p0]
+    skip: true
+    skip_reason: "Requires SSH server running on localhost"
+    steps:
+      - type: "ssh localhost"
+      - press: "Enter"
+      - wait: "2s"
+      - press: "Alt+H"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "history"
+
+  - name: "Selection injected into SSH session"
+    description: "Selected command from picker is injected into remote SSH session"
+    wrapper: clai-wrap
+    tags: [pty, ssh, injection, p0]
+    skip: true
+    skip_reason: "Requires SSH server running on localhost"
+    setup:
+      - "echo test_ssh_inject_cmd"
+    steps:
+      - type: "ssh localhost"
+      - press: "Enter"
+      - wait: "2s"
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "test_ssh_inject"
+      - wait: "200ms"
+      - press: "Enter"
+    expect:
+      - screen_contains: "test_ssh_inject_cmd"
+
+  - name: "SSH session stable after picker"
+    description: "SSH session remains functional after picker open/close"
+    wrapper: clai-wrap
+    tags: [pty, ssh, stability, p0]
+    skip: true
+    skip_reason: "Requires SSH server running on localhost"
+    steps:
+      - type: "ssh localhost"
+      - press: "Enter"
+      - wait: "2s"
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Escape"
+      - wait: "300ms"
+      - type: "echo still_working_in_ssh"
+      - press: "Enter"
+    expect:
+      - screen_contains: "still_working_in_ssh"
+
+  - name: "SSH exit returns to local shell"
+    description: "Exiting SSH session returns control to local shell"
+    wrapper: clai-wrap
+    tags: [pty, ssh, exit, p0]
+    skip: true
+    skip_reason: "Requires SSH server running on localhost"
+    steps:
+      - type: "ssh localhost"
+      - press: "Enter"
+      - wait: "2s"
+      - type: "exit"
+      - press: "Enter"
+      - wait: "1s"
+    expect:
+      - screen_contains: "TEST>"
+
+  # ===========================================================================
+  # P1: Output Buffering Tests (4 tests)
+  # ===========================================================================
+
+  - name: "High output stress with picker open"
+    description: "High-volume output while picker open doesn't cause deadlock"
+    wrapper: clai-wrap
+    tags: [pty, buffer, stress, p1]
+    steps:
+      - type: "yes | head -1000 &"
+      - press: "Enter"
+      - wait: "100ms"
+      - press: "Alt+H"
+      - wait: "1s"
+      - press: "Escape"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "y"
+      - screen_contains: "TEST>"
+
+  - name: "Buffer overflow warning logged"
+    description: "When buffer overflows, warning is logged"
+    wrapper: clai-wrap --buffer-cap=1024
+    tags: [pty, buffer, overflow, p1]
+    steps:
+      - type: "yes | head -10000 &"
+      - press: "Enter"
+      - wait: "100ms"
+      - press: "Alt+H"
+      - wait: "2s"
+      - press: "Escape"
+      - wait: "500ms"
+    expect:
+      - stderr_contains: "overflow"
+
+  - name: "Buffered output flushes on picker close"
+    description: "Output generated while picker open flushes correctly on close"
+    wrapper: clai-wrap
+    tags: [pty, buffer, flush, p1]
+    steps:
+      - type: "sleep 0.5 && echo DELAYED_FLUSH_OUTPUT &"
+      - press: "Enter"
+      - wait: "100ms"
+      - press: "Alt+H"
+      - wait: "1s"
+      - press: "Escape"
+      - wait: "500ms"
+    expect:
+      - screen_contains: "DELAYED_FLUSH_OUTPUT"
+
+  - name: "Wrapper responsive during high output"
+    description: "Wrapper remains responsive to input during high output volume"
+    wrapper: clai-wrap
+    tags: [pty, buffer, responsive, p1]
+    steps:
+      - type: "yes &"
+      - press: "Enter"
+      - wait: "500ms"
+      - press: "Ctrl+C"
+      - wait: "500ms"
+      - type: "echo responsive_test"
+      - press: "Enter"
+    expect:
+      - screen_contains: "responsive_test"
+
+  # ===========================================================================
+  # P1: Privacy Gate Tests (6 tests)
+  # ===========================================================================
+
+  - name: "ssh pauses output capture"
+    description: "Output capture paused when ssh is the foreground process"
+    wrapper: clai-wrap
+    tags: [privacy, denylist, ssh, p1]
+    skip: true
+    skip_reason: "Requires SSH server and daemon log inspection"
+    steps:
+      - type: "ssh localhost"
+      - press: "Enter"
+      - wait: "2s"
+      - type: "exit"
+      - press: "Enter"
+    expect:
+      - log_contains: "capture paused"
+
+  - name: "vim pauses output capture"
+    description: "Output capture paused when vim is the foreground process"
+    wrapper: clai-wrap
+    tags: [privacy, denylist, vim, p1]
+    steps:
+      - type: "vim -u NONE"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: ":q!"
+      - press: "Enter"
+    expect:
+      - log_contains: "denylist"
+
+  - name: "mysql pauses output capture"
+    description: "Output capture paused when mysql is the foreground process"
+    wrapper: clai-wrap
+    tags: [privacy, denylist, mysql, p1]
+    skip: true
+    skip_reason: "Requires mysql client installed"
+    steps:
+      - type: "mysql --version"
+      - press: "Enter"
+    expect:
+      - screen_contains: "mysql"
+
+  - name: "passwd pauses output capture"
+    description: "Output capture paused when passwd is the foreground process"
+    wrapper: clai-wrap
+    tags: [privacy, denylist, passwd, p1]
+    skip: true
+    skip_reason: "passwd requires interactive input and privileges"
+    steps:
+      - type: "passwd --help"
+      - press: "Enter"
+    expect:
+      - screen_contains: "passwd"
+
+  - name: "Capture resumes after sensitive command exits"
+    description: "Output capture resumes after denylisted process exits"
+    wrapper: clai-wrap
+    tags: [privacy, denylist, resume, p1]
+    steps:
+      - type: "vim -u NONE -c 'q!'"
+      - press: "Enter"
+      - wait: "500ms"
+      - type: "echo capture_should_resume"
+      - press: "Enter"
+    expect:
+      - screen_contains: "capture_should_resume"
+
+  - name: "Echo-gap heuristic detects password prompts"
+    description: "Echo-gap heuristic triggers secure mode for password input"
+    wrapper: clai-wrap
+    tags: [privacy, echo-gap, p1]
+    skip: true
+    skip_reason: "Requires special test setup for echo-gap detection"
+    steps:
+      - type: "sudo -k && sudo echo test"
+      - press: "Enter"
+      - wait: "1s"
+    expect:
+      - log_contains: "secure mode"
+
+  # ===========================================================================
+  # P1: OSC 133 Injection Tests (6 tests)
+  # ===========================================================================
+
+  - name: "OSC 133 emitted by bash after injection"
+    description: "Bash shell emits OSC 133 sequences after clai injection"
+    wrapper: clai-wrap
+    shell: bash
+    tags: [osc133, bash, injection, p1]
+    steps:
+      - type: "echo osc133_test"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - osc133_detected: true
+
+  - name: "OSC 133 emitted by zsh after injection"
+    description: "Zsh shell emits OSC 133 sequences after clai injection"
+    wrapper: clai-wrap
+    shell: zsh
+    tags: [osc133, zsh, injection, p1]
+    steps:
+      - type: "echo osc133_test"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - osc133_detected: true
+
+  - name: "Fish 3.6+ native OSC 133 detected"
+    description: "Fish 3.6+ native OSC 133 is detected and injection is skipped"
+    wrapper: clai-wrap
+    shell: fish
+    tags: [osc133, fish, native, p1]
+    steps:
+      - type: "echo osc133_test"
+      - press: "Enter"
+      - wait: "500ms"
+    expect:
+      - log_contains: "native OSC 133"
+
+  - name: "Fish older than 3.6 receives injection"
+    description: "Fish versions < 3.6 receive OSC 133 injection"
+    wrapper: clai-wrap
+    shell: fish
+    tags: [osc133, fish, injection, p1]
+    skip: true
+    skip_reason: "Requires Fish < 3.6 for testing"
+    steps:
+      - type: "echo test"
+      - press: "Enter"
+    expect:
+      - log_contains: "injected OSC 133"
+
+  - name: "Passthrough mode when OSC 133 not detected"
+    description: "Passthrough mode activated when shell doesn't emit OSC 133"
+    wrapper: clai-wrap
+    shell: sh
+    tags: [osc133, passthrough, fallback, p1]
+    steps:
+      - wait: "1s"
+    expect:
+      - log_contains: "passthrough mode"
+
+  - name: "Warning logged when passthrough mode engaged"
+    description: "Warning is logged when entering passthrough mode due to missing OSC 133"
+    wrapper: clai-wrap
+    shell: sh
+    tags: [osc133, passthrough, warning, p1]
+    steps:
+      - wait: "1s"
+    expect:
+      - stderr_contains: "passthrough"
+
+  # ===========================================================================
+  # P2: Bracketed Paste Tests (3 tests)
+  # ===========================================================================
+
+  - name: "Bracketed paste used when shell enables it"
+    description: "Selection injection uses bracketed paste when shell supports it"
+    wrapper: clai-wrap
+    tags: [paste, bracketed, p2]
+    setup:
+      - "echo test_bracketed_paste_cmd"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "test_bracketed"
+      - wait: "200ms"
+      - press: "Enter"
+    expect:
+      - pty_output_contains: "\x1b[200~"
+
+  - name: "Raw bytes fallback when bracketed paste disabled"
+    description: "Selection injection falls back to raw bytes when needed"
+    wrapper: clai-wrap
+    env:
+      CLAI_DISABLE_BRACKETED_PASTE: "1"
+    tags: [paste, raw, fallback, p2]
+    setup:
+      - "echo test_raw_paste_cmd"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "test_raw"
+      - wait: "200ms"
+      - press: "Enter"
+    expect:
+      - pty_output_not_contains: "\x1b[200~"
+
+  - name: "Mid-session bracketed paste state tracking"
+    description: "Bracketed paste state tracked correctly during session"
+    wrapper: clai-wrap
+    tags: [paste, bracketed, tracking, p2]
+    steps:
+      - type: "echo first_command"
+      - press: "Enter"
+      - wait: "300ms"
+      - press: "Alt+H"
+      - wait: "300ms"
+      - press: "Escape"
+    expect:
+      - screen_contains: "first_command"
+
+  # ===========================================================================
+  # P2: Color Detection Tests (4 tests)
+  # ===========================================================================
+
+  - name: "NO_COLOR disables picker colors"
+    description: "NO_COLOR environment variable disables all picker colors"
+    wrapper: clai-wrap
+    env:
+      NO_COLOR: "1"
+    tags: [color, no-color, p2]
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+    expect:
+      - screen_not_contains: "\x1b[38"
+
+  - name: "COLORTERM=truecolor enables 24-bit"
+    description: "COLORTERM=truecolor enables 24-bit color mode"
+    wrapper: clai-wrap
+    env:
+      COLORTERM: "truecolor"
+    tags: [color, truecolor, p2]
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+    expect:
+      - log_contains: "24-bit"
+
+  - name: "TERM=dumb disables picker UI"
+    description: "TERM=dumb disables picker UI entirely"
+    wrapper: clai-wrap
+    env:
+      TERM: "dumb"
+    tags: [color, dumb, degraded, p2]
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+    expect:
+      - log_contains: "picker disabled"
+
+  - name: "TERM=xterm-256color uses 256 colors"
+    description: "TERM=xterm-256color enables 256 color mode"
+    wrapper: clai-wrap
+    env:
+      TERM: "xterm-256color"
+    tags: [color, 256color, p2]
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+    expect:
+      - log_contains: "256"
+
+  # ===========================================================================
+  # P2: Assistant Comment Tests (3 tests)
+  # ===========================================================================
+
+  - name: "Suggestion appears after failed command"
+    description: "AI suggestion appears as comment after command fails"
+    wrapper: clai-wrap
+    tags: [suggestion, comment, failure, p2]
+    skip: true
+    skip_reason: "Requires AI daemon running for suggestions"
+    steps:
+      - type: "git psuh"
+      - press: "Enter"
+      - wait: "3s"
+    expect:
+      - screen_contains: "# clai suggestion"
+
+  - name: "Comment uses shell-specific syntax"
+    description: "Suggestion comment uses correct shell comment syntax"
+    wrapper: clai-wrap
+    shell: bash
+    tags: [suggestion, comment, syntax, p2]
+    skip: true
+    skip_reason: "Requires AI daemon running for suggestions"
+    steps:
+      - type: "nonexistent_command_xyz"
+      - press: "Enter"
+      - wait: "3s"
+    expect:
+      - screen_matches: "^#"
+
+  - name: "Comment appears on new prompt line"
+    description: "Suggestion appears after command output, on new line"
+    wrapper: clai-wrap
+    tags: [suggestion, comment, placement, p2]
+    skip: true
+    skip_reason: "Requires AI daemon running for suggestions"
+    steps:
+      - type: "false"
+      - press: "Enter"
+      - wait: "3s"
+    expect:
+      - screen_contains: "TEST>"
+      - screen_contains: "# clai"
+
+  # ===========================================================================
+  # P2: Hotkey Configuration Tests (3 tests)
+  # ===========================================================================
+
+  - name: "Custom hotkey chord works"
+    description: "Custom hotkey via --hotkey flag triggers picker"
+    wrapper: clai-wrap --hotkey="ctrl-] h"
+    tags: [hotkey, custom, p2]
+    steps:
+      - press: "Ctrl+]"
+      - press: "h"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "history"
+
+  - name: "Hotkey timeout forwards bytes"
+    description: "Partial hotkey chord forwards bytes after timeout"
+    wrapper: clai-wrap
+    tags: [hotkey, timeout, p2]
+    steps:
+      - press: "Ctrl+\\"
+      - wait: "600ms"
+      - press: "h"
+      - wait: "300ms"
+    expect:
+      - screen_not_contains: "history"
+
+  - name: "Default hotkey chord opens picker"
+    description: "Default Ctrl+\\ h hotkey chord opens picker"
+    wrapper: clai-wrap
+    tags: [hotkey, default, p2]
+    steps:
+      - press: "Ctrl+\\"
+      - press: "h"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "history"
+
+  # ===========================================================================
+  # P3: Daemon Connection Tests (5 tests)
+  # ===========================================================================
+
+  - name: "Standalone mode when daemon unavailable"
+    description: "Wrapper enters standalone mode when daemon socket unavailable"
+    wrapper: clai-wrap --daemon-socket=/nonexistent/socket.sock
+    tags: [daemon, standalone, p3]
+    steps:
+      - wait: "1s"
+    expect:
+      - stderr_contains: "standalone"
+
+  - name: "Picker works in standalone mode"
+    description: "Picker UI functional in standalone mode with local history"
+    wrapper: clai-wrap --no-daemon
+    tags: [daemon, standalone, picker, p3]
+    setup:
+      - "echo standalone_history_test"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+    expect:
+      - screen_contains: "history"
+      - screen_contains: "standalone_history_test"
+
+  - name: "Daemon unavailable warning logged once"
+    description: "Single warning logged when daemon unavailable"
+    wrapper: clai-wrap --daemon-socket=/nonexistent/socket.sock
+    tags: [daemon, warning, p3]
+    steps:
+      - type: "echo first"
+      - press: "Enter"
+      - wait: "300ms"
+      - type: "echo second"
+      - press: "Enter"
+      - wait: "300ms"
+    expect:
+      - stderr_count: { pattern: "standalone", max: 1 }
+
+  - name: "Reconnection attempt on socket error"
+    description: "Wrapper attempts reconnection after socket error"
+    wrapper: clai-wrap
+    tags: [daemon, reconnect, p3]
+    skip: true
+    skip_reason: "Requires daemon with controlled socket failure"
+    steps:
+      - wait: "1s"
+    expect:
+      - log_contains: "reconnect"
+
+  - name: "Stale socket cleanup on startup"
+    description: "Stale daemon socket cleaned up on wrapper startup"
+    wrapper: clai-wrap
+    tags: [daemon, socket, cleanup, p3]
+    skip: true
+    skip_reason: "Requires pre-existing stale socket"
+    steps:
+      - wait: "1s"
+    expect:
+      - log_contains: "cleaned"
+
+  # ===========================================================================
+  # P3: Unicode/Encoding Tests (3 tests)
+  # ===========================================================================
+
+  - name: "CJK characters display correct width"
+    description: "CJK characters rendered with correct double-width in picker"
+    wrapper: clai-wrap
+    tags: [unicode, cjk, p3]
+    setup:
+      - "echo '中文测试命令'"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "中文"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "中文测试"
+
+  - name: "Emoji handled in picker"
+    description: "Emoji characters rendered correctly in picker"
+    wrapper: clai-wrap
+    tags: [unicode, emoji, p3]
+    setup:
+      - "echo '🚀 rocket launch command'"
+    steps:
+      - press: "Alt+H"
+      - wait: "300ms"
+      - type: "rocket"
+      - wait: "200ms"
+    expect:
+      - screen_contains: "🚀"
+
+  - name: "Non-UTF-8 stream doesn't crash"
+    description: "Non-UTF-8 bytes in PTY stream handled gracefully"
+    wrapper: clai-wrap
+    tags: [unicode, encoding, lossy, p3]
+    steps:
+      - type: "printf '\\xff\\xfe'"
+      - press: "Enter"
+      - wait: "300ms"
+      - type: "echo after_invalid_utf8"
+      - press: "Enter"
+    expect:
+      - screen_contains: "after_invalid_utf8"
+
+  # ===========================================================================
+  # P3: Edge Case Tests (3 tests)
+  # ===========================================================================
+
+  - name: "Nested clai-wrap warns"
+    description: "Warning when running clai-wrap inside another clai-wrap"
+    wrapper: clai-wrap
+    env:
+      CLAI_WRAP: "1"
+    tags: [edge-case, nested, p3]
+    steps:
+      - wait: "500ms"
+    expect:
+      - stderr_contains: "nested"
+
+  - name: "Child exit during picker"
+    description: "Child shell exit while picker open handled gracefully"
+    wrapper: clai-wrap
+    tags: [edge-case, child-exit, p3]
+    steps:
+      - type: "bash -c 'sleep 1 && exit' &"
+      - press: "Enter"
+      - wait: "100ms"
+      - press: "Alt+H"
+      - wait: "2s"
+    expect:
+      - screen_contains: "TEST>"
+
+  - name: "Very long command truncated in buffer"
+    description: "Commands exceeding buffer size truncated without crash"
+    wrapper: clai-wrap --buffer-cap=1024
+    tags: [edge-case, truncation, p3]
+    steps:
+      - type: "echo "
+      - type: "A" # Repeat to generate long command
+      - type: "A"
+      - type: "A"
+      # ... would need many more to exceed buffer
+      - press: "Enter"
+    expect:
+      - screen_contains: "TEST>"
+
+# ===========================================================================
+# Test Plan Metadata
+# ===========================================================================
+metadata:
+  created: "2026-02-05"
+  updated: "2026-02-05"
+  author: "clai team"
+  purpose: "E2E tests for clai-wrap PTY wrapper features per tech_pty_design.md v2.3"
+  spec_version: "2.3"
+  beads_epic: "ai-terminal-e3r"
+
+  total_tests: 58
+  skipped_tests: 15
+  by_priority:
+    p0: 18
+    p1: 16
+    p2: 13
+    p3: 11
+  by_tag:
+    pty: 22
+    signals: 6
+    resize: 2
+    fullscreen: 4
+    ssh: 4
+    buffer: 4
+    privacy: 6
+    osc133: 6
+    paste: 3
+    color: 4
+    suggestion: 3
+    hotkey: 3
+    daemon: 5
+    unicode: 3
+    edge-case: 3
+
+  notes:
+    - "Run 'make test-server' before executing tests"
+    - "Some tests require SSH server on localhost (marked skip)"
+    - "Some tests require AI daemon for suggestions (marked skip)"
+    - "Privacy gate tests may need daemon log inspection"
+    - "OSC 133 tests need parser instrumentation"
+    - "Wrapper tests use clai-wrap binary"

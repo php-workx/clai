@@ -19,8 +19,6 @@ import (
 	pb "github.com/runger/clai/gen/clai/v1"
 	"github.com/runger/clai/internal/config"
 	"github.com/runger/clai/internal/provider"
-	"github.com/runger/clai/internal/storage"
-	"github.com/runger/clai/internal/suggest"
 	"github.com/runger/clai/internal/suggestions/alias"
 	"github.com/runger/clai/internal/suggestions/api"
 	"github.com/runger/clai/internal/suggestions/batch"
@@ -30,6 +28,7 @@ import (
 	"github.com/runger/clai/internal/suggestions/ingest"
 	"github.com/runger/clai/internal/suggestions/learning"
 	"github.com/runger/clai/internal/suggestions/maintenance"
+	"github.com/runger/clai/internal/suggestions/ops"
 	"github.com/runger/clai/internal/suggestions/projecttype"
 	search2 "github.com/runger/clai/internal/suggestions/search"
 	suggest2 "github.com/runger/clai/internal/suggestions/suggest"
@@ -50,19 +49,22 @@ type suggestSnapshot struct {
 	ShownAtMs   int64
 }
 
+type capturedEntry struct {
+	createdAt time.Time
+	size      int64
+}
+
 // Server is the main daemon server that handles all gRPC requests.
 type Server struct {
 	pb.UnimplementedClaiServiceServer
 	lastActivity         time.Time
 	startTime            time.Time
 	diagListener         net.Listener
-	store                storage.Store
-	ranker               suggest.Ranker
 	llm                  LLMQuerier
 	listener             net.Listener
-	aliasStore           *alias.Store
-	batchWriter          *batch.Writer
-	paths                *config.Paths
+	jsonListener         net.Listener
+	maintenanceRunner    *maintenance.Runner
+	searchSvc            *search2.Service
 	logger               *slog.Logger
 	sessionManager       *SessionManager
 	grpcServer           *grpc.Server
@@ -74,43 +76,42 @@ type Server struct {
 	weightsCache         map[string]cachedWeights
 	feedbackStore        *feedback.Store
 	dismissalStore       *dismissal.Store
-	maintenanceRunner    *maintenance.Runner
+	batchWriter          *batch.Writer
 	diagnosticsMux       *http.ServeMux
 	diagHTTPServer       *http.Server
-	v2Scorer             *suggest2.Scorer
-	v2SearchSvc          *search2.Service
+	scorer               *suggest2.Scorer
+	paths                *config.Paths
 	learner              *learning.Learner
 	projectDetector      *projecttype.Detector
-	v2db                 *suggestdb.DB
+	db                   *suggestdb.DB
 	workflowMiner        *workflow.Miner
 	learningStore        *learning.Store
-	scorerVersion        string
-	workflowMineInterval time.Duration
+	capturedSize         map[string]capturedEntry
+	aliasStore           *alias.Store
+	wg                   sync.WaitGroup
 	idleTimeout          time.Duration
 	commandsLogged       int64
-	wg                   sync.WaitGroup
+	workflowMineInterval time.Duration
 	weightsCacheMu       sync.RWMutex
 	snapshotMu           sync.RWMutex
 	mu                   sync.RWMutex
 	shutdownOnce         sync.Once
+	captureMu            sync.Mutex
 }
 
 // ServerConfig contains configuration options for the daemon server.
 type ServerConfig struct {
 	LLM               LLMQuerier
-	Ranker            suggest.Ranker
-	Store             storage.Store
 	MaintenanceRunner *maintenance.Runner
 	Paths             *config.Paths
 	Logger            *slog.Logger
 	FeedbackStore     *feedback.Store
 	DismissalStore    *dismissal.Store
 	Registry          *provider.Registry
-	V2DB              *suggestdb.DB
+	DB                *suggestdb.DB
 	BatchWriter       *batch.Writer
-	V2Scorer          *suggest2.Scorer
+	Scorer            *suggest2.Scorer
 	ReloadFn          ReloadFunc
-	ScorerVersion     string
 	IdleTimeout       time.Duration
 }
 
@@ -119,13 +120,12 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config is required")
 	}
-	if cfg.Store == nil {
-		return nil, fmt.Errorf("store is required")
+	if cfg.DB == nil {
+		return nil, fmt.Errorf("DB is required")
 	}
 
 	paths := defaultPaths(cfg.Paths)
 	logger := defaultLogger(cfg.Logger)
-	ranker := defaultRanker(cfg.Ranker, cfg.Store)
 	registry := defaultRegistry(cfg.Registry)
 	idleTimeout := defaultIdleTimeout(cfg.IdleTimeout)
 
@@ -137,24 +137,21 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		Logger: logger,
 	})
 
-	bw := resolveBatchWriter(cfg.BatchWriter, cfg.V2DB)
-	v2scorer := resolveV2Scorer(cfg.V2Scorer, cfg.V2DB, logger)
-	scorerVersion := resolveScorerVersion(cfg.ScorerVersion, v2scorer, logger)
-	v2SearchSvc := resolveV2SearchSvc(cfg.V2DB, logger)
-	diagMux := resolveDiagnosticsMux(v2scorer, v2SearchSvc, logger)
+	bw := resolveBatchWriter(cfg.BatchWriter, cfg.DB)
+	scorer := resolveScorer(cfg.Scorer, cfg.DB, logger)
+	searchSvc := resolveSearchSvc(cfg.DB, logger)
+	diagMux := resolveDiagnosticsMux(scorer, searchSvc, logger)
 	projectDetector := projecttype.NewDetector(projecttype.DetectorOptions{})
-	aliasStore := resolveAliasStore(cfg.V2DB)
-	feedbackStore := resolveFeedbackStore(cfg.FeedbackStore, cfg.V2DB, logger)
-	dismissalStore := resolveDismissalStore(cfg.DismissalStore, cfg.V2DB, logger)
-	learningStore := resolveLearningStore(cfg.V2DB)
+	aliasStore := resolveAliasStore(cfg.DB)
+	feedbackStore := resolveFeedbackStore(cfg.FeedbackStore, cfg.DB, logger)
+	dismissalStore := resolveDismissalStore(cfg.DismissalStore, cfg.DB, logger)
+	learningStore := resolveLearningStore(cfg.DB)
 	learner := resolveLearner(learningStore)
-	workflowMiner, workflowInterval := resolveWorkflowMiner(cfg.V2DB)
+	workflowMiner, workflowInterval := resolveWorkflowMiner(cfg.DB)
 
 	now := time.Now()
 	return &Server{
-		store:                cfg.Store,
-		v2db:                 cfg.V2DB,
-		ranker:               ranker,
+		db:                   cfg.DB,
 		registry:             registry,
 		llm:                  cfg.LLM,
 		paths:                paths,
@@ -166,12 +163,12 @@ func NewServer(cfg *ServerConfig) (*Server, error) {
 		lastActivity:         now,
 		idleTimeout:          idleTimeout,
 		shutdownChan:         make(chan struct{}),
+		capturedSize:         make(map[string]capturedEntry),
 		maintenanceRunner:    cfg.MaintenanceRunner,
 		diagnosticsMux:       diagMux,
 		batchWriter:          bw,
-		v2Scorer:             v2scorer,
-		v2SearchSvc:          v2SearchSvc,
-		scorerVersion:        scorerVersion,
+		scorer:               scorer,
+		searchSvc:            searchSvc,
 		projectDetector:      projectDetector,
 		aliasStore:           aliasStore,
 		workflowMiner:        workflowMiner,
@@ -198,13 +195,6 @@ func defaultLogger(logger *slog.Logger) *slog.Logger {
 	return logger
 }
 
-func defaultRanker(ranker suggest.Ranker, store storage.Store) suggest.Ranker {
-	if ranker == nil {
-		return suggest.NewRanker(store)
-	}
-	return ranker
-}
-
 func defaultRegistry(registry *provider.Registry) *provider.Registry {
 	if registry == nil {
 		return provider.NewRegistry()
@@ -219,52 +209,34 @@ func defaultIdleTimeout(timeout time.Duration) time.Duration {
 	return timeout
 }
 
-func resolveBatchWriter(override *batch.Writer, v2db *suggestdb.DB) *batch.Writer {
+func resolveBatchWriter(override *batch.Writer, db *suggestdb.DB) *batch.Writer {
 	if override != nil {
 		return override
 	}
-	if v2db == nil {
+	if db == nil {
 		return nil
 	}
 	opts := batch.DefaultOptions()
 	opts.WritePathConfig = &ingest.WritePathConfig{}
-	return batch.NewWriter(v2db.DB(), opts)
+	return batch.NewWriter(db.DB(), opts)
 }
 
-func resolveV2Scorer(override *suggest2.Scorer, v2db *suggestdb.DB, logger *slog.Logger) *suggest2.Scorer {
+func resolveScorer(override *suggest2.Scorer, db *suggestdb.DB, logger *slog.Logger) *suggest2.Scorer {
 	if override != nil {
 		return override
 	}
-	if v2db == nil {
+	if db == nil {
 		return nil
 	}
-	return initV2Scorer(v2db.DB(), logger)
+	return initScorer(db.DB(), logger)
 }
 
-func resolveScorerVersion(requested string, v2scorer *suggest2.Scorer, logger *slog.Logger) string {
-	version := requested
-	if version == "" {
-		if v2scorer != nil {
-			version = "v2"
-		} else {
-			version = "v1"
-		}
-	}
-	if version == "v2" && v2scorer == nil {
-		logger.Warn("scorer_version requires V2 scorer but V2 is unavailable; falling back to v1",
-			"requested", version,
-		)
-		return "v1"
-	}
-	return version
-}
-
-func resolveDiagnosticsMux(v2scorer *suggest2.Scorer, searchSvc *search2.Service, logger *slog.Logger) *http.ServeMux {
-	if v2scorer == nil {
+func resolveDiagnosticsMux(scorer *suggest2.Scorer, searchSvc *search2.Service, logger *slog.Logger) *http.ServeMux {
+	if scorer == nil {
 		return nil
 	}
 	handler := api.NewHandler(api.HandlerDependencies{
-		Scorer:    v2scorer,
+		Scorer:    scorer,
 		SearchSvc: searchSvc,
 		Logger:    logger,
 	})
@@ -273,53 +245,53 @@ func resolveDiagnosticsMux(v2scorer *suggest2.Scorer, searchSvc *search2.Service
 	return mux
 }
 
-func resolveV2SearchSvc(v2db *suggestdb.DB, logger *slog.Logger) *search2.Service {
-	if v2db == nil {
+func resolveSearchSvc(db *suggestdb.DB, logger *slog.Logger) *search2.Service {
+	if db == nil {
 		return nil
 	}
-	svc, err := search2.NewService(v2db.DB(), search2.Config{
+	svc, err := search2.NewService(db.DB(), search2.Config{
 		Logger:         logger,
 		EnableFallback: true,
 	})
 	if err != nil {
-		logger.Debug("v2 search service init failed", "error", err)
+		logger.Debug("search service init failed", "error", err)
 		return nil
 	}
 	return svc
 }
 
-func resolveAliasStore(v2db *suggestdb.DB) *alias.Store {
-	if v2db == nil {
+func resolveAliasStore(db *suggestdb.DB) *alias.Store {
+	if db == nil {
 		return nil
 	}
-	return alias.NewStore(v2db.DB())
+	return alias.NewStore(db.DB())
 }
 
-func resolveFeedbackStore(existing *feedback.Store, v2db *suggestdb.DB, logger *slog.Logger) *feedback.Store {
+func resolveFeedbackStore(existing *feedback.Store, db *suggestdb.DB, logger *slog.Logger) *feedback.Store {
 	if existing != nil {
 		return existing
 	}
-	if v2db == nil {
+	if db == nil {
 		return nil
 	}
-	return feedback.NewStore(v2db.DB(), feedback.DefaultConfig(), logger)
+	return feedback.NewStore(db.DB(), feedback.DefaultConfig(), logger)
 }
 
-func resolveDismissalStore(existing *dismissal.Store, v2db *suggestdb.DB, logger *slog.Logger) *dismissal.Store {
+func resolveDismissalStore(existing *dismissal.Store, db *suggestdb.DB, logger *slog.Logger) *dismissal.Store {
 	if existing != nil {
 		return existing
 	}
-	if v2db == nil {
+	if db == nil {
 		return nil
 	}
-	return dismissal.NewStore(v2db.DB(), dismissal.DefaultConfig(), logger)
+	return dismissal.NewStore(db.DB(), dismissal.DefaultConfig(), logger)
 }
 
-func resolveLearningStore(v2db *suggestdb.DB) *learning.Store {
-	if v2db == nil {
+func resolveLearningStore(db *suggestdb.DB) *learning.Store {
+	if db == nil {
 		return nil
 	}
-	return learning.NewStore(v2db.DB())
+	return learning.NewStore(db.DB())
 }
 
 func resolveLearner(store *learning.Store) *learning.Learner {
@@ -328,19 +300,23 @@ func resolveLearner(store *learning.Store) *learning.Learner {
 	}
 	w := learning.DefaultWeights()
 	l := learning.NewLearner(&w, learning.DefaultConfig(), store)
-	_, _ = l.LoadFromStore(context.Background(), "global")
+	if _, err := l.LoadFromStore(context.Background(), "global"); err != nil {
+		slog.Warn("failed to load learning weights from store, using defaults", "error", err)
+	}
 	return l
 }
 
-func resolveWorkflowMiner(v2db *suggestdb.DB) (*workflow.Miner, time.Duration) {
-	if v2db == nil {
+func resolveWorkflowMiner(db *suggestdb.DB) (*workflow.Miner, time.Duration) {
+	if db == nil {
 		return nil, 0
 	}
 	cfg := workflow.DefaultMinerConfig()
-	return workflow.NewMiner(v2db.DB(), cfg), time.Duration(cfg.MineIntervalMs) * time.Millisecond
+	return workflow.NewMiner(db.DB(), cfg), time.Duration(cfg.MineIntervalMs) * time.Millisecond
 }
 
 // Start starts the gRPC server and listens on the Unix socket.
+//
+//nolint:funlen // Startup orchestration is inherently sequential; splitting fragments the flow.
 func (s *Server) Start(ctx context.Context) error {
 	// Ensure runtime directory exists
 	if err := s.paths.EnsureDirectories(); err != nil {
@@ -361,14 +337,22 @@ func (s *Server) Start(ctx context.Context) error {
 	s.listener = listener
 
 	// Set socket permissions (readable/writable by owner only)
-	if err := os.Chmod(socketPath, 0o600); err != nil {
+	if chmodErr := os.Chmod(socketPath, 0o600); chmodErr != nil {
 		listener.Close()
-		return fmt.Errorf("failed to set socket permissions: %w", err)
+		return fmt.Errorf("failed to set socket permissions: %w", chmodErr)
 	}
 
 	// Create gRPC server
 	s.grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(s.accessLogUnaryInterceptor()))
 	pb.RegisterClaiServiceServer(s.grpcServer, s)
+
+	// Create JSON-RPC listener for clai-wrap phase-2 protocol.
+	jsonListener, err := s.startJSONRPCListener()
+	if err != nil {
+		listener.Close()
+		return err
+	}
+	s.jsonListener = jsonListener
 
 	if s.diagnosticsMux != nil {
 		diagListener, err := net.Listen("tcp", "127.0.0.1:0")
@@ -394,6 +378,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// Write PID file
 	if err := s.writePIDFile(); err != nil {
 		listener.Close()
+		jsonListener.Close()
 		return fmt.Errorf("failed to write PID file: %w", err)
 	}
 
@@ -420,7 +405,7 @@ func (s *Server) Start(ctx context.Context) error {
 		}()
 	}
 
-	// Start V2 batch writer (if configured)
+	// Start batch writer (if configured)
 	if s.batchWriter != nil {
 		s.batchWriter.Start()
 	}
@@ -433,23 +418,23 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	// Serve gRPC requests in a goroutine
-	errChan := make(chan error, 1)
+	errChan := make(chan error, 2)
 	go func() {
 		if err := s.grpcServer.Serve(listener); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 			errChan <- fmt.Errorf("gRPC server error: %w", err)
-		} else {
-			errChan <- nil
 		}
 	}()
+	go s.serveJSONRPC(ctx, jsonListener, errChan)
 
 	// Wait for context cancellation or server error
 	select {
 	case <-ctx.Done():
 		s.Shutdown()
-		// Wait for server to finish
-		<-errChan
+		return nil
+	case <-s.shutdownChan:
 		return nil
 	case err := <-errChan:
+		s.Shutdown()
 		return err
 	}
 }
@@ -479,7 +464,7 @@ func (s *Server) Shutdown() {
 		// Signal shutdown
 		close(s.shutdownChan)
 
-		// Stop V2 batch writer (flushes pending events)
+		// Stop batch writer (flushes pending events)
 		if s.batchWriter != nil {
 			s.batchWriter.Stop()
 		}
@@ -492,8 +477,8 @@ func (s *Server) Shutdown() {
 			cancel()
 		}
 
-		if s.v2SearchSvc != nil {
-			s.v2SearchSvc.Close()
+		if s.searchSvc != nil {
+			s.searchSvc.Close()
 		}
 
 		// Stop gRPC server
@@ -511,6 +496,9 @@ func (s *Server) Shutdown() {
 		if s.diagListener != nil {
 			s.diagListener.Close()
 		}
+		if s.jsonListener != nil {
+			s.jsonListener.Close()
+		}
 
 		// Cleanup PID file and socket
 		s.cleanup()
@@ -522,10 +510,14 @@ func (s *Server) Shutdown() {
 // cleanup removes the socket and PID file.
 func (s *Server) cleanup() {
 	socketPath := s.paths.SocketFile()
+	jsonSocketPath := s.paths.JSONRPCSocketFile()
 	pidPath := s.paths.PIDFile()
 
 	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
 		s.logger.Warn("failed to remove socket", "path", socketPath, "error", err)
+	}
+	if err := os.Remove(jsonSocketPath); err != nil && !os.IsNotExist(err) {
+		s.logger.Warn("failed to remove json-rpc socket", "path", jsonSocketPath, "error", err)
 	}
 
 	if err := os.Remove(pidPath); err != nil && !os.IsNotExist(err) {
@@ -543,15 +535,15 @@ func (s *Server) refreshWorkflowPatternsLoop(ctx context.Context) {
 	defer ticker.Stop()
 
 	load := func() {
-		if s.v2db == nil || s.v2Scorer == nil {
+		if s.db == nil || s.scorer == nil {
 			return
 		}
-		patterns, err := workflow.LoadPromotedPatterns(ctx, s.v2db.DB(), workflow.DefaultMinerConfig().MinOccurrences)
+		patterns, err := workflow.LoadPromotedPatterns(ctx, s.db.DB(), workflow.DefaultMinerConfig().MinOccurrences)
 		if err != nil {
 			s.logger.Warn("failed to refresh workflow patterns", "error", err)
 			return
 		}
-		s.v2Scorer.SetWorkflowPatterns(patterns)
+		s.scorer.SetWorkflowPatterns(patterns)
 	}
 
 	load()
@@ -658,14 +650,67 @@ func (s *Server) pruneCacheLoop(ctx context.Context) {
 	}
 }
 
+const maxCapturedEntryAge = 2 * time.Hour
+
 // pruneCache removes expired cache entries.
 func (s *Server) pruneCache(ctx context.Context) {
-	pruned, err := s.store.PruneExpiredCache(ctx)
+	pruned, err := ops.PruneExpiredCache(ctx, s.db)
 	if err != nil {
 		s.logger.Warn("failed to prune cache", "error", err)
-		return
-	}
-	if pruned > 0 {
+	} else if pruned > 0 {
 		s.logger.Info("pruned expired cache entries", "count", pruned)
 	}
+
+	outputPruned, err := ops.PruneExpiredCommandOutput(ctx, s.db)
+	if err != nil {
+		s.logger.Warn("failed to prune command output", "error", err)
+	} else if outputPruned > 0 {
+		s.logger.Info("pruned expired command output rows", "count", outputPruned)
+	}
+
+	// Prune stale suggest snapshots for crashed/orphaned sessions.
+	nowMs := time.Now().UnixMilli()
+	cutoffMs := nowMs - maxSuggestSnapshotAge.Milliseconds()
+	s.snapshotMu.Lock()
+	for sid := range s.lastSuggestSnapshots {
+		if s.lastSuggestSnapshots[sid].ShownAtMs < cutoffMs {
+			delete(s.lastSuggestSnapshots, sid)
+		}
+	}
+	s.snapshotMu.Unlock()
+
+	// Prune orphaned capturedSize entries (command.start without command.end).
+	capturedCutoff := time.Now().Add(-maxCapturedEntryAge)
+	s.captureMu.Lock()
+	for cid, entry := range s.capturedSize {
+		if entry.createdAt.Before(capturedCutoff) {
+			delete(s.capturedSize, cid)
+		}
+	}
+	s.captureMu.Unlock()
+}
+
+func (s *Server) setCapturedBytes(commandID string, value int64) {
+	s.captureMu.Lock()
+	defer s.captureMu.Unlock()
+	s.capturedSize[commandID] = capturedEntry{size: value, createdAt: time.Now()}
+}
+
+func (s *Server) addCapturedBytes(commandID string, delta int64) {
+	s.captureMu.Lock()
+	defer s.captureMu.Unlock()
+	entry := s.capturedSize[commandID]
+	entry.size += delta
+	if entry.createdAt.IsZero() {
+		entry.createdAt = time.Now()
+	}
+	s.capturedSize[commandID] = entry
+}
+
+func (s *Server) popCapturedBytes(commandID string) int64 {
+	s.captureMu.Lock()
+	defer s.captureMu.Unlock()
+	value := s.capturedSize[commandID].size
+	delete(s.capturedSize, commandID)
+	return value
 }

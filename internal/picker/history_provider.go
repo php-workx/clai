@@ -334,7 +334,7 @@ func (p *HistoryProvider) fetchCompositeGlobalPage(
 	want := globalOffset + req.Limit + 1
 	globalFiltered, globalAtEnd, err := p.fetchGlobalFiltered(ctx, client, req.Query, want, dedupe)
 	if err != nil {
-		return Response{}, err
+		return Response{}, fmt.Errorf("history provider: global fetch: %w", err)
 	}
 
 	out := make([]Item, 0, req.Limit)

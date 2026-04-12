@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-03-08
+
+### Fixed
+- Pin GoReleaser GitHub Action to v2 to match `version: 2` config format
+
 ## [0.4.0] - 2026-03-08
 
 Initial public release of clai — an intelligent terminal assistant that integrates Claude into your shell.

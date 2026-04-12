@@ -147,10 +147,12 @@ func (p *AnthropicProvider) query(ctx context.Context, prompt string) (string, e
 		return claude.QueryFast(ctx, prompt)
 	}
 
-	// Custom model requested — must use direct CLI to pass --model flag
-	args := []string{"--print", "--model", p.model}
+	// Custom model requested — must use direct CLI to pass --model flag.
+	// Use --output-format json to reliably capture text (plain --print can
+	// return empty stdout in some Claude Code versions).
+	args := []string{"--print", "--output-format", "json", "--max-turns", "1", "--model", p.model}
 
-	cmd := exec.CommandContext(ctx, p.cliPath, args...) //nolint:gosec // G204: cliPath is Claude CLI binary
+	cmd := exec.CommandContext(ctx, p.cliPath, args...) //nolint:gosec // G204: cliPath is Claude CLI binary // nosemgrep: dangerous-exec-command
 	cmd.Env = claude.FilterEnv(os.Environ(), "CLAUDECODE")
 	cmd.Stdin = strings.NewReader(prompt)
 
@@ -171,7 +173,7 @@ func (p *AnthropicProvider) query(ctx context.Context, prompt string) (string, e
 		return "", fmt.Errorf("failed to get response from Claude: %w", err)
 	}
 
-	return strings.TrimSpace(stdout.String()), nil
+	return claude.ExtractJSONResult(stdout.String())
 }
 
 // parseCommandResponse parses a response into suggestions

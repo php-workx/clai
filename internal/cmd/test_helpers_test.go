@@ -66,6 +66,12 @@ func captureStdout(t *testing.T, fn func()) string {
 	if err != nil {
 		t.Fatalf("os.Pipe() failed: %v", err)
 	}
+	// Restore os.Stdout and close pipe fds even if fn panics.
+	defer func() {
+		os.Stdout = old
+		_ = w.Close()
+		_ = r.Close()
+	}()
 	os.Stdout = w
 
 	outC := make(chan string)
@@ -79,6 +85,5 @@ func captureStdout(t *testing.T, fn func()) string {
 	_ = w.Close()
 	os.Stdout = old
 	out := <-outC
-	_ = r.Close()
 	return out
 }
